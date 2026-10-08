@@ -69,14 +69,6 @@ wails3 task build      # production build into bin/
 wails3 task test       # Go + frontend unit tests
 ```
 
-## Releases
-
-Push a version tag to build and publish a release; installed apps update from it.
-
-```sh
-git tag v1.2.3 && git push origin v1.2.3
-```
-
 ## License
 
 Apache License 2.0 with the Commons Clause (see `LICENSE` and `NOTICE`): you may use,
