@@ -21,6 +21,7 @@ export type {
 } from "../../bindings/github.com/nekiro/ots-creator/internal/app/models";
 export type { Settings, Recent } from "../../bindings/github.com/nekiro/ots-creator/internal/settings/models";
 export type { OptimizeOptions, OptimizeResult, ConvertResult, PropsPatch } from "../../bindings/github.com/nekiro/ots-creator/internal/project/models";
+export { Format } from "../../bindings/github.com/nekiro/ots-creator/internal/project/models";
 export type { Version, Features } from "../../bindings/github.com/nekiro/ots-creator/internal/client/models";
 export type { FrameDuration, Properties } from "../../bindings/github.com/nekiro/ots-creator/internal/thing/models";
 export { Category, AnimationMode } from "../../bindings/github.com/nekiro/ots-creator/internal/thing/models";
@@ -31,6 +32,13 @@ import {
   type FrameGroup as GoFrameGroup,
   type Thing as GoThing,
 } from "../../bindings/github.com/nekiro/ots-creator/internal/thing/models";
+
+/** Payload of the "app:files-dropped" event (app.FilesDropped). */
+export interface FilesDropped {
+  paths: string[] | null;
+  /** Id of the drop target element. */
+  target: string;
+}
 
 // Go nil slices arrive as null; the UI works on normalized copies.
 export type FrameGroup = Omit<GoFrameGroup, "sprites" | "durations"> & { sprites: number[]; durations: FrameDuration[] };

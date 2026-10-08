@@ -1,11 +1,13 @@
 // User actions shared by the menu bar, toolbar, context menus and shortcuts.
 import {
   CATEGORY_NAMES,
+  Format,
   DialogService,
   ProjectService,
   SpriteService,
   ThingService,
   WindowService,
+  encodeBytes,
   errorMessage,
   type PropsPatch,
   type Recent,
@@ -19,7 +21,13 @@ import { app, applyDraft, revertDraft, run, select, toast } from "./state.svelte
 const OBD = [{ name: "Object Builder Data (*.obd)", pattern: "*.obd" }];
 const IMAGES = [{ name: "Images (*.png, *.bmp, *.gif, *.jpg)", pattern: "*.png;*.bmp;*.gif;*.jpg;*.jpeg" }];
 const IMAGE_EXT = /\.(png|bmp|gif|jpe?g)$/i;
-const CLIENT_EXT = /\.(dat|spr|otfi)$/i;
+/** Id of the preview's file drop target: images dropped there are sheets. */
+export const PREVIEW_DROP = "preview-drop";
+/** Ids of object list cells as file drop targets: an image dropped on an
+ * object is a sheet for that object. */
+export const thingDropId = (id: number) => `thing-drop-${id}`;
+const THING_DROP = /^thing-drop-(\d+)$/;
+const CLIENT_EXT = /(\.(dat|spr|otfi)|catalog-content\.json)$/i;
 const HAS_EXT = /\.[^\\/]+$/;
 
 /** Save dialog filters with the preferred format first. */
@@ -55,6 +63,48 @@ async function confirmLeave(title: string, ok: string): Promise<boolean> {
   return ask({ title, message: "The client has uncompiled changes. Continue anyway?", ok });
 }
 
+async function importSheetWith(load: (id: number) => Promise<void>): Promise<void> {
+  if (!guard() || app.focused === null) return;
+  if (app.dirty) {
+    await applyDraft();
+    if (app.dirty) return; // the edit was rejected
+  }
+  const id = app.focused;
+  const ok = await run("Importing", async () => {
+    await load(id);
+    return true;
+  });
+  if (ok) toast("Sprite sheet imported.", "success");
+}
+
+/** Text put on the system clipboard by Copy object, so a later paste does
+ * not pick up an image copied before it. */
+const OBJECT_CLIP = "OTS Creator object";
+
+/**
+ * Paste (Ctrl+V outside text fields): an image on the clipboard (copied
+ * image or PNG file) becomes a sprite sheet of the focused object, like a
+ * drop on the preview; otherwise the copied object is pasted.
+ */
+export function handlePaste(e: ClipboardEvent, group: number): void {
+  if (app.dialog || (e.target as HTMLElement).closest?.("input, textarea, select")) return;
+  const data = e.clipboardData;
+  const image = [...(data?.files ?? [])].find((f) => f.type.startsWith("image/"));
+  e.preventDefault();
+  if (image && data?.getData("text/plain") !== OBJECT_CLIP && app.open && app.focused !== null) {
+    void image.arrayBuffer().then(
+      (b) => commands.pasteSheet(new Uint8Array(b), group),
+      (err) => toast(errorMessage(err), "error"),
+    );
+    return;
+  }
+  if (image && data?.getData("text/plain") !== OBJECT_CLIP && app.open) {
+    toast("Select an object to paste the sprite sheet into.");
+    return;
+  }
+  commands.paste("object").catch((err) => toast(errorMessage(err), "error"));
+}
+
 export const commands = {
   open: (path = "") => {
     app.openPath = path;
@@ -86,7 +136,13 @@ export const commands = {
   async openRecent(r: Recent) {
     if (app.open && !(await confirmLeave("Open client", "Open"))) return;
     const st = await run("Loading client", () =>
-      ProjectService.Open({ datPath: r.datPath, sprPath: r.sprPath, version: r.version, features: r.features }),
+      ProjectService.Open({
+        format: r.format === Format.FormatAssets ? Format.FormatAssets : Format.FormatDat,
+        datPath: r.datPath,
+        sprPath: r.sprPath,
+        version: r.version,
+        features: r.features,
+      }),
     );
     if (st?.open) toast(`Loaded ${r.version.name}.`, "success");
   },
@@ -181,14 +237,22 @@ export const commands = {
   },
 
   async importSheet(group = 0) {
-    if (!guard() || app.focused === null || !(await confirmDiscard())) return;
+    if (!guard() || app.focused === null) return;
     const paths = await DialogService.OpenFiles("Import sprite sheet", IMAGES, false);
-    if (!paths?.length) return;
-    const ok = await run("Importing", async () => {
-      await ThingService.ImportSheet(app.category, app.focused!, group, paths[0]);
-      return true;
-    });
-    if (ok) toast("Sprite sheet imported.", "success");
+    if (paths?.length) await commands.loadSheet(paths[0], group);
+  },
+
+  /** Puts a sheet image into the focused object. A sheet with the size of
+   * the group's layout (the edited one: unapplied changes are applied
+   * first, like ObjectBuilder) fills it; any other sheet sets the layout
+   * from the image. */
+  async loadSheet(path: string, group = 0) {
+    await importSheetWith((id) => ThingService.ImportSheet(app.category, id, group, path));
+  },
+
+  /** loadSheet for image bytes from the clipboard. */
+  async pasteSheet(data: Uint8Array, group = 0) {
+    await importSheetWith((id) => ThingService.PasteSheet(app.category, id, group, encodeBytes(data)));
   },
 
   async importSprites() {
@@ -233,6 +297,8 @@ export const commands = {
   copyObject() {
     if (!app.draft) return;
     copyThing(snapshot(app.draft));
+    // Replaces an image on the system clipboard (see handlePaste).
+    navigator.clipboard?.writeText(OBJECT_CLIP).catch(() => {});
     toast(`Copied ${CATEGORY_NAMES[app.draft.category]} #${app.draft.id}.`);
   },
 
@@ -283,8 +349,30 @@ export const commands = {
   },
 
   /** Handles files dropped onto the window. */
-  async drop(paths: string[]) {
+  /**
+   * Files dropped on the window. target is the id of the drop target
+   * element: one image dropped on the preview or on an object of the list
+   * is a sprite sheet for that object (group: the preview's frame group).
+   */
+  async drop(paths: string[], target = "", group = 0) {
     if (app.dialog || !paths.length) return;
+    const sheet = app.open && paths.length === 1 && IMAGE_EXT.test(paths[0]) ? paths[0] : null;
+    if (sheet && target === PREVIEW_DROP && app.focused !== null) {
+      await commands.loadSheet(sheet, group);
+      return;
+    }
+    const onThing = THING_DROP.exec(target);
+    if (sheet && onThing) {
+      // Keep unapplied edits of the current object, then switch to the target.
+      if (app.dirty) {
+        await applyDraft();
+        if (app.dirty) return;
+      }
+      const id = Number(onThing[1]);
+      await select(id);
+      if (app.focused === id) await commands.loadSheet(sheet, 0);
+      return;
+    }
     const obd = paths.filter((p) => /\.obd$/i.test(p));
     const images = paths.filter((p) => IMAGE_EXT.test(p));
     const client = paths.find((p) => CLIENT_EXT.test(p) || !HAS_EXT.test(p));
@@ -308,7 +396,7 @@ export const commands = {
       if (app.open && !(await confirmLeave("Open client", "Open"))) return;
       commands.open(client);
     } else {
-      toast("Drop a client folder, a .dat, .obd or image files.");
+      toast("Drop a client folder, a .dat, an assets folder, .obd or image files.");
     }
   },
 
@@ -343,5 +431,5 @@ export function handleShortcut(e: KeyboardEvent): void {
   if (mod && key === "e") return run(() => commands.exportObd());
   if (mod && key === "c") return run(commands.copyObject);
   if (mod && e.shiftKey && key === "v") return run(() => commands.paste("properties"));
-  if (mod && key === "v") return run(() => commands.paste("object"));
+  // Plain Ctrl+V arrives as a paste event (handlePaste) with the clipboard.
 }

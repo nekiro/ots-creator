@@ -310,10 +310,17 @@ func (g *FrameGroup) Validate() error {
 
 // Thing is one client object.
 type Thing struct {
-	ID          uint32        `json:"id"`
-	Category    Category      `json:"category"`
+	ID       uint32   `json:"id"`
+	Category Category `json:"category"`
+	// Name and Description are only stored by asset (protobuf) clients.
+	Name        string        `json:"name"`
+	Description string        `json:"description"`
 	Props       Properties    `json:"props"`
 	FrameGroups []*FrameGroup `json:"frameGroups"`
+	// Extra is format specific data a codec keeps to write the thing back
+	// (for example protobuf fields the model does not know). It is
+	// immutable and shared between clones.
+	Extra any `json:"-"`
 }
 
 // New returns an empty thing with one default frame group. Outfits get four
@@ -374,4 +381,31 @@ func (t *Thing) Validate() error {
 		}
 	}
 	return nil
+}
+
+// Stacked returns every frame of a thing in one group: the idle frames
+// followed by the walking frames, as in a sprite sheet of the whole outfit.
+// A thing with one group returns a copy of it; ok is false when the groups
+// have different layouts.
+func (t *Thing) Stacked() (g *FrameGroup, ok bool) {
+	if len(t.FrameGroups) == 0 {
+		return nil, false
+	}
+	g = t.FrameGroups[0].Clone()
+	if len(t.FrameGroups) == 1 {
+		return g, true
+	}
+	w := t.FrameGroups[1]
+	if w.Width != g.Width || w.Height != g.Height || w.Layers != g.Layers || w.PatternX != g.PatternX ||
+		w.PatternY != g.PatternY || w.PatternZ != g.PatternZ || int(g.Frames)+int(w.Frames) > 255 {
+		return nil, false
+	}
+	g.Frames += w.Frames
+	g.Sprites = append(g.Sprites, w.Sprites...)
+	g.Durations = append(g.Durations, w.Durations...)
+	if len(g.Durations) != int(g.Frames) {
+		g.Durations = nil
+		g.EnsureDurations(t.Category.DefaultDuration())
+	}
+	return g, true
 }

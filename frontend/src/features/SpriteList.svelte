@@ -1,6 +1,6 @@
 <script lang="ts">
   import { openContextMenu } from "../lib/menu.svelte";
-  import { spriteMenu } from "../lib/menus";
+  import { spriteListMenu, spriteMenu } from "../lib/menus";
   import { res } from "../lib/api";
   import { commands } from "../lib/commands";
   import { app, versions } from "../lib/state.svelte";
@@ -79,7 +79,8 @@
     </div>
     <input class="t-input grow" placeholder="Sprite id… (Enter)" bind:value={jump} onkeydown={onJump} inputmode="numeric" />
   </div>
-  <div class="list t-panel">
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="list t-panel" oncontextmenu={(e) => !(e.target as HTMLElement).closest(".spr") && openContextMenu(e, spriteListMenu())}>
     {#if app.open && count > 0}
       <VirtualGrid {count} cellWidth={36} cellHeight={48} gap={2} scrollTo={focusIndex} {onkeydown}>
         {#snippet cell(i)}

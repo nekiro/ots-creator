@@ -3,6 +3,7 @@ package project
 import (
 	"bytes"
 	"errors"
+	"image"
 	"os"
 	"path/filepath"
 	"testing"
@@ -321,11 +322,11 @@ func TestWarnings(t *testing.T) {
 	it.Props.IsMarket = true
 	p.UpdateThing(it)
 	v, _ := client.FindBySignatures(0x4C28B721, 0x4C220594) // 8.60
-	if w := p.Warnings(v); len(w) != 0 {
+	if w := p.Warnings(FormatDat, v); len(w) != 0 {
 		t.Fatalf("8.60 supports market: %v", w)
 	}
 	v = client.FindByValue(854)[0]
-	if w := p.Warnings(v); len(w) != 1 {
+	if w := p.Warnings(FormatDat, v); len(w) != 1 {
 		t.Fatalf("8.54 warnings %v", w)
 	}
 }
@@ -390,5 +391,39 @@ func TestNewClientStaysChangedAfterUndo(t *testing.T) {
 	p.Undo()
 	if !p.Info().Changed {
 		t.Fatal("a client never written to disk is always changed")
+	}
+}
+
+func TestImportSheetInfersOutfit(t *testing.T) {
+	// 4 directions x 9 frames of 64 px: idle + 8 walking frames.
+	img := image.NewNRGBA(image.Rect(0, 0, 256, 576))
+	for i := 3; i < len(img.Pix); i += 4 {
+		img.Pix[i-3], img.Pix[i] = byte(i/1024), 255
+	}
+	p := New(v1098(), client.Features{})
+	if err := p.ImportSheet(thing.CategoryOutfit, 1, img); err != nil {
+		t.Fatal(err)
+	}
+	o, _ := p.Thing(thing.CategoryOutfit, 1)
+	if len(o.FrameGroups) != 2 || o.FrameGroups[0].Frames != 1 || o.FrameGroups[1].Frames != 8 {
+		t.Fatalf("groups %d", len(o.FrameGroups))
+	}
+	for _, g := range o.FrameGroups {
+		if g.Width != 2 || g.Height != 2 || g.PatternX != 4 || g.Validate() != nil {
+			t.Fatalf("group %+v", g)
+		}
+	}
+	p.Undo()
+	if o, _ := p.Thing(thing.CategoryOutfit, 1); o.FrameGroups[0].Width != 1 {
+		t.Fatal("one undo step restores the outfit")
+	}
+
+	// Without frame groups every frame stays in one group.
+	old := New(client.FindByValue(860)[0], client.Features{})
+	if err := old.ImportSheet(thing.CategoryOutfit, 1, img); err != nil {
+		t.Fatal(err)
+	}
+	if o, _ := old.Thing(thing.CategoryOutfit, 1); len(o.FrameGroups) != 1 || o.FrameGroups[0].Frames != 9 {
+		t.Fatal("8.60 outfit")
 	}
 }

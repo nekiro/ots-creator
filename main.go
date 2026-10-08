@@ -97,7 +97,11 @@ func main() {
 
 	// Dropped files are handled by the frontend (open, import OBD/images).
 	mainWindow.OnWindowEvent(events.Common.WindowFilesDropped, func(e *application.WindowEvent) {
-		emit(app.EventFilesDropped, e.Context().DroppedFiles())
+		target := ""
+		if d := e.Context().DropTargetDetails(); d != nil {
+			target = d.ElementID
+		}
+		emit(app.EventFilesDropped, app.FilesDropped{Paths: e.Context().DroppedFiles(), Target: target})
 	})
 
 	// Open a client passed on the command line (file association, dev runs).

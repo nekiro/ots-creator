@@ -53,6 +53,11 @@ body,
   overflow: hidden;
 }
 
+/* Wails: never show the webview's own context menu. */
+html {
+  --default-contextmenu: hide;
+}
+
 /* A transparent composited layer makes Chromium use grayscale text
    antialiasing instead of ClearType, so pixel fonts get no color fringes. */
 #app {

@@ -27,6 +27,13 @@ func (ss *SettingsService) Update(s settings.Settings) error { return ss.st.Upda
 // RemoveRecent forgets one recent client; "" clears the list.
 func (ss *SettingsService) RemoveRecent(datPath string) error { return ss.st.RemoveRecent(datPath) }
 
+func assetsFormat(f project.Format) string {
+	if f == project.FormatAssets {
+		return string(f)
+	}
+	return ""
+}
+
 func (ss *SettingsService) remember(info project.Info) {
-	_ = ss.st.AddRecent(settings.Recent{DatPath: info.DatPath, SprPath: info.SprPath, Version: info.Version, Features: info.Features})
+	_ = ss.st.AddRecent(settings.Recent{Format: assetsFormat(info.Format), DatPath: info.DatPath, SprPath: info.SprPath, Version: info.Version, Features: info.Features})
 }

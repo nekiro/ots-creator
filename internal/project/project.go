@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/nekiro/ots-creator/internal/assets"
 	"github.com/nekiro/ots-creator/internal/client"
 	"github.com/nekiro/ots-creator/internal/dat"
 	"github.com/nekiro/ots-creator/internal/spr"
@@ -22,6 +23,7 @@ var ErrUnknownVersion = errors.New("unknown client version")
 
 // Info describes the loaded client.
 type Info struct {
+	Format      Format          `json:"format"`
 	Version     client.Version  `json:"version"`
 	Features    client.Features `json:"features"`
 	DatPath     string          `json:"datPath"`
@@ -49,15 +51,18 @@ type Project struct {
 	mu       sync.RWMutex
 	version  client.Version
 	features client.Features
-	datPath  string
-	sprPath  string
-	things   *dat.File
-	sprites  *spriteStore
-	history  history
+	format   Format
+	// datPath is the asset folder for FormatAssets.
+	datPath string
+	sprPath string
+	things  *dat.File
+	sprites *spriteStore
+	history history
 	// unsaved is set for a client that was never written to disk; edits
 	// are tracked by the history instead.
 	unsaved bool
 	delta   deltaSet
+	assets  *assetState // FormatAssets only
 }
 
 // OpenOptions control how a client is opened.
@@ -108,10 +113,11 @@ func Open(o OpenOptions) (*Project, error) {
 	return &Project{
 		version:  v,
 		features: f,
+		format:   FormatDat,
 		datPath:  o.DatPath,
 		sprPath:  o.SprPath,
 		things:   things,
-		sprites:  newSpriteStore(sf, f.SpriteSize, f.Transparency),
+		sprites:  newSpriteStore(sprFile(sf), f.SpriteSize, f.Transparency),
 	}, nil
 }
 
@@ -126,6 +132,7 @@ func New(v client.Version, f client.Features) *Project {
 	return &Project{
 		version:  v,
 		features: f,
+		format:   FormatDat,
 		things:   things,
 		sprites:  newSpriteStore(nil, f.SpriteSize, f.Transparency),
 		unsaved:  true,
@@ -144,7 +151,12 @@ func (p *Project) Info() Info {
 }
 
 func (p *Project) infoLocked() Info {
+	label, supported := dat.Table(client.MetadataFormat(p.version.Value)).Name(), dat.Table(client.MetadataFormat(p.version.Value)).Supported()
+	if p.format == FormatAssets {
+		label, supported = "Protobuf appearances", assets.Supported()
+	}
 	return Info{
+		Format:   p.format,
 		Version:  p.version,
 		Features: p.features,
 		DatPath:  p.datPath,
@@ -159,8 +171,8 @@ func (p *Project) infoLocked() Info {
 		Changed:     p.unsaved || !p.history.atClean(),
 		CanUndo:     p.history.canUndo(),
 		CanRedo:     p.history.canRedo(),
-		FormatLabel: dat.Table(client.MetadataFormat(p.version.Value)).Name(),
-		Supported:   dat.Table(client.MetadataFormat(p.version.Value)).Supported(),
+		FormatLabel: label,
+		Supported:   supported,
 	}
 }
 
@@ -169,6 +181,9 @@ func (p *Project) SpriteSize() int { return p.features.SpriteSize }
 
 // CompileOptions select the output of Compile.
 type CompileOptions struct {
+	// Format is the output format; empty means FormatDat. For FormatAssets
+	// DatPath is the output folder and the other fields are ignored.
+	Format   Format
 	DatPath  string
 	SprPath  string
 	Version  client.Version
@@ -184,6 +199,13 @@ type CompileOptions struct {
 func (p *Project) Compile(o CompileOptions) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if o.Format == FormatAssets {
+		if err := p.compileAssets(o.DatPath); err != nil {
+			return err
+		}
+		p.saved()
+		return nil
+	}
 	f := o.Features
 	f.ApplyVersionDefaults(o.Version.Value)
 	if f.SpriteSize != p.features.SpriteSize {
@@ -220,22 +242,31 @@ func (p *Project) Compile(o CompileOptions) error {
 	if err != nil {
 		return fmt.Errorf("reopen compiled spr: %w", err)
 	}
-	p.sprites = newSpriteStore(sf, f.SpriteSize, f.Transparency)
+	p.sprites = newSpriteStore(sprFile(sf), f.SpriteSize, f.Transparency)
+	p.format, p.assets = FormatDat, nil
 	p.version, p.features = o.Version, f
 	p.datPath, p.sprPath = o.DatPath, o.SprPath
 	p.things.Signature = o.Version.DatSignature
+	p.saved()
+	return nil
+}
+
+// saved resets change tracking after the files were written.
+func (p *Project) saved() {
 	p.unsaved = false
 	p.history.clear()
 	// Version and features (transparency) can change how sprites decode.
 	p.delta.everything()
-	return nil
 }
 
 // Warnings lists things whose properties would be lost when compiling to
-// the given version.
-func (p *Project) Warnings(v client.Version) []string {
+// the given format and version.
+func (p *Project) Warnings(format Format, v client.Version) []string {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
+	if format == FormatAssets {
+		return p.assetWarnings()
+	}
 	table := dat.Table(client.MetadataFormat(v.Value))
 	var out []string
 	for _, c := range thing.Categories {

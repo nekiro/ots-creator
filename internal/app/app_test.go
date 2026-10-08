@@ -168,6 +168,14 @@ func TestEndToEnd(t *testing.T) {
 	if err := ts.ImportSheet(thing.CategoryItem, 101, 0, sheet); err != nil {
 		t.Fatal(err)
 	}
+	// The same sheet from the clipboard; garbage is an error.
+	data, _ := os.ReadFile(sheet)
+	if err := ts.PasteSheet(thing.CategoryItem, 101, 0, data); err != nil {
+		t.Fatal(err)
+	}
+	if err := ts.PasteSheet(thing.CategoryItem, 101, 0, []byte("text")); err == nil {
+		t.Fatal("pasting text must fail")
+	}
 
 	// Compile, then reopen via Inspect.
 	datPath, sprPath := filepath.Join(dir, "Tibia.dat"), filepath.Join(dir, "Tibia.spr")
@@ -218,5 +226,33 @@ func TestUndoRedoService(t *testing.T) {
 	}
 	if label, _ := ps.Redo(); label != "" {
 		t.Fatal("nothing to redo")
+	}
+}
+
+func TestWholeOutfitSheet(t *testing.T) {
+	_, ps, ts, _, _ := newEnv(t)
+	ps.New(v1098(), client.Features{})
+	dir := t.TempDir()
+	// 4 directions x 9 frames of 64 px: idle + 8 walking frames.
+	src := filepath.Join(dir, "outfit.png")
+	writePNG(t, src, 256, 576, [4]byte{90, 40, 20, 255})
+	if err := ts.ImportSheet(thing.CategoryOutfit, 1, 0, src); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(dir, "all.png")
+	if err := ts.ExportSheet(thing.CategoryOutfit, 1, AllGroups, out, false); err != nil {
+		t.Fatal(err)
+	}
+	img, err := imaging.Load(out)
+	if err != nil || img.Rect.Dx() != 256 || img.Rect.Dy() != 576 {
+		t.Fatalf("whole sheet %v %v", img.Rect, err)
+	}
+	// Importing it back keeps the idle/walking split.
+	if err := ts.ImportSheet(thing.CategoryOutfit, 1, 0, out); err != nil {
+		t.Fatal(err)
+	}
+	o, _ := ts.Get(thing.CategoryOutfit, 1)
+	if len(o.FrameGroups) != 2 || o.FrameGroups[0].Frames != 1 || o.FrameGroups[1].Frames != 8 {
+		t.Fatalf("groups after round trip: %d", len(o.FrameGroups))
 	}
 }

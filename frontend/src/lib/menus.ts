@@ -68,6 +68,19 @@ export function objectMenu(context = false): MenuEntry[] {
   ];
 }
 
+/** Context menu of the empty area of the object list. */
+export function objectListMenu(): MenuEntry[] {
+  return [
+    { label: "New object", action: commands.newThing, disabled: noProject },
+    { label: "Import objects (OBD)…", keys: "Ctrl+I", action: () => commands.importObd(), disabled: noProject },
+  ];
+}
+
+/** Context menu of the empty area of the sprite list. */
+export function spriteListMenu(): MenuEntry[] {
+  return [{ label: "Import images…", action: commands.importSprites, disabled: noProject }];
+}
+
 export function spriteMenu(context = false): MenuEntry[] {
   return [
     ...(context ? [] : [{ label: "Import images…", action: commands.importSprites, disabled: noProject }]),

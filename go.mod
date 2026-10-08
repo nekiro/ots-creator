@@ -6,6 +6,7 @@ require (
 	github.com/ulikunitz/xz v0.5.15
 	github.com/wailsapp/wails/v3 v3.0.0-beta.28
 	golang.org/x/image v0.46.0
+	google.golang.org/protobuf v1.36.12
 )
 
 require (

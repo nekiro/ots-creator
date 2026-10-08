@@ -27,6 +27,9 @@ const (
 
 // Recent is a client that was opened or compiled.
 type Recent struct {
+	// Format is "assets" for a Tibia 12+ asset folder (DatPath is the
+	// folder); empty for dat/spr.
+	Format   string          `json:"format,omitempty"`
 	DatPath  string          `json:"datPath"`
 	SprPath  string          `json:"sprPath"`
 	Version  client.Version  `json:"version"`

@@ -3,7 +3,7 @@
   // and the animated list thumbnails. Pixels come from `get`; bump `ready`
   // when more sprites have loaded.
   import { Category, type Thing } from "../api";
-  import { Animator } from "../render/animator";
+  import { Animator, previewDurations } from "../render/animator";
   import { compose, type PixelSource } from "../render/compose";
   import { contentBox, union, type Box } from "../render/bounds";
   import { DEFAULT_COLORS } from "../render/outfit";
@@ -62,7 +62,7 @@
       frame = 0;
       return;
     }
-    const d = g.durations.length === g.frames ? g.durations : Array.from({ length: g.frames }, () => ({ min: 100, max: 100 }));
+    const d = previewDurations(g, isOutfit);
     let animator: Animator;
     try {
       animator = new Animator(Number(g.mode), 0, Math.min(Math.max(g.startFrame, 0), g.frames - 1), d, performance.now());

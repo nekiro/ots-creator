@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"image"
@@ -38,6 +39,15 @@ func (ts *ThingService) Find(c thing.Category, f project.Filter) ([]uint32, erro
 		return nil, err
 	}
 	return p.FindThings(c, f)
+}
+
+// Names returns the names of the named things of a category, by id.
+func (ts *ThingService) Names(c thing.Category) (map[uint32]string, error) {
+	p, err := ts.s.Project()
+	if err != nil {
+		return nil, err
+	}
+	return p.Names(c), nil
 }
 
 // Update replaces a thing.
@@ -156,9 +166,9 @@ func (ts *ThingService) ExportOBD(c thing.Category, ids []uint32, dir string) ([
 	return written, nil
 }
 
-// ExportSheet writes the sprite sheet of one frame group. The format
-// follows the file extension (png, bmp or jpg); formats without alpha get
-// a magenta background.
+// ExportSheet writes the sprite sheet of one frame group, or of the whole
+// thing with AllGroups. The format follows the file extension (png, bmp or
+// jpg); formats without alpha get a magenta background.
 func (ts *ThingService) ExportSheet(c thing.Category, id uint32, group int, path string, transparent bool) error {
 	p, err := ts.s.Project()
 	if err != nil {
@@ -177,15 +187,27 @@ func (ts *ThingService) ExportSheet(c thing.Category, id uint32, group int, path
 
 // renderSheet draws the sprite sheet of one frame group on magenta (like
 // ObjectBuilder) or a transparent background.
+// AllGroups selects every frame group of a thing in one sheet (idle frames
+// then walking frames).
+const AllGroups = -1
+
 func renderSheet(p *project.Project, c thing.Category, id uint32, group int, transparent bool) (*image.NRGBA, error) {
 	t, err := p.Thing(c, id)
 	if err != nil {
 		return nil, err
 	}
-	if group < 0 || group >= len(t.FrameGroups) {
+	var g *thing.FrameGroup
+	switch {
+	case group == AllGroups:
+		var ok bool
+		if g, ok = t.Stacked(); !ok {
+			return nil, errors.New("idle and walking groups have different layouts; export them one by one")
+		}
+	case group < 0 || group >= len(t.FrameGroups):
 		return nil, fmt.Errorf("no frame group %d", group)
+	default:
+		g = t.FrameGroups[group]
 	}
-	g := t.FrameGroups[group]
 	bg := imaging.Magenta
 	if transparent {
 		bg = color.NRGBA{}
@@ -205,8 +227,28 @@ func renderSheet(p *project.Project, c thing.Category, id uint32, group int, tra
 	return img, firstErr
 }
 
-// ImportSheet replaces the sprites of one frame group from a sheet image.
+// ImportSheet loads a sheet image into a thing. A sheet with the size of
+// the given frame group replaces that group's sprites; any other sheet
+// sets the layout from the image (see project.ImportSheet).
 func (ts *ThingService) ImportSheet(c thing.Category, id uint32, group int, path string) error {
+	img, err := imaging.Load(path)
+	if err != nil {
+		return err
+	}
+	return ts.importSheet(c, id, group, img)
+}
+
+// PasteSheet is ImportSheet for an image from the clipboard (PNG, BMP,
+// GIF or JPEG bytes).
+func (ts *ThingService) PasteSheet(c thing.Category, id uint32, group int, data []byte) error {
+	img, err := imaging.Decode(bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("clipboard image: %w", err)
+	}
+	return ts.importSheet(c, id, group, img)
+}
+
+func (ts *ThingService) importSheet(c thing.Category, id uint32, group int, img *image.NRGBA) error {
 	p, err := ts.s.Project()
 	if err != nil {
 		return err
@@ -218,15 +260,16 @@ func (ts *ThingService) ImportSheet(c thing.Category, id uint32, group int, path
 	if group < 0 || group >= len(t.FrameGroups) {
 		return fmt.Errorf("no frame group %d", group)
 	}
-	img, err := imaging.Load(path)
-	if err != nil {
-		return err
+	if w, h := t.FrameGroups[group].SheetSize(p.SpriteSize()); w == img.Rect.Dx() && h == img.Rect.Dy() {
+		pixels, err := imaging.SliceSheet(img, t.FrameGroups[group], p.SpriteSize())
+		if err != nil {
+			return err
+		}
+		err = p.SetGroupPixels(c, id, group, pixels)
+	} else {
+		err = p.ImportSheet(c, id, img)
 	}
-	pixels, err := imaging.SliceSheet(img, t.FrameGroups[group], p.SpriteSize())
 	if err != nil {
-		return err
-	}
-	if err := p.SetGroupPixels(c, id, group, pixels); err != nil {
 		return err
 	}
 	ts.s.Changed()

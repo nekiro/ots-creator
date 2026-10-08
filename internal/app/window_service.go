@@ -7,8 +7,15 @@ import "sync/atomic"
 // and calls WindowService.Quit to close anyway.
 const EventCloseRequested = "app:close-requested"
 
-// EventFilesDropped carries the paths of files dropped onto the window.
+// EventFilesDropped carries a FilesDropped for files dropped onto the window.
 const EventFilesDropped = "app:files-dropped"
+
+// FilesDropped lists dropped files and the id of the drop target element
+// (the closest element with data-file-drop-target).
+type FilesDropped struct {
+	Paths  []string `json:"paths"`
+	Target string   `json:"target"`
+}
 
 // WindowService guards the main window against closing with unsaved work.
 type WindowService struct {

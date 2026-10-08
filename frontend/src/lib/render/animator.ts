@@ -142,3 +142,19 @@ export class Animator {
     return next;
   }
 }
+
+/** Frame time of a walking outfit in previews: a normal walk, two steps per
+ * cycle of eight frames. */
+export const WALK_FRAME_MS = 100;
+
+/**
+ * Frame durations used to preview a frame group. The client paces outfit
+ * walking by the creature's speed and ignores the stored durations (the
+ * official files hold a 300 ms placeholder), so walking groups play at
+ * WALK_FRAME_MS; groups without durations use 100 ms.
+ */
+export function previewDurations(g: { frames: number; durations: Duration[] | null; type: number }, outfit: boolean): Duration[] {
+  if (outfit && g.type === 1) return Array.from({ length: g.frames }, () => ({ min: WALK_FRAME_MS, max: WALK_FRAME_MS }));
+  if (g.durations?.length === g.frames) return g.durations;
+  return Array.from({ length: g.frames }, () => ({ min: 100, max: 100 }));
+}

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CATEGORY_NAMES, Category, type FrameGroup } from "../lib/api";
+  import { CATEGORY_NAMES, Category, Format, type FrameGroup } from "../lib/api";
   import { clampField, FLAG_GROUPS, flagVisible, getPath, setPath, type Field } from "../lib/flags";
   import { resizeSprites, type Layout } from "../lib/render/layout";
   import { app, applyDraft, revertDraft } from "../lib/state.svelte";
@@ -85,6 +85,10 @@
   }
 
   const isOutfit = $derived(t?.category === Category.CategoryOutfit);
+  // Asset sprites are at most 64x64 pixels.
+  // Only asset clients store names and descriptions.
+  const hasTexts = $derived(app.project?.info.format === Format.FormatAssets);
+  const maxTiles = $derived(app.project?.info.format === Format.FormatAssets ? 2 : 8);
   const outfitGroups = $derived(isOutfit && !!app.project?.info.features.frameGroups);
 </script>
 
@@ -94,11 +98,18 @@
   {/snippet}
   {#if t && g}
     <div class="scroll">
+      {#if hasTexts}
+        <section>
+          <h4>Object</h4>
+          <label class="text"><span class="t-label">Name</span><input class="t-input" bind:value={t.name} spellcheck="false" /></label>
+          <label class="text"><span class="t-label">Description</span><textarea class="t-input" rows="2" bind:value={t.description} spellcheck="false"></textarea></label>
+        </section>
+      {/if}
       <section>
         <h4>Texture{#if t.frameGroups.length > 1}&nbsp;· {group === 0 ? "Idle" : "Walking"}{/if}</h4>
         <div class="grid">
-          <NumberField label="Width" value={g.width} min={1} max={8} onchange={(v) => setLayout("width", v)} width={44} />
-          <NumberField label="Height" value={g.height} min={1} max={8} onchange={(v) => setLayout("height", v)} width={44} />
+          <NumberField label="Width" value={g.width} min={1} max={maxTiles} onchange={(v) => setLayout("width", v)} width={44} />
+          <NumberField label="Height" value={g.height} min={1} max={maxTiles} onchange={(v) => setLayout("height", v)} width={44} />
           <NumberField label="Exact size" value={g.exactSize} min={1} max={255} onchange={(v) => setLayout("exactSize", v)} width={44} />
           <NumberField label="Layers" value={g.layers} min={1} max={8} onchange={(v) => setLayout("layers", v)} width={44} />
           <NumberField label="Pattern X" value={g.patternX} min={1} max={255} onchange={(v) => setLayout("patternX", v)} width={44} />
@@ -226,6 +237,22 @@
   }
   section {
     margin-bottom: 10px;
+  }
+  .text {
+    display: grid;
+    grid-template-columns: 62px 1fr;
+    align-items: start;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+  .text .t-label {
+    padding-top: 3px;
+    text-align: right;
+  }
+  textarea {
+    resize: vertical;
+    min-height: 34px;
+    font: inherit;
   }
   h4 {
     margin: 4px 0 6px;

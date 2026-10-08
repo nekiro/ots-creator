@@ -15,7 +15,7 @@
   const size = app.project?.info.features.spriteSize ?? 32;
 
   let thing = $state<Thing | null>(null);
-  let group = $state(app.sheetGroup);
+  const group = app.sheetGroup;
   let format = $state(prefs.settings.exportFormat);
   let transparent = $state(prefs.settings.sheetBackground === "transparent");
   let zoom = $state(0); // 0 = fit
@@ -31,9 +31,23 @@
     ThingService.Get(category, id).then((t) => (thing = t ? normalizeThing(t) : null));
   });
 
-  const g = $derived(thing?.frameGroups[Math.min(group, thing.frameGroups.length - 1)] ?? null);
+  // ALL_GROUPS: idle and walking frames in one sheet (needs one layout).
+  const ALL_GROUPS = -1;
+  const groups = $derived(thing?.frameGroups ?? []);
+  const sameLayout = $derived(
+    groups.length === 2 &&
+      (["width", "height", "layers", "patternX", "patternY", "patternZ"] as const).every((k) => groups[0][k] === groups[1][k]),
+  );
+  // The whole outfit by default; one group when the layouts differ.
+  let picked = $state<number | null>(null);
+  const effective = $derived(picked ?? (groups.length > 1 ? (sameLayout ? ALL_GROUPS : group) : 0));
+  const g = $derived.by(() => {
+    if (!thing) return null;
+    if (effective !== ALL_GROUPS) return groups[Math.min(effective, groups.length - 1)] ?? null;
+    return { ...groups[0], frames: groups[0].frames + groups[1].frames, sprites: [...groups[0].sprites, ...groups[1].sprites] };
+  });
   const bg = $derived(transparent && format === "png");
-  const url = $derived(res.sheet(category, id, group, bg, versions.thing(category, id)));
+  const url = $derived(res.sheet(category, id, effective, bg, versions.thing(category, id)));
   const columns = $derived(g ? g.patternZ * g.patternX * g.layers : 0);
   const rows = $derived(g ? g.frames * g.patternY : 0);
   // Whole pixels when the sheet fits; big sheets shrink to fit.
@@ -64,7 +78,7 @@
   }
 
   async function save() {
-    if (await commands.saveSheet(group, format, bg)) app.dialog = null;
+    if (await commands.saveSheet(effective, format, bg)) app.dialog = null;
   }
 </script>
 
@@ -92,8 +106,15 @@
       <strong class="name">{CATEGORY_NAMES[category]} #{id}</strong>
       {#if thing && thing.frameGroups.length > 1}
         <div class="t-tabs">
-          <button class="t-tab" class:on={group === 0} onclick={() => (group = 0)}>Idle</button>
-          <button class="t-tab" class:on={group === 1} onclick={() => (group = 1)}>Walking</button>
+          <button
+            class="t-tab"
+            class:on={effective === ALL_GROUPS}
+            disabled={!sameLayout}
+            title={sameLayout ? "Idle and walking frames in one sheet" : "Idle and walking groups have different layouts"}
+            onclick={() => (picked = ALL_GROUPS)}>All</button
+          >
+          <button class="t-tab" class:on={effective === 0} onclick={() => (picked = 0)}>Idle</button>
+          <button class="t-tab" class:on={effective === 1} onclick={() => (picked = 1)}>Walking</button>
         </div>
       {/if}
       <label class="row">

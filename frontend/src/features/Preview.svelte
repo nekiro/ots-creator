@@ -7,7 +7,8 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import { Category, errorMessage, normalizeThing, ThingService, type Thing } from "../lib/api";
-  import { Animator } from "../lib/render/animator";
+  import { Animator, previewDurations } from "../lib/render/animator";
+  import { PREVIEW_DROP } from "../lib/commands";
   import { compose, stackBottomRight } from "../lib/render/compose";
   import { clampPos, fillSlots, textureSlots, type TexturePos } from "../lib/render/layout";
   import { droppedSprites } from "../lib/dragsprites";
@@ -131,7 +132,7 @@
       animator = null;
       return;
     }
-    const durations = g.durations?.length === g.frames ? g.durations : Array.from({ length: g.frames }, () => ({ min: 100, max: 100 }));
+    const durations = previewDurations(g, isOutfit);
     try {
       animator = new Animator(Number(g.mode), 0, Math.min(Math.max(g.startFrame, 0), g.frames - 1), durations, performance.now());
       animator.setFrame(untrack(() => pos.frame), performance.now());
@@ -243,7 +244,8 @@
   }
 </script>
 
-<div class="preview">
+<!-- Images dropped here are sprite sheets for the object (commands.drop). -->
+<div class="preview" id={PREVIEW_DROP} data-file-drop-target>
   {#if g && sheetView}
   <div class="stage-wrap">
     <SheetEditor
@@ -400,6 +402,11 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+  }
+  /* Wails marks the drop target under a dragged file. */
+  .preview:global(.file-drop-target-active) {
+    outline: 1px dashed var(--gold);
+    outline-offset: 2px;
   }
   .stage-wrap {
     flex: 1;

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/nekiro/ots-creator/internal/assets"
 	"github.com/nekiro/ots-creator/internal/client"
 	"github.com/nekiro/ots-creator/internal/project"
 )
@@ -32,6 +33,9 @@ func (ps *ProjectService) State() State { return ps.s.State() }
 
 // ClientFiles describes a dat/spr pair found on disk before opening it.
 type ClientFiles struct {
+	// Format is FormatAssets for a Tibia 12+ asset folder; DatPath is then
+	// the folder and Detected its version.
+	Format       project.Format  `json:"format"`
 	DatPath      string          `json:"datPath"`
 	SprPath      string          `json:"sprPath"`
 	DatSignature uint32          `json:"datSignature"`
@@ -45,6 +49,11 @@ type ClientFiles struct {
 // and finds the matching files, signatures, version and OTFI features.
 func (ps *ProjectService) Inspect(path string) (ClientFiles, error) {
 	var cf ClientFiles
+	if dir, err := assets.FindDir(path); err == nil {
+		v := project.AssetsVersion(dir)
+		return ClientFiles{Format: project.FormatAssets, DatPath: dir, Detected: &v, Features: client.DefaultFeatures(v.Value)}, nil
+	}
+	cf.Format = project.FormatDat
 	if st, err := os.Stat(path); err == nil && st.IsDir() {
 		found, err := findClientFile(path)
 		if err != nil {
@@ -124,6 +133,8 @@ func readSignature(path string) (uint32, error) {
 
 // OpenRequest selects the client to open.
 type OpenRequest struct {
+	// Format FormatAssets opens the asset folder in DatPath.
+	Format   project.Format  `json:"format"`
 	DatPath  string          `json:"datPath"`
 	SprPath  string          `json:"sprPath"`
 	Version  *client.Version `json:"version"`
@@ -132,7 +143,13 @@ type OpenRequest struct {
 
 // Open loads a client and makes it the current project.
 func (ps *ProjectService) Open(req OpenRequest) (State, error) {
-	p, err := project.Open(project.OpenOptions{DatPath: req.DatPath, SprPath: req.SprPath, Version: req.Version, Features: req.Features})
+	var p *project.Project
+	var err error
+	if req.Format == project.FormatAssets {
+		p, err = project.OpenAssets(req.DatPath)
+	} else {
+		p, err = project.Open(project.OpenOptions{DatPath: req.DatPath, SprPath: req.SprPath, Version: req.Version, Features: req.Features})
+	}
 	if err != nil {
 		return ps.s.State(), err
 	}
@@ -154,6 +171,8 @@ func (ps *ProjectService) Close() {
 
 // CompileRequest selects the output of a compilation.
 type CompileRequest struct {
+	// Format FormatAssets writes an asset folder to DatPath.
+	Format    project.Format  `json:"format"`
 	DatPath   string          `json:"datPath"`
 	SprPath   string          `json:"sprPath"`
 	Version   client.Version  `json:"version"`
@@ -168,10 +187,10 @@ func (ps *ProjectService) Compile() error {
 		return err
 	}
 	info := p.Info()
-	if info.DatPath == "" || info.SprPath == "" {
+	if info.DatPath == "" || (info.Format != project.FormatAssets && info.SprPath == "") {
 		return errors.New("the client has never been saved, use Compile As")
 	}
-	return ps.CompileAs(CompileRequest{DatPath: info.DatPath, SprPath: info.SprPath, Version: info.Version, Features: info.Features})
+	return ps.CompileAs(CompileRequest{Format: info.Format, DatPath: info.DatPath, SprPath: info.SprPath, Version: info.Version, Features: info.Features})
 }
 
 // CompileAs saves to new files, optionally with another version/features.
@@ -180,7 +199,7 @@ func (ps *ProjectService) CompileAs(req CompileRequest) error {
 	if err != nil {
 		return err
 	}
-	err = p.Compile(project.CompileOptions{DatPath: req.DatPath, SprPath: req.SprPath, Version: req.Version, Features: req.Features, WriteOTFI: req.WriteOTFI})
+	err = p.Compile(project.CompileOptions{Format: req.Format, DatPath: req.DatPath, SprPath: req.SprPath, Version: req.Version, Features: req.Features, WriteOTFI: req.WriteOTFI})
 	ps.s.Changed()
 	if err == nil {
 		ps.s.saved()
@@ -188,13 +207,14 @@ func (ps *ProjectService) CompileAs(req CompileRequest) error {
 	return err
 }
 
-// Warnings lists properties that would be lost when compiling to v.
-func (ps *ProjectService) Warnings(v client.Version) ([]string, error) {
+// Warnings lists properties that would be lost when compiling to a format
+// and version.
+func (ps *ProjectService) Warnings(format project.Format, v client.Version) ([]string, error) {
 	p, err := ps.s.Project()
 	if err != nil {
 		return nil, err
 	}
-	return p.Warnings(v), nil
+	return p.Warnings(format, v), nil
 }
 
 // Undo reverts the last edit and returns its label.

@@ -1,6 +1,6 @@
 // User preferences and recent clients, stored by the backend
 // (SettingsService) in the user's config directory.
-import { SettingsService, errorMessage, type Recent, type Settings } from "./api";
+import { Format, SettingsService, errorMessage, type Recent, type Settings } from "./api";
 import { toast } from "./state.svelte";
 
 export const IMAGE_FORMATS = [
@@ -58,7 +58,8 @@ export function shortPath(path: string, max: number): string {
   return path.length > max ? "…" + path.slice(path.length - max + 1) : path;
 }
 
-/** Folder of a recent client, for display. */
+/** Folder of a recent client, for display (an asset folder is its own path). */
 export function recentDir(r: Recent): string {
+  if (r.format === Format.FormatAssets) return r.datPath;
   return r.datPath.replace(/[\\/][^\\/]*$/, "");
 }

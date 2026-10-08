@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Animator, AnimationMode } from "./animator";
+import { Animator, AnimationMode, previewDurations, WALK_FRAME_MS } from "./animator";
 import { clampPos, resizeSprites, spriteIndex, textureSlots, totalSprites, type Layout } from "./layout";
 import { colorize, hsiToRgb, PALETTE_SIZE } from "./outfit";
 
@@ -121,5 +121,26 @@ describe("outfit colors", () => {
     colorize(base, tpl2, { head: 0, body: 132, legs: 0, feet: 0 }); // last color, darkest row
     expect(base[0]).toBeLessThan(200);
     expect(base[4]).toBe(200);
+  });
+});
+
+describe("previewDurations", () => {
+  const durations = [
+    { min: 300, max: 300 },
+    { min: 300, max: 300 },
+  ];
+  it("plays outfit walking at walk speed", () => {
+    expect(previewDurations({ frames: 2, durations, type: 1 }, true)).toEqual([
+      { min: WALK_FRAME_MS, max: WALK_FRAME_MS },
+      { min: WALK_FRAME_MS, max: WALK_FRAME_MS },
+    ]);
+  });
+  it("keeps stored durations elsewhere", () => {
+    expect(previewDurations({ frames: 2, durations, type: 0 }, true)).toBe(durations);
+    expect(previewDurations({ frames: 2, durations, type: 1 }, false)).toBe(durations);
+    expect(previewDurations({ frames: 2, durations: null, type: 0 }, false)).toEqual([
+      { min: 100, max: 100 },
+      { min: 100, max: 100 },
+    ]);
   });
 });

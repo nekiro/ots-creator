@@ -2,6 +2,7 @@ package project
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/nekiro/ots-creator/internal/thing"
 )
@@ -17,6 +18,8 @@ const (
 type Filter struct {
 	Content string `json:"content"`
 	Flag    string `json:"flag"` // JSON name of a boolean property that must be set
+	// Name matches things whose name contains it, ignoring case.
+	Name string `json:"name"`
 }
 
 // FindThings returns the ids of things in c that match f, in order.
@@ -31,6 +34,7 @@ func (p *Project) FindThings(c thing.Category, f Filter) ([]uint32, error) {
 			return nil, fmt.Errorf("unknown flag %q", f.Flag)
 		}
 	}
+	name := strings.ToLower(strings.TrimSpace(f.Name))
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	ids := []uint32{}
@@ -43,6 +47,9 @@ func (p *Project) FindThings(c thing.Category, f Filter) ([]uint32, error) {
 			if on, _ := t.Props.FlagByKey(f.Flag); !on {
 				continue
 			}
+		}
+		if name != "" && !strings.Contains(strings.ToLower(t.Name), name) {
+			continue
 		}
 		if f.Content != ContentAll && p.hasPixels(t) != (f.Content == ContentUsed) {
 			continue
@@ -64,4 +71,17 @@ func (p *Project) hasPixels(t *thing.Thing) bool {
 		}
 	}
 	return false
+}
+
+// Names returns the names of the named things in c, by id.
+func (p *Project) Names(c thing.Category) map[uint32]string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	out := map[uint32]string{}
+	for _, t := range p.things.Things[c] {
+		if t != nil && t.Name != "" {
+			out[t.ID] = t.Name
+		}
+	}
+	return out
 }

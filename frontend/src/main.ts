@@ -5,4 +5,8 @@ import { initPixelScale } from "./lib/pixelscale";
 
 void initPixelScale();
 
+// No browser context menu (Inspect, Reload...) anywhere: the app opens its
+// own menus from oncontextmenu handlers, which still run.
+window.addEventListener("contextmenu", (e) => e.preventDefault());
+
 mount(App, { target: document.getElementById("app")! });

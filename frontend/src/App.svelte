@@ -22,12 +22,12 @@
   import SpriteList from "./features/SpriteList.svelte";
   import StatusBar from "./features/StatusBar.svelte";
   import ThingList from "./features/ThingList.svelte";
-  import { commands, handleShortcut } from "./lib/commands";
+  import { commands, handlePaste, handleShortcut } from "./lib/commands";
   import { app, initState } from "./lib/state.svelte";
   import Splitter from "./lib/ui/Splitter.svelte";
   import ContextMenu from "./lib/ui/ContextMenu.svelte";
   import ConfirmDialog from "./lib/ui/ConfirmDialog.svelte";
-  import { WindowService } from "./lib/api";
+  import { WindowService, type FilesDropped } from "./lib/api";
   import Toasts from "./lib/ui/Toasts.svelte";
 
   let group = $state(0);
@@ -77,7 +77,9 @@
       if (prefs.settings.reopenLast && last && !app.open) await commands.openRecent(last);
     })();
     const offClose = Events.On("app:close-requested", () => void commands.quit());
-    const offDrop = Events.On("app:files-dropped", (e: { data: string[] | null }) => void commands.drop(e.data ?? []));
+    const offDrop = Events.On("app:files-dropped", (e: { data: FilesDropped | null }) =>
+      void commands.drop(e.data?.paths ?? [], e.data?.target ?? "", group),
+    );
     return () => {
       offClose();
       offDrop();
@@ -92,6 +94,7 @@
 </script>
 
 <svelte:window onkeydown={handleShortcut} />
+<svelte:document onpaste={(e) => handlePaste(e, group)} />
 
 <div class="shell" data-file-drop-target>
   <MenuBar />

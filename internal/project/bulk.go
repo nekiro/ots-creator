@@ -112,7 +112,7 @@ func (p *Project) UpdateThings(ts []*thing.Thing) error {
 	}
 	r := p.record(fmt.Sprintf("Edit %d object(s)", len(ts)))
 	for _, t := range ts {
-		r.setThing(t.Category, t.ID, t.Clone())
+		r.setThing(t.Category, t.ID, keepExtra(t.Clone(), p.things.Get(t.Category, t.ID)))
 	}
 	r.commit()
 	return nil

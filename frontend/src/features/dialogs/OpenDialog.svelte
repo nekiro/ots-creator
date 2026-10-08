@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { DialogService, ProjectService, errorMessage, type ClientFiles, type Features, type Version } from "../../lib/api";
+  import { DialogService, Format, ProjectService, errorMessage, type ClientFiles, type Features, type Version } from "../../lib/api";
   import { app, run, toast } from "../../lib/state.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Select from "../../lib/ui/Select.svelte";
@@ -24,7 +24,8 @@
   let error = $state("");
 
   const keyOf = (v: Version) => `${v.value}|${v.name}|${v.datSignature}|${v.sprSignature}`;
-  const version = $derived(versions.find((v) => keyOf(v) === versionKey) ?? null);
+  const isAssets = $derived(files?.format === Format.FormatAssets);
+  const version = $derived(isAssets ? files!.detected : (versions.find((v) => keyOf(v) === versionKey) ?? null));
   const hex = (n: number) => "0x" + n.toString(16).toUpperCase();
 
   onMount(async () => {
@@ -57,7 +58,7 @@
     if (!files || !version) return;
     const f = files;
     const st = await run("Loading client", () =>
-      ProjectService.Open({ datPath: f.datPath, sprPath: f.sprPath, version: f.detected ? null : version, features }),
+      ProjectService.Open({ format: f.format, datPath: f.datPath, sprPath: f.sprPath, version: f.detected ? null : version, features }),
     );
     if (st?.open) {
       app.dialog = null;
@@ -71,7 +72,10 @@
     {#if !files}
       <div class="empty t-panel">
         <Icon name="open" size={22} />
-        <span>Choose the client folder with <strong>Tibia.dat</strong> and <strong>Tibia.spr</strong> (or an OTClient <strong>.otfi</strong>).</span>
+        <span
+          >Choose the client folder with <strong>Tibia.dat</strong> and <strong>Tibia.spr</strong> (or an OTClient <strong>.otfi</strong>), or the
+          <strong>assets</strong> folder of Tibia 12+.</span
+        >
         <button class="t-btn primary" onclick={browse}>Browse…</button>
       </div>
       {#if recent.length}
@@ -86,7 +90,12 @@
         </div>
       {/if}
     {/if}
-    {#if files}
+    {#if files && isAssets}
+      <div class="paths t-panel">
+        <span class="t-label">assets</span><span class="path" title={files.datPath}>{files.datPath}</span>
+        <span class="note">Protobuf appearances and sprite sheets, client {files.detected?.name}</span>
+      </div>
+    {:else if files}
       <div class="paths t-panel">
         <span class="t-label">dat</span><span class="path" title={files.datPath}>{files.datPath}</span>
         <span class="t-label">spr</span><span class="path" title={files.sprPath}>{files.sprPath}</span>

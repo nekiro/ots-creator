@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { CATEGORIES, CATEGORY_LABELS, Category, errorMessage, minId, normalizeThing, res, ThingService, type Thing } from "../lib/api";
-  import { commands } from "../lib/commands";
+  import { CATEGORIES, CATEGORY_LABELS, Category, Format, errorMessage, minId, normalizeThing, res, ThingService, type Thing } from "../lib/api";
+  import { commands, thingDropId } from "../lib/commands";
   import { FLAG_GROUPS, flagVisible } from "../lib/flags";
   import { openContextMenu } from "../lib/menu.svelte";
-  import { objectMenu } from "../lib/menus";
+  import { objectListMenu, objectMenu } from "../lib/menus";
   import { spriteCache } from "../lib/render/sprites";
   import { LIST_CELL } from "../lib/prefs.svelte";
   import { app, select, setCategory, toast, versions } from "../lib/state.svelte";
@@ -21,6 +21,11 @@
 
   let content = $state("");
   let flag = $state("");
+  // Text in the search box filters by name; a number jumps to an id.
+  let jump = $state("");
+  const name = $derived(/^\s*\d*\s*$/.test(jump) ? "" : jump.trim());
+  // Names of the named objects of the category (asset clients).
+  let names = $state<Record<number, string>>({});
   // Matching ids while a filter is active; null shows the whole range.
   let ids = $state<number[] | null>(null);
 
@@ -30,7 +35,7 @@
       .filter((f) => flagVisible(f.key, app.category, false))
       .map((f) => ({ value: f.key as string, label: f.label })),
   ]);
-  const filtered = $derived(content !== "" || flag !== "");
+  const filtered = $derived(content !== "" || flag !== "" || name !== "");
 
   // A flag hidden for the new category no longer applies.
   $effect(() => {
@@ -40,7 +45,7 @@
   let request = 0;
   $effect(() => {
     const c = app.category;
-    const f = { content, flag };
+    const f = { content, flag, name };
     void app.rev;
     if (!app.open || !filtered) {
       ids = null;
@@ -63,7 +68,15 @@
     const i = indexOf(app.focused);
     return i < 0 ? null : i;
   });
-  let jump = $state("");
+  $effect(() => {
+    const c = app.category;
+    void app.rev;
+    if (!app.open || app.project?.info.format !== Format.FormatAssets) {
+      names = {};
+      return;
+    }
+    ThingService.Names(c).then((n) => c === app.category && (names = (n ?? {}) as Record<number, string>));
+  });
 
   function go(id: number) {
     const max = app.maxId(app.category);
@@ -76,6 +89,10 @@
 
   function onJump(e: KeyboardEvent) {
     if (e.key !== "Enter") return;
+    if (name) {
+      if (count > 0) goIndex(0);
+      return;
+    }
     const n = parseInt(jump, 10);
     if (Number.isFinite(n)) go(n);
   }
@@ -165,18 +182,21 @@
   </div>
   <div class="bar">
     <Icon name="search" />
-    <input class="t-input grow" placeholder="Go to id… (Enter)" bind:value={jump} onkeydown={onJump} inputmode="numeric" />
+    <input class="t-input grow" placeholder={app.project?.info.format === Format.FormatAssets ? "Go to id or search name…" : "Go to id… (Enter)"} bind:value={jump} onkeydown={onJump} />
   </div>
-  <div class="list t-panel">
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="list t-panel" oncontextmenu={(e) => !(e.target as HTMLElement).closest(".thing") && openContextMenu(e, objectListMenu())}>
     {#if app.open}
       <VirtualGrid {count} cellWidth={LIST_CELL.width} cellHeight={48} gap={LIST_CELL.gap} scrollTo={focusIndex} {onkeydown}>
         {#snippet cell(i)}
           {@const id = idAt(i)}
           <button
+            id={thingDropId(id)}
+            data-file-drop-target
             class="thing"
             class:sel={app.selection.includes(id)}
             class:focus={app.focused === id}
-            title="#{id}"
+            title={names[id] ? `#${id} ${names[id]}` : `#${id}`}
             onclick={(e) => click(e, id)}
             onmouseenter={() => enter(id)}
             onmouseleave={leave}
@@ -202,7 +222,7 @@
   <div class="row filters">
     <Select grow value={content} options={CONTENT_OPTIONS} disabled={!app.open} onchange={(v) => (content = v)} />
     <Select grow value={flag} options={flagOptions} disabled={!app.open} maxItems={14} onchange={(v) => (flag = v)} />
-    <button class="t-icon-btn" title="Clear filters" disabled={!filtered} onclick={() => ((content = ""), (flag = ""))}><Icon name="close" /></button>
+    <button class="t-icon-btn" title="Clear filters" disabled={!filtered} onclick={() => ((content = ""), (flag = ""), (jump = ""))}><Icon name="close" /></button>
   </div>
   <div class="row foot">
     <button class="t-icon-btn" title="New object" disabled={!app.open} onclick={commands.newThing}><Icon name="plus" /></button>
@@ -261,6 +281,11 @@
   .thing.focus {
     border-color: #b6b6b6;
     color: #fff;
+  }
+  /* A file dragged over an object (Wails marks the drop target). */
+  .thing:global(.file-drop-target-active) {
+    border-color: var(--gold);
+    background: rgba(255, 210, 90, 0.15);
   }
   .t-slot img {
     max-width: 32px;

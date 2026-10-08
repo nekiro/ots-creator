@@ -2,8 +2,10 @@ package project
 
 import (
 	"fmt"
+	"image"
 	"slices"
 
+	"github.com/nekiro/ots-creator/internal/imaging"
 	"github.com/nekiro/ots-creator/internal/obd"
 	"github.com/nekiro/ots-creator/internal/spr"
 	"github.com/nekiro/ots-creator/internal/thing"
@@ -42,16 +44,26 @@ func (p *Project) UpdateThing(t *thing.Thing) error {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.things.Get(t.Category, t.ID) == nil {
+	cur := p.things.Get(t.Category, t.ID)
+	if cur == nil {
 		return fmt.Errorf("%s %d does not exist", t.Category, t.ID)
 	}
 	if err := p.checkSpriteIDs(t); err != nil {
 		return err
 	}
 	r := p.record(fmt.Sprintf("Edit %s %d", t.Category, t.ID))
-	r.setThing(t.Category, t.ID, t.Clone())
+	r.setThing(t.Category, t.ID, keepExtra(t.Clone(), cur))
 	r.commit()
 	return nil
+}
+
+// keepExtra gives an edited copy of a thing (that came from the UI or a
+// file) the format data of the thing it replaces.
+func keepExtra(t, cur *thing.Thing) *thing.Thing {
+	if cur != nil {
+		t.Extra = cur.Extra
+	}
+	return t
 }
 
 func (p *Project) checkSpriteIDs(t *thing.Thing) error {
@@ -217,6 +229,7 @@ func (p *Project) ImportOBD(d *obd.Data, replaceID uint32) (uint32, error) {
 		return 0, fmt.Errorf("object uses %dpx sprites, client uses %dpx", d.SpriteSize, p.features.SpriteSize)
 	}
 	t := d.Thing.Clone()
+	t.Extra = nil
 	if err := t.Validate(); err != nil {
 		return 0, err
 	}
@@ -237,6 +250,7 @@ func (p *Project) ImportOBD(d *obd.Data, replaceID uint32) (uint32, error) {
 	}
 	if replaceID != 0 {
 		t.ID = replaceID
+		keepExtra(t, p.things.Get(c, replaceID))
 	} else {
 		t.ID = p.things.MaxID(c) + 1
 	}
@@ -321,4 +335,66 @@ func (p *Project) ExportOBD(c thing.Category, id uint32, version int) (*obd.Data
 		d.Sprites = append(d.Sprites, sprites)
 	}
 	return d, nil
+}
+
+// ImportSheet puts a sprite sheet into a thing and picks the layout from
+// the sheet (see imaging.InferLayout). Outfit sheets hold every frame; with
+// frame groups the first frame becomes the idle group and the others the
+// walking group, unless the thing already splits its frames another way.
+func (p *Project) ImportSheet(c thing.Category, id uint32, img *image.NRGBA) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	cur := p.things.Get(c, id)
+	if cur == nil {
+		return fmt.Errorf("%s %d does not exist", c, id)
+	}
+	size := p.features.SpriteSize
+	merged, err := imaging.InferLayout(img, c, cur, size)
+	if err != nil {
+		return err
+	}
+	pixels, err := imaging.SliceSheet(img, merged, size)
+	if err != nil {
+		return err
+	}
+	r := p.record(fmt.Sprintf("Import sheet into %s %d", c, id))
+	copy(merged.Sprites, p.addSpritesDedup(r, pixels))
+	t := cur.Clone()
+	t.FrameGroups = splitSheetGroups(merged, cur, c == thing.CategoryOutfit && p.features.FrameGroups)
+	r.setThing(c, id, t)
+	r.commit()
+	return nil
+}
+
+func splitSheetGroups(merged *thing.FrameGroup, cur *thing.Thing, groups bool) []*thing.FrameGroup {
+	def := cur.Category.DefaultDuration()
+	// Animation settings and durations of the replaced group, when they fit.
+	adopt := func(g *thing.FrameGroup, i int) *thing.FrameGroup {
+		if i < len(cur.FrameGroups) {
+			old := cur.FrameGroups[i]
+			g.Mode, g.LoopCount = old.Mode, old.LoopCount
+			if old.Frames == g.Frames {
+				g.Durations = slices.Clone(old.Durations)
+				g.StartFrame = old.StartFrame
+			}
+		}
+		g.EnsureDurations(def)
+		return g
+	}
+	if !groups || merged.Frames < 2 {
+		g := merged.Clone()
+		g.Type = thing.FrameGroupDefault
+		return []*thing.FrameGroup{adopt(g, 0)}
+	}
+	idleFrames := 1
+	if len(cur.FrameGroups) == 2 && int(cur.FrameGroups[0].Frames)+int(cur.FrameGroups[1].Frames) == int(merged.Frames) {
+		idleFrames = int(cur.FrameGroups[0].Frames)
+	}
+	idle := merged.Clone()
+	idle.Type, idle.Frames = thing.FrameGroupDefault, uint8(idleFrames)
+	idle.Sprites = frameBlock(merged, 0, idleFrames)
+	walk := merged.Clone()
+	walk.Type, walk.Frames = thing.FrameGroupWalking, merged.Frames-uint8(idleFrames)
+	walk.Sprites = frameBlock(merged, idleFrames, int(merged.Frames))
+	return []*thing.FrameGroup{adopt(idle, 0), adopt(walk, 1)}
 }

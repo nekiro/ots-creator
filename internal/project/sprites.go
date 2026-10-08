@@ -6,22 +6,47 @@ import (
 	"github.com/nekiro/ots-creator/internal/spr"
 )
 
-// spriteStore overlays edited sprites on top of a read-only spr file.
+// spriteBase is the read-only sprite source of a store: an spr file or the
+// sprite sheets of an asset folder.
+type spriteBase interface {
+	Count() uint32
+	Compressed(id uint32) ([]byte, error)
+}
+
+type sprFileBase struct{ f *spr.File }
+
+func (b sprFileBase) Count() uint32                        { return b.f.Count }
+func (b sprFileBase) Compressed(id uint32) ([]byte, error) { return b.f.Compressed(id) }
+
+// spriteStore overlays edited sprites on top of a read-only base.
 // All data is kept compressed with the store's transparency setting.
 type spriteStore struct {
-	base        *spr.File
+	base        spriteBase
 	size        int
 	transparent bool
 	n           uint32
 	overlay     map[uint32][]byte // edited sprites; nil value = empty sprite
 }
 
-func newSpriteStore(base *spr.File, size int, transparent bool) *spriteStore {
+func newSpriteStore(base spriteBase, size int, transparent bool) *spriteStore {
 	s := &spriteStore{base: base, size: size, transparent: transparent, overlay: map[uint32][]byte{}}
 	if base != nil {
-		s.n = base.Count
+		s.n = base.Count()
 	}
 	return s
+}
+
+func sprFile(f *spr.File) spriteBase {
+	if f == nil {
+		return nil
+	}
+	return sprFileBase{f}
+}
+
+// edited reports whether a sprite differs from the base.
+func (s *spriteStore) edited(id uint32) bool {
+	_, ok := s.overlay[id]
+	return ok || s.base == nil || id > s.base.Count()
 }
 
 func (s *spriteStore) count() uint32 { return s.n }
@@ -34,7 +59,7 @@ func (s *spriteStore) compressed(id uint32) ([]byte, error) {
 	if c, ok := s.overlay[id]; ok {
 		return c, nil
 	}
-	if s.base != nil && id <= s.base.Count {
+	if s.base != nil && id <= s.base.Count() {
 		return s.base.Compressed(id)
 	}
 	return nil, nil
@@ -75,7 +100,7 @@ func (s *spriteStore) setCount(n uint32) {
 	}
 	for id := s.n + 1; id <= n; id++ {
 		// Hide base sprites that were removed earlier and are now re-added.
-		if s.base != nil && id <= s.base.Count {
+		if s.base != nil && id <= s.base.Count() {
 			if _, ok := s.overlay[id]; !ok {
 				s.overlay[id] = nil
 			}
