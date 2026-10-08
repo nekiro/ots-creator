@@ -56,6 +56,8 @@ jobs:
       - name: Test
         run: |
           wails3 task common:generate:bindings
+          # main.go embeds frontend/dist, which exists only after the frontend build.
+          mkdir -p frontend/dist && touch frontend/dist/.keep
           go test ./...
           cd frontend && npx vitest run && npx svelte-check --threshold error
 
