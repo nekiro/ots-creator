@@ -1,0 +1,15 @@
+{
+	"fixed": {
+		"file_version": "0.1.0"
+	},
+	"info": {
+		"0000": {
+			"ProductVersion": "0.1.0",
+			"CompanyName": "nekiro",
+			"FileDescription": "Object editor for Open Tibia clients",
+			"LegalCopyright": "(c) 2026 Marcin Jałocha (nekiro)",
+			"ProductName": "OTS Creator",
+			"Comments": "https://github.com/nekiro/ots-creator"
+		}
+	}
+}

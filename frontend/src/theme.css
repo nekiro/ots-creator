@@ -1,0 +1,523 @@
+/* Tibia client look built from OTClient (mehah) UI images.
+   Every 9-slice uses border-image with the borders from the OTUI styles.
+   Like OTClient's image-border, edges and center are tiled, not stretched.
+
+   Fonts are OTClient bitmap fonts converted to pixel TTFs (tools/otfont2ttf.py).
+   They render 1:1 only at their em size: --fs (14px) and --fs-small (9px). */
+
+@font-face {
+  font-family: "Tibia Verdana";
+  src: url("./assets/fonts/tibia-verdana.ttf") format("truetype");
+  font-weight: 400;
+}
+@font-face {
+  font-family: "Tibia Verdana";
+  src: url("./assets/fonts/tibia-verdana-bold.ttf") format("truetype");
+  font-weight: 700;
+}
+@font-face {
+  font-family: "Tibia Small";
+  src: url("./assets/fonts/tibia-small.ttf") format("truetype");
+}
+
+:root {
+  --font: "Tibia Verdana", Verdana, Tahoma, sans-serif;
+  --font-small: "Tibia Small", "Tibia Verdana", Verdana, sans-serif;
+  --fs: 14px;
+  --fs-small: 9px;
+  --text: #c0c0c0;
+  --text-bright: #dfdfdf;
+  --text-dim: #8a8a8a;
+  --text-disabled: #6b6b6b;
+  --accent: #f4f4f4;
+  --gold: #e8c46a;
+  --green: #44ad25;
+  --red: #d33c3c;
+  --blue: #6aa6e8;
+  --select: rgba(255, 255, 255, 0.16);
+  --select-strong: rgba(130, 170, 255, 0.35);
+  --line-dark: #191919;
+  --line-bright: #5c5c5c;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* A transparent composited layer makes Chromium use grayscale text
+   antialiasing instead of ClearType, so pixel fonts get no color fringes. */
+#app {
+  will-change: transform;
+}
+
+body {
+  font: var(--fs) / 16px var(--font);
+  font-synthesis: none;
+  color: var(--text);
+  background: #232323 url("./assets/ui/background_dark.png") repeat;
+  user-select: none;
+  -webkit-font-smoothing: none;
+  text-rendering: optimizeSpeed;
+}
+
+/* Pixel art skin: never smooth when the window is scaled (125%, 150% DPI). */
+.t-window,
+.t-mini,
+.t-mini-header,
+.t-flat,
+.t-panel,
+.t-lightflat,
+.t-frame-down,
+.t-frame-up,
+.t-btn,
+.t-icon-btn,
+.t-input,
+.t-check,
+.t-tab,
+.t-slot,
+.t-sep,
+.t-vsep {
+  image-rendering: pixelated;
+}
+.t-window,
+.t-mini,
+.t-mini-header,
+.t-flat,
+.t-panel,
+.t-lightflat,
+.t-frame-down,
+.t-frame-up,
+.t-btn,
+.t-input,
+.t-tab {
+  border-image-repeat: repeat;
+}
+
+/* ---------- containers ---------- */
+
+.t-window {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-style: solid;
+  border-width: 27px 6px 6px 6px;
+  border-image: url("./assets/ui/window.png") 27 6 6 6 fill / 27px 6px 6px 6px repeat;
+  min-height: 0;
+}
+.t-window > .t-window-title {
+  position: absolute;
+  top: -27px;
+  left: 0;
+  right: 0;
+  height: 27px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-bright);
+  font-weight: bold;
+  text-shadow: 1px 1px 0 #000;
+  pointer-events: none;
+}
+
+.t-mini {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-style: solid;
+  border-width: 4px;
+  border-image: url("./assets/ui/miniwindow_body.png") 4 fill / 4px repeat;
+}
+.t-mini-header {
+  flex: none;
+  height: 17px;
+  margin: -4px -4px 0;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-bright);
+  font-weight: bold;
+  font-size: var(--fs);
+  text-shadow: 1px 1px 0 #000;
+  border-style: solid;
+  border-width: 4px 4px 4px 4px;
+  border-image: url("./assets/ui/miniwindow_header.png") 4 fill / 4px repeat;
+  border-top: 0;
+  border-bottom: 0;
+}
+.t-mini-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 4px 2px 2px;
+}
+
+.t-flat {
+  border-style: solid;
+  border-width: 1px;
+  border-image: url("./assets/ui/panel_flat.png") 1 fill / 1px repeat;
+}
+/* OTClient FlatPanel: panel_flat, image-border 1, center tiled.
+   (The darker look in the client comes from image-color, not the texture.) */
+.t-panel {
+  border-style: solid;
+  border-width: 1px;
+  border-image: url("./assets/ui/panel_flat.png") 1 fill / 1px repeat;
+}
+.t-lightflat {
+  border-style: solid;
+  border-width: 1px;
+  border-image: url("./assets/ui/panel_lightflat.png") 1 fill / 1px repeat;
+}
+.t-frame-down {
+  border-style: solid;
+  border-width: 1px;
+  border-image: url("./assets/ui/1pixel-down-frame.png") 1 fill / 1px repeat;
+}
+.t-frame-up {
+  border-style: solid;
+  border-width: 2px;
+  border-image: url("./assets/ui/2pixel-up-frame-borderimage.png") 2 fill / 2px repeat;
+}
+
+.t-sep {
+  height: 2px;
+  background: url("./assets/ui/separator_horizontal.png") repeat-x;
+  margin: 6px 0;
+  flex: none;
+}
+.t-vsep {
+  width: 2px;
+  align-self: stretch;
+  background: url("./assets/ui/separator_vertical.png") repeat-y;
+}
+
+/* ---------- controls ---------- */
+
+.t-btn {
+  font: inherit;
+  color: var(--text-bright);
+  min-width: 43px;
+  height: 20px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+  background: transparent;
+  border-style: solid;
+  border-width: 1px;
+  border-image: url("./assets/ui/btn-idle.png") 1 fill / 1px repeat;
+  cursor: pointer;
+  text-shadow: 1px 1px 0 #000;
+  outline: none;
+}
+.t-btn:hover:not(:disabled) {
+  filter: brightness(1.18);
+}
+.t-btn:active:not(:disabled),
+.t-btn.on {
+  border-image-source: url("./assets/ui/btn-pressed.png");
+  padding-top: 2px;
+  padding-left: 11px;
+}
+.t-btn:disabled {
+  color: #dfdfdf88;
+  opacity: 0.75;
+  cursor: default;
+}
+.t-btn:focus-visible {
+  box-shadow: 0 0 0 1px #9a9a9a;
+}
+.t-btn.primary {
+  color: #fff;
+}
+.t-btn.danger {
+  color: #ffb0b0;
+}
+
+/* Square icon button (22x23) */
+.t-icon-btn {
+  width: 22px;
+  height: 23px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-bright);
+  background: url("./assets/ui/sqbtn-idle.png");
+  border: 0;
+  cursor: pointer;
+  outline: none;
+  flex: none;
+}
+.t-icon-btn:hover:not(:disabled) {
+  background-image: url("./assets/ui/sqbtn-hover.png");
+}
+.t-icon-btn:active:not(:disabled),
+.t-icon-btn.on {
+  background-image: url("./assets/ui/sqbtn-pressed.png");
+}
+.t-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.t-icon-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.t-input {
+  font: bold var(--fs) var(--font);
+  color: #c0c0c0;
+  height: 20px;
+  padding: 0 4px;
+  background: transparent;
+  border-style: solid;
+  border-width: 1px;
+  border-image: url("./assets/ui/textedit.png") 1 fill / 1px repeat;
+  outline: none;
+  min-width: 0;
+}
+.t-input:focus {
+  color: var(--text-bright);
+  box-shadow: inset 0 0 0 1px #6d6d6d;
+}
+.t-input:disabled {
+  color: #27272788;
+}
+.t-input::placeholder {
+  color: var(--text-dim);
+  font-weight: normal;
+}
+.t-input::selection {
+  background: #808080;
+}
+/* Numbers change with the mouse wheel (focused) or keyboard; native spinners clash with the skin. */
+input[type="number"].t-input::-webkit-inner-spin-button,
+input[type="number"].t-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.t-check {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  flex: none;
+  background: url("./assets/ui/check-off.png");
+  cursor: pointer;
+}
+.t-check:checked {
+  background-image: url("./assets/ui/check-on.png");
+}
+.t-check:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.t-tabs {
+  display: flex;
+  gap: 2px;
+  flex: none;
+}
+.t-tab {
+  flex: 1;
+  font: inherit;
+  color: var(--text);
+  height: 18px;
+  padding: 0 6px;
+  background: transparent;
+  border-style: solid;
+  border-width: 3px 3px 0 3px;
+  border-image: url("./assets/ui/tab-idle.png") 3 3 0 3 fill / 3px 3px 0 3px repeat;
+  cursor: pointer;
+  white-space: nowrap;
+  text-shadow: 1px 1px 0 #000;
+}
+.t-tab:hover {
+  border-image-source: url("./assets/ui/tab-hover.png");
+  color: var(--text-bright);
+}
+.t-tab.on {
+  border-image-source: url("./assets/ui/tab-on.png");
+  color: #fff;
+}
+
+/* Item slot (34x34) */
+.t-slot {
+  width: 34px;
+  height: 34px;
+  background: url("./assets/ui/item.png");
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.t-label {
+  color: var(--text-dim);
+}
+.t-value {
+  color: var(--text-bright);
+}
+
+/* ---------- scrollbars (WebView2 / Chromium) ---------- */
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+/* VerticalScrollBar: scrollbar.png clip 24 0 12 74, image-border 1 */
+::-webkit-scrollbar-track:vertical {
+  border-style: solid;
+  border-width: 1px;
+  border-image: url("./assets/ui/sb-track-v.png") 1 fill / 1px repeat;
+}
+/* HorizontalScrollBar: clip 0 38 24 12, image-border 1 */
+::-webkit-scrollbar-track:horizontal {
+  border-style: solid;
+  border-width: 1px;
+  border-image: url("./assets/ui/sb-track-h.png") 1 fill / 1px repeat;
+}
+/* VerticalScrollBarSlider: clip 0 24 12 14, image-border 6 */
+::-webkit-scrollbar-thumb:vertical {
+  min-height: 14px;
+  border-style: solid;
+  border-width: 6px;
+  border-image: url("./assets/ui/sb-thumb-v.png") 6 fill / 6px repeat;
+}
+/* HorizontalScrollBarSlider: clip 12 26 12 12, borders t3 r6 b3 l5 */
+::-webkit-scrollbar-thumb:horizontal {
+  min-width: 12px;
+  border-style: solid;
+  border-width: 3px 6px 3px 5px;
+  border-image: url("./assets/ui/sb-thumb-h.png") 3 6 3 5 fill / 3px 6px 3px 5px repeat;
+}
+::-webkit-scrollbar-button:single-button:vertical:decrement {
+  height: 12px;
+  background: url("./assets/ui/sb-up.png");
+}
+::-webkit-scrollbar-button:single-button:vertical:decrement:active {
+  background-image: url("./assets/ui/sb-up-pressed.png");
+}
+::-webkit-scrollbar-button:single-button:vertical:increment {
+  height: 12px;
+  background: url("./assets/ui/sb-down.png");
+}
+::-webkit-scrollbar-button:single-button:vertical:increment:active {
+  background-image: url("./assets/ui/sb-down-pressed.png");
+}
+::-webkit-scrollbar-button:single-button:horizontal:decrement {
+  width: 12px;
+  background: url("./assets/ui/sb-left.png");
+}
+::-webkit-scrollbar-button:single-button:horizontal:decrement:active {
+  background-image: url("./assets/ui/sb-left-pressed.png");
+}
+::-webkit-scrollbar-button:single-button:horizontal:increment {
+  width: 12px;
+  background: url("./assets/ui/sb-right.png");
+}
+::-webkit-scrollbar-button:single-button:horizontal:increment:active {
+  background-image: url("./assets/ui/sb-right-pressed.png");
+}
+::-webkit-scrollbar-corner {
+  background: #2a2a2a;
+}
+
+/* ---------- helpers ---------- */
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.grow {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.pixel {
+  image-rendering: pixelated;
+}
+.checker {
+  background-color: #3a3a3a;
+  background-image: linear-gradient(45deg, #333 25%, transparent 25%), linear-gradient(-45deg, #333 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #333 75%), linear-gradient(-45deg, transparent 75%, #333 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+kbd {
+  font: var(--fs-small) var(--font-small);
+  color: var(--text-dim);
+}
+
+.t-small {
+  font: var(--fs-small) / 10px var(--font-small);
+}
+
+/* ---------- popup menus (OTClient PopupMenu) ---------- */
+
+/* 3pixel_frame_borderimage, image-border 4 */
+.t-menu {
+  padding: 1px;
+  border-style: solid;
+  border-width: 4px;
+  border-image: url("./assets/ui/popupmenu.png") 4 fill / 4px repeat;
+  image-rendering: pixelated;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+}
+/* PopupMenuSeparator: horizontal_line_bright */
+.t-menu-sep {
+  height: 1px;
+  margin: 2px 3px 3px;
+  background: url("./assets/ui/line-bright.png") repeat-x;
+}
+/* PopupMenuButton */
+.t-menu-entry {
+  font: inherit;
+  color: #ffffff;
+  background: none;
+  border: 0;
+  text-align: left;
+  height: 18px;
+  padding: 0 4px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.t-menu-entry:hover:not(:disabled) {
+  background: #ffffff36;
+}
+.t-menu-entry:disabled {
+  color: #c0c0c0;
+  opacity: 0.55;
+  cursor: default;
+}
+.t-menu-entry kbd {
+  color: #c0c0c0;
+  text-shadow: 1px 1px 0 #000;
+}

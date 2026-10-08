@@ -1,0 +1,25 @@
+OTS Creator
+Copyright 2026 Marcin Jałocha (nekiro)
+https://github.com/nekiro/ots-creator
+
+Licensed under the Apache License, Version 2.0 with the Commons Clause
+License Condition v1.0 (see LICENSE). The software may not be sold.
+
+This NOTICE file must be kept, unchanged, in every copy and every derived
+work, as required by section 4(d) of the Apache License. Derived works must
+also keep the credits shown in the application ("About OTS Creator") and state
+that they are based on OTS Creator, with a link to the repository above.
+
+---------------------------------------------------------------------------
+Third-party material
+---------------------------------------------------------------------------
+
+User interface images and bitmap fonts are Tibia client assets,
+copyright CipSoft GmbH. They were taken from the OTClient Redemption
+repository (https://github.com/mehah/otclient).
+
+internal/client/versions.xml and the file formats follow ObjectBuilder
+(https://github.com/ottools/ObjectBuilder), MIT License.
+
+Tibia is a trademark of CipSoft GmbH. This project is not affiliated with or
+endorsed by CipSoft GmbH.

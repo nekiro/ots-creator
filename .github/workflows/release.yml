@@ -1,0 +1,79 @@
+# Builds a Windows release when a version tag (v1.2.3) is pushed.
+#
+# Release assets:
+#   otscreator-amd64-installer.exe  NSIS installer for first installs
+#   otscreator-windows-amd64.exe    plain executable, used by the in-app updater
+#                                   (Wails updater, GitHub provider)
+#   checksums.txt                   SHA-256 of both, checked by the updater
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Version from tag
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          # Windows resources and NSIS need plain x.y.z.
+          numeric="${version%%[-+]*}"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "NUMERIC_VERSION=$numeric" >> "$GITHUB_ENV"
+          sed -i "s/\"0\.1\.0\"/\"$numeric\"/g" build/windows/info.json
+
+      - name: Install tools
+        run: |
+          go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.28
+          if ! command -v makensis >/dev/null; then choco install nsis -y --no-progress; fi
+          echo "C:/Program Files (x86)/NSIS" >> "$GITHUB_PATH"
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Test
+        run: |
+          wails3 task common:generate:bindings
+          go test ./...
+          cd frontend && npx vitest run && npx svelte-check --threshold error
+
+      - name: Build installer
+        run: wails3 task windows:package VERSION="$VERSION" INSTALLER_VERSION="$NUMERIC_VERSION"
+
+      - name: Collect assets
+        run: |
+          mkdir dist
+          cp bin/otscreator.exe dist/otscreator-windows-amd64.exe
+          cp bin/otscreator-amd64-installer.exe dist/
+          cd dist && sha256sum otscreator-windows-amd64.exe otscreator-amd64-installer.exe > checksums.txt
+          cat checksums.txt
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=""
+          if [ "$VERSION" != "$NUMERIC_VERSION" ]; then prerelease="--prerelease"; fi
+          gh release create "$GITHUB_REF_NAME" dist/* --title "OTS Creator $VERSION" --generate-notes $prerelease

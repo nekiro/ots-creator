@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=OTS Creator
+Comment=Object editor for Open Tibia clients
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/otscreator %u
+Terminal=false
+Type=Application
+Icon=otscreator
+Categories=Utility;
+StartupWMClass=otscreator
+
+ 
