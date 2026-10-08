@@ -492,6 +492,24 @@ kbd {
   display: flex;
   flex-direction: column;
 }
+/* QtComboBoxPopupMenu: the frame of combobox_new (image-clip 0 60 91 20,
+   image-border 2). Its 87x16 center has edges that do not match, which a
+   narrow client popup hides but a wide list shows as bands; the inside is
+   the seamless stone tile of the same tone instead, muted and a little
+   lighter so the list stands out from the window behind it. A background, not a
+   border-image fill: border-image tiles show seams at fractional zoom. */
+.t-popup {
+  border-style: solid;
+  border-width: 2px;
+  border-image: url("./assets/ui/qcombo-popup.png") 2 / 2px repeat;
+  /* A flat veil softens the stone so only a hint of it shows. */
+  background:
+    linear-gradient(rgba(76, 76, 76, 0.7), rgba(76, 76, 76, 0.7)),
+    #4c4c4c url("./assets/ui/background.png") repeat;
+  background-clip: padding-box;
+  image-rendering: pixelated;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+}
 /* PopupMenuSeparator: horizontal_line_bright */
 .t-menu-sep {
   height: 1px;

@@ -47,6 +47,7 @@ export function toolsMenu(): MenuEntry[] {
     { label: "Merge outfit frame groups…", action: () => commands.convertFrameGroups(false), disabled: noProject },
     "-",
     { label: "Object viewer…", action: () => commands.viewObd() },
+    { label: "Market…", action: commands.market },
   ];
 }
 
@@ -62,6 +63,7 @@ export function objectMenu(context = false): MenuEntry[] {
     "-",
     { label: "Import sprite sheet…", action: () => commands.importSheet(0), disabled: notSingle },
     { label: "Export sprite sheet…", action: () => commands.exportSheet(0), disabled: notSingle },
+    { label: "Share to market…", action: commands.shareObject, disabled: notSingle },
     ...(context
       ? (["-", ...clipboardEntries(), "-", { label: "Copy id", action: () => copy(app.selection.join(", ")), disabled: noThing }] as MenuEntry[])
       : []),
@@ -73,12 +75,16 @@ export function objectListMenu(): MenuEntry[] {
   return [
     { label: "New object", action: commands.newThing, disabled: noProject },
     { label: "Import objects (OBD)…", keys: "Ctrl+I", action: () => commands.importObd(), disabled: noProject },
+    { label: "Browse market…", action: commands.market },
   ];
 }
 
 /** Context menu of the empty area of the sprite list. */
 export function spriteListMenu(): MenuEntry[] {
-  return [{ label: "Import images…", action: commands.importSprites, disabled: noProject }];
+  return [
+    { label: "Import images…", action: commands.importSprites, disabled: noProject },
+    { label: "Browse market…", action: commands.market },
+  ];
 }
 
 export function spriteMenu(context = false): MenuEntry[] {
@@ -86,6 +92,7 @@ export function spriteMenu(context = false): MenuEntry[] {
     ...(context ? [] : [{ label: "Import images…", action: commands.importSprites, disabled: noProject }]),
     { label: "Replace selected…", action: commands.replaceSprite, disabled: noSprite },
     { label: "Export selected…", action: commands.exportSprites, disabled: noSprite },
+    { label: "Share to market…", action: commands.shareSprites, disabled: noSprite },
     "-",
     { label: "Clear selected", keys: "Del", action: commands.removeSprites, disabled: noSprite },
     ...(context

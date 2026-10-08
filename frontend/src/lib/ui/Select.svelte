@@ -151,7 +151,7 @@
 {#if open}
   <div
     bind:this={list}
-    class="popup"
+    class="popup t-popup"
     role="listbox"
     style="left:{rect.left}px;top:{rect.top}px;min-width:{rect.width}px;max-height:{maxItems * ITEM_H + 4}px"
   >
@@ -232,12 +232,6 @@
     z-index: 200;
     overflow-y: auto;
     padding: 1px 0;
-    border-style: solid;
-    /* ComboBoxPopupMenu: combobox_square clip 0 60 98 20, image-border 1 */
-    border-width: 1px;
-    border-image: url("../../assets/ui/combo-popup.png") 1 fill / 1px repeat;
-    image-rendering: pixelated;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55);
   }
   /* QtComboBoxPopupMenuButton: height 20, text-offset 5 0 */
   .item {

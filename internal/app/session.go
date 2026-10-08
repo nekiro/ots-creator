@@ -6,6 +6,7 @@ import (
 	"errors"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/nekiro/ots-creator/internal/project"
 )
@@ -46,7 +47,13 @@ func NewSession(notify Notifier) *Session {
 	if notify == nil {
 		notify = func(string, any) {}
 	}
-	return &Session{notify: notify}
+	s := &Session{notify: notify}
+	// Resource URLs carry the revision and are cached as immutable, also on
+	// disk by the webview; starting from the launch time keeps URLs of one
+	// run from matching cached images of an earlier run. Milliseconds stay
+	// exact as JavaScript numbers.
+	s.rev.Store(uint64(time.Now().UnixMilli()))
+	return s
 }
 
 // Project returns the open project.

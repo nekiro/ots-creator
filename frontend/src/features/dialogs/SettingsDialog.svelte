@@ -47,6 +47,20 @@
     </label>
     <p class="t-label note">BMP and JPG have no transparency; empty pixels become magenta.</p>
 
+    <h4>Market</h4>
+    <label class="row">
+      <span class="t-label lbl">Admin token</span>
+      <input
+        class="t-input grow"
+        type="password"
+        autocomplete="off"
+        placeholder="Only for market moderators"
+        value={s.marketAdminToken}
+        onchange={(e) => savePrefs({ marketAdminToken: e.currentTarget.value.trim() })}
+      />
+    </label>
+    <p class="t-label note">With the admin token every market entry can be deleted.</p>
+
     <h4>Recent clients</h4>
     <div class="row">
       <span class="t-label grow">{recent ? `${recent} remembered` : "None yet"}</span>

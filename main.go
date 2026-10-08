@@ -55,6 +55,7 @@ func main() {
 			application.NewService(updates),
 			application.NewService(windows),
 			application.NewService(app.NewSettingsService(prefs, session)),
+			application.NewService(app.NewMarketService(session, prefs)),
 		},
 		Assets: application.AssetOptions{
 			Handler:        application.AssetFileServerFS(assets),

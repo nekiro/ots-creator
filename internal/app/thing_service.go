@@ -353,6 +353,11 @@ func (ts *ThingService) ReadOBD(path string) (*OBDFile, error) {
 	if err != nil {
 		return nil, err
 	}
+	return newOBDFile(path, d), nil
+}
+
+// newOBDFile prepares decoded OBD data for the frontend.
+func newOBDFile(path string, d *obd.Data) *OBDFile {
 	out := &OBDFile{Path: path, Version: d.Version, ClientVersion: d.ClientVersion, SpriteSize: d.SpriteSize, Thing: d.Thing.Clone(), Sprites: [][]byte{}}
 	for gi, g := range out.Thing.FrameGroups {
 		for si := range g.Sprites {
@@ -360,5 +365,5 @@ func (ts *ThingService) ReadOBD(path string) (*OBDFile, error) {
 			g.Sprites[si] = uint32(len(out.Sprites))
 		}
 	}
-	return out, nil
+	return out
 }

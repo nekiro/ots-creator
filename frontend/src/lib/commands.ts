@@ -9,6 +9,7 @@ import {
   WindowService,
   encodeBytes,
   errorMessage,
+  minId,
   type PropsPatch,
   type Recent,
   type Thing,
@@ -398,6 +399,35 @@ export const commands = {
     } else {
       toast("Drop a client folder, a .dat, an assets folder, .obd or image files.");
     }
+  },
+
+  /** Opens the market browser. */
+  market() {
+    app.dialog = "market";
+  },
+
+  /** Opens the share window for the focused object. */
+  shareObject() {
+    if (!guard() || app.focused === null) return;
+    app.shareTarget = { kind: "object", category: app.category, id: app.focused };
+    app.dialog = "share";
+  },
+
+  /** Opens the share window for the selected sprites. */
+  shareSprites() {
+    if (!guard() || app.selectedSprites.length === 0) return;
+    app.shareTarget = { kind: "sprites", ids: [...app.selectedSprites].sort((a, b) => a - b) };
+    app.dialog = "share";
+  },
+
+  /** Opens the share window with a picker, starting from the selection. */
+  sharePick() {
+    app.shareTarget = !app.open
+      ? { kind: "file", path: "", pick: true }
+      : app.focused === null && app.selectedSprites.length
+        ? { kind: "sprites", ids: [...app.selectedSprites].sort((a, b) => a - b), pick: true }
+        : { kind: "object", category: app.category, id: app.focused ?? minId(app.category), pick: true };
+    app.dialog = "share";
   },
 
   /** Opens the object viewer, optionally with an OBD or image file. */

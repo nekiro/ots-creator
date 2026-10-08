@@ -125,6 +125,8 @@
     <span class="t-vsep"></span>
     <button class="t-icon-btn" title="Import objects (Ctrl+I)" disabled={!app.open} onclick={() => commands.importObd()}><Icon name="import" /></button>
     <button class="t-icon-btn" title="Export selected objects (Ctrl+E)" disabled={!app.open || app.focused === null} onclick={() => commands.exportObd()}><Icon name="export" /></button>
+    <span class="t-vsep"></span>
+    <button class="t-btn market" title="Browse objects and sprites shared by other users" onclick={commands.market}><Icon name="market" />Market</button>
   </div>
   <div class="spacer"></div>
   <!-- Frameless window: OTClient miniwindow buttons instead of the native frame. -->
@@ -194,7 +196,22 @@
     gap: 2px;
     margin-left: 14px;
   }
+  .market {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    height: 23px;
+    padding: 0 10px 0 7px;
+    color: var(--gold);
+    text-shadow: 1px 1px 0 #000;
+  }
+  .market :global(svg) {
+    width: 16px;
+    height: 16px;
+  }
   .toolbar .t-vsep {
+    /* .t-vsep stretches; a fixed height would sit at the top. */
+    align-self: center;
     height: 18px;
     margin: 0 4px;
   }

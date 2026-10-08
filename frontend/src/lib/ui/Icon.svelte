@@ -7,6 +7,8 @@
     undo: "M5 5L2 8l3 3 M2 8h8a3 3 0 0 1 0 6H8",
     redo: "M11 5l3 3-3 3 M14 8H6a3 3 0 0 0 0 6h2",
     plus: "M8 3v10 M3 8h10",
+    refresh: "M13 8a5 5 0 1 1-1.5-3.6 M13 2v3h-3",
+    market: "M2 6l1.5-4h9L14 6z M2 6a2 2 0 0 0 4 0a2 2 0 0 0 4 0a2 2 0 0 0 4 0 M3 8v6h10V8 M6.5 14v-3.5h3V14",
     copy: "M5 5h8v8H5z M3 11V3h8",
     trash: "M3 4h10 M6 4V2h4v2 M4 4l1 10h6l1-10",
     import: "M8 2v8 M5 7l3 3 3-3 M3 12v2h10v-2",

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -52,6 +53,13 @@ type Settings struct {
 	// list panel is sized to fit them.
 	ListColumns int      `json:"listColumns"`
 	Recent      []Recent `json:"recent"`
+	// MarketAuthor is the nickname last used to share to the market.
+	MarketAuthor string `json:"marketAuthor"`
+	// MarketAdminToken deletes any market entry (the API's admin token).
+	MarketAdminToken string `json:"marketAdminToken"`
+	// MarketShared maps market entries shared from this computer to their
+	// delete tokens. Like Recent, Update keeps it as stored.
+	MarketShared map[string]string `json:"marketShared"`
 }
 
 // Object list columns range.
@@ -63,7 +71,7 @@ const (
 
 // Defaults returns the settings of a fresh install.
 func Defaults() Settings {
-	return Settings{CheckUpdates: true, SheetBackground: BackgroundMagenta, ExportFormat: "png", ListColumns: DefaultListColumns, Recent: []Recent{}}
+	return Settings{CheckUpdates: true, SheetBackground: BackgroundMagenta, ExportFormat: "png", ListColumns: DefaultListColumns, Recent: []Recent{}, MarketShared: map[string]string{}}
 }
 
 func (s *Settings) normalize() {
@@ -81,6 +89,9 @@ func (s *Settings) normalize() {
 	s.ListColumns = min(max(s.ListColumns, MinListColumns), MaxListColumns)
 	if s.Recent == nil {
 		s.Recent = []Recent{}
+	}
+	if s.MarketShared == nil {
+		s.MarketShared = map[string]string{}
 	}
 	if len(s.Recent) > MaxRecent {
 		s.Recent = s.Recent[:MaxRecent]
@@ -129,14 +140,17 @@ func (st *Store) Get() Settings {
 	defer st.mu.Unlock()
 	s := st.s
 	s.Recent = append([]Recent{}, st.s.Recent...)
+	s.MarketShared = maps.Clone(st.s.MarketShared)
 	return s
 }
 
-// Update changes the preferences. The recent list is kept as stored.
+// Update changes the preferences. The recent list and shared market
+// entries are kept as stored.
 func (st *Store) Update(s Settings) error {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	s.Recent = st.s.Recent
+	s.MarketShared = st.s.MarketShared
 	s.normalize()
 	st.s = s
 	return st.saveLocked()
@@ -160,6 +174,30 @@ func (st *Store) AddRecent(r Recent) error {
 	}
 	st.s.Recent = list
 	st.s.normalize()
+	return st.saveLocked()
+}
+
+// SetMarketShared remembers the delete token of a shared market entry;
+// an empty token forgets the entry.
+func (st *Store) SetMarketShared(id, token string) error {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if token == "" {
+		delete(st.s.MarketShared, id)
+	} else {
+		st.s.MarketShared[id] = token
+	}
+	return st.saveLocked()
+}
+
+// SetMarketAuthor remembers the nickname used to share.
+func (st *Store) SetMarketAuthor(name string) error {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if st.s.MarketAuthor == name {
+		return nil
+	}
+	st.s.MarketAuthor = name
 	return st.saveLocked()
 }
 

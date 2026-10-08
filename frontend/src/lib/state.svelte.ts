@@ -24,7 +24,20 @@ export type DialogName =
   | "slicer"
   | "obd"
   | "sheet"
+  | "market"
+  | "share"
   | null;
+
+/** What the share window publishes. */
+export type ShareTarget = (
+  | { kind: "object"; category: Category; id: number }
+  | { kind: "sprites"; ids: number[] }
+  /** An OBD file or an image from disk; works without an open client. */
+  | { kind: "file"; path: string }
+) & {
+  /** The share window lets the user pick another object or other sprites. */
+  pick?: boolean;
+};
 
 class AppState {
   project = $state<State | null>(null);
@@ -44,6 +57,8 @@ class AppState {
   sheetGroup = $state(0);
   /** File for the OBD viewer; "" asks for one. */
   obdPath = $state("");
+  /** What the share window publishes. */
+  shareTarget = $state<ShareTarget | null>(null);
 
   get open(): boolean {
     return !!this.project?.open;
