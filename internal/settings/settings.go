@@ -49,6 +49,9 @@ type Settings struct {
 	SheetBackground string `json:"sheetBackground"`
 	// ExportFormat is the default image format: png, bmp or jpg.
 	ExportFormat string `json:"exportFormat"`
+	// ObjectFormat is the file format of exported objects: "otobj" (the
+	// native format) or "obd" (ObjectBuilder).
+	ObjectFormat string `json:"objectFormat"`
 	// ListColumns is the number of objects per row in the object list; the
 	// list panel is sized to fit them.
 	ListColumns int      `json:"listColumns"`
@@ -71,7 +74,7 @@ const (
 
 // Defaults returns the settings of a fresh install.
 func Defaults() Settings {
-	return Settings{CheckUpdates: true, SheetBackground: BackgroundMagenta, ExportFormat: "png", ListColumns: DefaultListColumns, Recent: []Recent{}, MarketShared: map[string]string{}}
+	return Settings{CheckUpdates: true, SheetBackground: BackgroundMagenta, ExportFormat: "png", ObjectFormat: "otobj", ListColumns: DefaultListColumns, Recent: []Recent{}, MarketShared: map[string]string{}}
 }
 
 func (s *Settings) normalize() {
@@ -82,6 +85,9 @@ func (s *Settings) normalize() {
 	case "png", "bmp", "jpg":
 	default:
 		s.ExportFormat = "png"
+	}
+	if s.ObjectFormat != "obd" {
+		s.ObjectFormat = "otobj"
 	}
 	if s.ListColumns == 0 {
 		s.ListColumns = DefaultListColumns

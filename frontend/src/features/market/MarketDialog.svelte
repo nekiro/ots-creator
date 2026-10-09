@@ -5,7 +5,7 @@
   // token, every entry) can be deleted. Share opens the share window with a
   // picker for an object or sprites.
   import { onMount } from "svelte";
-  import { MarketService, decodeBytes, errorMessage, normalizeThing, type MarketIndex, type OBDFile, type Thing } from "../../lib/api";
+  import { MarketService, decodeBytes, errorMessage, normalizeThing, type MarketIndex, type ObjectFile, type Thing } from "../../lib/api";
   import { commands } from "../../lib/commands";
   import { ask } from "../../lib/confirm.svelte";
   import { filterEntries, LICENSES, sectionCounts, sectionOf, topTags, type MarketEntry, type MarketSort } from "../../lib/market";
@@ -77,7 +77,7 @@
   }
 
   // Live preview of the selected object (downloaded once per entry).
-  type Loaded = { file: OBDFile; thing: Thing; pixels: Uint8ClampedArray[] };
+  type Loaded = { file: ObjectFile; thing: Thing; pixels: Uint8ClampedArray[] };
   const cache = new Map<string, Promise<Loaded>>();
   let loaded = $state<Loaded | null>(null);
   let previewError = $state("");

@@ -4,6 +4,7 @@
   // guards against spam. The delete token is kept in the settings.
   import { onMount } from "svelte";
   import {
+    OBJECT_EXT,
     CATEGORIES,
     CATEGORY_LABELS,
     CATEGORY_NAMES,
@@ -51,11 +52,11 @@
 
   // A file from disk: an OBD object or an image cut into sprites.
   const FILE_FILTERS = [
-    { name: "Objects and images (*.obd, *.png, *.bmp, *.gif)", pattern: "*.obd;*.png;*.bmp;*.gif" },
-    { name: "Object Builder Data (*.obd)", pattern: "*.obd" },
+    { name: "Objects and images (*.otobj, *.obd, *.png, *.bmp, *.gif)", pattern: "*.otobj;*.obd;*.png;*.bmp;*.gif" },
+    { name: "Object files (*.otobj, *.obd)", pattern: "*.otobj;*.obd" },
     { name: "Images (*.png, *.bmp, *.gif)", pattern: "*.png;*.bmp;*.gif" },
   ];
-  const OBD_EXT = /\.obd$/i;
+  const OBD_EXT = OBJECT_EXT;
   let fileSize = $state(app.project?.info.features.spriteSize ?? 32);
   let fileThing = $state<{ thing: Thing; pixels: Uint8ClampedArray[]; size: number } | null>(null);
   let fileImage = $state<{ url: string; width: number; height: number } | null>(null);
@@ -79,8 +80,8 @@
     if (!nameTouched) name = fileName(path).replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
     try {
       if (OBD_EXT.test(path)) {
-        const f = await ThingService.ReadOBD(path);
-        if (!f?.thing) throw new Error("empty OBD file");
+        const f = await ThingService.ReadObject(path);
+        if (!f?.thing) throw new Error("empty object file");
         fileThing = { thing: normalizeThing(f.thing), pixels: (f.sprites ?? []).map((b) => decodeBytes(b as unknown as string)), size: f.spriteSize };
       } else {
         const img = await ViewerService.ReadImage(path);
@@ -231,7 +232,7 @@
           {#if target.kind === "file"}
             <div class="row pickrow">
               <button class="t-btn" onclick={chooseFile}>Choose…</button>
-              <span class="t-label fname" title={target.path}>{target.path ? fileName(target.path) : "An .obd file or an image"}</span>
+              <span class="t-label fname" title={target.path}>{target.path ? fileName(target.path) : "An .otobj or .obd file, or an image"}</span>
               {#if target.path && !isObdFile}
                 <span class="grow"></span>
                 <Select

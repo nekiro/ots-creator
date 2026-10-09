@@ -17,7 +17,7 @@ export type {
   FileFilter,
   ImportResult,
   UpdateInfo,
-  OBDFile,
+  ObjectFile,
   ImageFile,
   ViewerEntry,
   MarketIndex,
@@ -39,6 +39,9 @@ import {
   type Thing as GoThing,
   type NpcSale,
 } from "../../bindings/github.com/nekiro/ots-creator/internal/thing/models";
+
+/** Object files: the native .otobj and ObjectBuilder .obd. */
+export const OBJECT_EXT = /\.(otobj|obd)$/i;
 
 /** Payload of the "app:files-dropped" event (app.FilesDropped). */
 export interface FilesDropped {

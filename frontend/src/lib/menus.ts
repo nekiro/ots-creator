@@ -3,12 +3,15 @@ import { clipboardThing } from "./clipboard";
 import { commands } from "./commands";
 import type { MenuEntry } from "./menu.svelte";
 import { app, toast } from "./state.svelte";
+import { prefs } from "./prefs.svelte";
 
 const noProject = () => !app.open;
 const noThing = () => !app.open || app.selection.length === 0;
 const notSingle = () => !app.open || app.selection.length !== 1;
 const noSprite = () => !app.open || app.selectedSprites.length === 0;
 const noClip = () => noThing() || !clipboardThing();
+/** The export format of objects, as shown in menus. */
+const fmt = () => (prefs.settings.objectFormat === "obd" ? "OBD" : "OTOBJ");
 
 function copy(text: string) {
   navigator.clipboard.writeText(text).then(
@@ -56,12 +59,12 @@ export function objectMenu(context = false): MenuEntry[] {
   return [
     { label: "New object", action: commands.newThing, disabled: noProject },
     { label: "Duplicate", keys: "Ctrl+D", action: commands.duplicate, disabled: noThing },
-    { label: "Replace with object (OBD)…", action: () => commands.importObd(true), disabled: notSingle },
+    { label: "Replace with object file…", action: () => commands.importObd(true), disabled: notSingle },
     { label: "Remove", keys: "Del", action: commands.remove, disabled: noThing },
     "-",
-    ...(context ? [] : [{ label: "Import objects (OBD)…", keys: "Ctrl+I", action: () => commands.importObd(), disabled: noProject }]),
-    { label: "Export selected (OBD)…", keys: "Ctrl+E", action: commands.exportObd, disabled: noThing },
-    ...(context ? [] : [{ label: "Export all objects (OBD)…", action: commands.exportAllObjects, disabled: noProject }]),
+    ...(context ? [] : [{ label: "Import objects…", keys: "Ctrl+I", action: () => commands.importObd(), disabled: noProject }]),
+    { label: `Export selected (${fmt()})…`, keys: "Ctrl+E", action: commands.exportObd, disabled: noThing },
+    ...(context ? [] : [{ label: `Export all objects (${fmt()})…`, action: commands.exportAllObjects, disabled: noProject }]),
     "-",
     { label: "Import sprite sheet…", action: () => commands.importSheet(0), disabled: notSingle },
     { label: "Export sprite sheet…", action: () => commands.exportSheet(0), disabled: notSingle },
@@ -76,7 +79,7 @@ export function objectMenu(context = false): MenuEntry[] {
 export function objectListMenu(): MenuEntry[] {
   return [
     { label: "New object", action: commands.newThing, disabled: noProject },
-    { label: "Import objects (OBD)…", keys: "Ctrl+I", action: () => commands.importObd(), disabled: noProject },
+    { label: "Import objects…", keys: "Ctrl+I", action: () => commands.importObd(), disabled: noProject },
     { label: "Browse market…", action: commands.market },
   ];
 }

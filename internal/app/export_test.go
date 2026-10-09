@@ -27,14 +27,14 @@ func TestExportAll(t *testing.T) {
 	}
 
 	out := filepath.Join(dir, "objects")
-	sum, err := ts.ExportAll(out, true)
+	sum, err := ts.ExportAll(out, true, ObjectOBD)
 	if err != nil || sum.Files != 1 || sum.Skipped != 4 {
 		t.Fatalf("objects %+v %v", sum, err)
 	}
 	if _, err := os.Stat(filepath.Join(out, "items", "item_101.obd")); err != nil {
 		t.Fatal(err)
 	}
-	if sum, err = ts.ExportAll(out, false); err != nil || sum.Files != 5 {
+	if sum, err = ts.ExportAll(out, false, ObjectOTOBJ); err != nil || sum.Files != 5 {
 		t.Fatalf("all objects %+v %v", sum, err)
 	}
 

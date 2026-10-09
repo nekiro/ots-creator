@@ -163,14 +163,15 @@ func TestSettingsKeepMarketShared(t *testing.T) {
 	}
 }
 
-// TestMarketShareFile shares an OBD file and an image from disk without an
+// TestMarketShareFile shares an object file (OTOBJ, stored as OBD by the
+// market) and an image from disk without an
 // open client.
 func TestMarketShareFile(t *testing.T) {
 	srv := markettest.New()
 	defer srv.Close()
 	m, _ := marketEnv(t, srv)
 	dir := t.TempDir()
-	files, err := NewThingService(m.s).ExportOBD(thing.CategoryOutfit, []uint32{1}, dir)
+	files, err := NewThingService(m.s).ExportObjects(thing.CategoryOutfit, []uint32{1}, dir, ObjectOTOBJ)
 	if err != nil {
 		t.Fatal(err)
 	}

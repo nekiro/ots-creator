@@ -39,7 +39,7 @@ type ViewerService struct{}
 
 func viewerKind(name string) string {
 	switch strings.ToLower(filepath.Ext(name)) {
-	case ".obd":
+	case ".obd", ".otobj":
 		return ViewerOBD
 	case ".png", ".bmp", ".gif", ".jpg", ".jpeg":
 		return ViewerImage

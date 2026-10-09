@@ -168,7 +168,7 @@ func (m *MarketService) download(id string) (*market.Entry, []byte, error) {
 
 // Read downloads an object entry for previewing. No client needs to be
 // open.
-func (m *MarketService) Read(id string) (*OBDFile, error) {
+func (m *MarketService) Read(id string) (*ObjectFile, error) {
 	e, data, err := m.download(id)
 	if err != nil {
 		return nil, err
@@ -180,7 +180,7 @@ func (m *MarketService) Read(id string) (*OBDFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newOBDFile(e.File, d), nil
+	return newObjectFile(e.File, d), nil
 }
 
 // MarketImport reports an imported entry: an object (Category and ID) or
@@ -334,18 +334,15 @@ func (m *MarketService) sharePixels(all [][]byte, size int, req ShareRequest) (s
 	return m.submit(market.Submission{Meta: meta, Info: info, File: data, Captcha: req.Captcha})
 }
 
-// ShareFile publishes a file from disk: an OBD file as an object, or an
+// ShareFile publishes a file from disk: an object file (.otobj or .obd;
+// the market stores objects as OBD) as an object, or an
 // image cut into sprites of spriteSize px (32 or 64; magenta is
 // transparent) as a sprite pack. No client needs to be open.
 func (m *MarketService) ShareFile(path string, spriteSize int, req ShareRequest) (string, error) {
-	if strings.EqualFold(filepath.Ext(path), ".obd") {
-		data, err := os.ReadFile(path)
+	if isObjectFile(path) {
+		d, err := readObject(path)
 		if err != nil {
 			return "", err
-		}
-		d, err := obd.Decode(data)
-		if err != nil {
-			return "", fmt.Errorf("%s: %w", filepath.Base(path), err)
 		}
 		return m.shareOBD(d, req)
 	}

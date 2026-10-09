@@ -35,11 +35,14 @@ and Svelte 5.
 
 **Import and export**
 
-- OBD (ObjectBuilder) import of versions 1 to 3 and export as version 3, with an OBD
-  viewer that works without an open client.
+- Objects as `.otobj`, the native format (see [OTOBJ](#otobj-object-format) below), or as
+  OBD (ObjectBuilder): import of OBD versions 1 to 3, export as version 3. Settings choose
+  the export format. An object viewer shows both without an open client.
+- Export all objects (one folder per category) or all sprites (single files or sprite
+  sheets) at once.
 - Sprite sheets: export one frame group or the whole outfit. On import the layout is
   detected from the image (directions, mask layer, mounts, addons, frames).
-- Drop images or OBD files anywhere, onto the preview or onto an object in the list, or
+- Drop images, `.otobj` or `.obd` files anywhere, onto the preview or onto an object in the list, or
   paste a PNG with Ctrl+V.
 - Slicer to cut images into sprites.
 
@@ -52,12 +55,53 @@ and Svelte 5.
 
 - Browse objects and sprite packs shared by other users, with categories, tags, search,
   a live preview and one-click import.
-- Share an object, sprites or an `.obd` / image file from disk. No account is needed: you
+- Share an object, sprites or an `.otobj` / `.obd` / image file from disk. No account is needed: you
   pick a nickname, Tibia-style tags and a license. You can later delete your own entries.
 
 **Updates**
 
 - Built-in updater from GitHub releases.
+
+## OTOBJ object format
+
+`.otobj` is the object format of OTS Creator: a ZIP file with a `manifest.json` and one PNG
+sprite sheet per frame group. The full specification is in [docs/otobj.md](docs/otobj.md).
+
+```
+manifest.json        category, name, flags by name, frame groups, animation, NPC trade
+sprites/idle.png     sprite sheet in the ObjectBuilder layout
+sprites/walking.png
+```
+
+Why a new format instead of OBD:
+
+- **Readable.** The manifest is plain JSON: you can read an object in a text editor and
+  see what changed in a git diff. OBD is one LZMA-compressed binary block.
+- **Not tied to a client version.** Flags are stored by name (`pickupable`, `hasLight`), not
+  as the flag bytes of one dat version. On import the client keeps what it can store and
+  warns about the rest, like "compile as" does.
+- **Editable sprites.** The sheets are normal PNG files that open in any image editor, and
+  they use the ObjectBuilder sheet layout.
+- **Complete.** It stores what OBD cannot: names and descriptions, NPC trade, the Tibia 12+
+  flags and 64 px sprites.
+- **Easy to extend.** Readers ignore keys and files they do not know, so new fields do not
+  need a new version or break older readers.
+
+Measured on the current CipSoft client (one file at a time, one core):
+
+| | OBD | OTOBJ |
+|---|---|---|
+| Reading | 1x | 2 to 4x faster (PNG decodes faster than LZMA) |
+| Writing 1 000 items | 3.6 s | 0.26 s |
+| Size, typical outfit (citizen) | 84 KB | 80 KB |
+| Size, outfit with many colors | 134 KB | 386 KB |
+| Size, all 1 978 outfits | 72 MB | 111 MB |
+
+Files are 1 to 3 times larger, because LZMA on raw pixels compresses better than PNG.
+Sheets with at most 256 colors use a palette, which brings most outfits to the size of
+OBD. We accepted the difference of a few kilobytes per object in exchange for a format
+that people can read and edit. OBD stays fully supported for exchanging objects with
+ObjectBuilder, and the market keeps storing objects as OBD.
 
 ## Development
 

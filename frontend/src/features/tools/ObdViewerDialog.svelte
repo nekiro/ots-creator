@@ -4,6 +4,7 @@
   // not being objects, and can be imported as sprites.
   import { onMount, tick } from "svelte";
   import {
+    OBJECT_EXT,
     CATEGORY_NAMES,
     Category,
     DialogService,
@@ -14,7 +15,7 @@
     errorMessage,
     normalizeThing,
     type ImageFile,
-    type OBDFile,
+    type ObjectFile,
     type Thing,
     type ViewerEntry,
   } from "../../lib/api";
@@ -26,8 +27,8 @@
   import { ZOOM_LEVELS, stepZoom, zoomLabel } from "../../lib/pan.svelte";
 
   const FILTERS = [
-    { name: "Objects and images (*.obd, *.png, *.bmp, *.gif, *.jpg)", pattern: "*.obd;*.png;*.bmp;*.gif;*.jpg;*.jpeg" },
-    { name: "Object Builder Data (*.obd)", pattern: "*.obd" },
+    { name: "Objects and images (*.otobj, *.obd, *.png, *.bmp, *.gif, *.jpg)", pattern: "*.otobj;*.obd;*.png;*.bmp;*.gif;*.jpg;*.jpeg" },
+    { name: "Object files (*.otobj, *.obd)", pattern: "*.otobj;*.obd" },
     { name: "Images (*.png, *.bmp, *.gif, *.jpg)", pattern: "*.png;*.bmp;*.gif;*.jpg;*.jpeg" },
   ];
   const DIRECTIONS = [
@@ -43,7 +44,7 @@
   let list = $state<HTMLDivElement>();
   let listing = $state(false);
 
-  let file = $state<OBDFile | null>(null);
+  let file = $state<ObjectFile | null>(null);
   let thing = $state<Thing | null>(null);
   let image = $state<(ImageFile & { url: string }) | null>(null);
   let pixels = $state.raw<Uint8ClampedArray[]>([]);
@@ -97,7 +98,7 @@
   }
 
   type Loaded =
-    | { kind: "obd"; file: OBDFile; thing: Thing; pixels: Uint8ClampedArray[] }
+    | { kind: "obd"; file: ObjectFile; thing: Thing; pixels: Uint8ClampedArray[] }
     | { kind: "image"; image: ImageFile & { url: string } };
 
   // Recently read files, so browsing back and forth is instant. Neighbours
@@ -112,9 +113,9 @@
       cache.set(path, hit); // most recent last
       return hit;
     }
-    const p: Promise<Loaded> = /\.obd$/i.test(path)
-      ? ThingService.ReadOBD(path).then((f) => {
-          if (!f?.thing) throw new Error("empty OBD file");
+    const p: Promise<Loaded> = OBJECT_EXT.test(path)
+      ? ThingService.ReadObject(path).then((f) => {
+          if (!f?.thing) throw new Error("empty object file");
           return { kind: "obd", file: f, thing: normalizeThing(f.thing), pixels: (f.sprites ?? []).map((b) => decodeBytes(b as unknown as string)) };
         })
       : ViewerService.ReadImage(path).then((img) => {
@@ -189,7 +190,7 @@
 
   async function importObject() {
     if (!file || !app.open) return;
-    const res = await run("Importing", () => ThingService.ImportOBD([file!.path], 0));
+    const res = await run("Importing", () => ThingService.ImportObjects([file!.path], 0));
     const r = res?.[0];
     if (!r) return;
     if (r.error) {
@@ -219,18 +220,18 @@
       <div class="list t-panel" bind:this={list} tabindex="0" role="listbox" aria-label="Files" {onkeydown}>
         {#each entries as e (e.path)}
           <button class="entry" class:on={e.path === current} class:busy={loading && e.path === current} role="option" aria-selected={e.path === current} title={e.name} onclick={() => show(e.path)}>
-            <span class="kind {e.kind}">{e.kind === "obd" ? "OBD" : "IMG"}</span>
+            <span class="kind {e.kind}">{e.kind === "obd" ? (/\.otobj$/i.test(e.name) ? "OTOBJ" : "OBD") : "IMG"}</span>
             <span class="fname">{e.name}</span>
           </button>
         {:else}
           {#if listing}
             <div class="t-label none"><span class="spinner"></span>Reading folder…</div>
           {:else}
-            <div class="t-label none">No OBD files or images here.</div>
+            <div class="t-label none">No object files or images here.</div>
           {/if}
         {/each}
       </div>
-      <div class="t-label small">{counts.obd} OBD · {counts.image} image{counts.image === 1 ? "" : "s"} · ↑↓ to browse</div>
+      <div class="t-label small">{counts.obd} object{counts.obd === 1 ? "" : "s"} · {counts.image} image{counts.image === 1 ? "" : "s"} · ↑↓ to browse</div>
     </div>
 
     <div class="stage checker" class:dim={loading}>
@@ -255,7 +256,7 @@
       {#if image}
         <div class="notice">
           <Icon name="info" />
-          <span>Not an OBD object. This is a plain {image.format.toUpperCase()} image; it can only be imported as sprites.</span>
+          <span>Not an object file. This is a plain {image.format.toUpperCase()} image; it can only be imported as sprites.</span>
         </div>
         <div class="info t-panel">
           <span class="t-label">Type</span><span>{image.format.toUpperCase()} image</span>
@@ -265,7 +266,7 @@
       {:else if thing && file && g}
         <div class="info t-panel">
           <span class="t-label">Category</span><span>{CATEGORY_NAMES[thing.category]}</span>
-          <span class="t-label">OBD version</span><span>{file.version}</span>
+          <span class="t-label">Format</span><span>{file.format === "otobj" ? "OTOBJ" : "OBD"} {file.version}</span>
           <span class="t-label">Client</span><span>{(file.clientVersion / 100).toFixed(2)}</span>
           <span class="t-label">Size</span><span>{g.width}×{g.height} ({file.spriteSize}px)</span>
           <span class="t-label">Layers</span><span>{g.layers}</span>

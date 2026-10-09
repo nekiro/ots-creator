@@ -145,7 +145,7 @@
               </div>
             </div>
           {/if}
-          <p class="t-label hint"><kbd>Ctrl+O</kbd> open · <kbd>Ctrl+N</kbd> new · drop a client folder, .dat or .obd here</p>
+          <p class="t-label hint"><kbd>Ctrl+O</kbd> open · <kbd>Ctrl+N</kbd> new · drop a client folder, .dat, .otobj or .obd here</p>
         </section>
       </div>
     {/if}

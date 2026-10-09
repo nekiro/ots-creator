@@ -33,6 +33,18 @@
       <span class="t-label lbl">Image format</span>
       <Select grow value={s.exportFormat} options={IMAGE_FORMATS} onchange={(v) => savePrefs({ exportFormat: v })} />
     </label>
+    <label class="row" title="OTOBJ is readable and editable (JSON and PNG); OBD opens in ObjectBuilder">
+      <span class="t-label lbl">Object files</span>
+      <Select
+        grow
+        value={s.objectFormat}
+        options={[
+          { value: "otobj", label: "OTOBJ (.otobj)" },
+          { value: "obd", label: "ObjectBuilder (.obd)" },
+        ]}
+        onchange={(v) => savePrefs({ objectFormat: v })}
+      />
+    </label>
     <label class="row">
       <span class="t-label lbl">Sheet background</span>
       <Select

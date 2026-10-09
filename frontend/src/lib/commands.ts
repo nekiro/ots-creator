@@ -13,13 +13,19 @@ import {
   type PropsPatch,
   type Recent,
   type Thing,
+  OBJECT_EXT,
 } from "./api";
 import { clipboardThing, copyThing, pasteInto, type PasteMode } from "./clipboard";
 import { ask } from "./confirm.svelte";
 import { prefs } from "./prefs.svelte";
 import { app, applyDraft, revertDraft, run, select, toast } from "./state.svelte";
 
-const OBD = [{ name: "Object Builder Data (*.obd)", pattern: "*.obd" }];
+const OBJECTS = [
+  { name: "Object files (*.otobj, *.obd)", pattern: "*.otobj;*.obd" },
+  { name: "OTS Creator objects (*.otobj)", pattern: "*.otobj" },
+  { name: "Object Builder Data (*.obd)", pattern: "*.obd" },
+];
+
 const IMAGES = [{ name: "Images (*.png, *.bmp, *.gif, *.jpg)", pattern: "*.png;*.bmp;*.gif;*.jpg;*.jpeg" }];
 const IMAGE_EXT = /\.(png|bmp|gif|jpe?g)$/i;
 /** Id of the preview's file drop target: images dropped there are sheets. */
@@ -205,10 +211,10 @@ export const commands = {
 
   async importObd(replace = false) {
     if (!guard()) return;
-    const paths = await DialogService.OpenFiles(replace ? "Replace with object" : "Import objects", OBD, !replace);
+    const paths = await DialogService.OpenFiles(replace ? "Replace with object" : "Import objects", OBJECTS, !replace);
     if (!paths?.length) return;
     const replaceId = replace ? (app.focused ?? 0) : 0;
-    const results = await run("Importing", () => ThingService.ImportOBD(paths, replaceId));
+    const results = await run("Importing", () => ThingService.ImportObjects(paths, replaceId));
     if (!results) return;
     const failed = results.filter((r) => r.error);
     const ok = results.length - failed.length;
@@ -222,7 +228,7 @@ export const commands = {
     if (!guard() || app.selection.length === 0) return;
     const dir = await DialogService.PickDirectory("Export objects to");
     if (!dir) return;
-    const files = await run("Exporting", () => ThingService.ExportOBD(app.category, app.selection, dir));
+    const files = await run("Exporting", () => ThingService.ExportObjects(app.category, app.selection, dir, prefs.settings.objectFormat));
     if (files) toast(`Exported ${files.length} file(s).`, "success");
   },
 
@@ -290,7 +296,7 @@ export const commands = {
     if (!guard()) return;
     const dir = await DialogService.PickDirectory("Export all objects to");
     if (!dir) return;
-    const sum = await run("Exporting objects", () => ThingService.ExportAll(dir, true));
+    const sum = await run("Exporting objects", () => ThingService.ExportAll(dir, true, prefs.settings.objectFormat));
     if (sum) toast(`Exported ${sum.files.toLocaleString()} object(s), skipped ${sum.skipped.toLocaleString()} empty.`, "success");
   },
 
@@ -404,13 +410,13 @@ export const commands = {
       if (app.focused === id) await commands.loadSheet(sheet, 0);
       return;
     }
-    const obd = paths.filter((p) => /\.obd$/i.test(p));
+    const obd = paths.filter((p) => OBJECT_EXT.test(p));
     const images = paths.filter((p) => IMAGE_EXT.test(p));
     const client = paths.find((p) => CLIENT_EXT.test(p) || !HAS_EXT.test(p));
     if ((obd.length || images.length) && !app.open) {
       commands.viewObd(obd[0] ?? images[0]);
     } else if (obd.length) {
-      const results = await run("Importing", () => ThingService.ImportOBD(obd, 0));
+      const results = await run("Importing", () => ThingService.ImportObjects(obd, 0));
       if (!results) return;
       const ok = results.filter((r) => !r.error).length;
       if (ok) toast(`Imported ${ok} object(s).`, "success");
@@ -427,7 +433,7 @@ export const commands = {
       if (app.open && !(await confirmLeave("Open client", "Open"))) return;
       commands.open(client);
     } else {
-      toast("Drop a client folder, a .dat, an assets folder, .obd or image files.");
+      toast("Drop a client folder, a .dat, an assets folder, .otobj, .obd or image files.");
     }
   },
 
@@ -460,7 +466,7 @@ export const commands = {
     app.dialog = "share";
   },
 
-  /** Opens the object viewer, optionally with an OBD or image file. */
+  /** Opens the object viewer, optionally with an object or image file. */
   viewObd(path = "") {
     app.obdPath = path;
     app.dialog = "obd";

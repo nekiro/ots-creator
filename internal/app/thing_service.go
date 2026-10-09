@@ -8,9 +8,11 @@ import (
 	"image/color"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/nekiro/ots-creator/internal/imaging"
 	"github.com/nekiro/ots-creator/internal/obd"
+	"github.com/nekiro/ots-creator/internal/otobj"
 	"github.com/nekiro/ots-creator/internal/project"
 	"github.com/nekiro/ots-creator/internal/thing"
 )
@@ -110,9 +112,9 @@ type ImportResult struct {
 	Error    string         `json:"error"`
 }
 
-// ImportOBD imports OBD files. With replaceID set and one file, that thing
-// is replaced instead of appending.
-func (ts *ThingService) ImportOBD(paths []string, replaceID uint32) ([]ImportResult, error) {
+// ImportObjects imports object files (.otobj or .obd). With replaceID set
+// and one file, that thing is replaced instead of appending.
+func (ts *ThingService) ImportObjects(paths []string, replaceID uint32) ([]ImportResult, error) {
 	p, err := ts.s.Project()
 	if err != nil {
 		return nil, err
@@ -123,13 +125,10 @@ func (ts *ThingService) ImportOBD(paths []string, replaceID uint32) ([]ImportRes
 	out := make([]ImportResult, 0, len(paths))
 	for _, path := range paths {
 		res := ImportResult{Path: path}
-		data, err := os.ReadFile(path)
+		d, err := readObject(path)
 		if err == nil {
-			var d *obd.Data
-			if d, err = obd.Decode(data); err == nil {
-				res.Category = d.Thing.Category
-				res.ID, err = p.ImportOBD(d, replaceID)
-			}
+			res.Category = d.Thing.Category
+			res.ID, err = p.ImportOBD(d, replaceID)
 		}
 		if err != nil {
 			res.Error = err.Error()
@@ -140,25 +139,18 @@ func (ts *ThingService) ImportOBD(paths []string, replaceID uint32) ([]ImportRes
 	return out, nil
 }
 
-// ExportOBD writes one OBD file per thing into dir, named {category}_{id}.obd.
-// Exports always use the newest OBD version; imports accept every version.
-func (ts *ThingService) ExportOBD(c thing.Category, ids []uint32, dir string) ([]string, error) {
+// ExportObjects writes one file per thing into dir, named
+// {category}_{id}.otobj or .obd by format (ObjectOTOBJ or ObjectOBD).
+// Imports accept every version of both formats.
+func (ts *ThingService) ExportObjects(c thing.Category, ids []uint32, dir, format string) ([]string, error) {
 	p, err := ts.s.Project()
 	if err != nil {
 		return nil, err
 	}
 	var written []string
 	for _, id := range ids {
-		d, err := p.ExportOBD(c, id, obd.Version3)
+		path, err := exportObject(p, c, id, dir, format)
 		if err != nil {
-			return written, err
-		}
-		data, err := obd.Encode(d)
-		if err != nil {
-			return written, fmt.Errorf("%s %d: %w", c, id, err)
-		}
-		path := filepath.Join(dir, fmt.Sprintf("%s_%d.obd", c, id))
-		if err := os.WriteFile(path, data, 0o644); err != nil {
 			return written, err
 		}
 		written = append(written, path)
@@ -331,10 +323,13 @@ func (ts *ThingService) ConvertFrameGroups(toGroups bool) (project.ConvertResult
 	return res, nil
 }
 
-// OBDFile is a decoded OBD file for previewing. Sprite ids of Thing are
-// rewritten to 1..len(Sprites); Sprites[id-1] holds RGBA pixels.
-type OBDFile struct {
-	Path          string       `json:"path"`
+// ObjectFile is a decoded object file (.otobj or .obd) for previewing.
+// Sprite ids of Thing are rewritten to 1..len(Sprites); Sprites[id-1]
+// holds RGBA pixels.
+type ObjectFile struct {
+	Path string `json:"path"`
+	// Format is ObjectOTOBJ or ObjectOBD; Version the version of that format.
+	Format        string       `json:"format"`
 	Version       int          `json:"version"`
 	ClientVersion uint16       `json:"clientVersion"`
 	SpriteSize    int          `json:"spriteSize"`
@@ -342,23 +337,23 @@ type OBDFile struct {
 	Sprites       [][]byte     `json:"sprites"`
 }
 
-// ReadOBD decodes an OBD file without importing it. No client needs to be
-// open.
-func (ts *ThingService) ReadOBD(path string) (*OBDFile, error) {
-	data, err := os.ReadFile(path)
+// ReadObject decodes an object file without importing it. No client needs
+// to be open.
+func (ts *ThingService) ReadObject(path string) (*ObjectFile, error) {
+	d, err := readObject(path)
 	if err != nil {
 		return nil, err
 	}
-	d, err := obd.Decode(data)
-	if err != nil {
-		return nil, err
-	}
-	return newOBDFile(path, d), nil
+	return newObjectFile(path, d), nil
 }
 
-// newOBDFile prepares decoded OBD data for the frontend.
-func newOBDFile(path string, d *obd.Data) *OBDFile {
-	out := &OBDFile{Path: path, Version: d.Version, ClientVersion: d.ClientVersion, SpriteSize: d.SpriteSize, Thing: d.Thing.Clone(), Sprites: [][]byte{}}
+// newObjectFile prepares decoded object data for the frontend.
+func newObjectFile(path string, d *obd.Data) *ObjectFile {
+	format := ObjectOBD
+	if strings.EqualFold(filepath.Ext(path), otobj.Ext) {
+		format = ObjectOTOBJ
+	}
+	out := &ObjectFile{Path: path, Format: format, Version: d.Version, ClientVersion: d.ClientVersion, SpriteSize: d.SpriteSize, Thing: d.Thing.Clone(), Sprites: [][]byte{}}
 	for gi, g := range out.Thing.FrameGroups {
 		for si := range g.Sprites {
 			out.Sprites = append(out.Sprites, d.Sprites[gi][si].Pixels)

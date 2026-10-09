@@ -137,7 +137,7 @@ func TestEndToEnd(t *testing.T) {
 	}
 
 	// OBD export + import.
-	paths, err := ts.ExportOBD(thing.CategoryItem, []uint32{100}, dir)
+	paths, err := ts.ExportObjects(thing.CategoryItem, []uint32{100}, dir, ObjectOBD)
 	if err != nil || len(paths) != 1 {
 		t.Fatalf("export %v %v", paths, err)
 	}
@@ -148,16 +148,33 @@ func TestEndToEnd(t *testing.T) {
 	if d, err := obd.Decode(raw); err != nil || d.Version != obd.Version3 {
 		t.Fatalf("export must write the newest OBD version: %v", err)
 	}
-	view, err := ts.ReadOBD(paths[0])
-	if err != nil || view.Version != obd.Version3 || view.Thing.Category != thing.CategoryItem || len(view.Sprites) != len(view.Thing.SpriteIDs()) {
+	view, err := ts.ReadObject(paths[0])
+	if err != nil || view.Format != ObjectOBD || view.Version != obd.Version3 || view.Thing.Category != thing.CategoryItem || len(view.Sprites) != len(view.Thing.SpriteIDs()) {
 		t.Fatalf("read obd %+v %v", view, err)
 	}
 	if ids := view.Thing.SpriteIDs(); ids[0] != 1 || len(view.Sprites[0]) != 32*32*4 {
 		t.Fatalf("read obd sprites %v", ids)
 	}
-	res, err := ts.ImportOBD(paths, 0)
+	res, err := ts.ImportObjects(paths, 0)
 	if err != nil || res[0].Error != "" || res[0].ID != 101 {
 		t.Fatalf("import %+v %v", res, err)
+	}
+
+	// OTOBJ export + import.
+	paths, err = ts.ExportObjects(thing.CategoryItem, []uint32{100}, dir, ObjectOTOBJ)
+	if err != nil || len(paths) != 1 || filepath.Ext(paths[0]) != ".otobj" {
+		t.Fatalf("export otobj %v %v", paths, err)
+	}
+	if view, err = ts.ReadObject(paths[0]); err != nil || view.Format != ObjectOTOBJ || len(view.Sprites) != len(view.Thing.SpriteIDs()) {
+		t.Fatalf("read otobj %+v %v", view, err)
+	}
+	if res, err = ts.ImportObjects(paths, 0); err != nil || res[0].Error != "" || res[0].ID != 102 {
+		t.Fatalf("import otobj %+v %v", res, err)
+	}
+	a, _ := ts.Get(thing.CategoryItem, 101)
+	b, _ := ts.Get(thing.CategoryItem, 102)
+	if a.Props != b.Props {
+		t.Fatal("otobj and obd imports differ")
 	}
 
 	// Sheet export + import.
@@ -196,7 +213,7 @@ func TestEndToEnd(t *testing.T) {
 		t.Fatal("inspect of an empty dir must fail")
 	}
 	st, err = ps.Open(OpenRequest{DatPath: cf.DatPath, SprPath: cf.SprPath, Features: cf.Features})
-	if err != nil || st.Info.Counts.Items != 101 {
+	if err != nil || st.Info.Counts.Items != 102 {
 		t.Fatalf("open %+v %v", st.Info.Counts, err)
 	}
 

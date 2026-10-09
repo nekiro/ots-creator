@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/nekiro/ots-creator/internal/imaging"
-	"github.com/nekiro/ots-creator/internal/obd"
 	"github.com/nekiro/ots-creator/internal/project"
 	"github.com/nekiro/ots-creator/internal/thing"
 )
@@ -85,11 +84,11 @@ func (s *Session) parallel(label string, n int, fn func(i int) error) error {
 	return firstErr
 }
 
-// ExportAll writes every object of every category as OBD files into
-// subfolders of dir (items, outfits, effects, missiles), named
-// {category}_{id}.obd like ExportOBD. With skipEmpty objects without
-// visible sprites are left out.
-func (ts *ThingService) ExportAll(dir string, skipEmpty bool) (ExportSummary, error) {
+// ExportAll writes every object of every category into subfolders of dir
+// (items, outfits, effects, missiles), named like ExportObjects, in format
+// (ObjectOTOBJ or ObjectOBD). With skipEmpty objects without visible
+// sprites are left out.
+func (ts *ThingService) ExportAll(dir string, skipEmpty bool, format string) (ExportSummary, error) {
 	p, err := ts.s.Project()
 	if err != nil {
 		return ExportSummary{}, err
@@ -123,15 +122,8 @@ func (ts *ThingService) ExportAll(dir string, skipEmpty bool) (ExportSummary, er
 	}
 	err = ts.s.parallel("Exporting objects", len(jobs), func(i int) error {
 		j := jobs[i]
-		d, err := p.ExportOBD(j.c, j.id, obd.Version3)
-		if err != nil {
-			return err
-		}
-		data, err := obd.Encode(d)
-		if err != nil {
-			return fmt.Errorf("%s %d: %w", j.c, j.id, err)
-		}
-		return os.WriteFile(filepath.Join(dir, categoryFolder(j.c), fmt.Sprintf("%s_%d.obd", j.c, j.id)), data, 0o644)
+		_, err := exportObject(p, j.c, j.id, filepath.Join(dir, categoryFolder(j.c)), format)
+		return err
 	})
 	return ExportSummary{Files: len(jobs), Skipped: total - len(jobs)}, err
 }

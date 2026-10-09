@@ -262,13 +262,25 @@ func DrawOver(img *image.NRGBA, x, y, size int, px []byte) {
 // SliceSheet cuts a group sheet into sprites, returning RGBA bytes indexed
 // by sprite slot. Magenta is removed. The image must match g.SheetSize.
 func SliceSheet(img *image.NRGBA, g *thing.FrameGroup, size int) ([][]byte, error) {
+	return sliceSheet(img, g, size, true)
+}
+
+// SliceSheetExact is SliceSheet for sheets with real transparency: magenta
+// is kept as a color.
+func SliceSheetExact(img *image.NRGBA, g *thing.FrameGroup, size int) ([][]byte, error) {
+	return sliceSheet(img, g, size, false)
+}
+
+func sliceSheet(img *image.NRGBA, g *thing.FrameGroup, size int, magenta bool) ([][]byte, error) {
 	w, h := g.SheetSize(size)
 	if img.Rect.Dx() != w || img.Rect.Dy() != h {
 		return nil, fmt.Errorf("sheet is %dx%d, frame group needs %dx%d", img.Rect.Dx(), img.Rect.Dy(), w, h)
 	}
 	clean := image.NewNRGBA(img.Rect)
 	copy(clean.Pix, img.Pix)
-	RemoveMagenta(clean)
+	if magenta {
+		RemoveMagenta(clean)
+	}
 	Normalize(clean)
 	out := make([][]byte, g.TotalSprites())
 	eachSprite(g, size, func(slot, x, y int) {

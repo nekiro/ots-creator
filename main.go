@@ -33,6 +33,7 @@ func main() {
 			wailsApp.Event.Emit(name, data)
 		}
 	}
+	app.Generator = "OTS Creator " + version
 	session := app.NewSession(emit)
 	prefs := openSettings()
 	resources := app.NewResources(session)
