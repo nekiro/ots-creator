@@ -19,6 +19,7 @@
     fit = 0,
     playing = true,
     colorize = true,
+    improved,
   }: {
     thing: Thing;
     get: PixelSource;
@@ -33,7 +34,16 @@
     playing?: boolean;
     /** Paint outfits with the default colors; off shows the white template like list thumbnails. */
     colorize?: boolean;
+    /** The client stores frame durations; guessed from the thing when not given. */
+    improved?: boolean;
   } = $props();
+
+  // Things from files without a client (market, OBD): frame groups or
+  // durations other than the 300 ms placeholder mean stored durations.
+  function guessImproved(t: Thing): boolean {
+    if (t.frameGroups.length > 1) return true;
+    return t.frameGroups.some((fg) => fg.durations.some((d) => d.min !== 300 || d.max !== 300));
+  }
 
   let canvas = $state<HTMLCanvasElement>();
   let frame = $state(0);
@@ -62,7 +72,12 @@
       frame = 0;
       return;
     }
-    const d = previewDurations(g, isOutfit);
+    const d = previewDurations(g, {
+      outfit: isOutfit,
+      groups: thing.frameGroups.length,
+      animateAlways: !!thing.props.animateAlways,
+      improved: improved ?? guessImproved(thing),
+    });
     let animator: Animator;
     try {
       animator = new Animator(Number(g.mode), 0, Math.min(Math.max(g.startFrame, 0), g.frames - 1), d, performance.now());

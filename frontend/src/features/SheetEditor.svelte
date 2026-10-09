@@ -7,6 +7,11 @@
   import { sheetCellPos, sheetGrid, spriteIndex, tileOffset, type TexturePos } from "../lib/render/layout";
   import { spriteCache } from "../lib/render/sprites";
   import { dragsMany, droppedSprites } from "../lib/dragsprites";
+  import type { OutfitColors } from "../lib/render/outfit";
+  import { PanView } from "../lib/pan.svelte";
+
+  /** The pixel grid shows from this zoom up (same as the single view). */
+  const PIXEL_GRID_ZOOM = 4;
 
   let {
     g,
@@ -14,6 +19,9 @@
     loaded,
     selected,
     showGrid,
+    pixelGrid = false,
+    colors = null,
+    resetKey = "",
     current,
     onassign,
     onpick,
@@ -28,6 +36,12 @@
     loaded: number;
     selected: number[];
     showGrid: boolean;
+    /** Lines between single pixels (from PIXEL_GRID_ZOOM up). */
+    pixelGrid?: boolean;
+    /** Outfit colors painted on layer 0 textures; mask layers stay as they are. */
+    colors?: OutfitColors | null;
+    /** A change centers the sheet again (another object or frame group). */
+    resetKey?: string;
     /** Texture shown in the single view, highlighted here. */
     current: TexturePos;
     onassign: (slot: number, ids: number[]) => void;
@@ -64,11 +78,27 @@
   });
   const zoom = $derived(manualZoom ?? fit);
 
-  function onwheel(e: WheelEvent) {
-    if (!e.ctrlKey) return;
-    e.preventDefault();
-    onwheelzoom?.(e.deltaY < 0 ? 1 : -1);
-  }
+  // A canvas, not a scrolled box: the sheet is centered and panned
+  // (space + drag, middle button drag, wheel; ctrl+wheel zooms).
+  const view = new PanView(
+    () => ({ w: sheetW * zoom, h: sheetH * zoom, sw: stageSize[0], sh: stageSize[1] }),
+    (d) => onwheelzoom?.(d),
+  );
+  // Zooming keeps the centered pixel; fitting the window or another object centers.
+  let lastZoom = 0;
+  $effect(() => {
+    const z = zoom;
+    if (lastZoom && z !== lastZoom) view.rescale(z / lastZoom);
+    lastZoom = z;
+  });
+  $effect(() => {
+    if (manualZoom === null) view.reset();
+  });
+  let lastKey = "";
+  $effect(() => {
+    if (resetKey !== lastKey) view.reset();
+    lastKey = resetKey;
+  });
 
   // Every slot with its position on the (unscaled) sheet.
   const tiles = $derived.by(() => {
@@ -108,7 +138,7 @@
     const get = (id: number) => spriteCache.get(id)?.pixels;
     for (let r = 0; r < grid.rows; r++)
       for (let c = 0; c < grid.columns; c++) {
-        const img = compose(g, g.sprites, size, { pos: sheetCellPos(g, c, r) }, get);
+        const img = compose(g, g.sprites, size, { pos: sheetCellPos(g, c, r), colors }, get);
         ctx.putImageData(img, c * (texW + GAP), r * (texH + GAP));
       }
   });
@@ -128,9 +158,15 @@
   }
 </script>
 
-<div class="sheet checker" bind:this={stage} {onwheel}>
-  <div class="wrap" style="width:{sheetW * zoom}px;height:{sheetH * zoom}px">
+<svelte:window onkeydown={view.key} onkeyup={view.key} onblur={view.blur} />
+
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="sheet checker" class:pan-ready={view.ready} class:panning={view.dragging} bind:this={stage} {...view.handlers}>
+  <div class="wrap" style="width:{sheetW * zoom}px;height:{sheetH * zoom}px;transform:{view.transform}">
     <canvas bind:this={canvas} class="pixel" style="width:100%;height:100%"></canvas>
+    {#if pixelGrid && zoom >= PIXEL_GRID_ZOOM}
+      <div class="pixel-grid" style="background-size:{zoom}px {zoom}px"></div>
+    {/if}
     {#each Array.from({ length: grid.rows * grid.columns }, (_, i) => i) as i (i)}
       {@const c = i % grid.columns}
       {@const r = Math.floor(i / grid.columns)}
@@ -162,18 +198,38 @@
 
 <style>
   .sheet {
+    position: relative;
     flex: 1;
     min-width: 0;
     min-height: 0;
-    overflow: auto;
+    overflow: hidden;
     display: grid;
     place-items: center;
     border: 1px solid #111;
     box-shadow: inset 0 0 0 1px #4a4a4a;
   }
   .wrap {
-    position: relative;
-    margin: 12px;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+  }
+  .pixel-grid {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, rgba(128, 128, 128, 0.35) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(128, 128, 128, 0.35) 1px, transparent 1px);
+  }
+  .sheet.pan-ready {
+    cursor: grab;
+  }
+  .sheet.panning {
+    cursor: grabbing;
+  }
+  .sheet.pan-ready .slot,
+  .sheet.panning .slot {
+    pointer-events: none;
   }
   .tex {
     position: absolute;

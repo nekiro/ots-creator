@@ -205,7 +205,7 @@
           >
             <span class="t-slot">
               {#if hover?.id === id}
-                <ThingCanvas thing={hover.thing} get={(sid) => spriteCache.get(sid)?.pixels} size={spriteCache.size} ready={hoverReady} group={hover.thing.frameGroups.length > 1 ? 1 : 0} fit={32} colorize={false} />
+                <ThingCanvas thing={hover.thing} get={(sid) => spriteCache.get(sid)?.pixels} size={spriteCache.size} ready={hoverReady} group={hover.thing.frameGroups.length > 1 ? 1 : 0} fit={32} colorize={false} improved={app.project?.info.format === Format.FormatAssets || !!app.project?.info.features.improvedAnimations} />
               {:else}
                 <img class="pixel" src={res.thumb(app.category, id, versions.thing(app.category, id))} alt="" loading="lazy" decoding="async" draggable="false" />
               {/if}

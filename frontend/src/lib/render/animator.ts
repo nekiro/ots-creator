@@ -143,18 +143,56 @@ export class Animator {
   }
 }
 
-/** Frame time of a walking outfit in previews: a normal walk, two steps per
- * cycle of eight frames. */
-export const WALK_FRAME_MS = 100;
+/**
+ * Step duration the outfit preview walks at: a level 1 player (speed 220)
+ * on grass (ground speed 150), rounded up to the 50 ms server beat like
+ * the client does: 1000 * 150 / 220 = 682 -> 700.
+ */
+export const WALK_STEP_MS = 700;
 
 /**
- * Frame durations used to preview a frame group. The client paces outfit
- * walking by the creature's speed and ignores the stored durations (the
- * official files hold a 300 ms placeholder), so walking groups play at
- * WALK_FRAME_MS; groups without durations use 100 ms.
+ * Delay between walking frames in the client (OTClient / voidcores
+ * Creature::updateWalkAnimation): one walk cycle takes a bit longer than a
+ * step, and outfits with more than 2 walking frames show a whole stride per
+ * cycle, so they cycle 1.5x slower.
  */
-export function previewDurations(g: { frames: number; durations: Duration[] | null; type: number }, outfit: boolean): Duration[] {
-  if (outfit && g.type === 1) return Array.from({ length: g.frames }, () => ({ min: WALK_FRAME_MS, max: WALK_FRAME_MS }));
+export function footDelay(walkFrames: number, step = WALK_STEP_MS): number {
+  const cycle = walkFrames > 2 ? Math.floor(((step + 20) * 3) / 2) : step + 20;
+  return Math.max(Math.floor(cycle / walkFrames) + 10, 20);
+}
+
+/** What previewDurations needs to know about the thing and its client. */
+export interface PreviewContext {
+  outfit: boolean;
+  /** Number of frame groups of the thing. */
+  groups: number;
+  /** The animate always flag of the thing. */
+  animateAlways: boolean;
+  /**
+   * The client stores frame durations (improved animations); without them
+   * the stored durations are made-up defaults.
+   */
+  improved: boolean;
+}
+
+const fixed = (frames: number, ms: number): Duration[] => Array.from({ length: frames }, () => ({ min: ms, max: ms }));
+
+/**
+ * Frame durations used to preview a frame group, timed like the client:
+ * - outfit walking frames advance at footDelay, paced by the walk speed,
+ *   not by stored durations (the official files hold a 300 ms placeholder);
+ * - an outfit of an old client (one group, no improved animations) walks
+ *   over frames 1..n-1, frame 0 is standing (it gets 0 ms so it is skipped),
+ *   unless it animates always: then a whole cycle takes one second;
+ * - everything else uses the stored durations, or 100 ms without them.
+ */
+export function previewDurations(g: { frames: number; durations: Duration[] | null; type: number }, ctx: PreviewContext): Duration[] {
+  if (ctx.outfit && g.type === 1) return fixed(g.frames, footDelay(g.frames));
+  if (ctx.outfit && ctx.groups === 1 && !ctx.improved) {
+    if (ctx.animateAlways) return fixed(g.frames, Math.round(1000 / g.frames));
+    if (g.frames > 2) return [{ min: 0, max: 0 }, ...fixed(g.frames - 1, footDelay(g.frames - 1))];
+    return fixed(g.frames, footDelay(g.frames));
+  }
   if (g.durations?.length === g.frames) return g.durations;
-  return Array.from({ length: g.frames }, () => ({ min: 100, max: 100 }));
+  return fixed(g.frames, 100);
 }

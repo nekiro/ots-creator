@@ -6,7 +6,7 @@
 
 <script lang="ts">
   import { untrack } from "svelte";
-  import { Category, errorMessage, normalizeThing, ThingService, type Thing } from "../lib/api";
+  import { Category, errorMessage, Format, normalizeThing, ThingService, type Thing } from "../lib/api";
   import { Animator, previewDurations } from "../lib/render/animator";
   import { PREVIEW_DROP } from "../lib/commands";
   import { compose, stackBottomRight } from "../lib/render/compose";
@@ -16,6 +16,7 @@
   import { DEFAULT_COLORS, type OutfitColors } from "../lib/render/outfit";
   import { spriteCache } from "../lib/render/sprites";
   import { app, toast } from "../lib/state.svelte";
+  import { PanView } from "../lib/pan.svelte";
   import NumberField from "../lib/ui/NumberField.svelte";
   import Slider from "../lib/ui/Slider.svelte";
   import Icon from "../lib/ui/Icon.svelte";
@@ -30,6 +31,10 @@
   let stage = $state<HTMLDivElement>();
   let stageSize = $state<[number, number]>([0, 0]);
   let showGrid = $state(true);
+  // Lines between single pixels; drawn only from PIXEL_GRID_ZOOM up, where
+  // they do not hide the sprite.
+  let showPixelGrid = $state(false);
+  const PIXEL_GRID_ZOOM = 4;
   let playing = $state(true);
   let colorize = $state(true);
   let addon1 = $state(false);
@@ -69,8 +74,18 @@
   });
 
   function setZoom(z: number) {
-    manualZoom = Math.min(MAX_ZOOM, Math.max(1, z));
+    const next = Math.min(MAX_ZOOM, Math.max(1, z));
+    const factor = next / zoom;
+    manualZoom = next;
+    view.rescale(factor);
   }
+
+  // The stage is a canvas, not a scrolled box: the texture is centered and
+  // moved by the pan offset (space + drag, middle button drag, wheel).
+  const view = new PanView(
+    () => ({ w: (canvasSize[0] || (g?.width ?? 1) * size) * zoom, h: (canvasSize[1] || (g?.height ?? 1) * size) * zoom, sw: stageSize[0], sh: stageSize[1] }),
+    (d) => setZoom(zoom + d),
+  );
 
   // Reset view state when another thing is selected.
   let lastKey = "";
@@ -80,6 +95,7 @@
     lastKey = key;
     group = 0;
     manualZoom = null;
+    view.reset();
     pos = { layer: 0, x: isOutfit && (thing?.frameGroups[0]?.patternX ?? 1) > 2 ? 2 : 0, y: 0, z: 0, frame: 0 };
     hoverSlot = null;
   });
@@ -132,7 +148,13 @@
       animator = null;
       return;
     }
-    const durations = previewDurations(g, isOutfit);
+    const info = app.project?.info;
+    const durations = previewDurations(g, {
+      outfit: isOutfit,
+      groups: thing?.frameGroups.length ?? 1,
+      animateAlways: !!thing?.props.animateAlways,
+      improved: !!info && (info.format === Format.FormatAssets || info.features.improvedAnimations),
+    });
     try {
       animator = new Animator(Number(g.mode), 0, Math.min(Math.max(g.startFrame, 0), g.frames - 1), durations, performance.now());
       animator.setFrame(untrack(() => pos.frame), performance.now());
@@ -216,7 +238,10 @@
 
   function zoomFit() {
     if (sheetView) sheetManualZoom = null;
-    else manualZoom = null;
+    else {
+      manualZoom = null;
+      view.reset();
+    }
   }
 
   if (savedSheetView) playing = false;
@@ -237,14 +262,11 @@
     }
   }
 
-  function onWheel(e: WheelEvent) {
-    if (!e.ctrlKey) return;
-    e.preventDefault();
-    setZoom(zoom + (e.deltaY < 0 ? 1 : -1));
-  }
 </script>
 
 <!-- Images dropped here are sprite sheets for the object (commands.drop). -->
+<svelte:window onkeydown={view.key} onkeyup={view.key} onblur={view.blur} />
+
 <div class="preview" id={PREVIEW_DROP} data-file-drop-target>
   {#if g && sheetView}
   <div class="stage-wrap">
@@ -254,6 +276,9 @@
       {loaded}
       selected={app.selectedSprites}
       {showGrid}
+      pixelGrid={showPixelGrid}
+      colors={isOutfit && colorize ? colors : null}
+      resetKey={`${app.category}:${thing?.id}:${group}`}
       current={pos}
       onassign={assign}
       onpick={(slot) => {
@@ -268,10 +293,23 @@
   </div>
   {:else}
   <div class="stage-wrap">
-  <div class="stage checker" onwheel={onWheel} bind:this={stage}>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="stage checker"
+    class:pan-ready={view.ready}
+    class:panning={view.dragging}
+    bind:this={stage}
+    {...view.handlers}
+  >
     {#if g}
-      <div class="canvas-wrap" style="width:{(canvasSize[0] || g.width * size) * zoom}px;height:{(canvasSize[1] || g.height * size) * zoom}px">
+      <div
+        class="canvas-wrap"
+        style="width:{(canvasSize[0] || g.width * size) * zoom}px;height:{(canvasSize[1] || g.height * size) * zoom}px;transform:{view.transform}"
+      >
         <canvas bind:this={canvas} class="pixel" style="width:100%;height:100%"></canvas>
+        {#if showPixelGrid && zoom >= PIXEL_GRID_ZOOM}
+          <div class="pixel-grid" style="background-size:{zoom}px {zoom}px"></div>
+        {/if}
         <div class="slots" class:grid={showGrid}>
           {#each slots as s (s.slot)}
             {@const id = g.sprites[s.slot]}
@@ -332,6 +370,12 @@
         </button>
         <button class="t-icon-btn" title="Zoom in (Ctrl+wheel)" onclick={() => zoomBy(1)}><Icon name="zoomin" /></button>
         <button class="t-icon-btn" class:on={showGrid} title="Tile grid" onclick={() => (showGrid = !showGrid)}><Icon name="grid" /></button>
+        <button
+          class="t-icon-btn"
+          class:on={showPixelGrid}
+          title={shownZoom >= PIXEL_GRID_ZOOM ? "Pixel grid" : `Pixel grid (shown from ${PIXEL_GRID_ZOOM}x zoom)`}
+          onclick={() => (showPixelGrid = !showPixelGrid)}><Icon name="pixels" /></button
+        >
         <button
           class="t-icon-btn"
           class:on={sheetView}
@@ -426,23 +470,45 @@
     pointer-events: none;
   }
   .stage {
+    position: relative;
     flex: 1;
     min-width: 0;
     min-height: 0;
-    overflow: auto;
+    overflow: hidden;
     display: grid;
     place-items: center;
     border: 1px solid #111;
     box-shadow: inset 0 0 0 1px #4a4a4a;
   }
   .canvas-wrap {
-    position: relative;
-    margin: 16px;
+    position: absolute;
+    left: 50%;
+    top: 50%;
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
   }
   .slots {
     position: absolute;
     inset: 0;
+  }
+  .stage.pan-ready {
+    cursor: grab;
+  }
+  .stage.panning {
+    cursor: grabbing;
+  }
+  /* While panning, slots neither click nor show hover outlines. */
+  .stage.pan-ready .slots,
+  .stage.panning .slots {
+    pointer-events: none;
+  }
+  /* One line per pixel edge; grey stays visible on dark and light pixels. */
+  .pixel-grid {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, rgba(128, 128, 128, 0.35) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(128, 128, 128, 0.35) 1px, transparent 1px);
   }
   .slot {
     position: absolute;

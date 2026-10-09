@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Animator, AnimationMode, previewDurations, WALK_FRAME_MS } from "./animator";
+import { Animator, AnimationMode, footDelay, previewDurations } from "./animator";
 import { clampPos, resizeSprites, spriteIndex, textureSlots, totalSprites, type Layout } from "./layout";
 import { colorize, hsiToRgb, PALETTE_SIZE } from "./outfit";
 
@@ -128,19 +128,27 @@ describe("previewDurations", () => {
   const durations = [
     { min: 300, max: 300 },
     { min: 300, max: 300 },
+    { min: 300, max: 300 },
   ];
-  it("plays outfit walking at walk speed", () => {
-    expect(previewDurations({ frames: 2, durations, type: 1 }, true)).toEqual([
-      { min: WALK_FRAME_MS, max: WALK_FRAME_MS },
-      { min: WALK_FRAME_MS, max: WALK_FRAME_MS },
-    ]);
+  const outfit = { outfit: true, groups: 2, animateAlways: false, improved: true };
+  const ms = (d: { min: number }[]) => d.map((x) => x.min);
+
+  it("paces walking like the client", () => {
+    // 2 frames: (700 + 20) / 2 + 10; 8 frames: (720 * 1.5) / 8 + 10.
+    expect(footDelay(2)).toBe(370);
+    expect(footDelay(8)).toBe(145);
+    expect(ms(previewDurations({ frames: 3, durations, type: 1 }, outfit))).toEqual([370, 370, 370]);
+  });
+  it("walks old single group outfits over frames 1..n-1", () => {
+    const old = { ...outfit, groups: 1, improved: false };
+    expect(ms(previewDurations({ frames: 3, durations, type: 0 }, old))).toEqual([0, footDelay(2), footDelay(2)]);
+    expect(ms(previewDurations({ frames: 2, durations: durations.slice(1), type: 0 }, old))).toEqual([370, 370]);
+    expect(ms(previewDurations({ frames: 4, durations: null, type: 0 }, { ...old, animateAlways: true }))).toEqual([250, 250, 250, 250]);
   });
   it("keeps stored durations elsewhere", () => {
-    expect(previewDurations({ frames: 2, durations, type: 0 }, true)).toBe(durations);
-    expect(previewDurations({ frames: 2, durations, type: 1 }, false)).toBe(durations);
-    expect(previewDurations({ frames: 2, durations: null, type: 0 }, false)).toEqual([
-      { min: 100, max: 100 },
-      { min: 100, max: 100 },
-    ]);
+    expect(previewDurations({ frames: 3, durations, type: 0 }, outfit)).toBe(durations);
+    expect(previewDurations({ frames: 3, durations, type: 0 }, { ...outfit, groups: 1 })).toBe(durations);
+    expect(previewDurations({ frames: 3, durations, type: 1 }, { ...outfit, outfit: false })).toBe(durations);
+    expect(ms(previewDurations({ frames: 2, durations: null, type: 0 }, { ...outfit, outfit: false }))).toEqual([100, 100]);
   });
 });
