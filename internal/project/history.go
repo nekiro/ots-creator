@@ -13,6 +13,9 @@ type thingChange struct {
 type spriteChange struct {
 	id            uint32
 	before, after []byte
+	// fromBase: before is the untouched sprite of the file, so undo marks
+	// the sprite unedited again (compiling then keeps it as it is).
+	fromBase bool
 }
 
 // edit is one undoable operation. It records list lengths before and after
@@ -123,8 +126,20 @@ func setSlot(p *Project, c thing.Category, id uint32, t *thing.Thing) {
 func (r *recorder) setSprite(id uint32, c []byte) {
 	if _, ok := r.sprIdx[id]; !ok {
 		before, _ := r.p.sprites.compressed(id)
+		r.setSpriteKnown(id, before, c)
+		return
+	}
+	r.e.sprites[r.sprIdx[id]].after = c
+	r.p.sprites.set(id, c)
+	r.p.delta.sprite(id)
+}
+
+// setSpriteKnown is setSprite for a caller that already read the current
+// data of the sprite (before), which saves a slow read for asset sheets.
+func (r *recorder) setSpriteKnown(id uint32, before, c []byte) {
+	if _, ok := r.sprIdx[id]; !ok {
 		r.sprIdx[id] = len(r.e.sprites)
-		r.e.sprites = append(r.e.sprites, spriteChange{id: id, before: before})
+		r.e.sprites = append(r.e.sprites, spriteChange{id: id, before: before, fromBase: !r.p.sprites.edited(id)})
 	}
 	r.e.sprites[r.sprIdx[id]].after = c
 	r.p.sprites.set(id, c)
@@ -185,9 +200,12 @@ func (p *Project) applyEdit(e *edit, forward bool) {
 		if ch.id > count {
 			continue
 		}
-		if forward {
+		switch {
+		case forward:
 			p.sprites.set(ch.id, ch.after)
-		} else {
+		case ch.fromBase:
+			p.sprites.unset(ch.id)
+		default:
 			p.sprites.set(ch.id, ch.before)
 		}
 	}

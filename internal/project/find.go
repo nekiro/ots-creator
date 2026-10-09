@@ -37,24 +37,35 @@ func (p *Project) FindThings(c thing.Category, f Filter) ([]uint32, error) {
 	name := strings.ToLower(strings.TrimSpace(f.Name))
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	ids := []uint32{}
-	for id := c.MinID(); id <= p.things.MaxID(c); id++ {
-		t := p.things.Get(c, id)
+	match := func(t *thing.Thing) bool {
 		if t == nil {
-			continue
+			return false
 		}
 		if f.Flag != "" {
 			if on, _ := t.Props.FlagByKey(f.Flag); !on {
-				continue
+				return false
 			}
 		}
 		if name != "" && !strings.Contains(strings.ToLower(t.Name), name) {
-			continue
+			return false
 		}
-		if f.Content != ContentAll && p.hasPixels(t) != (f.Content == ContentUsed) {
-			continue
+		return f.Content == ContentAll || p.hasPixels(t) == (f.Content == ContentUsed)
+	}
+	first, last := c.MinID(), p.things.MaxID(c)
+	keep := make([]bool, max(int(last)-int(first)+1, 0))
+	// The content filter reads sprites (asset sheets decode slowly): check
+	// the things in parallel, then collect them in order.
+	parallelRange(first, last, thingChunk(uint32(len(keep))), func(from, to uint32) error {
+		for id := from; id <= to; id++ {
+			keep[id-first] = match(p.things.Get(c, id))
 		}
-		ids = append(ids, id)
+		return nil
+	})
+	ids := []uint32{}
+	for i, k := range keep {
+		if k {
+			ids = append(ids, first+uint32(i))
+		}
 	}
 	return ids, nil
 }

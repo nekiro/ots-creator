@@ -427,3 +427,28 @@ func TestImportSheetInfersOutfit(t *testing.T) {
 		t.Fatal("8.60 outfit")
 	}
 }
+
+func TestUndoMarksSpritesUnedited(t *testing.T) {
+	dir := t.TempDir()
+	p := New(v1098(), client.Features{})
+	p.AddSprites([][]byte{solid(255, 0, 0), solid(0, 255, 0)})
+	o := CompileOptions{DatPath: filepath.Join(dir, "Tibia.dat"), SprPath: filepath.Join(dir, "Tibia.spr"), Version: v1098(), Features: p.Info().Features}
+	if err := p.Compile(o); err != nil {
+		t.Fatal(err)
+	}
+	p.ReplaceSprite(1, solid(1, 2, 3))
+	if !p.sprites.edited(1) {
+		t.Fatal("replaced sprite must be edited")
+	}
+	p.Undo()
+	if p.sprites.edited(1) {
+		t.Fatal("undo must restore the file sprite")
+	}
+	if px, _ := p.SpritePixels(1); px[0] != 255 {
+		t.Fatal("pixels not restored")
+	}
+	p.Redo()
+	if px, _ := p.SpritePixels(1); px[0] != 1 {
+		t.Fatal("redo lost")
+	}
+}

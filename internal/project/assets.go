@@ -311,12 +311,20 @@ func (p *Project) compileAssets(dir string) error {
 		return err
 	}
 
-	// Copy the files of the source folder when writing somewhere else.
+	// Copy the files of the source folder when writing somewhere else
+	// (thousands of sheets: in parallel, hard links where possible).
 	if p.assets != nil && !sameDir(p.assets.dir, dir) {
-		for _, name := range base.Files() {
-			if err := copyFile(filepath.Join(p.assets.dir, name), filepath.Join(dir, name)); err != nil {
-				return err
+		names := base.Files()
+		err := parallelRange(0, uint32(len(names)-1), 16, func(from, to uint32) error {
+			for _, name := range names[from : to+1] {
+				if err := copyFile(filepath.Join(p.assets.dir, name), filepath.Join(dir, name)); err != nil {
+					return err
+				}
 			}
+			return nil
+		})
+		if err != nil {
+			return err
 		}
 	}
 
@@ -383,9 +391,15 @@ func sameDir(a, b string) bool {
 	return strings.EqualFold(filepath.Clean(a), filepath.Clean(b))
 }
 
+// copyFile copies src to dst. Asset files are never changed in place (every
+// write goes to a new file that is renamed over), so a hard link is a safe
+// and much faster copy when both are on one volume.
 func copyFile(src, dst string) error {
 	if st, err := os.Stat(dst); err == nil && !st.IsDir() {
 		return nil // content addressed names: an existing file is the same
+	}
+	if os.Link(src, dst) == nil {
+		return nil
 	}
 	in, err := os.Open(src)
 	if err != nil {

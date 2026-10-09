@@ -80,6 +80,9 @@ func (s *spriteStore) set(id uint32, c []byte) {
 	s.overlay[id] = c
 }
 
+// unset drops an edit: the sprite reads from the base again.
+func (s *spriteStore) unset(id uint32) { delete(s.overlay, id) }
+
 // setCount changes the sprite count. Sprites past the new count are
 // dropped from the overlay; growing exposes empty sprites.
 func (s *spriteStore) setCount(n uint32) {

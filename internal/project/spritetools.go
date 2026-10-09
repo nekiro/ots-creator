@@ -2,6 +2,7 @@ package project
 
 import (
 	"fmt"
+	"hash/maphash"
 	"slices"
 
 	"github.com/nekiro/ots-creator/internal/thing"
@@ -28,26 +29,28 @@ func (p *Project) FindSprites(filter string) ([]uint32, error) {
 				out = append(out, id)
 			}
 		}
-	case SpritesEmpty, SpritesDuplicate:
-		seen := map[string]struct{}{}
+	case SpritesEmpty:
+		empty := make([]bool, n+1)
+		err := p.sprites.eachCompressed(func(id uint32, c []byte) error {
+			empty[id] = len(c) == 0
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
 		for id := uint32(1); id <= n; id++ {
-			c, err := p.sprites.compressed(id)
-			if err != nil {
-				return nil, err
-			}
-			if filter == SpritesEmpty {
-				if len(c) == 0 {
-					out = append(out, id)
-				}
-				continue
-			}
-			if len(c) == 0 {
-				continue
-			}
-			if _, ok := seen[string(c)]; ok {
+			if empty[id] {
 				out = append(out, id)
-			} else {
-				seen[string(c)] = struct{}{}
+			}
+		}
+	case SpritesDuplicate:
+		dups, err := p.duplicateSprites()
+		if err != nil {
+			return nil, err
+		}
+		for id := uint32(1); id <= n; id++ {
+			if dups[id] != 0 {
+				out = append(out, id)
 			}
 		}
 	default:
@@ -135,4 +138,37 @@ func (p *Project) ReplaceSpriteRefs(from []uint32, to uint32) (int, error) {
 	}
 	r.commit()
 	return changed, nil
+}
+
+// duplicateSprites maps every sprite with the same pixels as a sprite with
+// a lower id to the first of them (0: not a duplicate; empty sprites are
+// never duplicates). Sprites are hashed in parallel with a 128-bit hash, so
+// a collision is practically impossible and nothing is read twice.
+func (p *Project) duplicateSprites() ([]uint32, error) {
+	n := p.sprites.count()
+	s1, s2 := maphash.MakeSeed(), maphash.MakeSeed()
+	hashes := make([][2]uint64, n+1)
+	err := p.sprites.eachCompressed(func(id uint32, c []byte) error {
+		if len(c) > 0 {
+			hashes[id] = [2]uint64{maphash.Bytes(s1, c) | 1, maphash.Bytes(s2, c)} // 0 marks empty
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	dups := make([]uint32, n+1)
+	first := make(map[[2]uint64]uint32, n)
+	for id := uint32(1); id <= n; id++ {
+		h := hashes[id]
+		if h[0] == 0 {
+			continue
+		}
+		if f, ok := first[h]; ok {
+			dups[id] = f
+		} else {
+			first[h] = id
+		}
+	}
+	return dups, nil
 }

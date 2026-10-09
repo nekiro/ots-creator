@@ -35,12 +35,12 @@ func (p *Project) OptimizeSprites(o OptimizeOptions) (OptimizeResult, error) {
 	res := OptimizeResult{Before: n, After: n}
 
 	data := make([][]byte, n+1)
-	for id := uint32(1); id <= n; id++ {
-		c, err := p.sprites.compressed(id)
-		if err != nil {
-			return res, err
-		}
+	err := p.sprites.eachCompressed(func(id uint32, c []byte) error {
 		data[id] = c
+		return nil
+	})
+	if err != nil {
+		return res, err
 	}
 
 	// canon maps every id to the id that replaces it (0 = empty).
@@ -129,11 +129,11 @@ func (p *Project) OptimizeSprites(o OptimizeOptions) (OptimizeResult, error) {
 	// restore it, then shrink.
 	for id := uint32(1); id <= n; id++ {
 		if m := newID[id]; m != 0 && m != id {
-			r.setSprite(m, data[id])
+			r.setSpriteKnown(m, data[m], data[id]) // m < id: not written yet
 		}
 	}
 	for id := next + 1; id <= n; id++ {
-		r.setSprite(id, nil)
+		r.setSpriteKnown(id, data[id], nil)
 	}
 	r.setSpriteCount(next)
 	r.commit()

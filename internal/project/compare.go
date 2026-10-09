@@ -4,10 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"path/filepath"
-	"runtime"
 	"slices"
-	"sync"
-	"sync/atomic"
 
 	"github.com/nekiro/ots-creator/internal/spr"
 	"github.com/nekiro/ots-creator/internal/thing"
@@ -47,9 +44,6 @@ type DiffResult struct {
 	Same    int         `json:"same"`
 }
 
-// diffChunk is the number of ids one worker compares at a time.
-const diffChunk = 1024
-
 // Diff compares the things of category c in a and b. Sprites are compared
 // by their pixels, not by their ids, so the same object stored under other
 // sprite ids is equal. Differences that only come from the formats of the
@@ -79,37 +73,19 @@ func Diff(a, b *Project, c thing.Category) (DiffResult, error) {
 	}
 	// Chunks are compared in parallel (sprite reads may decode asset sheets)
 	// and joined in id order.
-	chunks := int((last-first)/diffChunk) + 1
-	parts := make([]DiffResult, chunks)
-	errs := make([]error, chunks)
-	next := atomic.Int64{}
-	var wg sync.WaitGroup
-	for range min(chunks, runtime.GOMAXPROCS(0)) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			cmp := thingComparer{opts: opts, sprites: spriteComparer{a: a.sprites, b: b.sprites, cache: map[[2]uint32]bool{}}}
-			for {
-				i := int(next.Add(1) - 1)
-				if i >= chunks {
-					return
-				}
-				from := first + uint32(i)*diffChunk
-				to := min(from+diffChunk-1, last)
-				parts[i], errs[i] = diffRange(a, b, c, from, to, &cmp)
-				if errs[i] != nil {
-					next.Store(int64(chunks)) // stop the other workers early
-					return
-				}
-			}
-		}()
+	size := thingChunk(last - first + 1)
+	parts := make([]DiffResult, (last-first)/size+1)
+	err := parallelRange(first, last, size, func(from, to uint32) error {
+		cmp := thingComparer{opts: opts, sprites: spriteComparer{a: a.sprites, b: b.sprites, cache: map[[2]uint32]bool{}}}
+		part, err := diffRange(a, b, c, from, to, &cmp)
+		parts[(from-first)/size] = part
+		return err
+	})
+	if err != nil {
+		return DiffResult{}, err
 	}
-	wg.Wait()
 	res := DiffResult{Entries: []DiffEntry{}}
-	for i, part := range parts {
-		if errs[i] != nil {
-			return DiffResult{}, errs[i]
-		}
+	for _, part := range parts {
 		res.Entries = append(res.Entries, part.Entries...)
 		res.Same += part.Same
 	}

@@ -201,7 +201,7 @@ func TestDiffChunksKeepOrder(t *testing.T) {
 	b := New(v1098(), client.Features{})
 	a.AddSprites([][]byte{solid(255, 0, 0)})
 	b.AddSprites([][]byte{solid(255, 0, 0)})
-	const n = 3*diffChunk + 17
+	const n = 3*1024 + 17
 	setItem(t, a, 100+n, false, 1)
 	setItem(t, b, 100+n-5, true, 1)
 	d, err := Diff(a, b, thing.CategoryItem)
