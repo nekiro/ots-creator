@@ -468,6 +468,25 @@ input[type="number"].t-input::-webkit-outer-spin-button {
 ::-webkit-scrollbar-button:single-button:horizontal:increment:active {
   background-image: url("./assets/ui/sb-right-pressed.png");
 }
+/* WKWebView / WebKitGTK never draw scrollbar buttons, so the arrows are
+   painted on the scrollbar itself and the track is shortened to make room;
+   lib/ui/scrollbuttons.ts makes them clickable. */
+html.sb-fake-buttons ::-webkit-scrollbar:vertical {
+  background:
+    url("./assets/ui/sb-up.png") top / 12px 12px no-repeat,
+    url("./assets/ui/sb-down.png") bottom / 12px 12px no-repeat;
+}
+html.sb-fake-buttons ::-webkit-scrollbar-track:vertical {
+  margin: 12px 0;
+}
+html.sb-fake-buttons ::-webkit-scrollbar:horizontal {
+  background:
+    url("./assets/ui/sb-left.png") left / 12px 12px no-repeat,
+    url("./assets/ui/sb-right.png") right / 12px 12px no-repeat;
+}
+html.sb-fake-buttons ::-webkit-scrollbar-track:horizontal {
+  margin: 0 12px;
+}
 ::-webkit-scrollbar-corner {
   background: #2a2a2a;
 }
