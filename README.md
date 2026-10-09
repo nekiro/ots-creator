@@ -103,6 +103,18 @@ OBD. We accepted the difference of a few kilobytes per object in exchange for a 
 that people can read and edit. OBD stays fully supported for exchanging objects with
 ObjectBuilder, and the market keeps storing objects as OBD.
 
+## Install
+
+Download the latest build from [Releases](https://github.com/nekiro/ots-creator/releases):
+
+- **Windows:** `otscreator-amd64-installer.exe`, or the portable `otscreator-windows-amd64.exe`.
+- **macOS 12+:** `otscreator-darwin-arm64.zip` (Apple Silicon) or `otscreator-darwin-amd64.zip`
+  (Intel). Unzip and move `otscreator.app` to Applications. The app is not notarized, so
+  macOS blocks the first start: open System Settings > Privacy & Security and click
+  "Open Anyway", or run `xattr -dr com.apple.quarantine /Applications/otscreator.app`.
+
+Later versions install from the built-in updater.
+
 ## Development
 
 Requirements: Go 1.26+, Node 22+, `wails3` CLI (`go install github.com/wailsapp/wails/v3/cmd/wails3@latest`).

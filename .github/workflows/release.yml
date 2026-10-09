@@ -1,10 +1,15 @@
-# Builds a Windows release when a version tag (v1.2.3) is pushed.
+# Builds Windows and macOS releases when a version tag (v1.2.3) is pushed.
 #
 # Release assets:
 #   otscreator-amd64-installer.exe  NSIS installer for first installs
 #   otscreator-windows-amd64.exe    plain executable, used by the in-app updater
-#                                   (Wails updater, GitHub provider)
-#   checksums.txt                   SHA-256 of both, checked by the updater
+#   otscreator-darwin-arm64.zip     .app bundle for Apple Silicon Macs
+#   otscreator-darwin-amd64.zip     .app bundle for Intel Macs
+#   checksums.txt                   SHA-256 of all of them, checked by the updater
+#
+# The in-app updater (Wails updater, GitHub provider) picks the asset whose name
+# contains the running OS and architecture and skips "-installer." assets. On
+# macOS it needs a .zip with exactly one top-level .app (no .dmg).
 name: Release
 
 on:
@@ -13,6 +18,9 @@ on:
 
 permissions:
   contents: write
+
+env:
+  WAILS_VERSION: v3.0.0-beta.28
 
 jobs:
   windows:
@@ -45,7 +53,7 @@ jobs:
 
       - name: Install tools
         run: |
-          go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.28
+          go install github.com/wailsapp/wails/v3/cmd/wails3@$WAILS_VERSION
           if ! command -v makensis >/dev/null; then choco install nsis -y --no-progress; fi
           echo "C:/Program Files (x86)/NSIS" >> "$GITHUB_PATH"
 
@@ -69,13 +77,93 @@ jobs:
           mkdir dist
           cp bin/otscreator.exe dist/otscreator-windows-amd64.exe
           cp bin/otscreator-amd64-installer.exe dist/
-          cd dist && sha256sum otscreator-windows-amd64.exe otscreator-amd64-installer.exe > checksums.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: dist/*
+          if-no-files-found: error
+
+  macos:
+    # Apple Silicon runner; the amd64 build is cross-compiled with the same
+    # toolchain (Go passes -arch x86_64 to clang for cgo).
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Version from tag
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          # CFBundleShortVersionString / CFBundleVersion need plain x.y.z.
+          numeric="${version%%[-+]*}"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          sed -i '' "s|<string>0\.1\.0</string>|<string>$numeric</string>|g" build/darwin/Info.plist
+          grep -c "<string>$numeric</string>" build/darwin/Info.plist
+
+      - name: Install tools
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@$WAILS_VERSION
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Test
+        run: |
+          wails3 task common:generate:bindings
+          # main.go embeds frontend/dist, which exists only after the frontend build.
+          mkdir -p frontend/dist && touch frontend/dist/.keep
+          go test ./...
+
+      - name: Build app bundles
+        run: |
+          mkdir dist
+          for arch in arm64 amd64; do
+            # Builds bin/otscreator.app (ad-hoc signed by create:app:bundle).
+            wails3 task darwin:package ARCH="$arch" VERSION="$VERSION"
+            lipo -info bin/otscreator.app/Contents/MacOS/otscreator
+            codesign --verify --deep --strict bin/otscreator.app
+            # One top-level .app per zip, as the updater expects.
+            ditto -c -k --norsrc --keepParent bin/otscreator.app "dist/otscreator-darwin-$arch.zip"
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-macos
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        run: |
+          cd dist && sha256sum * > checksums.txt
           cat checksums.txt
 
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          version="${GITHUB_REF_NAME#v}"
           prerelease=""
-          if [ "$VERSION" != "$NUMERIC_VERSION" ]; then prerelease="--prerelease"; fi
-          gh release create "$GITHUB_REF_NAME" dist/* --title "OTS Creator $VERSION" --generate-notes $prerelease
+          if [ "$version" != "${version%%[-+]*}" ]; then prerelease="--prerelease"; fi
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
+            --title "OTS Creator $version" --generate-notes $prerelease
