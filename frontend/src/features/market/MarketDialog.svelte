@@ -369,12 +369,12 @@
     flex: 1;
     min-width: 0;
     overflow-y: auto;
-    padding: 6px;
+    padding: 3px;
   }
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
-    gap: 4px;
+    grid-template-columns: repeat(auto-fill, 78px);
+    gap: 2px;
   }
   .card {
     display: flex;
@@ -382,7 +382,7 @@
     align-items: center;
     gap: 1px;
     min-width: 0;
-    padding: 4px 3px 3px;
+    padding: 2px 2px 1px;
     border: 1px solid transparent;
     background: rgba(255, 255, 255, 0.025);
     font: inherit;
@@ -403,7 +403,7 @@
     display: grid;
     place-items: center;
     overflow: hidden;
-    margin-bottom: 2px;
+    margin-bottom: 1px;
   }
   .thumb img {
     max-width: 64px;
