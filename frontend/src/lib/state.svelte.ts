@@ -3,7 +3,7 @@
 
 import { Events } from "@wailsio/runtime";
 import { Category, CompareService, ProjectService, ThingService, errorMessage, normalizeThing, type State, type Thing } from "./api";
-import { spriteCache } from "./render/sprites";
+import { otherSpriteCache, spriteCache, type SpriteCache } from "./render/sprites";
 
 export type ToastKind = "info" | "success" | "error";
 export interface Toast {
@@ -92,8 +92,8 @@ export const app = new AppState();
  * of what it touched, so other images stay cached and do not flicker.
  */
 class ResourceVersions {
-  /** ownsSprites: the shared sprite cache shows this client (the main one). */
-  constructor(private ownsSprites = true) {}
+  /** cache: the sprite cache that shows this client. */
+  constructor(private cache: SpriteCache) {}
   private tick = $state(0);
   private epoch = 0;
   private things = new Map<string, number>();
@@ -104,11 +104,11 @@ class ResourceVersions {
       this.epoch = rev;
       this.things.clear();
       this.sprites.clear();
-      if (this.ownsSprites) spriteCache.invalidate(null);
+      this.cache.invalidate(null);
     } else {
       for (const t of delta.things ?? []) this.things.set(`${t.category}:${t.id}`, rev);
       for (const id of delta.sprites ?? []) this.sprites.set(id, rev);
-      if (this.ownsSprites) spriteCache.invalidate(delta.sprites ?? []);
+      this.cache.invalidate(delta.sprites ?? []);
     }
     this.tick++;
   }
@@ -124,9 +124,9 @@ class ResourceVersions {
   }
 }
 
-export const versions = new ResourceVersions();
+export const versions = new ResourceVersions(spriteCache);
 /** Cache keys of the second client of the compare window. */
-export const otherVersions = new ResourceVersions(false);
+export const otherVersions = new ResourceVersions(otherSpriteCache);
 
 let toastSeq = 0;
 export function toast(text: string, kind: ToastKind = "info", ms = 3500): void {

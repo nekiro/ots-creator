@@ -10,6 +10,8 @@ export interface SpriteEntry {
 const BATCH = 512;
 
 export class SpriteCache {
+  /** url builds the batch request: res.sprites for the open client. */
+  constructor(private url: (ids: number[], rev: number) => string = res.sprites) {}
   size = 32;
   // Bumped on every invalidation; batches fetched under an older generation
   // are discarded because they may hold stale pixels.
@@ -50,7 +52,7 @@ export class SpriteCache {
 
   private async fetchChunk(ids: number[], gen: number): Promise<void> {
     try {
-      const resp = await fetch(res.sprites(ids, gen));
+      const resp = await fetch(this.url(ids, gen));
       if (!resp.ok) throw new Error(await resp.text());
       const size = Number(resp.headers.get("X-Sprite-Size")) || 32;
       this.size = size;
@@ -66,3 +68,5 @@ export class SpriteCache {
 }
 
 export const spriteCache = new SpriteCache();
+/** Sprites of the second client of the compare window. */
+export const otherSpriteCache = new SpriteCache(res.otherSprites);

@@ -35,6 +35,15 @@ func (cs *CompareService) Open(req OpenRequest) (State, error) {
 	return cs.s.OtherState(), nil
 }
 
+// Thing returns one thing of the second client.
+func (cs *CompareService) Thing(c thing.Category, id uint32) (*thing.Thing, error) {
+	p, err := cs.s.Other()
+	if err != nil {
+		return nil, err
+	}
+	return p.Thing(c, id)
+}
+
 // Close closes the second client.
 func (cs *CompareService) Close() { cs.s.SetOther(nil) }
 

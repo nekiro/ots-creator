@@ -91,6 +91,8 @@ export const res = {
   sheet: (c: Category, id: number, group: number, transparent: boolean, ver: string | number) =>
     `/res/sheet/${CATEGORY_NAMES[c]}/${id}?g=${group}&bg=${transparent ? "transparent" : "magenta"}&v=${ver}`,
   sprites: (ids: number[], rev: number) => `/res/sprites?ids=${ids.join(",")}&r=${rev}`,
+  /** Raw sprites of the second client of a comparison. */
+  otherSprites: (ids: number[], rev: number) => `/res/b/sprites?ids=${ids.join(",")}&r=${rev}`,
 };
 
 /** Decodes a Go []byte (base64 in JSON) into bytes. */

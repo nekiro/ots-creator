@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { CATEGORIES, CATEGORY_LABELS, Category, Format, errorMessage, minId, normalizeThing, res, ThingService, type Thing } from "../lib/api";
+  import { CATEGORIES, CATEGORY_LABELS, Format, errorMessage, minId, normalizeThing, res, ThingService } from "../lib/api";
   import { commands, thingDropId } from "../lib/commands";
   import { FLAG_GROUPS, flagVisible } from "../lib/flags";
   import { openContextMenu } from "../lib/menu.svelte";
   import { objectListMenu, objectMenu } from "../lib/menus";
+  import { HoverAnim } from "../lib/render/hoveranim.svelte";
   import { spriteCache } from "../lib/render/sprites";
   import { LIST_CELL } from "../lib/prefs.svelte";
   import { app, select, setCategory, toast, versions } from "../lib/state.svelte";
@@ -99,37 +100,11 @@
   }
 
   // Animated thumbnail of the hovered object (animated objects only).
-  let hover = $state<{ id: number; thing: Thing } | null>(null);
-  let hoverReady = $state(0);
-  let hoverId: number | null = null;
-  let hoverTimer: ReturnType<typeof setTimeout> | undefined;
-
-  function enter(id: number) {
-    hoverId = id;
-    clearTimeout(hoverTimer);
-    hoverTimer = setTimeout(async () => {
-      const cat = app.category;
-      try {
-        const raw = await ThingService.Get(cat, id);
-        if (!raw || hoverId !== id || cat !== app.category) return;
-        const t = normalizeThing(raw);
-        const g = t.frameGroups[t.category === Category.CategoryOutfit && t.frameGroups.length > 1 ? 1 : 0];
-        if (!g || g.frames < 2) return;
-        await spriteCache.load(g.sprites);
-        if (hoverId !== id) return;
-        hover = { id, thing: t };
-        hoverReady++;
-      } catch {
-        /* thumbnail stays static */
-      }
-    }, 150);
-  }
-
-  function leave() {
-    hoverId = null;
-    clearTimeout(hoverTimer);
-    hover = null;
-  }
+  const hover = new HoverAnim(spriteCache, async (id) => {
+    const cat = app.category;
+    const raw = await ThingService.Get(cat, id);
+    return raw && cat === app.category ? normalizeThing(raw) : null;
+  });
 
   function click(e: MouseEvent, id: number) {
     if (e.shiftKey && app.focused !== null) {
@@ -199,14 +174,14 @@
             class:focus={app.focused === id}
             title={names[id] ? `#${id} ${names[id]}` : `#${id}`}
             onclick={(e) => click(e, id)}
-            onmouseenter={() => enter(id)}
-            onmouseleave={leave}
+            onmouseenter={() => hover.enter(id)}
+            onmouseleave={() => hover.leave()}
             ondblclick={() => select(id)}
             oncontextmenu={(e) => oncontextmenu(e, id)}
           >
             <span class="t-slot">
-              {#if hover?.id === id}
-                <ThingCanvas thing={hover.thing} get={(sid) => spriteCache.get(sid)?.pixels} size={spriteCache.size} ready={hoverReady} group={hover.thing.frameGroups.length > 1 ? 1 : 0} fit={32} colorize={false} improved={app.project?.info.format === Format.FormatAssets || !!app.project?.info.features.improvedAnimations} />
+              {#if hover.current?.id === id}
+                <ThingCanvas thing={hover.current.thing} get={(sid) => spriteCache.get(sid)?.pixels} size={spriteCache.size} ready={hover.ready} group={HoverAnim.group(hover.current.thing)} fit={32} colorize={false} improved={app.project?.info.format === Format.FormatAssets || !!app.project?.info.features.improvedAnimations} />
               {:else}
                 {@const src = res.thumb(app.category, id, versions.thing(app.category, id))}
                 <img class="pixel" {src} alt="" loading="lazy" decoding="async" draggable="false" use:loading={src} />

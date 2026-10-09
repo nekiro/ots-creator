@@ -2,12 +2,16 @@
   // Compares the open client (A) with a second client (B) and copies objects
   // in both directions. Copies keep their ids (replacing, or extending the
   // target) or are appended as new objects.
-  import { CATEGORIES, CATEGORY_LABELS, CATEGORY_NAMES, CompareService, res, type Category, type DiffEntry, type DiffResult } from "../../lib/api";
+  import { CATEGORIES, CATEGORY_LABELS, CATEGORY_NAMES, CompareService, Format, normalizeThing, res, ThingService, type Category, type DiffEntry, type DiffResult } from "../../lib/api";
+  import { HoverAnim } from "../../lib/render/hoveranim.svelte";
+  import { otherSpriteCache, spriteCache } from "../../lib/render/sprites";
   import { app, otherVersions, run, toast, versions } from "../../lib/state.svelte";
   import { ask } from "../../lib/confirm.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
+  import ThingCanvas from "../../lib/ui/ThingCanvas.svelte";
   import VirtualGrid from "../../lib/ui/VirtualGrid.svelte";
+  import { loading as imgLoading } from "../../lib/ui/loading";
 
   type Status = "changed" | "onlyA" | "onlyB";
   const STATUS_LABELS: Record<Status, string> = { changed: "Changed", onlyA: "Only in A", onlyB: "Only in B" };
@@ -33,6 +37,25 @@
 
   const a = $derived(app.project?.info);
   const b = $derived(app.other?.info);
+  const improvedA = $derived(a?.format === Format.FormatAssets || !!a?.features.improvedAnimations);
+  const improvedB = $derived(b?.format === Format.FormatAssets || !!b?.features.improvedAnimations);
+
+  // Hovering a row animates both of its thumbnails, like the object list.
+  const hoverAnim = (get: typeof ThingService.Get) => async (id: number) => {
+    const c = category;
+    const raw = await get(c, id);
+    return raw && c === category ? normalizeThing(raw) : null;
+  };
+  const hoverA = new HoverAnim(spriteCache, hoverAnim(ThingService.Get));
+  const hoverB = new HoverAnim(otherSpriteCache, hoverAnim(CompareService.Thing));
+  function enter(e: DiffEntry) {
+    if (e.status !== "onlyB") hoverA.enter(e.id);
+    if (e.status !== "onlyA") hoverB.enter(e.id);
+  }
+  function leave() {
+    hoverA.leave();
+    hoverB.leave();
+  }
   // Objects copied with their ids are equal afterwards and drop out of the
   // diff. They stay listed as copied (until the category changes), so the
   // list does not shift under the cursor.
@@ -229,14 +252,24 @@
         <VirtualGrid count={entries.length} cellWidth={4000} cellHeight={38} gap={1} {onkeydown}>
           {#snippet cell(i)}
             {@const e = entries[i]}
-            <button class="entry" class:sel={selected.includes(e.id)} onclick={(ev) => click(ev, e.id)}>
+            <button class="entry" class:sel={selected.includes(e.id)} onclick={(ev) => click(ev, e.id)} onmouseenter={() => enter(e)} onmouseleave={leave}>
               <span class="id">{e.id}</span>
               <span class="t-slot">
-                {#if e.status !== "onlyB"}<img class="pixel" src={res.thumb(category, e.id, versions.thing(category, e.id))} alt="" loading="lazy" draggable="false" />{/if}
+                {#if hoverA.current?.id === e.id}
+                  <ThingCanvas thing={hoverA.current.thing} get={(sid) => spriteCache.get(sid)?.pixels} size={spriteCache.size} ready={hoverA.ready} group={HoverAnim.group(hoverA.current.thing)} fit={32} colorize={false} improved={improvedA} />
+                {:else if e.status !== "onlyB"}
+                  {@const src = res.thumb(category, e.id, versions.thing(category, e.id))}
+                  <img class="pixel" {src} alt="" loading="lazy" decoding="async" draggable="false" use:imgLoading={src} />
+                {/if}
               </span>
               <Icon name="arrowE" />
               <span class="t-slot">
-                {#if e.status !== "onlyA"}<img class="pixel" src={res.otherThumb(category, e.id, otherVersions.thing(category, e.id))} alt="" loading="lazy" draggable="false" />{/if}
+                {#if hoverB.current?.id === e.id}
+                  <ThingCanvas thing={hoverB.current.thing} get={(sid) => otherSpriteCache.get(sid)?.pixels} size={otherSpriteCache.size} ready={hoverB.ready} group={HoverAnim.group(hoverB.current.thing)} fit={32} colorize={false} improved={improvedB} />
+                {:else if e.status !== "onlyA"}
+                  {@const src = res.otherThumb(category, e.id, otherVersions.thing(category, e.id))}
+                  <img class="pixel" {src} alt="" loading="lazy" decoding="async" draggable="false" use:imgLoading={src} />
+                {/if}
               </span>
               <span class="state {e.status}">{e.status === "copied" ? "Copied" : STATUS_LABELS[e.status as Status]}</span>
               <span class="t-label changes">{(e.changes ?? []).map((c) => CHANGE_LABELS[c] ?? c).join(", ")}</span>
