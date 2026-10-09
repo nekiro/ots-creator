@@ -190,7 +190,8 @@
     const key = `${app.category}:${thing?.id}`;
     if (key === lastKey) return;
     lastKey = key;
-    group = 0;
+    // Keep the idle/walking tab when the new thing has that group too.
+    if (group >= (thing?.frameGroups.length ?? 1)) group = 0;
     manualZoom = null;
     view.reset();
     paintImage = null;
