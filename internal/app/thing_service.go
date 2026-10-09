@@ -367,3 +367,32 @@ func newOBDFile(path string, d *obd.Data) *OBDFile {
 	}
 	return out
 }
+
+// SetPixels replaces the pixels of sprite slots of one frame group after
+// painting (see project.SetSlotPixels).
+func (ts *ThingService) SetPixels(c thing.Category, id uint32, group int, slots []int, pixels [][]byte) error {
+	p, err := ts.s.Project()
+	if err != nil {
+		return err
+	}
+	if err := p.SetSlotPixels(c, id, group, slots, pixels, "Paint"); err != nil {
+		return err
+	}
+	ts.s.Changed()
+	return nil
+}
+
+// ShiftPixels moves the pixels of every texture of a frame group, or with
+// one set only the texture at frame and pattern x, y, z (all its layers).
+func (ts *ThingService) ShiftPixels(c thing.Category, id uint32, group, dx, dy int, one bool, frame, x, y, z int) error {
+	p, err := ts.s.Project()
+	if err != nil {
+		return err
+	}
+	pos := project.TexturePos{Frame: frame, PatternX: x, PatternY: y, PatternZ: z}
+	if err := p.ShiftPixels(c, id, group, dx, dy, !one, pos); err != nil {
+		return err
+	}
+	ts.s.Changed()
+	return nil
+}

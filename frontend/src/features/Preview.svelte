@@ -6,7 +6,7 @@
 
 <script lang="ts">
   import { untrack } from "svelte";
-  import { Category, errorMessage, Format, normalizeThing, ThingService, type Thing } from "../lib/api";
+  import { Category, encodeBytes, errorMessage, Format, normalizeThing, ThingService, type Thing } from "../lib/api";
   import { Animator, previewDurations } from "../lib/render/animator";
   import { PREVIEW_DROP } from "../lib/commands";
   import { compose, stackBottomRight } from "../lib/render/compose";
@@ -17,6 +17,7 @@
   import { spriteCache } from "../lib/render/sprites";
   import { app, toast } from "../lib/state.svelte";
   import { PanView } from "../lib/pan.svelte";
+  import { changedSlots, drawLine, getPixel, hexToRGBA, rgbaToHex, type RGBA } from "../lib/render/paint";
   import NumberField from "../lib/ui/NumberField.svelte";
   import Slider from "../lib/ui/Slider.svelte";
   import Icon from "../lib/ui/Icon.svelte";
@@ -87,6 +88,102 @@
     (d) => setZoom(zoom + d),
   );
 
+  // Pixel editing of the shown texture (raw layer, no colors or addons).
+  // Strokes paint on a copy and are stored when the mouse is released.
+  type Tool = "pencil" | "eraser" | "picker";
+  let editing = $state(false);
+  let tool = $state<Tool>("pencil");
+  let paintHex = $state("#ffffff");
+  let shiftAll = $state(true);
+  let paintImage = $state.raw<ImageData | null>(null);
+  let paintTick = $state(0);
+  let committed = false;
+  let stroke: { id: number; before: ImageData; last: [number, number] } | null = null;
+  const groupIndex = () => Math.min(group, (thing?.frameGroups.length ?? 1) - 1);
+  const getSprite = (id: number) => spriteCache.get(id)?.pixels;
+
+  function toggleEditing() {
+    editing = !editing;
+    if (editing) {
+      playing = false;
+      sheetView = false;
+    }
+    paintImage = null;
+  }
+
+  /** Edits go to the client directly; unapplied changes would overwrite them. */
+  function canEdit(): boolean {
+    if (!app.dirty) return true;
+    toast("Apply or revert the object changes first.");
+    return false;
+  }
+
+  function pixelAt(e: PointerEvent): [number, number] {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    return [Math.floor((e.clientX - r.left) / zoom), Math.floor((e.clientY - r.top) / zoom)];
+  }
+
+  function paintDown(e: PointerEvent) {
+    if (!editing || e.button !== 0 || view.ready || !g || stroke) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const base = compose(g, g.sprites, size, { pos }, getSprite);
+    const [x, y] = pixelAt(e);
+    if (tool === "picker") {
+      const c = getPixel(base, x, y);
+      if (c[3]) paintHex = rgbaToHex(c);
+      tool = "pencil";
+      return;
+    }
+    if (!canEdit()) return;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    paintImage = new ImageData(new Uint8ClampedArray(base.data), base.width, base.height);
+    stroke = { id: e.pointerId, before: base, last: [x, y] };
+    drawLine(paintImage, x, y, x, y, paintColor());
+    paintTick++;
+  }
+
+  function paintMove(e: PointerEvent) {
+    if (stroke?.id !== e.pointerId || !paintImage) return;
+    const [x, y] = pixelAt(e);
+    drawLine(paintImage, stroke.last[0], stroke.last[1], x, y, paintColor());
+    stroke.last = [x, y];
+    paintTick++;
+  }
+
+  function paintColor(): RGBA {
+    return tool === "eraser" ? [0, 0, 0, 0] : hexToRGBA(paintHex);
+  }
+
+  async function paintUp(e: PointerEvent) {
+    const s = stroke;
+    if (s?.id !== e.pointerId) return;
+    stroke = null;
+    if (!paintImage || !g || !thing) return;
+    const { slots, pixels } = changedSlots(s.before, paintImage, g, pos, size);
+    if (!slots.length) {
+      paintImage = null;
+      return;
+    }
+    committed = true;
+    try {
+      await ThingService.SetPixels(thing.category, thing.id, groupIndex(), slots, pixels.map(encodeBytes));
+    } catch (err) {
+      toast(errorMessage(err), "error");
+      paintImage = null;
+      committed = false;
+    }
+  }
+
+  async function shift(dx: number, dy: number) {
+    if (!thing || !canEdit()) return;
+    try {
+      await ThingService.ShiftPixels(thing.category, thing.id, groupIndex(), dx, dy, !shiftAll, pos.frame, pos.x, pos.y, pos.z);
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    }
+  }
+
   // Reset view state when another thing is selected.
   let lastKey = "";
   $effect(() => {
@@ -96,6 +193,8 @@
     group = 0;
     manualZoom = null;
     view.reset();
+    paintImage = null;
+    stroke = null;
     pos = { layer: 0, x: isOutfit && (thing?.frameGroups[0]?.patternX ?? 1) > 2 ? 2 : 0, y: 0, z: 0, frame: 0 };
     hoverSlot = null;
   });
@@ -138,13 +237,20 @@
     if (!g) return;
     const ids = g.sprites;
     void app.rev;
-    spriteCache.load(ids).then(() => loaded++);
+    spriteCache.load(ids).then(() => {
+      loaded++;
+      // A committed stroke stays on screen until its sprites have arrived.
+      if (!stroke && paintImage && untrack(() => committed)) {
+        paintImage = null;
+        committed = false;
+      }
+    });
   });
 
   // Animation.
   let animator: Animator | null = null;
   $effect(() => {
-    if (!g || g.frames < 2 || !playing) {
+    if (!g || g.frames < 2 || !playing || editing) {
       animator = null;
       return;
     }
@@ -176,10 +282,21 @@
   // Draw.
   $effect(() => {
     void loaded;
+    void paintTick;
     if (!g || !canvas) return;
     const addons = isOutfit ? [addon1 ? 1 : -1, addon2 ? 2 : -1].filter((y) => y > 0) : [];
     const p = { ...pos, z: isOutfit && mount && g.patternZ > 1 ? 1 : pos.z };
     const get = (id: number) => spriteCache.get(id)?.pixels;
+    if (editing) {
+      // The raw texture of the chosen layer, as it is stored.
+      const img = paintImage ?? compose(g, g.sprites, size, { pos }, get);
+      riderOffset = [0, 0];
+      canvasSize = [img.width, img.height];
+      canvas.width = img.width;
+      canvas.height = img.height;
+      canvas.getContext("2d")!.putImageData(img, 0, 0);
+      return;
+    }
     const outfitColors = isOutfit && colorize ? colors : null;
     const rider = compose(g, g.sprites, size, { pos: p, addons, colors: outfitColors }, get);
     let img = rider;
@@ -302,8 +419,14 @@
     {...view.handlers}
   >
     {#if g}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
         class="canvas-wrap"
+        class:editing
+        onpointerdown={paintDown}
+        onpointermove={paintMove}
+        onpointerup={paintUp}
+        onpointercancel={paintUp}
         style="width:{(canvasSize[0] || g.width * size) * zoom}px;height:{(canvasSize[1] || g.height * size) * zoom}px;transform:{view.transform}"
       >
         <canvas bind:this={canvas} class="pixel" style="width:100%;height:100%"></canvas>
@@ -370,6 +493,7 @@
         </button>
         <button class="t-icon-btn" title="Zoom in (Ctrl+wheel)" onclick={() => zoomBy(1)}><Icon name="zoomin" /></button>
         <button class="t-icon-btn" class:on={showGrid} title="Tile grid" onclick={() => (showGrid = !showGrid)}><Icon name="grid" /></button>
+        <button class="t-icon-btn" class:on={editing} title="Edit pixels" onclick={toggleEditing}><Icon name="pencil" /></button>
         <button
           class="t-icon-btn"
           class:on={showPixelGrid}
@@ -426,6 +550,23 @@
         {/if}
       </div>
 
+      {#if editing && !sheetView}
+        <div class="row edit">
+          <button class="t-icon-btn" class:on={tool === "pencil"} title="Pencil" onclick={() => (tool = "pencil")}><Icon name="pencil" /></button>
+          <button class="t-icon-btn" class:on={tool === "eraser"} title="Eraser" onclick={() => (tool = "eraser")}><Icon name="eraser" /></button>
+          <button class="t-icon-btn" class:on={tool === "picker"} title="Pick a color from the texture" onclick={() => (tool = "picker")}><Icon name="picker" /></button>
+          <input class="swatch" type="color" title="Paint color" bind:value={paintHex} />
+          <span class="t-vsep"></span>
+          <span class="t-label">Shift</span>
+          <button class="t-icon-btn" title="Move pixels left" onclick={() => shift(-1, 0)}><Icon name="arrowW" /></button>
+          <button class="t-icon-btn" title="Move pixels up" onclick={() => shift(0, -1)}><Icon name="arrowN" /></button>
+          <button class="t-icon-btn" title="Move pixels down" onclick={() => shift(0, 1)}><Icon name="arrowS" /></button>
+          <button class="t-icon-btn" title="Move pixels right" onclick={() => shift(1, 0)}><Icon name="arrowE" /></button>
+          <label class="row" title="Move every frame and pattern, or only the shown texture (with all its layers)"
+            ><input class="t-check" type="checkbox" bind:checked={shiftAll} />All textures</label
+          >
+        </div>
+      {/if}
       {#if isOutfit && g.layers > 1}
         <div class="row">
           <label class="row"><input class="t-check" type="checkbox" bind:checked={colorize} />Colors</label>
@@ -490,8 +631,26 @@
     position: absolute;
     inset: 0;
   }
+  .canvas-wrap.editing {
+    cursor: crosshair;
+  }
+  .canvas-wrap.editing .slots {
+    pointer-events: none;
+  }
+  .swatch {
+    width: 26px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid #111;
+    background: none;
+    cursor: pointer;
+  }
   .stage.pan-ready {
     cursor: grab;
+  }
+  .stage.pan-ready .canvas-wrap,
+  .stage.panning .canvas-wrap {
+    cursor: inherit;
   }
   .stage.panning {
     cursor: grabbing;
