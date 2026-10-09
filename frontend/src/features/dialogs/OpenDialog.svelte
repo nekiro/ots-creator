@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { DialogService, Format, ProjectService, errorMessage, type ClientFiles, type Features, type Version } from "../../lib/api";
+  import { CompareService, DialogService, Format, ProjectService, errorMessage, type ClientFiles, type Features, type Version } from "../../lib/api";
   import { app, run, toast } from "../../lib/state.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Select from "../../lib/ui/Select.svelte";
@@ -13,8 +13,18 @@
   const recent = $derived((prefs.settings.recent ?? []).slice(0, 5));
 
   function openRecent(r: Recent) {
+    if (other) {
+      void openOther(r);
+      return;
+    }
     app.dialog = null;
     void commands.openRecent(r);
+  }
+
+  async function openOther(r: Recent) {
+    const format = r.format === Format.FormatAssets ? Format.FormatAssets : Format.FormatDat;
+    const req = { format, datPath: r.datPath, sprPath: r.sprPath, version: r.version, features: r.features };
+    if ((await run("Loading client", () => CompareService.Open(req)))?.open) close();
   }
 
   let versions = $state<Version[]>([]);
@@ -54,20 +64,27 @@
     }
   }
 
+  // Loads the second client of the compare window instead of the main one.
+  const other = app.openOther;
+
+  function close() {
+    app.openOther = false;
+    app.dialog = other ? "compare" : null;
+  }
+
   async function open() {
     if (!files || !version) return;
     const f = files;
-    const st = await run("Loading client", () =>
-      ProjectService.Open({ format: f.format, datPath: f.datPath, sprPath: f.sprPath, version: f.detected ? null : version, features }),
-    );
+    const req = { format: f.format, datPath: f.datPath, sprPath: f.sprPath, version: f.detected ? null : version, features };
+    const st = await run("Loading client", () => (other ? CompareService.Open(req) : ProjectService.Open(req)));
     if (st?.open) {
-      app.dialog = null;
+      close();
       toast(`Loaded ${version.name}: ${st.info.counts.items - 99} items, ${st.info.counts.sprites} sprites.`, "success");
     }
   }
 </script>
 
-<Dialog title="Open Client" width={500} onclose={() => (app.dialog = null)}>
+<Dialog title={other ? "Open Client to Compare" : "Open Client"} width={500} onclose={close}>
   <div class="col">
     {#if !files}
       <div class="empty t-panel">
@@ -114,7 +131,7 @@
     {#if files}<button class="t-btn" onclick={browse}>Browse…</button>{/if}
     <span class="grow"></span>
     <button class="t-btn primary" disabled={!files || !version || !!app.busy} onclick={open}>Open</button>
-    <button class="t-btn" onclick={() => (app.dialog = null)}>Cancel</button>
+    <button class="t-btn" onclick={close}>Cancel</button>
   {/snippet}
 </Dialog>
 

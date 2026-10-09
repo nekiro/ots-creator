@@ -22,6 +22,7 @@ var assets embed.FS
 
 func init() {
 	application.RegisterEvent[app.State](app.EventProjectChanged)
+	application.RegisterEvent[app.State](app.EventOtherChanged)
 }
 
 func main() {
@@ -50,6 +51,7 @@ func main() {
 			application.NewService(app.NewProjectService(session)),
 			application.NewService(app.NewThingService(session)),
 			application.NewService(app.NewSpriteService(session)),
+			application.NewService(app.NewCompareService(session)),
 			application.NewService(&app.DialogService{}),
 			application.NewService(&app.ViewerService{}),
 			application.NewService(updates),

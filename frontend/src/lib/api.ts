@@ -8,6 +8,7 @@ export * as WindowService from "../../bindings/github.com/nekiro/ots-creator/int
 export * as ViewerService from "../../bindings/github.com/nekiro/ots-creator/internal/app/viewerservice";
 export * as SettingsService from "../../bindings/github.com/nekiro/ots-creator/internal/app/settingsservice";
 export * as MarketService from "../../bindings/github.com/nekiro/ots-creator/internal/app/marketservice";
+export * as CompareService from "../../bindings/github.com/nekiro/ots-creator/internal/app/compareservice";
 export type {
   State,
   ClientFiles,
@@ -25,7 +26,7 @@ export type {
   ShareRequest,
 } from "../../bindings/github.com/nekiro/ots-creator/internal/app/models";
 export type { Settings, Recent } from "../../bindings/github.com/nekiro/ots-creator/internal/settings/models";
-export type { OptimizeOptions, OptimizeResult, ConvertResult, PropsPatch } from "../../bindings/github.com/nekiro/ots-creator/internal/project/models";
+export type { OptimizeOptions, OptimizeResult, ConvertResult, PropsPatch, DiffEntry, DiffResult, TransferResult } from "../../bindings/github.com/nekiro/ots-creator/internal/project/models";
 export { Format } from "../../bindings/github.com/nekiro/ots-creator/internal/project/models";
 export type { Version, Features } from "../../bindings/github.com/nekiro/ots-creator/internal/client/models";
 export type { FrameDuration, Properties } from "../../bindings/github.com/nekiro/ots-creator/internal/thing/models";
@@ -79,6 +80,8 @@ export function minId(c: Category): number {
 
 export const res = {
   thumb: (c: Category, id: number, ver: string | number) => `/res/thumb/${CATEGORY_NAMES[c]}/${id}?v=${ver}`,
+  /** Thumbnail of the second client of a comparison. */
+  otherThumb: (c: Category, id: number, ver: string | number) => `/res/b/thumb/${CATEGORY_NAMES[c]}/${id}?v=${ver}`,
   spritePng: (id: number, ver: string | number) => `/res/spritepng/${id}?v=${ver}`,
   sheet: (c: Category, id: number, group: number, transparent: boolean, ver: string | number) =>
     `/res/sheet/${CATEGORY_NAMES[c]}/${id}?g=${group}&bg=${transparent ? "transparent" : "magenta"}&v=${ver}`,

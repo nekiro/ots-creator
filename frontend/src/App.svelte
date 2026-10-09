@@ -18,6 +18,7 @@
   import SlicerDialog from "./features/tools/SlicerDialog.svelte";
   import SheetExportDialog from "./features/tools/SheetExportDialog.svelte";
   import MarketDialog from "./features/market/MarketDialog.svelte";
+  import CompareDialog from "./features/tools/CompareDialog.svelte";
   import ShareDialog from "./features/market/ShareDialog.svelte";
   import { listPanelWidth, loadPrefs, prefs, recentDir, removeRecent, shortPath } from "./lib/prefs.svelte";
   import { setMinLayoutWidth } from "./lib/pixelscale";
@@ -162,6 +163,7 @@
 {#if app.dialog === "obd"}<ObdViewerDialog />{/if}
 {#if app.dialog === "sheet" && app.open && app.focused !== null}<SheetExportDialog />{/if}
 {#if app.dialog === "market"}<MarketDialog />{/if}
+{#if app.dialog === "compare" && app.open && app.other?.open}<CompareDialog />{/if}
 {#if app.dialog === "share" && app.shareTarget && (app.open || app.shareTarget.kind === "file")}<ShareDialog />{/if}
 <ConfirmDialog />
 <Toasts />

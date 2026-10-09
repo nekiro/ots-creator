@@ -58,6 +58,9 @@ func (ws *WindowService) unsaved() bool {
 	if ws.unapplied.Load() {
 		return true
 	}
+	if st := ws.s.OtherState(); st.Open && st.Info.Changed {
+		return true
+	}
 	st := ws.s.State()
 	return st.Open && st.Info.Changed
 }

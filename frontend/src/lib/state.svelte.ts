@@ -2,7 +2,7 @@
 // the fields they touch re-render.
 
 import { Events } from "@wailsio/runtime";
-import { Category, ProjectService, ThingService, errorMessage, normalizeThing, type State, type Thing } from "./api";
+import { Category, CompareService, ProjectService, ThingService, errorMessage, normalizeThing, type State, type Thing } from "./api";
 import { spriteCache } from "./render/sprites";
 
 export type ToastKind = "info" | "success" | "error";
@@ -26,6 +26,7 @@ export type DialogName =
   | "sheet"
   | "market"
   | "share"
+  | "compare"
   | null;
 
 /** What the share window publishes. */
@@ -41,6 +42,8 @@ export type ShareTarget = (
 
 class AppState {
   project = $state<State | null>(null);
+  /** Second client of the compare window (B). */
+  other = $state<State | null>(null);
   category = $state<Category>(Category.CategoryItem);
   /** Selected thing ids in the current category (first = focused). */
   selection = $state<number[]>([]);
@@ -53,6 +56,8 @@ class AppState {
   busy = $state<string | null>(null);
   /** Path for the open dialog (dropped file); "" asks for a folder. */
   openPath = $state("");
+  /** The open dialog loads the second client of the compare window. */
+  openOther = $state(false);
   /** Frame group shown by the sprite sheet export window. */
   sheetGroup = $state(0);
   /** File for the OBD viewer; "" asks for one. */
@@ -85,6 +90,8 @@ export const app = new AppState();
  * of what it touched, so other images stay cached and do not flicker.
  */
 class ResourceVersions {
+  /** ownsSprites: the shared sprite cache shows this client (the main one). */
+  constructor(private ownsSprites = true) {}
   private tick = $state(0);
   private epoch = 0;
   private things = new Map<string, number>();
@@ -95,11 +102,11 @@ class ResourceVersions {
       this.epoch = rev;
       this.things.clear();
       this.sprites.clear();
-      spriteCache.invalidate(null);
+      if (this.ownsSprites) spriteCache.invalidate(null);
     } else {
       for (const t of delta.things ?? []) this.things.set(`${t.category}:${t.id}`, rev);
       for (const id of delta.sprites ?? []) this.sprites.set(id, rev);
-      spriteCache.invalidate(delta.sprites ?? []);
+      if (this.ownsSprites) spriteCache.invalidate(delta.sprites ?? []);
     }
     this.tick++;
   }
@@ -116,6 +123,8 @@ class ResourceVersions {
 }
 
 export const versions = new ResourceVersions();
+/** Cache keys of the second client of the compare window. */
+export const otherVersions = new ResourceVersions(false);
 
 let toastSeq = 0;
 export function toast(text: string, kind: ToastKind = "info", ms = 3500): void {
@@ -158,9 +167,16 @@ function applyState(s: State): void {
   }
 }
 
+function applyOther(s: State): void {
+  app.other = s;
+  otherVersions.apply(s.rev, s.delta);
+}
+
 export async function initState(): Promise<void> {
   Events.On("project:changed", (ev) => applyState(ev.data));
+  Events.On("compare:changed", (ev) => applyOther(ev.data));
   applyState(await ProjectService.State());
+  applyOther(await CompareService.State());
 }
 
 async function reloadDraft(): Promise<void> {

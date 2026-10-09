@@ -46,6 +46,7 @@ export function toolsMenu(): MenuEntry[] {
     { label: "Split outfits into frame groups…", action: () => commands.convertFrameGroups(true), disabled: noProject },
     { label: "Merge outfit frame groups…", action: () => commands.convertFrameGroups(false), disabled: noProject },
     "-",
+    { label: "Compare & merge clients…", action: commands.compare, disabled: noProject },
     { label: "Object viewer…", action: () => commands.viewObd() },
     { label: "Market…", action: commands.market },
   ];

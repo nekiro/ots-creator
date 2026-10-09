@@ -26,6 +26,8 @@ const maxBatch = 4096
 //	/res/texture/{cat}/{id}?g=&l=&x=&y=&z=&f=   PNG of one texture
 //	/res/sheet/{cat}/{id}?g=&bg=transparent      PNG of a frame group sprite sheet
 //
+// The same paths under /res/b/ serve the second client of a comparison.
+//
 // The response header X-Sprite-Size carries the sprite edge length. URLs
 // should include ?r={rev} so cached responses are invalidated on change.
 type Resources struct {
@@ -47,12 +49,16 @@ func (h *Resources) Middleware(next http.Handler) http.Handler {
 }
 
 func (h *Resources) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	p, err := h.s.Project()
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, ResourcePrefix), "/")
+	project := h.s.Project
+	if len(parts) > 1 && parts[0] == "b" {
+		project, parts = h.s.Other, parts[1:]
+	}
+	p, err := project()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, ResourcePrefix), "/")
 	w.Header().Set("X-Sprite-Size", strconv.Itoa(p.SpriteSize()))
 	w.Header().Set("Cache-Control", "max-age=31536000, immutable")
 	switch {

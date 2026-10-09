@@ -14,8 +14,15 @@ import (
 // ErrNoProject is returned when an operation needs an open client.
 var ErrNoProject = errors.New("no client is open")
 
+// ErrNoOther is returned when an operation needs a second client.
+var ErrNoOther = errors.New("no second client is open")
+
 // EventProjectChanged is emitted with a State after every change.
 const EventProjectChanged = "project:changed"
+
+// EventOtherChanged is emitted with a State after every change of the
+// second client (see CompareService).
+const EventOtherChanged = "compare:changed"
 
 // Notifier delivers events to the frontend.
 type Notifier func(name string, data any)
@@ -32,10 +39,12 @@ type State struct {
 	Delta *project.Delta `json:"delta"`
 }
 
-// Session owns the currently open project.
+// Session owns the currently open project and an optional second client
+// it is compared with.
 type Session struct {
 	mu     sync.RWMutex
 	p      *project.Project
+	other  *project.Project
 	rev    atomic.Uint64
 	notify Notifier
 	// onSaved is called after a client is opened or compiled to disk.
@@ -114,4 +123,55 @@ func (s *Session) Changed() {
 	}
 	st.Delta = &d
 	s.notify(EventProjectChanged, st)
+}
+
+// Other returns the second client.
+func (s *Session) Other() (*project.Project, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.other == nil {
+		return nil, ErrNoOther
+	}
+	return s.other, nil
+}
+
+// SetOther replaces the second client (nil closes it).
+func (s *Session) SetOther(p *project.Project) {
+	s.mu.Lock()
+	s.other = p
+	s.mu.Unlock()
+	if p != nil {
+		p.TakeDelta() // a new client replaces everything anyway
+	}
+	s.rev.Add(1)
+	st := s.OtherState()
+	st.Delta = &project.Delta{All: true}
+	s.notify(EventOtherChanged, st)
+}
+
+// OtherState returns the snapshot of the second client. Rev is shared with
+// the main project, so resource URLs of both stay unique.
+func (s *Session) OtherState() State {
+	s.mu.RLock()
+	p := s.other
+	s.mu.RUnlock()
+	st := State{Rev: s.rev.Load()}
+	if p != nil {
+		st.Open = true
+		st.Info = p.Info()
+	}
+	return st
+}
+
+// OtherChanged bumps the revision and notifies the frontend about the
+// second client.
+func (s *Session) OtherChanged() {
+	s.rev.Add(1)
+	st := s.OtherState()
+	d := project.Delta{All: true}
+	if p, err := s.Other(); err == nil {
+		d = p.TakeDelta()
+	}
+	st.Delta = &d
+	s.notify(EventOtherChanged, st)
 }

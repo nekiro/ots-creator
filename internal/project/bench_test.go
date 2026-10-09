@@ -88,6 +88,26 @@ func BenchmarkBigClient(b *testing.B) {
 			p.Undo()
 		}
 	})
+	other := open()
+	b.Run("DiffSame", func(b *testing.B) {
+		for range b.N {
+			if _, err := Diff(p, other, thing.CategoryItem); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("Transfer1k", func(b *testing.B) {
+		ids := make([]uint32, 1000)
+		for i := range ids {
+			ids[i] = uint32(100 + i*7)
+		}
+		for range b.N {
+			if _, err := Transfer(p, other, thing.CategoryItem, ids, true); err != nil {
+				b.Fatal(err)
+			}
+			p.Undo()
+		}
+	})
 	b.Run("Optimize", func(b *testing.B) {
 		for range b.N {
 			p.OptimizeSprites(OptimizeOptions{Duplicates: true, Empty: true})

@@ -112,6 +112,12 @@ export const commands = {
     app.dialog = "open";
   },
   create: () => (app.dialog = "new"),
+  /** Opens the compare window; without a second client it asks for one first. */
+  compare: () => {
+    if (!guard()) return;
+    app.openOther = !app.other?.open;
+    app.dialog = app.openOther ? "open" : "compare";
+  },
   compileAs: () => guard() && (app.dialog = "compile"),
 
   async compile() {
@@ -150,7 +156,11 @@ export const commands = {
 
   /** Window close with unsaved work (the backend held the close). */
   async quit() {
-    const lost = [app.dirty && "unapplied object changes", app.project?.info.changed && "uncompiled client changes"].filter(Boolean);
+    const lost = [
+      app.dirty && "unapplied object changes",
+      app.project?.info.changed && "uncompiled client changes",
+      app.other?.info.changed && "uncompiled changes in the compared client",
+    ].filter(Boolean);
     const message = `You have ${lost.join(" and ") || "unsaved changes"}. Quit anyway?`;
     if (await ask({ title: "Quit OTS Creator", message, ok: "Quit" })) await WindowService.Quit();
   },
