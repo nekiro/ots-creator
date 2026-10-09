@@ -9,6 +9,7 @@
   import MiniWindow from "../lib/ui/MiniWindow.svelte";
   import VirtualGrid from "../lib/ui/VirtualGrid.svelte";
   import Select from "../lib/ui/Select.svelte";
+  import { loading } from "../lib/ui/loading";
 
   const FILTERS = [
     { value: "", label: "All sprites" },
@@ -124,6 +125,7 @@
       <VirtualGrid {count} cellWidth={36} cellHeight={48} gap={2} scrollTo={focusIndex} {onkeydown}>
         {#snippet cell(i)}
           {@const id = idAt(i)}
+          {@const src = res.spritePng(id, versions.sprite(id))}
           <button
             class="spr"
             class:sel={app.selectedSprites.includes(id)}
@@ -136,7 +138,7 @@
             }}
             title="Sprite #{id}: drag onto a preview tile (a multi-selection fills the following slots)"
           >
-            <span class="t-slot"><img class="pixel" src={res.spritePng(id, versions.sprite(id))} alt="" loading="lazy" decoding="async" draggable="false" /></span>
+            <span class="t-slot"><img class="pixel" {src} alt="" loading="lazy" decoding="async" draggable="false" use:loading={src} /></span>
             <span class="id">{id}</span>
           </button>
         {/snippet}

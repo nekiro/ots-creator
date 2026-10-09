@@ -371,6 +371,35 @@ input[type="number"].t-input::-webkit-outer-spin-button {
   justify-content: center;
   flex: none;
 }
+/* Tibia-style hourglass (flips every 650ms) while the slot's image loads; delayed so
+   cached images never flash it */
+.t-slot.loading {
+  position: relative;
+}
+.t-slot.loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 16px;
+  height: 16px;
+  background: url("./assets/ui/hourglass.png") center / contain no-repeat;
+  image-rendering: auto;
+  opacity: 0;
+  animation:
+    t-loading-in 0s 120ms forwards,
+    t-hourglass 1.3s steps(2) infinite;
+}
+@keyframes t-loading-in {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes t-hourglass {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 .t-label {
   color: var(--text-dim);

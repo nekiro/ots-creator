@@ -12,6 +12,7 @@
   import Select from "../lib/ui/Select.svelte";
   import ThingCanvas from "../lib/ui/ThingCanvas.svelte";
   import VirtualGrid from "../lib/ui/VirtualGrid.svelte";
+  import { loading } from "../lib/ui/loading";
 
   const CONTENT_OPTIONS = [
     { value: "", label: "All objects" },
@@ -207,7 +208,8 @@
               {#if hover?.id === id}
                 <ThingCanvas thing={hover.thing} get={(sid) => spriteCache.get(sid)?.pixels} size={spriteCache.size} ready={hoverReady} group={hover.thing.frameGroups.length > 1 ? 1 : 0} fit={32} colorize={false} improved={app.project?.info.format === Format.FormatAssets || !!app.project?.info.features.improvedAnimations} />
               {:else}
-                <img class="pixel" src={res.thumb(app.category, id, versions.thing(app.category, id))} alt="" loading="lazy" decoding="async" draggable="false" />
+                {@const src = res.thumb(app.category, id, versions.thing(app.category, id))}
+                <img class="pixel" {src} alt="" loading="lazy" decoding="async" draggable="false" use:loading={src} />
               {/if}
             </span>
             <span class="id">{id}</span>
