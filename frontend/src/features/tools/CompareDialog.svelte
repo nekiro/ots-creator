@@ -19,6 +19,7 @@
     frames: "frame count",
     groups: "frame groups",
     animation: "animation",
+    npcSales: "NPC trade",
     sprites: "sprites",
   };
 

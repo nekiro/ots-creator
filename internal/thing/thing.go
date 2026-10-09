@@ -169,6 +169,66 @@ type Properties struct {
 	HasBones         bool   `json:"hasBones"`
 	// Bones holds offsets indexed by Direction (north, east, south, west).
 	Bones [4]Point `json:"bones"`
+
+	// Flags only asset (protobuf, Tibia 12+) clients store.
+	ChangedToExpire          bool   `json:"changedToExpire"`
+	FormerObjectID           uint16 `json:"formerObjectId"`
+	Corpse                   bool   `json:"corpse"`
+	PlayerCorpse             bool   `json:"playerCorpse"`
+	Cyclopedia               bool   `json:"cyclopedia"`
+	CyclopediaType           uint16 `json:"cyclopediaType"`
+	Ammo                     bool   `json:"ammo"`
+	ShowOffSocket            bool   `json:"showOffSocket"`
+	Reportable               bool   `json:"reportable"`
+	HasUpgradeClassification bool   `json:"hasUpgradeClassification"`
+	UpgradeClassification    uint16 `json:"upgradeClassification"`
+	ReverseAddonsEast        bool   `json:"reverseAddonsEast"`
+	ReverseAddonsWest        bool   `json:"reverseAddonsWest"`
+	ReverseAddonsSouth       bool   `json:"reverseAddonsSouth"`
+	ReverseAddonsNorth       bool   `json:"reverseAddonsNorth"`
+	Wearout                  bool   `json:"wearout"`
+	ClockExpire              bool   `json:"clockExpire"`
+	Expire                   bool   `json:"expire"`
+	ExpireStop               bool   `json:"expireStop"`
+	WrapKit                  bool   `json:"wrapKit"`
+}
+
+// AssetOnly lists the json names of the flags in p that only asset
+// (protobuf) clients store. dat/spr clients drop them.
+func (p *Properties) AssetOnly() []string {
+	var out []string
+	for _, f := range []struct {
+		key string
+		on  bool
+	}{
+		{"changedToExpire", p.ChangedToExpire}, {"corpse", p.Corpse}, {"playerCorpse", p.PlayerCorpse},
+		{"cyclopedia", p.Cyclopedia}, {"ammo", p.Ammo}, {"showOffSocket", p.ShowOffSocket},
+		{"reportable", p.Reportable}, {"hasUpgradeClassification", p.HasUpgradeClassification},
+		{"reverseAddonsEast", p.ReverseAddonsEast}, {"reverseAddonsWest", p.ReverseAddonsWest},
+		{"reverseAddonsSouth", p.ReverseAddonsSouth}, {"reverseAddonsNorth", p.ReverseAddonsNorth},
+		{"wearout", p.Wearout}, {"clockExpire", p.ClockExpire}, {"expire", p.Expire},
+		{"expireStop", p.ExpireStop}, {"wrapKit", p.WrapKit},
+	} {
+		if f.on {
+			out = append(out, f.key)
+		}
+	}
+	return out
+}
+
+// NpcSale is one NPC that buys or sells an item (asset clients show it in
+// the cyclopedia and market). A price of 0 means the NPC does not trade
+// that way.
+type NpcSale struct {
+	Name     string `json:"name"`
+	Location string `json:"location"`
+	// SalePrice is what the player pays the NPC, BuyPrice what the NPC pays.
+	SalePrice uint32 `json:"salePrice"`
+	BuyPrice  uint32 `json:"buyPrice"`
+	// CurrencyObjectID is the item paid with; 0 means gold.
+	CurrencyObjectID uint32 `json:"currencyObjectId"`
+	// CurrencyQuestFlag names a quest currency shown instead of an item.
+	CurrencyQuestFlag string `json:"currencyQuestFlag"`
 }
 
 // AnimationMode controls how an animation starts.
@@ -313,9 +373,11 @@ type Thing struct {
 	ID       uint32   `json:"id"`
 	Category Category `json:"category"`
 	// Name and Description are only stored by asset (protobuf) clients.
-	Name        string        `json:"name"`
-	Description string        `json:"description"`
-	Props       Properties    `json:"props"`
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	Props       Properties `json:"props"`
+	// NpcSales are only stored by asset clients.
+	NpcSales    []NpcSale     `json:"npcSales"`
 	FrameGroups []*FrameGroup `json:"frameGroups"`
 	// Extra is format specific data a codec keeps to write the thing back
 	// (for example protobuf fields the model does not know). It is
@@ -348,6 +410,7 @@ func (t *Thing) Group(ft FrameGroupType) *FrameGroup {
 // Clone returns a deep copy.
 func (t *Thing) Clone() *Thing {
 	c := *t
+	c.NpcSales = slices.Clone(t.NpcSales)
 	c.FrameGroups = make([]*FrameGroup, len(t.FrameGroups))
 	for i, g := range t.FrameGroups {
 		c.FrameGroups[i] = g.Clone()

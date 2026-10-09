@@ -480,7 +480,7 @@ func (t *FlagTable) Unsupported(p *thing.Properties) []string {
 			out = append(out, attrNames[a])
 		}
 	}
-	return out
+	return append(out, p.AssetOnly()...)
 }
 
 var attrNames = map[attr]string{

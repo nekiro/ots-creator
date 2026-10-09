@@ -73,7 +73,20 @@
                   {#each f.fields as fd}
                     <label class="row">
                       <span class="t-label">{fd.label}</span>
-                      {#if fd.kind === "select"}
+                      {#if fd.kind === "mask"}
+                        <span class="mask">
+                          {#each fd.options ?? [] as [bit, name]}
+                            <label class="row"
+                              ><input
+                                class="t-check"
+                                type="checkbox"
+                                checked={(Number(values[fd.key] ?? 0) & bit) !== 0}
+                                onchange={(e) => (values[fd.key] = e.currentTarget.checked ? Number(values[fd.key] ?? 0) | bit : Number(values[fd.key] ?? 0) & ~bit)}
+                              />{name}</label
+                            >
+                          {/each}
+                        </span>
+                      {:else if fd.kind === "select"}
                         <Select grow value={values[fd.key] ?? 0} options={options(fd)} onchange={(v) => (values[fd.key] = v)} />
                       {:else if fd.kind === "text"}
                         <input class="t-input grow" value={values[fd.key] ?? ""} onchange={(e) => (values[fd.key] = e.currentTarget.value)} />
@@ -171,5 +184,10 @@
   .apply {
     justify-content: flex-end;
     padding: 0 4px 2px;
+  }
+  .mask {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 8px;
   }
 </style>

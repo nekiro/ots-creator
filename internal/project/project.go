@@ -271,7 +271,11 @@ func (p *Project) Warnings(format Format, v client.Version) []string {
 	var out []string
 	for _, c := range thing.Categories {
 		for _, t := range p.things.Things[c] {
-			if u := table.Unsupported(&t.Props); len(u) > 0 {
+			u := table.Unsupported(&t.Props)
+			if len(t.NpcSales) > 0 {
+				u = append(u, "npcSales")
+			}
+			if len(u) > 0 {
 				out = append(out, fmt.Sprintf("%s %d: %v", c, t.ID, u))
 			}
 		}

@@ -1,7 +1,8 @@
 // Property editor metadata: groups, labels and payload fields.
 import type { Properties } from "./api";
 
-export type FieldKind = "u16" | "i16" | "text" | "select";
+/** mask: a bit set, one checkbox per option (option values are bits). */
+export type FieldKind = "u16" | "i16" | "text" | "select" | "mask";
 
 export interface Field {
   key: string; // path inside Properties, e.g. "groundSpeed" or "market.name"
@@ -34,8 +35,9 @@ export const MARKET_CATEGORIES: [number, string][] = [
   [19, "Distance Weapons"], [20, "Swords"], [21, "Wands & Rods"], [22, "Premium Scrolls"], [255, "Meta Weapons"],
 ];
 
+/** Vocation bits of market.restrictProfession; none set means any vocation. */
 export const PROFESSIONS: [number, string][] = [
-  [0, "Any"], [1, "Knight"], [2, "Paladin"], [4, "Sorcerer"], [8, "Druid"], [16, "Monk"],
+  [1, "Knight"], [2, "Paladin"], [4, "Sorcerer"], [8, "Druid"], [16, "Monk"],
 ];
 
 export const FLAG_GROUPS: FlagGroup[] = [
@@ -116,7 +118,7 @@ export const FLAG_GROUPS: FlagGroup[] = [
           { key: "market.category", label: "Category", kind: "select", options: MARKET_CATEGORIES },
           { key: "market.tradeAs", label: "Trade as", kind: "u16" },
           { key: "market.showAs", label: "Show as", kind: "u16" },
-          { key: "market.restrictProfession", label: "Vocation", kind: "select", options: PROFESSIONS },
+          { key: "market.restrictProfession", label: "Vocations", kind: "mask", options: PROFESSIONS },
           { key: "market.restrictLevel", label: "Min level", kind: "u16" },
         ],
       },
@@ -124,13 +126,37 @@ export const FLAG_GROUPS: FlagGroup[] = [
   },
   {
     title: "Outfit",
-    flags: [{ key: "hasBones", label: "Bones", hint: "Per-direction attachment offsets" }],
+    flags: [
+      { key: "hasBones", label: "Bones", hint: "Per-direction attachment offsets" },
+      { key: "reverseAddonsNorth", label: "Reverse addons north", hint: "Addons are drawn under the outfit facing north" },
+      { key: "reverseAddonsEast", label: "Reverse addons east", hint: "Addons are drawn under the outfit facing east" },
+      { key: "reverseAddonsSouth", label: "Reverse addons south", hint: "Addons are drawn under the outfit facing south" },
+      { key: "reverseAddonsWest", label: "Reverse addons west", hint: "Addons are drawn under the outfit facing west" },
+    ],
+  },
+  {
+    title: "Tibia 12+",
+    flags: [
+      { key: "hasUpgradeClassification", label: "Upgrade classification", hint: "Item tier class for upgrades", fields: [{ key: "upgradeClassification", label: "Class", kind: "u16" }] },
+      { key: "cyclopedia", label: "Cyclopedia", hint: "Shown in the item cyclopedia", fields: [{ key: "cyclopediaType", label: "Type", kind: "u16" }] },
+      { key: "changedToExpire", label: "Changed to expire", hint: "Expiring version of another item", fields: [{ key: "formerObjectId", label: "Former id", kind: "u16" }] },
+      { key: "corpse", label: "Corpse" },
+      { key: "playerCorpse", label: "Player corpse" },
+      { key: "ammo", label: "Ammo" },
+      { key: "showOffSocket", label: "Show-off socket" },
+      { key: "reportable", label: "Reportable" },
+      { key: "wearout", label: "Wear out" },
+      { key: "clockExpire", label: "Clock expire" },
+      { key: "expire", label: "Expire" },
+      { key: "expireStop", label: "Expire stop" },
+      { key: "wrapKit", label: "Wrap kit" },
+    ],
   },
 ];
 
 // Flags that make sense outside items (category 1). Items get everything but bones.
 const CATEGORY_FLAGS: Record<number, ReadonlySet<string>> = {
-  2: new Set(["hasLight", "hasOffset", "animateAlways", "hasBones"]),
+  2: new Set(["hasLight", "hasOffset", "animateAlways", "hasBones", "reverseAddonsNorth", "reverseAddonsEast", "reverseAddonsSouth", "reverseAddonsWest"]),
   3: new Set(["hasLight", "hasOffset", "animateAlways", "topEffect"]),
   4: new Set(["hasLight", "hasOffset"]),
 };
@@ -140,7 +166,7 @@ const CATEGORY_FLAGS: Record<number, ReadonlySet<string>> = {
 export function flagVisible(key: string, category: number, set: boolean): boolean {
   if (set) return true;
   const allowed = CATEGORY_FLAGS[category];
-  return allowed ? allowed.has(key) : key !== "hasBones";
+  return allowed ? allowed.has(key) : key !== "hasBones" && !key.startsWith("reverseAddons");
 }
 
 export function getPath(obj: any, path: string): any {

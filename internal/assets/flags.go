@@ -3,6 +3,7 @@ package assets
 import (
 	"google.golang.org/protobuf/encoding/protowire"
 
+	"github.com/nekiro/ots-creator/internal/binio"
 	"github.com/nekiro/ots-creator/internal/thing"
 )
 
@@ -20,6 +21,11 @@ const (
 	fClothes        = 34
 	fDefaultAction  = 35
 	fMarket         = 36
+	fNpcSaleData    = 40
+	fChangedExpire  = 41
+	fCyclopedia     = 44
+	fUpgrade        = 48
+	fLastFlag       = 57 // wrapkit, the highest flag the editor knows
 	fHookSouth      = 70
 	fHookEast       = 71
 	hookSouth       = 1
@@ -27,6 +33,7 @@ const (
 	marketCategory  = 1
 	marketTradeAs   = 2
 	marketShowAs    = 3
+	marketVocation  = 5 // repeated PLAYER_PROFESSION
 	marketMinLevel  = 6
 	marketName      = 7
 	payloadFirstSub = 1
@@ -64,11 +71,49 @@ var boolFlags = []struct {
 	{37, func(p *thing.Properties) *bool { return &p.Wrappable }},
 	{38, func(p *thing.Properties) *bool { return &p.Unwrappable }},
 	{39, func(p *thing.Properties) *bool { return &p.TopEffect }},
+	{42, func(p *thing.Properties) *bool { return &p.Corpse }},
+	{43, func(p *thing.Properties) *bool { return &p.PlayerCorpse }},
+	{45, func(p *thing.Properties) *bool { return &p.Ammo }},
+	{46, func(p *thing.Properties) *bool { return &p.ShowOffSocket }},
+	{47, func(p *thing.Properties) *bool { return &p.Reportable }},
+	{49, func(p *thing.Properties) *bool { return &p.ReverseAddonsEast }},
+	{50, func(p *thing.Properties) *bool { return &p.ReverseAddonsWest }},
+	{51, func(p *thing.Properties) *bool { return &p.ReverseAddonsSouth }},
+	{52, func(p *thing.Properties) *bool { return &p.ReverseAddonsNorth }},
+	{53, func(p *thing.Properties) *bool { return &p.Wearout }},
+	{54, func(p *thing.Properties) *bool { return &p.ClockExpire }},
+	{55, func(p *thing.Properties) *bool { return &p.Expire }},
+	{56, func(p *thing.Properties) *bool { return &p.ExpireStop }},
+	{57, func(p *thing.Properties) *bool { return &p.WrapKit }},
+}
+
+// NPC sale entry fields (AppearanceFlagNPC).
+const (
+	npcName      = 1
+	npcLocation  = 2
+	npcSalePrice = 3
+	npcBuyPrice  = 4
+	npcCurrency  = 5
+	npcQuestFlag = 6
+)
+
+// professionMask turns PLAYER_PROFESSION values (knight 1 ... monk 5) into
+// the vocation bit mask of thing.Market (knight 1, paladin 2, sorcerer 4,
+// druid 8, monk 16). Any, none and promoted give no bit.
+func professionMask(values []uint64) uint16 {
+	var mask uint16
+	for _, v := range values {
+		if v >= 1 && v <= 5 {
+			mask |= 1 << (v - 1)
+		}
+	}
+	return mask
 }
 
 // knownFlags lists every flag number written by encodeFlags.
 var knownFlags = func() []protowire.Number {
-	out := []protowire.Number{fBank, fWrite, fWriteOnce, fHook, fLight, fShift, fHeight, fAutomap, fLenshelp, fClothes, fDefaultAction, fMarket, fHookSouth, fHookEast}
+	out := []protowire.Number{fBank, fWrite, fWriteOnce, fHook, fLight, fShift, fHeight, fAutomap, fLenshelp, fClothes, fDefaultAction, fMarket,
+		fNpcSaleData, fChangedExpire, fCyclopedia, fUpgrade, fHookSouth, fHookEast}
 	for _, f := range boolFlags {
 		out = append(out, f.num)
 	}
@@ -84,6 +129,9 @@ func Supported() []string {
 		"hasLight", "dontHide", "translucent", "hasOffset", "hasElevation", "lyingObject", "animateAlways",
 		"miniMap", "lensHelp", "fullGround", "ignoreLook", "cloth", "isMarket", "hasDefaultAction",
 		"wrappable", "unwrappable", "topEffect", "usable",
+		"changedToExpire", "corpse", "playerCorpse", "cyclopedia", "ammo", "showOffSocket", "reportable",
+		"hasUpgradeClassification", "reverseAddonsEast", "reverseAddonsWest", "reverseAddonsSouth",
+		"reverseAddonsNorth", "wearout", "clockExpire", "expire", "expireStop", "wrapKit", "npcSales",
 	}
 }
 
@@ -161,13 +209,58 @@ func decodeFlags(m message, p *thing.Properties) {
 			ShowAs:        u16(s.uint(marketShowAs)),
 			Name:          string(name.b),
 			RestrictLevel: u16(s.uint(marketMinLevel)),
+
+			RestrictProfession: professionMask(s.uints(marketVocation)),
 		}
+	}
+	if m.has(fChangedExpire) {
+		p.ChangedToExpire, p.FormerObjectID = true, u16(m.sub(fChangedExpire).uint(1))
+	}
+	if m.has(fCyclopedia) {
+		p.Cyclopedia, p.CyclopediaType = true, u16(m.sub(fCyclopedia).uint(1))
+	}
+	if m.has(fUpgrade) {
+		p.HasUpgradeClassification, p.UpgradeClassification = true, u16(m.sub(fUpgrade).uint(1))
 	}
 }
 
-// encodeFlags writes the flags of p. Fields of om (the original flags)
-// that the model does not know are kept, also inside the flags it does.
-func encodeFlags(p *thing.Properties, om message) []byte {
+// decodeNpcSales reads the repeated NPC sale entries of the flags.
+func decodeNpcSales(m message) []thing.NpcSale {
+	var out []thing.NpcSale
+	for _, s := range m.all(fNpcSaleData) {
+		name, _ := s.get(npcName)
+		loc, _ := s.get(npcLocation)
+		quest, _ := s.get(npcQuestFlag)
+		out = append(out, thing.NpcSale{
+			Name:              binio.DecodeLatin1(name.b),
+			Location:          binio.DecodeLatin1(loc.b),
+			SalePrice:         uint32(s.uint(npcSalePrice)),
+			BuyPrice:          uint32(s.uint(npcBuyPrice)),
+			CurrencyObjectID:  uint32(s.uint(npcCurrency)),
+			CurrencyQuestFlag: binio.DecodeLatin1(quest.b),
+		})
+	}
+	return out
+}
+
+func encodeNpcSale(n thing.NpcSale) []byte {
+	b := putBytes(nil, npcName, binio.EncodeLatin1(n.Name))
+	b = putBytes(b, npcLocation, binio.EncodeLatin1(n.Location))
+	b = putUint(b, npcSalePrice, uint64(n.SalePrice))
+	b = putUint(b, npcBuyPrice, uint64(n.BuyPrice))
+	if n.CurrencyObjectID != 0 {
+		b = putUint(b, npcCurrency, uint64(n.CurrencyObjectID))
+	}
+	if n.CurrencyQuestFlag != "" {
+		b = putBytes(b, npcQuestFlag, binio.EncodeLatin1(n.CurrencyQuestFlag))
+	}
+	return b
+}
+
+// encodeFlags writes the flags of p and the NPC sale entries. Fields of om
+// (the original flags) that the model does not know are kept, also inside
+// the flags it does.
+func encodeFlags(p *thing.Properties, npc []thing.NpcSale, om message) []byte {
 	var b []byte
 	sub := func(num protowire.Number, known []protowire.Number, fields []byte) {
 		b = putBytes(b, num, om.sub(num).appendOthers(fields, known...))
@@ -180,7 +273,7 @@ func encodeFlags(p *thing.Properties, om message) []byte {
 		bools[f.num] = *f.get(p)
 	}
 	newHooks := om.has(fHookSouth) || om.has(fHookEast)
-	for num := protowire.Number(1); num <= fMarket+3; num++ {
+	for num := protowire.Number(1); num <= fLastFlag; num++ {
 		if v, ok := bools[num]; ok {
 			b = putBool(b, num, v)
 			continue
@@ -242,7 +335,33 @@ func encodeFlags(p *thing.Properties, om message) []byte {
 					f = putUint(f, marketMinLevel, uint64(m.RestrictLevel))
 				}
 				f = putBytes(f, marketName, []byte(m.Name))
-				sub(fMarket, []protowire.Number{marketCategory, marketTradeAs, marketShowAs, marketMinLevel, marketName}, f)
+				known := []protowire.Number{marketCategory, marketTradeAs, marketShowAs, marketMinLevel, marketName}
+				// Unchanged vocations keep their original values (promoted, any).
+				if m.RestrictProfession != professionMask(om.sub(fMarket).uints(marketVocation)) {
+					known = append(known, marketVocation)
+					for v := uint64(1); v <= 5; v++ {
+						if m.RestrictProfession&(1<<(v-1)) != 0 {
+							f = putUint(f, marketVocation, v)
+						}
+					}
+				}
+				sub(fMarket, known, f)
+			}
+		case fNpcSaleData:
+			for _, n := range npc {
+				b = putBytes(b, fNpcSaleData, encodeNpcSale(n))
+			}
+		case fChangedExpire:
+			if p.ChangedToExpire {
+				one(fChangedExpire, uint64(p.FormerObjectID))
+			}
+		case fCyclopedia:
+			if p.Cyclopedia {
+				one(fCyclopedia, uint64(p.CyclopediaType))
+			}
+		case fUpgrade:
+			if p.HasUpgradeClassification {
+				one(fUpgrade, uint64(p.UpgradeClassification))
 			}
 		}
 	}

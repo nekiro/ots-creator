@@ -133,6 +133,7 @@ func decodeAppearance(raw []byte, c thing.Category, sm SpriteMap) (*thing.Thing,
 		t.Description = binio.DecodeLatin1(f.b)
 	}
 	decodeFlags(m.sub(3), &t.Props)
+	t.NpcSales = decodeNpcSales(m.sub(3))
 	orig := &Original{raw: raw, thing: t}
 	for _, gm := range m.all(2) {
 		if c != thing.CategoryOutfit && len(t.FrameGroups) == 1 {
@@ -241,7 +242,7 @@ func decodeGroup(gm message, c thing.Category, sm SpriteMap) (*thing.FrameGroup,
 // Blank reports whether t is a placeholder for an id missing from the file
 // (or an object removed in the editor): nothing about it is worth writing.
 func Blank(t *thing.Thing) bool {
-	if t.Extra != nil || t.Props != (thing.Properties{}) || t.Name != "" || t.Description != "" {
+	if t.Extra != nil || t.Props != (thing.Properties{}) || t.Name != "" || t.Description != "" || len(t.NpcSales) > 0 {
 		return false
 	}
 	for _, g := range t.FrameGroups {
@@ -325,7 +326,7 @@ func encodeAppearance(t *thing.Thing, resolve Resolver) ([]byte, error) {
 		}
 		b = putBytes(b, 2, encodeGroup(t.Category, g, ids[gi], og, slices.Equal(ids[gi], oids)))
 	}
-	b = putBytes(b, 3, encodeFlags(&t.Props, om.sub(3)))
+	b = putBytes(b, 3, encodeFlags(&t.Props, t.NpcSales, om.sub(3)))
 	if t.Name != "" {
 		b = putBytes(b, fieldName, binio.EncodeLatin1(t.Name))
 	}

@@ -253,3 +253,52 @@ func TestOfficialAssets(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestNewerFlagsRoundTrip(t *testing.T) {
+	npc := putBytes(putBytes(nil, npcName, []byte("Rashid")), npcLocation, []byte("Svargrond"))
+	npc = putUint(putUint(npc, npcSalePrice, 0), npcBuyPrice, 150)
+	flags := putBytes(nil, fNpcSaleData, npc)
+	flags = putBytes(flags, fNpcSaleData, putBytes(putUint(nil, npcSalePrice, 20), npcQuestFlag, []byte("gold token")))
+	flags = putBytes(flags, fChangedExpire, putUint(nil, 1, 3051))
+	flags = putBool(flags, 42, true) // corpse
+	flags = putBytes(flags, fCyclopedia, putUint(nil, 1, 3))
+	flags = putBytes(flags, fUpgrade, putUint(nil, 1, 4))
+	flags = putBool(flags, 57, true) // wrapkit
+	flags = putBytes(flags, fMarket, putUint(putUint(nil, marketVocation, 10), marketVocation, 1)) // promoted + knight
+	app := putBytes(putUint(nil, 1, 100), 3, flags)
+
+	m, _ := parse(app)
+	var p thing.Properties
+	decodeFlags(m.sub(3), &p)
+	sales := decodeNpcSales(m.sub(3))
+	if len(sales) != 2 || sales[0].Name != "Rashid" || sales[0].BuyPrice != 150 || sales[1].CurrencyQuestFlag != "gold token" {
+		t.Fatalf("npc %+v", sales)
+	}
+	if !p.ChangedToExpire || p.FormerObjectID != 3051 || !p.Corpse || p.CyclopediaType != 3 || p.UpgradeClassification != 4 || !p.WrapKit {
+		t.Fatalf("props %+v", p)
+	}
+	if p.Market.RestrictProfession != 1 {
+		t.Fatalf("vocations %d", p.Market.RestrictProfession)
+	}
+	if got := p.AssetOnly(); len(got) != 5 {
+		t.Fatalf("asset only %v", got)
+	}
+
+	// Unchanged vocations keep "promoted"; edited ones are rewritten.
+	out, _ := parse(encodeFlags(&p, sales, m.sub(3)))
+	if v := out.sub(fMarket).uints(marketVocation); len(v) != 2 {
+		t.Fatalf("vocations %v", v)
+	}
+	p.Market.RestrictProfession = 1 | 8 // knight, druid
+	p.UpgradeClassification = 2
+	sales[0].SalePrice = 99
+	out, _ = parse(encodeFlags(&p, sales, m.sub(3)))
+	var p2 thing.Properties
+	decodeFlags(out, &p2)
+	if v := out.sub(fMarket).uints(marketVocation); len(v) != 2 || v[0] != 1 || v[1] != 4 {
+		t.Fatalf("vocations %v", v)
+	}
+	if p2.UpgradeClassification != 2 || decodeNpcSales(out)[0].SalePrice != 99 || len(out.all(fNpcSaleData)) != 2 {
+		t.Fatalf("props %+v", p2)
+	}
+}

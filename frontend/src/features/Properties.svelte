@@ -6,6 +6,7 @@
   import MiniWindow from "../lib/ui/MiniWindow.svelte";
   import NumberField from "../lib/ui/NumberField.svelte";
   import Select from "../lib/ui/Select.svelte";
+  import Icon from "../lib/ui/Icon.svelte";
 
   let { group = $bindable(0) }: { group?: number } = $props();
 
@@ -104,6 +105,32 @@
           <label class="text"><span class="t-label">Name</span><input class="t-input" bind:value={t.name} spellcheck="false" /></label>
           <label class="text"><span class="t-label">Description</span><textarea class="t-input" rows="2" bind:value={t.description} spellcheck="false"></textarea></label>
         </section>
+        {#if t.category === Category.CategoryItem}
+          <section>
+            <h4>NPC trade{#if t.npcSales.length}&nbsp;· {t.npcSales.length}{/if}</h4>
+            {#each t.npcSales as n, i}
+              <div class="npc t-panel">
+                <div class="row">
+                  <input class="t-input grow" placeholder="NPC name" bind:value={n.name} spellcheck="false" />
+                  <button class="t-icon-btn" title="Remove this NPC" onclick={() => t.npcSales.splice(i, 1)}><Icon name="trash" /></button>
+                </div>
+                <input class="t-input" placeholder="Location" bind:value={n.location} spellcheck="false" />
+                <div class="row wrap">
+                  <NumberField label="Sells for" title="Price the player pays; 0 = does not sell" value={n.salePrice} min={0} max={4294967295} width={70} onchange={(v) => (n.salePrice = v)} />
+                  <NumberField label="Buys for" title="Price the NPC pays; 0 = does not buy" value={n.buyPrice} min={0} max={4294967295} width={70} onchange={(v) => (n.buyPrice = v)} />
+                </div>
+                <div class="row wrap">
+                  <NumberField label="Currency id" title="Item paid with; 0 = gold" value={n.currencyObjectId} min={0} max={4294967295} width={60} onchange={(v) => (n.currencyObjectId = v)} />
+                  <input class="t-input grow" placeholder="Quest currency" title="Name of a quest currency shown instead of an item" bind:value={n.currencyQuestFlag} spellcheck="false" />
+                </div>
+              </div>
+            {/each}
+            <button
+              class="t-btn"
+              onclick={() => t.npcSales.push({ name: "", location: "", salePrice: 0, buyPrice: 0, currencyObjectId: 0, currencyQuestFlag: "" })}>Add NPC</button
+            >
+          </section>
+        {/if}
       {/if}
       <section>
         <h4>Texture{#if t.frameGroups.length > 1}&nbsp;· {group === 0 ? "Idle" : "Walking"}{/if}</h4>
@@ -184,7 +211,21 @@
                         {#each f.fields as fd}
                           <label class="row">
                             <span class="t-label">{fd.label}</span>
-                            {#if fd.kind === "select"}
+                            {#if fd.kind === "mask"}
+                              <span class="mask">
+                                {#each fd.options ?? [] as [bit, name]}
+                                  <label class="row"
+                                    ><input
+                                      class="t-check"
+                                      type="checkbox"
+                                      checked={(fieldValue(fd) & bit) !== 0}
+                                      onchange={(e) => setField(fd, e.currentTarget.checked ? fieldValue(fd) | bit : fieldValue(fd) & ~bit)}
+                                    />{name}</label
+                                  >
+                                {/each}
+                                {#if !fieldValue(fd)}<span class="t-label">(any)</span>{/if}
+                              </span>
+                            {:else if fd.kind === "select"}
                               <Select grow value={fieldValue(fd)} options={selectOptions(fd)} onchange={(v) => setField(fd, v)} />
                             {:else if fd.kind === "text"}
                               <input class="t-input grow" value={fieldValue(fd)} onchange={(e) => setField(fd, e.currentTarget.value)} />
@@ -319,6 +360,18 @@
   }
   .flag .on {
     color: var(--text-bright);
+  }
+  .npc {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 4px;
+    margin-bottom: 4px;
+  }
+  .mask {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 8px;
   }
   .flag.unsupported {
     opacity: 0.45;

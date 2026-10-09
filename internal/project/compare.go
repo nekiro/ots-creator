@@ -24,6 +24,7 @@ const (
 const (
 	ChangeName      = "name"
 	ChangeProps     = "props"
+	ChangeNpcSales  = "npcSales"
 	ChangeSize      = "size"      // width, height or exact size
 	ChangePatterns  = "patterns"  // layers or patterns
 	ChangeFrames    = "frames"    // frame count
@@ -163,6 +164,9 @@ func (tc *thingComparer) compare(a, b *thing.Thing) ([]string, error) {
 	}
 	if a.Props != b.Props {
 		out = append(out, ChangeProps)
+	}
+	if !slices.Equal(a.NpcSales, b.NpcSales) {
+		out = append(out, ChangeNpcSales)
 	}
 	ga, gb := a.FrameGroups, b.FrameGroups
 	if len(ga) != len(gb) {

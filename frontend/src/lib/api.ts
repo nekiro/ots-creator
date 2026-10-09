@@ -29,7 +29,7 @@ export type { Settings, Recent } from "../../bindings/github.com/nekiro/ots-crea
 export type { OptimizeOptions, OptimizeResult, ConvertResult, PropsPatch, DiffEntry, DiffResult, TransferResult } from "../../bindings/github.com/nekiro/ots-creator/internal/project/models";
 export { Format } from "../../bindings/github.com/nekiro/ots-creator/internal/project/models";
 export type { Version, Features } from "../../bindings/github.com/nekiro/ots-creator/internal/client/models";
-export type { FrameDuration, Properties } from "../../bindings/github.com/nekiro/ots-creator/internal/thing/models";
+export type { FrameDuration, NpcSale, Properties } from "../../bindings/github.com/nekiro/ots-creator/internal/thing/models";
 export { Category, AnimationMode } from "../../bindings/github.com/nekiro/ots-creator/internal/thing/models";
 
 import {
@@ -37,6 +37,7 @@ import {
   type FrameDuration,
   type FrameGroup as GoFrameGroup,
   type Thing as GoThing,
+  type NpcSale,
 } from "../../bindings/github.com/nekiro/ots-creator/internal/thing/models";
 
 /** Payload of the "app:files-dropped" event (app.FilesDropped). */
@@ -48,12 +49,13 @@ export interface FilesDropped {
 
 // Go nil slices arrive as null; the UI works on normalized copies.
 export type FrameGroup = Omit<GoFrameGroup, "sprites" | "durations"> & { sprites: number[]; durations: FrameDuration[] };
-export type Thing = Omit<GoThing, "frameGroups"> & { frameGroups: FrameGroup[] };
+export type Thing = Omit<GoThing, "frameGroups" | "npcSales"> & { frameGroups: FrameGroup[]; npcSales: NpcSale[] };
 
 export function normalizeThing(t: GoThing): Thing {
   const plain = JSON.parse(JSON.stringify(t)) as GoThing;
   return {
     ...plain,
+    npcSales: plain.npcSales ?? [],
     frameGroups: (plain.frameGroups ?? []).filter((g): g is GoFrameGroup => !!g).map((g) => ({ ...g, sprites: g.sprites ?? [], durations: g.durations ?? [] })),
   };
 }
