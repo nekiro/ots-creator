@@ -9,6 +9,8 @@
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import Select from "../../lib/ui/Select.svelte";
+  import PanStage from "../../lib/ui/PanStage.svelte";
+  import { ZOOM_LEVELS, fitZoom, stepZoom, zoomLabel } from "../../lib/pan.svelte";
 
   const category = app.category;
   const id = app.focused!;
@@ -22,7 +24,6 @@
   let loading = $state(true);
   let failed = $state(false);
   let natural = $state<[number, number]>([0, 0]);
-  let stage = $state<HTMLDivElement>();
   let stageSize = $state<[number, number]>([0, 0]);
 
   // The saved object: the sheet is rendered from it, not from the editor.
@@ -51,11 +52,7 @@
   const columns = $derived(g ? g.patternZ * g.patternX * g.layers : 0);
   const rows = $derived(g ? g.frames * g.patternY : 0);
   // Whole pixels when the sheet fits; big sheets shrink to fit.
-  const fit = $derived.by(() => {
-    if (!natural[0] || !stageSize[0]) return 1;
-    const r = Math.min((stageSize[0] - 18) / natural[0], (stageSize[1] - 18) / natural[1]);
-    return r >= 1 ? Math.min(8, Math.floor(r)) : r;
-  });
+  const fit = $derived(fitZoom(natural[0], natural[1], stageSize[0], stageSize[1]));
   const scale = $derived(zoom || fit);
 
   $effect(() => {
@@ -64,12 +61,16 @@
     failed = false;
   });
 
-  $effect(() => {
-    if (!stage) return;
-    const ro = new ResizeObserver(() => (stageSize = [stage!.clientWidth, stage!.clientHeight]));
-    ro.observe(stage);
-    return () => ro.disconnect();
-  });
+  function zoomBy(d: number) {
+    zoom = stepZoom(scale, d);
+  }
+
+  // Fit also centers the sheet again.
+  let centered = $state(0);
+  function zoomFit() {
+    zoom = 0;
+    centered++;
+  }
 
   function loaded(e: Event) {
     const img = e.currentTarget as HTMLImageElement;
@@ -84,22 +85,23 @@
 
 <Dialog title="Export Sprite Sheet" width={820} onclose={() => (app.dialog = null)}>
   <div class="layout">
-    <div class="stage checker" bind:this={stage}>
+    <div class="stage checker">
+      <PanStage bind:stageSize zoom={scale} onzoom={zoomBy} resetKey={`${effective}:${centered}`}>
+        <img
+          class="pixel"
+          class:hidden={loading || failed}
+          src={url}
+          alt="Sprite sheet"
+          onload={loaded}
+          onerror={() => ((failed = true), (loading = false))}
+        />
+      </PanStage>
       {#if loading && !failed}
         <div class="loader t-panel" role="status"><span class="spinner"></span>Rendering…</div>
       {/if}
       {#if failed}
         <span class="err">The sheet could not be rendered.</span>
       {/if}
-      <img
-        class="pixel"
-        class:hidden={loading || failed}
-        src={url}
-        alt="Sprite sheet"
-        style="width:{natural[0] * scale}px;height:{natural[1] * scale}px"
-        onload={loaded}
-        onerror={() => ((failed = true), (loading = false))}
-      />
     </div>
 
     <div class="side col">
@@ -146,10 +148,10 @@
       {/if}
 
       <div class="row">
-        <button class="t-icon-btn" title="Zoom out" disabled={scale <= 1} onclick={() => (zoom = Math.max(1, Math.ceil(scale) - 1))}><Icon name="zoomout" /></button>
-        <span class="t-label zoom">{scale >= 1 ? `${scale}×` : `${Math.round(scale * 100)}%`}{zoom ? "" : " (fit)"}</span>
-        <button class="t-icon-btn" title="Zoom in" disabled={scale >= 8} onclick={() => (zoom = Math.min(8, Math.floor(scale) + 1))}><Icon name="zoomin" /></button>
-        {#if zoom}<button class="t-btn" onclick={() => (zoom = 0)}>Fit</button>{/if}
+        <button class="t-icon-btn" title="Zoom out (Ctrl+wheel)" disabled={scale <= ZOOM_LEVELS[0]} onclick={() => zoomBy(-1)}><Icon name="zoomout" /></button>
+        <span class="t-label zoom">{zoomLabel(scale)}{zoom ? "" : " (fit)"}</span>
+        <button class="t-icon-btn" title="Zoom in (Ctrl+wheel)" disabled={scale >= ZOOM_LEVELS[ZOOM_LEVELS.length - 1]} onclick={() => zoomBy(1)}><Icon name="zoomin" /></button>
+        {#if zoom}<button class="t-btn" onclick={zoomFit}>Fit</button>{/if}
       </div>
 
       {#if app.dirty}
@@ -179,8 +181,7 @@
     min-width: 0;
     display: grid;
     place-items: center;
-    overflow: auto;
-    padding: 8px;
+    overflow: hidden;
     border: 1px solid #1a1a1a;
   }
   .stage img {

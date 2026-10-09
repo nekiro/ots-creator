@@ -239,19 +239,24 @@ func Sheet(g *thing.FrameGroup, size int, bg color.NRGBA, pixels func(slot int) 
 		if px == nil {
 			return
 		}
-		// Blend over the background so transparent pixels keep it.
-		for row := 0; row < size; row++ {
-			for col := 0; col < size; col++ {
-				s := px[(row*size+col)*4:]
-				if s[3] == 0 {
-					continue
-				}
-				o := img.PixOffset(x+col, y+row)
-				copy(img.Pix[o:o+4], s[:4])
-			}
-		}
+		DrawOver(img, x, y, size, px)
 	})
 	return img
+}
+
+// DrawOver draws RGBA sprite bytes at (x, y), keeping the destination where
+// the sprite is fully transparent (so a background color stays).
+func DrawOver(img *image.NRGBA, x, y, size int, px []byte) {
+	for row := 0; row < size; row++ {
+		for col := 0; col < size; col++ {
+			s := px[(row*size+col)*4:]
+			if s[3] == 0 {
+				continue
+			}
+			o := img.PixOffset(x+col, y+row)
+			copy(img.Pix[o:o+4], s[:4])
+		}
+	}
 }
 
 // SliceSheet cuts a group sheet into sprites, returning RGBA bytes indexed

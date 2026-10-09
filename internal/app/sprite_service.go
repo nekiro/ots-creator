@@ -154,3 +154,35 @@ func (ss *SpriteService) Optimize(o project.OptimizeOptions) (project.OptimizeRe
 	}
 	return res, err
 }
+
+// Find returns the ids of sprites matching a filter (see project.FindSprites).
+func (ss *SpriteService) Find(filter string) ([]uint32, error) {
+	p, err := ss.s.Project()
+	if err != nil {
+		return nil, err
+	}
+	return p.FindSprites(filter)
+}
+
+// Users lists the objects that use a sprite.
+func (ss *SpriteService) Users(id uint32) ([]project.ThingRef, error) {
+	p, err := ss.s.Project()
+	if err != nil {
+		return nil, err
+	}
+	return p.SpriteUsers(id), nil
+}
+
+// ReplaceRefs points every use of the sprites in from at sprite to (0
+// clears them) and returns the number of changed objects.
+func (ss *SpriteService) ReplaceRefs(from []uint32, to uint32) (int, error) {
+	p, err := ss.s.Project()
+	if err != nil {
+		return 0, err
+	}
+	n, err := p.ReplaceSpriteRefs(from, to)
+	if err == nil && n > 0 {
+		ss.s.Changed()
+	}
+	return n, err
+}

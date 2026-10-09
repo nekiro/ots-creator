@@ -23,6 +23,7 @@ var assets embed.FS
 func init() {
 	application.RegisterEvent[app.State](app.EventProjectChanged)
 	application.RegisterEvent[app.State](app.EventOtherChanged)
+	application.RegisterEvent[app.Progress](app.EventProgress)
 }
 
 func main() {

@@ -22,6 +22,8 @@
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import ThingCanvas from "../../lib/ui/ThingCanvas.svelte";
+  import PanStage from "../../lib/ui/PanStage.svelte";
+  import { ZOOM_LEVELS, stepZoom, zoomLabel } from "../../lib/pan.svelte";
 
   const FILTERS = [
     { name: "Objects and images (*.obd, *.png, *.bmp, *.gif, *.jpg)", pattern: "*.obd;*.png;*.bmp;*.gif;*.jpg;*.jpeg" },
@@ -235,10 +237,14 @@
       {#if loading}
         <div class="loader t-panel" role="status"><span class="spinner"></span>Loading {name}…</div>
       {/if}
-      {#if thing}
-        <ThingCanvas {thing} {get} size={file?.spriteSize ?? 32} {ready} {group} {direction} {zoom} />
-      {:else if image}
-        <img class="pixel" src={image.url} alt={name} style="width:{image.width * zoom}px;height:{image.height * zoom}px" />
+      {#if thing || image}
+        <PanStage {zoom} onzoom={(d) => (zoom = stepZoom(zoom, d))} resetKey={current}>
+          {#if thing}
+            <ThingCanvas {thing} {get} size={file?.spriteSize ?? 32} {ready} {group} {direction} />
+          {:else if image}
+            <img class="pixel" src={image.url} alt={name} />
+          {/if}
+        </PanStage>
       {:else if error}
         <span class="err">{error}</span>
       {/if}
@@ -284,9 +290,9 @@
       {/if}
       {#if thing || image}
         <div class="row">
-          <button class="t-icon-btn" title="Zoom out" disabled={zoom <= 1} onclick={() => zoom--}><Icon name="zoomout" /></button>
-          <span class="t-label">{zoom}×</span>
-          <button class="t-icon-btn" title="Zoom in" disabled={zoom >= 8} onclick={() => zoom++}><Icon name="zoomin" /></button>
+          <button class="t-icon-btn" title="Zoom out (Ctrl+wheel)" disabled={zoom <= ZOOM_LEVELS[0]} onclick={() => (zoom = stepZoom(zoom, -1))}><Icon name="zoomout" /></button>
+          <span class="t-label">{zoomLabel(zoom)}</span>
+          <button class="t-icon-btn" title="Zoom in (Ctrl+wheel)" disabled={zoom >= ZOOM_LEVELS[ZOOM_LEVELS.length - 1]} onclick={() => (zoom = stepZoom(zoom, 1))}><Icon name="zoomin" /></button>
         </div>
       {/if}
     </div>
@@ -384,7 +390,7 @@
     min-width: 0;
     display: grid;
     place-items: center;
-    overflow: auto;
+    overflow: hidden;
     border: 1px solid #1a1a1a;
   }
   /* Previous content stays visible but faded while the next file loads. */

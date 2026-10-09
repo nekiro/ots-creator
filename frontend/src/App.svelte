@@ -19,6 +19,8 @@
   import SheetExportDialog from "./features/tools/SheetExportDialog.svelte";
   import MarketDialog from "./features/market/MarketDialog.svelte";
   import CompareDialog from "./features/tools/CompareDialog.svelte";
+  import ReplaceRefsDialog from "./features/tools/ReplaceRefsDialog.svelte";
+  import ExportSpritesDialog from "./features/tools/ExportSpritesDialog.svelte";
   import ShareDialog from "./features/market/ShareDialog.svelte";
   import { listPanelWidth, loadPrefs, prefs, recentDir, removeRecent, shortPath } from "./lib/prefs.svelte";
   import { setMinLayoutWidth } from "./lib/pixelscale";
@@ -164,6 +166,8 @@
 {#if app.dialog === "sheet" && app.open && app.focused !== null}<SheetExportDialog />{/if}
 {#if app.dialog === "market"}<MarketDialog />{/if}
 {#if app.dialog === "compare" && app.open && app.other?.open}<CompareDialog />{/if}
+{#if app.dialog === "replaceRefs" && app.open && app.selectedSprites.length}<ReplaceRefsDialog />{/if}
+{#if app.dialog === "exportSprites" && app.open}<ExportSpritesDialog />{/if}
 {#if app.dialog === "share" && app.shareTarget && (app.open || app.shareTarget.kind === "file")}<ShareDialog />{/if}
 <ConfirmDialog />
 <Toasts />

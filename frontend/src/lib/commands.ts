@@ -285,6 +285,26 @@ export const commands = {
     await run("Replacing", () => SpriteService.Replace(id, paths[0]));
   },
 
+  /** Exports every object with sprites, one folder per category. */
+  async exportAllObjects() {
+    if (!guard()) return;
+    const dir = await DialogService.PickDirectory("Export all objects to");
+    if (!dir) return;
+    const sum = await run("Exporting objects", () => ThingService.ExportAll(dir, true));
+    if (sum) toast(`Exported ${sum.files.toLocaleString()} object(s), skipped ${sum.skipped.toLocaleString()} empty.`, "success");
+  },
+
+  /** Asks for single files or sprite sheets, then exports every sprite. */
+  exportAllSprites() {
+    if (guard()) app.dialog = "exportSprites";
+  },
+
+  /** Points every use of the selected sprites at another sprite. */
+  replaceRefs() {
+    if (!guard() || app.selectedSprites.length === 0) return;
+    app.dialog = "replaceRefs";
+  },
+
   async exportSprites() {
     if (!guard() || app.selectedSprites.length === 0) return;
     const dir = await DialogService.PickDirectory("Export sprites to");

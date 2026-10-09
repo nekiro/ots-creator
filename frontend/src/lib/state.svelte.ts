@@ -27,6 +27,8 @@ export type DialogName =
   | "market"
   | "share"
   | "compare"
+  | "replaceRefs"
+  | "exportSprites"
   | null;
 
 /** What the share window publishes. */
@@ -175,6 +177,11 @@ function applyOther(s: State): void {
 export async function initState(): Promise<void> {
   Events.On("project:changed", (ev) => applyState(ev.data));
   Events.On("compare:changed", (ev) => applyOther(ev.data));
+  // Long operations report progress in the busy label.
+  Events.On("app:progress", (ev) => {
+    const p = ev.data;
+    if (app.busy && p.done < p.total) app.busy = `${p.label} ${p.done.toLocaleString()}/${p.total.toLocaleString()}`;
+  });
   applyState(await ProjectService.State());
   applyOther(await CompareService.State());
 }

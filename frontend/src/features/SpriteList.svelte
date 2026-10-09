@@ -1,16 +1,41 @@
 <script lang="ts">
   import { openContextMenu } from "../lib/menu.svelte";
   import { spriteListMenu, spriteMenu } from "../lib/menus";
-  import { res } from "../lib/api";
+  import { SpriteService, errorMessage, res } from "../lib/api";
   import { commands } from "../lib/commands";
-  import { app, versions } from "../lib/state.svelte";
+  import { app, toast, versions } from "../lib/state.svelte";
   import { startSpriteDrag } from "../lib/dragsprites";
   import Icon from "../lib/ui/Icon.svelte";
   import MiniWindow from "../lib/ui/MiniWindow.svelte";
   import VirtualGrid from "../lib/ui/VirtualGrid.svelte";
+  import Select from "../lib/ui/Select.svelte";
+
+  const FILTERS = [
+    { value: "", label: "All sprites" },
+    { value: "unused", label: "Unused" },
+    { value: "empty", label: "Empty" },
+    { value: "duplicate", label: "Duplicates" },
+  ];
 
   let mode = $state<"all" | "object">("object");
   let jump = $state("");
+  let filter = $state("");
+  // Ids matching the filter of the All tab; refreshed after every change.
+  let found = $state<number[] | null>(null);
+  $effect(() => {
+    const f = filter;
+    void app.rev;
+    if (!f || mode !== "all" || !app.open) {
+      found = null;
+      return;
+    }
+    let stale = false;
+    SpriteService.Find(f).then(
+      (ids) => !stale && (found = ids ?? []),
+      (e) => toast(errorMessage(e), "error"),
+    );
+    return () => (stale = true);
+  });
 
   const total = $derived(app.project?.info.counts.sprites ?? 0);
   const objectIds = $derived.by(() => {
@@ -20,7 +45,7 @@
     for (const g of t.frameGroups) for (const id of g?.sprites ?? []) if (id) seen.add(id);
     return [...seen];
   });
-  const ids = $derived(mode === "object" ? objectIds : null);
+  const ids = $derived(mode === "object" ? objectIds : filter ? (found ?? []) : null);
   const count = $derived(ids ? ids.length : total);
   const idAt = (i: number) => (ids ? ids[i] : i + 1);
   const focusIndex = $derived.by(() => {
@@ -32,6 +57,10 @@
   function pick(id: number, e: MouseEvent) {
     if (e.ctrlKey || e.metaKey) {
       app.selectedSprites = app.selectedSprites.includes(id) ? app.selectedSprites.filter((x) => x !== id) : [...app.selectedSprites, id];
+    } else if (e.shiftKey && app.selectedSprites.length && ids) {
+      const a = app.selectedSprites[0];
+      const [i, j] = [ids.indexOf(a), ids.indexOf(id)];
+      if (i >= 0 && j >= 0) app.selectedSprites = [a, ...ids.slice(Math.min(i, j), Math.max(i, j) + 1).filter((x) => x !== a)];
     } else if (e.shiftKey && app.selectedSprites.length && !ids) {
       const a = app.selectedSprites[0];
       const [lo, hi] = a < id ? [a, id] : [id, a];
@@ -46,6 +75,7 @@
     const n = parseInt(jump, 10);
     if (Number.isFinite(n) && n >= 1 && n <= total) {
       mode = "all";
+      filter = "";
       app.selectedSprites = [n];
     }
   }
@@ -79,6 +109,15 @@
     </div>
     <input class="t-input grow" placeholder="Sprite id… (Enter)" bind:value={jump} onkeydown={onJump} inputmode="numeric" />
   </div>
+  {#if mode === "all"}
+    <div class="row filter">
+      <Select grow value={filter} options={FILTERS} disabled={!app.open} onchange={(v) => ((filter = v), (app.selectedSprites = []))} />
+      {#if filter && found}
+        <span class="t-label">{found.length.toLocaleString()}</span>
+        <button class="t-btn" title="Select every sprite in the list" disabled={!found.length} onclick={() => (app.selectedSprites = [...found!])}>All</button>
+      {/if}
+    </div>
+  {/if}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="list t-panel" oncontextmenu={(e) => !(e.target as HTMLElement).closest(".spr") && openContextMenu(e, spriteListMenu())}>
     {#if app.open && count > 0}
@@ -103,7 +142,7 @@
         {/snippet}
       </VirtualGrid>
     {:else if app.open}
-      <div class="empty t-label">{mode === "object" ? "This object has no sprites yet." : "No sprites."}</div>
+      <div class="empty t-label">{mode === "object" ? "This object has no sprites yet." : filter ? "No sprites match the filter." : "No sprites."}</div>
     {/if}
   </div>
   <div class="row foot">
@@ -123,6 +162,10 @@
   }
   .top {
     margin: 2px 2px 6px;
+  }
+  .filter {
+    gap: 4px;
+    margin: 0 2px 6px;
   }
   .tabs {
     width: 120px;

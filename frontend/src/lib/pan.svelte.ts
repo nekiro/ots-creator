@@ -106,3 +106,28 @@ export class PanView {
     this.dragging = false;
   }
 }
+
+/** Zoom steps of image views: fine below 1x, whole pixels above 2x. */
+export const ZOOM_LEVELS = [0.1, 0.15, 0.2, 0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 16];
+
+/** The next zoom level from z in direction d (+1 in, -1 out). */
+export function stepZoom(z: number, d: number): number {
+  const eps = 1e-6;
+  if (d > 0) return ZOOM_LEVELS.find((l) => l > z + eps) ?? ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
+  return [...ZOOM_LEVELS].reverse().find((l) => l < z - eps) ?? ZOOM_LEVELS[0];
+}
+
+/** "3×" from 1x up, "50%" below. */
+export function zoomLabel(z: number): string {
+  return z >= 1 ? `${Math.round(z * 100) / 100}×` : `${Math.round(z * 100)}%`;
+}
+
+/**
+ * Zoom that fits content of w x h into a stage of sw x sh (minus a margin):
+ * whole steps when it is 1x or more, so pixels stay even.
+ */
+export function fitZoom(w: number, h: number, sw: number, sh: number, max = 8, margin = 16): number {
+  if (!w || !h || !sw || !sh) return 1;
+  const r = Math.min((sw - margin) / w, (sh - margin) / h);
+  return r >= 1 ? Math.min(max, Math.floor(r)) : Math.max(ZOOM_LEVELS[0], r);
+}

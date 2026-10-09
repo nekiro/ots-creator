@@ -6,6 +6,7 @@
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import NumberField from "../../lib/ui/NumberField.svelte";
+  import PanStage from "../../lib/ui/PanStage.svelte";
 
   const size = app.project?.info.features.spriteSize ?? 32;
 
@@ -134,8 +135,10 @@
   <div class="layout">
     <div class="stage t-panel">
       {#if img}
-        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-        <canvas bind:this={canvas} onclick={toggle} class="pixel"></canvas>
+        <PanStage onzoom={(d) => (zoom = Math.min(6, Math.max(1, zoom + d)))} resetKey={name}>
+          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+          <canvas bind:this={canvas} onclick={toggle} class="pixel"></canvas>
+        </PanStage>
       {:else}
         <button class="pick" onclick={() => fileInput.click()}>
           <Icon name="image" size={28} />
@@ -174,9 +177,10 @@
     height: 440px;
   }
   .stage {
+    position: relative;
     flex: 1;
     min-width: 0;
-    overflow: auto;
+    overflow: hidden;
     padding: 6px;
     display: flex;
     background-image: url("../../assets/ui/ditherpattern.png");
