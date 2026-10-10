@@ -24,6 +24,7 @@ export type {
   MarketConfig,
   MarketImport,
   ShareRequest,
+  TargetPlan,
 } from "../../bindings/github.com/nekiro/ots-creator/internal/app/models";
 export type { Settings, Recent } from "../../bindings/github.com/nekiro/ots-creator/internal/settings/models";
 export type { OptimizeOptions, OptimizeResult, ConvertResult, PropsPatch, DiffEntry, DiffResult, TransferResult } from "../../bindings/github.com/nekiro/ots-creator/internal/project/models";

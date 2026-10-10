@@ -280,6 +280,29 @@ type TransferResult struct {
 // groups are merged into one group when dst has no frame groups.
 // The whole transfer is one undoable edit in dst.
 func Transfer(dst, src *Project, c thing.Category, ids []uint32, appendNew bool) (TransferResult, error) {
+	return transfer(dst, src, c, ids, appendNew, nil)
+}
+
+// TransferTo is Transfer that copies ids[i] to targets[i] in dst,
+// replacing the things there (targets past the end of dst extend it).
+func TransferTo(dst, src *Project, c thing.Category, ids, targets []uint32) (TransferResult, error) {
+	if len(targets) != len(ids) {
+		return TransferResult{}, fmt.Errorf("%d target ids for %d %s(s)", len(targets), len(ids), c)
+	}
+	seen := map[uint32]bool{}
+	for _, id := range targets {
+		if id < c.MinID() {
+			return TransferResult{}, fmt.Errorf("%s id %d is below %d", c, id, c.MinID())
+		}
+		if seen[id] {
+			return TransferResult{}, fmt.Errorf("target id %d is used twice", id)
+		}
+		seen[id] = true
+	}
+	return transfer(dst, src, c, ids, false, targets)
+}
+
+func transfer(dst, src *Project, c thing.Category, ids []uint32, appendNew bool, targets []uint32) (TransferResult, error) {
 	if dst == src {
 		return TransferResult{}, fmt.Errorf("cannot copy a client into itself")
 	}
@@ -316,7 +339,10 @@ func Transfer(dst, src *Project, c thing.Category, ids []uint32, appendNew bool)
 	res := TransferResult{IDs: make([]uint32, 0, len(things)), Before: map[uint32]*thing.Thing{}}
 	mapped := map[uint32]uint32{}
 	added := map[string]uint32{}
-	for _, t := range things {
+	for i, t := range things {
+		if targets != nil {
+			t.ID = targets[i]
+		}
 		for _, g := range t.FrameGroups {
 			for i, sid := range g.Sprites {
 				nid, ok := mapped[sid]
@@ -353,6 +379,41 @@ func Transfer(dst, src *Project, c thing.Category, ids []uint32, appendNew bool)
 	}
 	r.commit()
 	return res, nil
+}
+
+// FreeIDs returns n ids of category c from id from on that are free: past
+// the end of the category, or blank things (no name, default properties
+// and no sprite with pixels).
+func (p *Project) FreeIDs(c thing.Category, from uint32, n int) ([]uint32, error) {
+	if !c.Valid() {
+		return nil, fmt.Errorf("invalid category %d", c)
+	}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	ids := make([]uint32, 0, n)
+	for id := max(from, c.MinID()); len(ids) < n; id++ {
+		if t := p.things.Get(c, id); t == nil || p.isBlank(t) {
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
+}
+
+// TakenIDs returns the ids of ids that hold a thing in c that is not blank.
+func (p *Project) TakenIDs(c thing.Category, ids []uint32) []uint32 {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	out := []uint32{}
+	for _, id := range ids {
+		if t := p.things.Get(c, id); t != nil && !p.isBlank(t) {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+func (p *Project) isBlank(t *thing.Thing) bool {
+	return t.Name == "" && t.Description == "" && t.Props == (thing.Properties{}) && len(t.NpcSales) == 0 && !p.hasPixels(t)
 }
 
 // RestoreThings puts back things of category c as they were before a

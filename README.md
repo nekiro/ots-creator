@@ -72,7 +72,9 @@ and sprites with other users. Built with [Wails v3](https://v3.wails.io) (Go) an
   object counts as a new object, and a filter hides ids that are empty in the only client
   that has them.
 - Copy objects in both directions, keeping their ids or appending them as new objects,
-  or merge everything B has into A at once. A sprite with the same pixels under the same
+  or merge everything B has into A at once. Objects of B can also be queued (double
+  click) and dropped one by one into the slots of A shown next to the list, or all at
+  once into the free ids from a slot. A sprite with the same pixels under the same
   id in the target is reused instead of added again.
 - Every copy is one undo step in its target client. Copies that kept their ids can also
   be reverted one by one from the list. The second client can be compiled from the

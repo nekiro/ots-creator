@@ -10,6 +10,8 @@ export interface Toast {
   id: number;
   kind: ToastKind;
   text: string;
+  /** Toasts with the same key replace each other instead of stacking. */
+  key?: string;
 }
 
 export type DialogName =
@@ -71,6 +73,8 @@ class AppState {
   obdPath = $state("");
   /** What the share window publishes. */
   shareTarget = $state<ShareTarget | null>(null);
+  /** Objects of B queued in the compare window to be dropped into A. */
+  queue = $state<{ category: Category; id: number }[]>([]);
 
   get open(): boolean {
     return !!this.project?.open;
@@ -134,10 +138,28 @@ export const versions = new ResourceVersions(spriteCache);
 export const otherVersions = new ResourceVersions(otherSpriteCache);
 
 let toastSeq = 0;
-export function toast(text: string, kind: ToastKind = "info", ms = 3500): void {
-  const t = { id: ++toastSeq, kind, text };
-  app.toasts = [...app.toasts, t];
-  setTimeout(() => (app.toasts = app.toasts.filter((x) => x.id !== t.id)), kind === "error" ? ms * 2 : ms);
+const toastTimers = new Map<number, ReturnType<typeof setTimeout>>();
+/** Shows a toast. One with the key of a shown toast replaces it and keeps it up longer. */
+export function toast(text: string, kind: ToastKind = "info", ms = 3500, key?: string): void {
+  const old = key ? app.toasts.find((x) => x.key === key) : undefined;
+  const t = old ? { ...old, kind, text } : { id: ++toastSeq, kind, text, key };
+  app.toasts = old ? app.toasts.map((x) => (x.id === t.id ? t : x)) : [...app.toasts, t];
+  clearTimeout(toastTimers.get(t.id));
+  toastTimers.set(
+    t.id,
+    setTimeout(
+      () => {
+        app.toasts = app.toasts.filter((x) => x.id !== t.id);
+        toastTimers.delete(t.id);
+      },
+      kind === "error" ? ms * 2 : ms,
+    ),
+  );
+}
+
+/** Whether a toast with the key is shown. */
+export function hasToast(key: string): boolean {
+  return app.toasts.some((x) => x.key === key);
 }
 
 /** Runs an async action with a busy indicator and error toast. */
@@ -176,6 +198,8 @@ function applyState(s: State): void {
 }
 
 function applyOther(s: State): void {
+  // Queued ids belong to the client they were queued from.
+  if (!s.open || s.info?.datPath !== app.other?.info?.datPath) app.queue = [];
   app.other = s;
   otherVersions.apply(s.rev, s.delta);
 }

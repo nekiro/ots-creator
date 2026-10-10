@@ -286,3 +286,48 @@ func TestTransferTranscodesTransparency(t *testing.T) {
 		t.Fatal("pixels changed")
 	}
 }
+
+func TestTransferToAndFreeIDs(t *testing.T) {
+	a := New(v1098(), client.Features{})
+	b := New(v1098(), client.Features{})
+	a.AddSprites([][]byte{solid(255, 0, 0)})
+	b.AddSprites([][]byte{solid(0, 0, 255)})
+	setItem(t, a, 101, false, 1)
+	setItem(t, a, 102, false, 0)
+	setItem(t, a, 103, true, 0) // no pixels but a flag: not free
+	setItem(t, a, 104, false, 1)
+	setItem(t, b, 101, true, 1)
+	setItem(t, b, 102, false, 1)
+
+	free, err := a.FreeIDs(thing.CategoryItem, 101, 3)
+	if err != nil || !slices.Equal(free, []uint32{102, 105, 106}) {
+		t.Fatalf("free %v %v", free, err)
+	}
+	if taken := a.TakenIDs(thing.CategoryItem, []uint32{101, 102, 103, 200}); !slices.Equal(taken, []uint32{101, 103}) {
+		t.Fatalf("taken %v", taken)
+	}
+
+	res, err := TransferTo(a, b, thing.CategoryItem, []uint32{101, 102}, []uint32{102, 106})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(res.IDs, []uint32{102, 106}) || res.Sprites != 1 {
+		t.Fatalf("result %+v", res)
+	}
+	if res.Before[102] == nil || res.Before[106] != nil {
+		t.Fatalf("before %+v", res.Before)
+	}
+	it, _ := a.Thing(thing.CategoryItem, 102)
+	if !it.Props.Pickupable || it.ID != 102 {
+		t.Fatalf("copied %+v", it)
+	}
+	if a.Info().Counts.Items != 106 {
+		t.Fatalf("items %d", a.Info().Counts.Items)
+	}
+	if _, err := TransferTo(a, b, thing.CategoryItem, []uint32{101, 102}, []uint32{110, 110}); err == nil {
+		t.Fatal("duplicate target")
+	}
+	if _, err := TransferTo(a, b, thing.CategoryItem, []uint32{101}, []uint32{99}); err == nil {
+		t.Fatal("target below the first id")
+	}
+}

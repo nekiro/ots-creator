@@ -105,7 +105,68 @@ func (cs *CompareService) Transfer(toOther bool, c thing.Category, ids []uint32,
 	if toOther {
 		dst, src = b, a
 	}
-	res, err := project.Transfer(dst, src, c, ids, appendNew)
+	return cs.transfer(toOther, dst, c, func() (project.TransferResult, error) {
+		return project.Transfer(dst, src, c, ids, appendNew)
+	})
+}
+
+// TransferTo copies things between the clients like Transfer, ids[i] to
+// targets[i] in the target client.
+func (cs *CompareService) TransferTo(toOther bool, c thing.Category, ids, targets []uint32) (project.TransferResult, error) {
+	a, b, err := cs.both()
+	if err != nil {
+		return project.TransferResult{}, err
+	}
+	if len(ids) == 0 {
+		return project.TransferResult{}, errors.New("nothing to copy")
+	}
+	dst, src := a, b
+	if toOther {
+		dst, src = b, a
+	}
+	return cs.transfer(toOther, dst, c, func() (project.TransferResult, error) {
+		return project.TransferTo(dst, src, c, ids, targets)
+	})
+}
+
+// TargetPlan is where TransferTo would put things.
+type TargetPlan struct {
+	IDs []uint32 `json:"ids"`
+	// Taken are the target ids that hold objects, which the copies replace.
+	Taken []uint32 `json:"taken"`
+}
+
+// PlanTargets returns n target ids from id from on in A, or in B with
+// toOther: free ids only (see project.FreeIDs), or consecutive ids.
+func (cs *CompareService) PlanTargets(toOther bool, c thing.Category, from uint32, n int, freeOnly bool) (TargetPlan, error) {
+	a, b, err := cs.both()
+	if err != nil {
+		return TargetPlan{}, err
+	}
+	dst := a
+	if toOther {
+		dst = b
+	}
+	if n <= 0 {
+		return TargetPlan{IDs: []uint32{}, Taken: []uint32{}}, nil
+	}
+	if !c.Valid() {
+		return TargetPlan{}, fmt.Errorf("invalid category %d", c)
+	}
+	from = max(from, c.MinID())
+	if freeOnly {
+		ids, err := dst.FreeIDs(c, from, n)
+		return TargetPlan{IDs: ids, Taken: []uint32{}}, err
+	}
+	ids := make([]uint32, n)
+	for i := range ids {
+		ids[i] = from + uint32(i)
+	}
+	return TargetPlan{IDs: ids, Taken: dst.TakenIDs(c, ids)}, nil
+}
+
+func (cs *CompareService) transfer(toOther bool, dst *project.Project, c thing.Category, run func() (project.TransferResult, error)) (project.TransferResult, error) {
+	res, err := run()
 	if err != nil {
 		return res, err
 	}
