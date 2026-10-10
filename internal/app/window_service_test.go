@@ -26,6 +26,17 @@ func TestWindowCloseGuard(t *testing.T) {
 	}
 	ws.SetUnapplied(false)
 
+	// A running export blocks too.
+	err := s.parallel("test", 1, func(int) error {
+		if !block() {
+			t.Error("not blocked during an export")
+		}
+		return nil
+	})
+	if err != nil || block() {
+		t.Fatalf("after export: %v, blocked %v", err, block())
+	}
+
 	// A new client is not compiled yet.
 	ps.New(v1098(), client.Features{})
 	if !block() {

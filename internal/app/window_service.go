@@ -3,7 +3,7 @@ package app
 import "sync/atomic"
 
 // EventCloseRequested is emitted when the user closes the window while
-// there are changes that would be lost. The frontend asks for confirmation
+// there are changes that would be lost or an export runs. The frontend asks for confirmation
 // and calls WindowService.Quit to close anyway.
 const EventCloseRequested = "app:close-requested"
 
@@ -55,7 +55,7 @@ func BlockClose(ws *WindowService) func() bool {
 }
 
 func (ws *WindowService) unsaved() bool {
-	if ws.unapplied.Load() {
+	if ws.unapplied.Load() || ws.s.exporting.Load() > 0 {
 		return true
 	}
 	if st := ws.s.OtherState(); st.Open && st.Info.Changed {

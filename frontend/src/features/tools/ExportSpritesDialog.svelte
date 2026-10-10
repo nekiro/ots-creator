@@ -1,9 +1,11 @@
 <script lang="ts">
   // Exports every sprite of the client: one file per sprite, or sprite
   // sheets that keep the ids in order (left to right, top to bottom).
-  import { DialogService, SpriteService } from "../../lib/api";
+  // Closing the window while the export runs leaves it running.
+  import { DialogService } from "../../lib/api";
+  import { commands } from "../../lib/commands";
   import { IMAGE_FORMATS, prefs } from "../../lib/prefs.svelte";
-  import { app, run, toast } from "../../lib/state.svelte";
+  import { app, toast } from "../../lib/state.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import NumberField from "../../lib/ui/NumberField.svelte";
   import Select from "../../lib/ui/Select.svelte";
@@ -18,24 +20,24 @@
   let rows = $state(16);
   let transparent = $state(prefs.settings.sheetBackground === "transparent");
 
+  const running = $derived(app.stoppable);
+  const percent = $derived(app.progress && app.progress.total > 0 ? (app.progress.done / app.progress.total) * 100 : 0);
   const perSheet = $derived(columns * rows);
   const sheetCount = $derived(Math.ceil(total / Math.max(1, perSheet)));
 
   async function exportAll() {
     const dir = await DialogService.PickDirectory("Export all sprites to");
-    if (!dir) return;
-    const sum = await run("Exporting sprites", () =>
-      sheets ? SpriteService.ExportAllSheets(dir, format, columns, rows, transparent) : SpriteService.ExportAll(dir, format, skipEmpty),
-    );
-    if (!sum) return;
+    if (dir) await commands.exportAllSpritesTo(dir, { sheets, format, skipEmpty, columns, rows, transparent });
+  }
+
+  function close() {
     app.dialog = null;
-    if (sheets) toast(`Exported ${sum.files.toLocaleString()} sprite sheet(s).`, "success");
-    else toast(`Exported ${sum.files.toLocaleString()} sprite(s)${sum.skipped ? `, skipped ${sum.skipped.toLocaleString()} empty` : ""}.`, "success");
+    if (running && !app.stopping) toast("The export keeps running in the background. Stop it from the status bar.");
   }
 </script>
 
-<Dialog title="Export All Sprites" width={400} onclose={() => (app.dialog = null)}>
-  <div class="col">
+<Dialog title="Export All Sprites" width={400} onclose={close}>
+  <div class="col" class:off={running}>
     <div class="t-tabs">
       <button class="t-tab" class:on={!sheets} onclick={() => (sheets = false)}>Single files</button>
       <button class="t-tab" class:on={sheets} onclick={() => (sheets = true)}>Sprite sheets</button>
@@ -64,9 +66,18 @@
     {/if}
   </div>
   {#snippet footer()}
-    <span class="grow"></span>
-    <button class="t-btn primary" disabled={!!app.busy || total === 0} onclick={exportAll}>Export…</button>
-    <button class="t-btn" onclick={() => (app.dialog = null)}>Cancel</button>
+    {#if running}
+      <div class="progress grow">
+        <div class="bar" style="width:{percent}%"></div>
+        <span>{app.stopping ? "Stopping…" : app.progress ? `${app.progress.done.toLocaleString()} / ${app.progress.total.toLocaleString()}` : "Exporting…"}</span>
+      </div>
+      <button class="t-btn" title="Close this window, the export keeps running" onclick={close}>Hide</button>
+      <button class="t-btn danger" disabled={app.stopping} onclick={commands.stopTask}>Stop</button>
+    {:else}
+      <span class="grow"></span>
+      <button class="t-btn primary" disabled={!!app.busy || total === 0} onclick={exportAll}>Export…</button>
+      <button class="t-btn" onclick={close}>Cancel</button>
+    {/if}
   {/snippet}
 </Dialog>
 
@@ -76,5 +87,31 @@
   }
   p {
     margin: 0;
+  }
+  .off {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .progress {
+    position: relative;
+    height: 18px;
+    align-self: center;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.3);
+  }
+  .bar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--gold);
+    opacity: 0.45;
+    transition: width 0.15s linear;
+  }
+  .progress span {
+    position: relative;
+    display: block;
+    text-align: center;
+    line-height: 18px;
+    font-size: 11px;
+    color: var(--text-bright);
   }
 </style>

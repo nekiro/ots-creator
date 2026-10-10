@@ -1,14 +1,34 @@
 package app
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/nekiro/ots-creator/internal/client"
 	"github.com/nekiro/ots-creator/internal/imaging"
 	"github.com/nekiro/ots-creator/internal/thing"
 )
+
+func TestParallelCancel(t *testing.T) {
+	s := NewSession(nil)
+	var ran atomic.Int64
+	err := s.parallel("test", 100000, func(i int) error {
+		if ran.Add(1) == 1 {
+			s.Cancel()
+		}
+		return nil
+	})
+	if !errors.Is(err, ErrCanceled) || ran.Load() == 100000 {
+		t.Fatalf("err %v after %d", err, ran.Load())
+	}
+	// The next operation starts uncanceled.
+	if err := s.parallel("test", 10, func(int) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestExportAll(t *testing.T) {
 	dir := t.TempDir()

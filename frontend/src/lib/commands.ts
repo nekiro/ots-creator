@@ -160,9 +160,11 @@ export const commands = {
     if (st?.open) toast(`Loaded ${r.version.name}.`, "success");
   },
 
-  /** Window close with unsaved work (the backend held the close). */
+  /** Window close with unsaved work or a running export (the backend held
+   * the close). */
   async quit() {
     const lost = [
+      app.stoppable && "an export in progress",
       app.dirty && "unapplied object changes",
       app.project?.info.changed && "uncompiled client changes",
       app.other?.info.changed && "uncompiled changes in the compared client",
@@ -298,6 +300,45 @@ export const commands = {
     if (!dir) return;
     const sum = await run("Exporting objects", () => ThingService.ExportAll(dir, true, prefs.settings.objectFormat));
     if (sum) toast(`Exported ${sum.files.toLocaleString()} object(s), skipped ${sum.skipped.toLocaleString()} empty.`, "success");
+  },
+
+  /** Exports every sprite into dir. The export keeps running when its
+   * window is closed, so the editor stays usable, and can be stopped. */
+  async exportAllSpritesTo(
+    dir: string,
+    o: { sheets: boolean; format: string; skipEmpty: boolean; columns: number; rows: number; transparent: boolean },
+  ): Promise<void> {
+    app.busy = "Exporting sprites";
+    app.stoppable = true;
+    app.stopping = false;
+    try {
+      const sum = await (o.sheets
+        ? SpriteService.ExportAllSheets(dir, o.format, o.columns, o.rows, o.transparent)
+        : SpriteService.ExportAll(dir, o.format, o.skipEmpty));
+      if (app.dialog === "exportSprites") app.dialog = null;
+      if (o.sheets) toast(`Exported ${sum.files.toLocaleString()} sprite sheet(s).`, "success");
+      else toast(`Exported ${sum.files.toLocaleString()} sprite(s)${sum.skipped ? `, skipped ${sum.skipped.toLocaleString()} empty` : ""}.`, "success");
+    } catch (e) {
+      if (app.stopping) {
+        if (app.dialog === "exportSprites") app.dialog = null;
+        toast("Export stopped. Files written so far stay in the folder.");
+      } else toast(errorMessage(e), "error");
+    } finally {
+      app.busy = null;
+      app.progress = null;
+      app.stoppable = false;
+      app.stopping = false;
+    }
+  },
+
+  /** Stops the running export after asking. */
+  async stopTask() {
+    if (!app.stoppable || app.stopping) return;
+    const ok = await ask({ title: "Export in progress", message: "Sprites are still being exported. Stop the export?", ok: "Stop" });
+    // The export may have finished while the question was open.
+    if (!ok || !app.stoppable) return;
+    app.stopping = true;
+    await ProjectService.Cancel();
   },
 
   /** Asks for single files or sprite sheets, then exports every sprite. */

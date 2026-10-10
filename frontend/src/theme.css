@@ -249,7 +249,11 @@ body {
   color: #fff;
 }
 .t-btn.danger {
-  color: #ffb0b0;
+  color: #fff;
+  border-image: url("./assets/ui/btn-danger-idle.png") 3 fill / 3px stretch;
+}
+.t-btn.danger:active:not(:disabled) {
+  border-image-source: url("./assets/ui/btn-danger-pressed.png");
 }
 
 /* Square icon button (22x23) */

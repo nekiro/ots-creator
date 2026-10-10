@@ -56,6 +56,11 @@ class AppState {
   toasts = $state<Toast[]>([]);
   dialog = $state<DialogName>(null);
   busy = $state<string | null>(null);
+  /** Progress of the running long operation, while it reports one. */
+  progress = $state<{ done: number; total: number } | null>(null);
+  /** The running operation can be stopped (commands.stopTask). */
+  stoppable = $state(false);
+  stopping = $state(false);
   /** Path for the open dialog (dropped file); "" asks for a folder. */
   openPath = $state("");
   /** The open dialog loads the second client of the compare window. */
@@ -145,6 +150,7 @@ export async function run<T>(label: string, fn: () => Promise<T>): Promise<T | u
     return undefined;
   } finally {
     app.busy = null;
+    app.progress = null;
   }
 }
 
@@ -180,7 +186,10 @@ export async function initState(): Promise<void> {
   // Long operations report progress in the busy label.
   Events.On("app:progress", (ev) => {
     const p = ev.data;
-    if (app.busy && p.done < p.total) app.busy = `${p.label} ${p.done.toLocaleString()}/${p.total.toLocaleString()}`;
+    if ((app.busy || app.stoppable) && p.done < p.total) {
+      app.busy = `${p.label} ${p.done.toLocaleString()}/${p.total.toLocaleString()}`;
+      app.progress = { done: p.done, total: p.total };
+    }
   });
   applyState(await ProjectService.State());
   applyOther(await CompareService.State());

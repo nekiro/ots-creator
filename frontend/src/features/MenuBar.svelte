@@ -45,7 +45,6 @@
         { label: "Compile", keys: "Ctrl+S", action: commands.compile, disabled: nothingToCompile },
         { label: "Compile as…", keys: "Ctrl+Shift+S", action: commands.compileAs, disabled: noProject },
         "-",
-        { label: "Object viewer…", action: () => commands.viewObd() },
         { label: "Settings…", action: () => (app.dialog = "settings") },
         "-",
         { label: "Close client", action: commands.close, disabled: noProject },

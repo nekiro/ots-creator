@@ -47,6 +47,10 @@ type Session struct {
 	other  *project.Project
 	rev    atomic.Uint64
 	notify Notifier
+	// canceled stops the running parallel operation (see Cancel).
+	canceled atomic.Bool
+	// exporting counts running parallel operations (exports).
+	exporting atomic.Int32
 	// onSaved is called after a client is opened or compiled to disk.
 	onSaved func(project.Info)
 }
@@ -64,6 +68,10 @@ func NewSession(notify Notifier) *Session {
 	s.rev.Store(uint64(time.Now().UnixMilli()))
 	return s
 }
+
+// Cancel stops the running long operation (an export) after the files
+// that are being written.
+func (s *Session) Cancel() { s.canceled.Store(true) }
 
 // Project returns the open project.
 func (s *Session) Project() (*project.Project, error) {

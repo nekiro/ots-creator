@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -34,12 +35,18 @@ type ExportSummary struct {
 	Skipped int `json:"skipped"`
 }
 
+// ErrCanceled is returned by a long operation stopped with Cancel.
+var ErrCanceled = errors.New("canceled")
+
 // progressEvery is the minimum time between progress events.
 const progressEvery = 150 * time.Millisecond
 
 // parallel runs fn for 0..n-1 on all cores and reports progress. It stops
-// at the first error and returns it.
+// at the first error and returns it, or ErrCanceled after Session.Cancel.
 func (s *Session) parallel(label string, n int, fn func(i int) error) error {
+	s.canceled.Store(false)
+	s.exporting.Add(1)
+	defer s.exporting.Add(-1)
 	var next, done atomic.Int64
 	var failed atomic.Bool
 	var firstErr error
@@ -64,6 +71,11 @@ func (s *Session) parallel(label string, n int, fn func(i int) error) error {
 		go func() {
 			defer wg.Done()
 			for !failed.Load() {
+				if s.canceled.Load() {
+					errOnce.Do(func() { firstErr = ErrCanceled })
+					failed.Store(true)
+					return
+				}
 				i := int(next.Add(1) - 1)
 				if i >= n {
 					return

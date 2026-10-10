@@ -20,6 +20,9 @@ type ProjectService struct {
 // NewProjectService returns the service.
 func NewProjectService(s *Session) *ProjectService { return &ProjectService{s: s} }
 
+// Cancel stops the running export; it then returns ErrCanceled.
+func (ps *ProjectService) Cancel() { ps.s.Cancel() }
+
 // Versions returns all known client versions.
 func (ps *ProjectService) Versions() []client.Version { return client.Versions() }
 

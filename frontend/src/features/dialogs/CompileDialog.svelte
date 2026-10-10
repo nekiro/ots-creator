@@ -42,12 +42,13 @@
 
   async function compileAssets() {
     if (app.dirty) await applyDraft();
+    // The status bar shows the compile while it runs.
+    app.dialog = null;
     const ok = await run("Compiling", async () => {
       await ProjectService.CompileAs({ format, datPath: dir, sprPath: "", version: info.version, features: info.features, writeOtfi: false });
       return true;
     });
     if (ok) {
-      app.dialog = null;
       toast(`Compiled assets to ${dir}`, "success");
     }
   }
@@ -57,12 +58,12 @@
     if (!version || !dir || !name) return;
     if (app.dirty) await applyDraft();
     const base = dir + sep + name;
+    app.dialog = null;
     const ok = await run("Compiling", async () => {
       await ProjectService.CompileAs({ format, datPath: base + ".dat", sprPath: base + ".spr", version, features, writeOtfi });
       return true;
     });
     if (ok) {
-      app.dialog = null;
       toast(`Compiled ${version.name} to ${base}.dat/.spr`, "success");
     }
   }

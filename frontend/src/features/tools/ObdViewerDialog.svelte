@@ -65,13 +65,11 @@
     const path = app.obdPath;
     app.obdPath = "";
     if (path) void open(path);
-    else void browse();
   });
 
   async function browse() {
     const paths = await DialogService.OpenFiles("View objects and images", FILTERS, false);
     if (paths?.length) await open(paths[0]);
-    else if (!current) app.dialog = null;
   }
 
   // Windows paths compare without case and separator differences.
@@ -226,8 +224,10 @@
         {:else}
           {#if listing}
             <div class="t-label none"><span class="spinner"></span>Reading folder…</div>
-          {:else}
+          {:else if dir}
             <div class="t-label none">No object files or images here.</div>
+          {:else}
+            <div class="t-label none">Choose a file with Open… to list its folder.</div>
           {/if}
         {/each}
       </div>
@@ -248,6 +248,8 @@
         </PanStage>
       {:else if error}
         <span class="err">{error}</span>
+      {:else if !current && !loading}
+        <span class="t-label">Open an .otobj, .obd or image file to view it.</span>
       {/if}
     </div>
 
