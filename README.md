@@ -84,6 +84,9 @@ and sprites with other users. Built with [Wails v3](https://v3.wails.io) (Go) an
 
 - Optimize sprites (duplicates, empty and unused ones), bulk frame durations, and split
   or merge outfit frame groups.
+- Reorder objects within a client: drag them to other ids, or cut and click a slot. They
+  swap places with the objects there, or are inserted and the objects between shift.
+  Item ids stored in items (market, NPC currency) follow the moved items.
 
 **Market**
 

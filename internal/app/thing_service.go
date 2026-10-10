@@ -104,6 +104,21 @@ func (ts *ThingService) Remove(c thing.Category, ids []uint32) error {
 	return nil
 }
 
+// Move moves things to the ids from at on; see project.MoveThings. It
+// returns the new ids of ids.
+func (ts *ThingService) Move(c thing.Category, ids []uint32, at uint32, o project.MoveOptions) ([]uint32, error) {
+	p, err := ts.s.Project()
+	if err != nil {
+		return nil, err
+	}
+	out, err := p.MoveThings(c, ids, at, o)
+	if err != nil {
+		return nil, err
+	}
+	ts.s.Changed()
+	return out, nil
+}
+
 // ImportResult reports one imported file.
 type ImportResult struct {
 	Path     string         `json:"path"`

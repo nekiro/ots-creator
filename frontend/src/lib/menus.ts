@@ -50,6 +50,7 @@ export function toolsMenu(): MenuEntry[] {
     { label: "Merge outfit frame groups…", action: () => commands.convertFrameGroups(false), disabled: noProject },
     "-",
     { label: "Compare & merge clients…", action: commands.compare, disabled: noProject },
+    { label: "Reorder objects…", action: () => (app.dialog = "reorder"), disabled: noProject },
     { label: "Object viewer…", action: () => commands.viewObd() },
     { label: "Market…", action: commands.market },
   ];

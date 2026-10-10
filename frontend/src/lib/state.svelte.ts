@@ -29,6 +29,7 @@ export type DialogName =
   | "market"
   | "share"
   | "compare"
+  | "reorder"
   | "replaceRefs"
   | "exportSprites"
   | null;
