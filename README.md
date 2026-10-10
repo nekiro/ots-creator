@@ -29,7 +29,7 @@ and Svelte 5.
 - Properties editor for layout, patterns, frame durations and every flag, with a flag
   filter.
 - Sprite list per object or for the whole client, with multi-select, replace, import and
-  export.
+  export. Draw on sprites in the sprite view, with a pixel grid, zoom and pan.
 - Undo/redo, copy and paste of whole objects or only their properties, bulk edit of
   several objects, and duplicate and remove.
 
@@ -39,12 +39,28 @@ and Svelte 5.
   OBD (ObjectBuilder): import of OBD versions 1 to 3, export as version 3. Settings choose
   the export format. An object viewer shows both without an open client.
 - Export all objects (one folder per category) or all sprites (single files or sprite
-  sheets) at once.
+  sheets) at once. Exports run in the background (see [Performance](#performance)).
 - Sprite sheets: export one frame group or the whole outfit. On import the layout is
   detected from the image (directions, mask layer, mounts, addons, frames).
 - Drop images, `.otobj` or `.obd` files anywhere, onto the preview or onto an object in the list, or
   paste a PNG with Ctrl+V.
 - Slicer to cut images into sprites.
+
+**Compare and merge clients**
+
+- Open a second client next to the current one and compare them category by category.
+  Sprites are compared by their pixels, not by their ids, and differences that only come
+  from the client formats are ignored.
+- Every difference shows both versions side by side, animated on hover, with what changed
+  (flags, size, patterns, frames, animation, sprites). An empty placeholder against a real
+  object counts as a new object, and a filter hides ids that are empty in the only client
+  that has them.
+- Copy objects in both directions, keeping their ids or appending them as new objects,
+  or merge everything B has into A at once. A sprite with the same pixels under the same
+  id in the target is reused instead of added again.
+- Every copy is one undo step in its target client. Copies that kept their ids can also
+  be reverted one by one from the list. The second client can be compiled from the
+  same window.
 
 **Tools**
 
@@ -61,6 +77,21 @@ and Svelte 5.
 **Updates**
 
 - Built-in updater from GitHub releases.
+
+## Performance
+
+OTS Creator uses every CPU core for the heavy work: comparing clients, searching objects
+and sprites, optimizing sprites, decoding Tibia 12+ sprite sheets and exporting, so it
+stays fast on clients with hundreds of thousands of sprites.
+
+Long operations run in the background:
+
+- The status bar shows the progress, and you can keep editing while an export runs.
+- The export window can be hidden, and opened again to see the progress. **Stop** in the
+  window or in the status bar stops an export after asking. Files written so far stay in
+  the folder.
+- Closing the app asks first when an export is running, or when there are changes that
+  are not applied or compiled yet.
 
 ## OTOBJ object format
 
