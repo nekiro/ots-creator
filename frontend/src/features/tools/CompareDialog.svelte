@@ -33,6 +33,10 @@
   let loading = $state(false);
   let error = $state("");
   let shown = $state<Record<Status, boolean>>({ changed: true, onlyA: true, onlyB: true });
+  // Ids that exist in one client only and show nothing there are mostly
+  // padding at the end of a category.
+  let hideEmpty = $state(true);
+  const visible = $derived((diff?.entries ?? []).filter((e) => !(hideEmpty && e.empty)));
   let selected = $state<number[]>([]);
   let anchor: number | null = null;
 
@@ -62,7 +66,7 @@
   // list does not shift under the cursor.
   let copied = $state<Record<number, "A" | "B">>({});
   const entries = $derived.by(() => {
-    const list: DiffEntry[] = (diff?.entries ?? []).filter((e) => shown[e.status as Status]);
+    const list: DiffEntry[] = visible.filter((e) => shown[e.status as Status]);
     const listed = new Set((diff?.entries ?? []).map((e) => e.id));
     const extra = Object.entries(copied)
       .filter(([id]) => !listed.has(+id))
@@ -71,7 +75,7 @@
   });
   const counts = $derived.by(() => {
     const out: Record<Status, number> = { changed: 0, onlyA: 0, onlyB: 0 };
-    for (const e of diff?.entries ?? []) out[e.status as Status]++;
+    for (const e of visible) out[e.status as Status]++;
     return out;
   });
   const picked = $derived(entries.filter((e) => selected.includes(e.id)));
@@ -163,7 +167,7 @@
     for (const c of CATEGORIES) {
       const d = await run("Comparing", () => CompareService.Diff(c));
       if (!d) return;
-      const ids = (d.entries ?? []).filter((e) => e.status !== "onlyA").map((e) => e.id);
+      const ids = (d.entries ?? []).filter((e) => e.status !== "onlyA" && !(hideEmpty && e.empty)).map((e) => e.id);
       if (ids.length) plan.push({ c, ids });
     }
     if (!plan.length) {
@@ -258,6 +262,9 @@
           <input class="t-check" type="checkbox" bind:checked={shown[st]} />{STATUS_LABELS[st]} <span class="n">{counts[st]}</span>
         </label>
       {/each}
+      <label class="row filter" title="Hide objects that exist in one client only and have no sprites there">
+        <input class="t-check" type="checkbox" bind:checked={hideEmpty} />Hide empty
+      </label>
     </div>
 
     <div class="list t-panel">

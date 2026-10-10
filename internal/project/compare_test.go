@@ -53,6 +53,7 @@ func TestDiff(t *testing.T) {
 	setItem(t, a, 103, false, 1, 2)
 	setItem(t, b, 103, false, 2) // size differs
 	setItem(t, b, 104, false, 3) // only in b
+	setItem(t, b, 105, false, 0) // only in b, no sprites
 
 	res, err := Diff(a, b, thing.CategoryItem)
 	if err != nil {
@@ -63,9 +64,10 @@ func TestDiff(t *testing.T) {
 		{ID: 102, Status: DiffChanged, Changes: []string{ChangeSprites}},
 		{ID: 103, Status: DiffChanged, Changes: []string{ChangeSize}},
 		{ID: 104, Status: DiffOnlyB},
+		{ID: 105, Status: DiffOnlyB, Empty: true},
 	}
 	if res.Same != 1 || !slices.EqualFunc(res.Entries, want, func(x, y DiffEntry) bool {
-		return x.ID == y.ID && x.Status == y.Status && slices.Equal(x.Changes, y.Changes)
+		return x.ID == y.ID && x.Status == y.Status && x.Empty == y.Empty && slices.Equal(x.Changes, y.Changes)
 	}) {
 		t.Fatalf("diff %+v", res)
 	}

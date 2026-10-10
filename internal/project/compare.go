@@ -36,6 +36,9 @@ type DiffEntry struct {
 	ID      uint32   `json:"id"`
 	Status  string   `json:"status"`
 	Changes []string `json:"changes"`
+	// Empty marks an id that exists in one client only and has no sprite
+	// with pixels there.
+	Empty bool `json:"empty,omitempty"`
 }
 
 // DiffResult compares one category of two clients. Entries lists only the
@@ -100,9 +103,9 @@ func diffRange(a, b *Project, c thing.Category, from, to uint32, cmp *thingCompa
 		switch {
 		case ta == nil && tb == nil:
 		case tb == nil:
-			res.Entries = append(res.Entries, DiffEntry{ID: id, Status: DiffOnlyA})
+			res.Entries = append(res.Entries, DiffEntry{ID: id, Status: DiffOnlyA, Empty: !a.hasPixels(ta)})
 		case ta == nil:
-			res.Entries = append(res.Entries, DiffEntry{ID: id, Status: DiffOnlyB})
+			res.Entries = append(res.Entries, DiffEntry{ID: id, Status: DiffOnlyB, Empty: !b.hasPixels(tb)})
 		default:
 			ch, err := cmp.compare(ta, tb)
 			if err != nil {
