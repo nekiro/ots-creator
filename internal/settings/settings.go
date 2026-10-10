@@ -63,6 +63,9 @@ type Settings struct {
 	// MarketShared maps market entries shared from this computer to their
 	// delete tokens. Like Recent, Update keeps it as stored.
 	MarketShared map[string]string `json:"marketShared"`
+	// LastDirs maps a file dialog to the folder it last confirmed, so each
+	// dialog opens where it was left. Like Recent, Update keeps it as stored.
+	LastDirs map[string]string `json:"lastDirs"`
 }
 
 // Object list columns range.
@@ -74,7 +77,7 @@ const (
 
 // Defaults returns the settings of a fresh install.
 func Defaults() Settings {
-	return Settings{CheckUpdates: true, SheetBackground: BackgroundMagenta, ExportFormat: "png", ObjectFormat: "otobj", ListColumns: DefaultListColumns, Recent: []Recent{}, MarketShared: map[string]string{}}
+	return Settings{CheckUpdates: true, SheetBackground: BackgroundMagenta, ExportFormat: "png", ObjectFormat: "otobj", ListColumns: DefaultListColumns, Recent: []Recent{}, MarketShared: map[string]string{}, LastDirs: map[string]string{}}
 }
 
 func (s *Settings) normalize() {
@@ -98,6 +101,9 @@ func (s *Settings) normalize() {
 	}
 	if s.MarketShared == nil {
 		s.MarketShared = map[string]string{}
+	}
+	if s.LastDirs == nil {
+		s.LastDirs = map[string]string{}
 	}
 	if len(s.Recent) > MaxRecent {
 		s.Recent = s.Recent[:MaxRecent]
@@ -147,16 +153,18 @@ func (st *Store) Get() Settings {
 	s := st.s
 	s.Recent = append([]Recent{}, st.s.Recent...)
 	s.MarketShared = maps.Clone(st.s.MarketShared)
+	s.LastDirs = maps.Clone(st.s.LastDirs)
 	return s
 }
 
-// Update changes the preferences. The recent list and shared market
-// entries are kept as stored.
+// Update changes the preferences. The recent list, shared market entries
+// and dialog folders are kept as stored.
 func (st *Store) Update(s Settings) error {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	s.Recent = st.s.Recent
 	s.MarketShared = st.s.MarketShared
+	s.LastDirs = st.s.LastDirs
 	s.normalize()
 	st.s = s
 	return st.saveLocked()
@@ -204,6 +212,27 @@ func (st *Store) SetMarketAuthor(name string) error {
 		return nil
 	}
 	st.s.MarketAuthor = name
+	return st.saveLocked()
+}
+
+// LastDir returns the folder the dialog key last confirmed, or "".
+func (st *Store) LastDir(key string) string {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	return st.s.LastDirs[key]
+}
+
+// SetLastDir remembers the folder confirmed in the dialog key.
+func (st *Store) SetLastDir(key, dir string) error {
+	if key == "" || dir == "" {
+		return nil
+	}
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if st.s.LastDirs[key] == dir {
+		return nil
+	}
+	st.s.LastDirs[key] = dir
 	return st.saveLocked()
 }
 

@@ -67,7 +67,7 @@
   const fileGet = (id: number) => (id > 0 ? fileThing?.pixels[id - 1] : undefined);
 
   async function chooseFile() {
-    const paths = await DialogService.OpenFiles("Share a file", FILE_FILTERS, false);
+    const paths = await DialogService.OpenFiles("marketShare", "Share a file", FILE_FILTERS, false);
     if (paths?.length) await pickFile(paths[0]);
   }
 

@@ -213,7 +213,7 @@ export const commands = {
 
   async importObd(replace = false) {
     if (!guard()) return;
-    const paths = await DialogService.OpenFiles(replace ? "Replace with object" : "Import objects", OBJECTS, !replace);
+    const paths = await DialogService.OpenFiles(replace ? "replaceObject" : "importObjects", replace ? "Replace with object" : "Import objects", OBJECTS, !replace);
     if (!paths?.length) return;
     const replaceId = replace ? (app.focused ?? 0) : 0;
     const results = await run("Importing", () => ThingService.ImportObjects(paths, replaceId));
@@ -228,7 +228,7 @@ export const commands = {
 
   async exportObd() {
     if (!guard() || app.selection.length === 0) return;
-    const dir = await DialogService.PickDirectory("Export objects to");
+    const dir = await DialogService.PickDirectory("exportObjects", "Export objects to");
     if (!dir) return;
     const files = await run("Exporting", () => ThingService.ExportObjects(app.category, app.selection, dir, prefs.settings.objectFormat));
     if (files) toast(`Exported ${files.length} file(s).`, "success");
@@ -245,7 +245,7 @@ export const commands = {
   async saveSheet(group: number, format: string, transparent: boolean): Promise<boolean> {
     if (!guard() || app.focused === null) return false;
     const name = `${CATEGORY_NAMES[app.category]}_${app.focused}.${format}`;
-    const path = await DialogService.SaveFile("Export sprite sheet", name, imageFilters(format));
+    const path = await DialogService.SaveFile("exportSheet", "Export sprite sheet", name, imageFilters(format));
     if (!path) return false;
     const ok = await run("Exporting", async () => {
       await ThingService.ExportSheet(app.category, app.focused!, group, path, transparent && format === "png");
@@ -257,7 +257,7 @@ export const commands = {
 
   async importSheet(group = 0) {
     if (!guard() || app.focused === null) return;
-    const paths = await DialogService.OpenFiles("Import sprite sheet", IMAGES, false);
+    const paths = await DialogService.OpenFiles("importSheet", "Import sprite sheet", IMAGES, false);
     if (paths?.length) await commands.loadSheet(paths[0], group);
   },
 
@@ -276,7 +276,7 @@ export const commands = {
 
   async importSprites() {
     if (!guard()) return;
-    const paths = await DialogService.OpenFiles("Import sprites", IMAGES, true);
+    const paths = await DialogService.OpenFiles("importSprites", "Import sprites", IMAGES, true);
     if (!paths?.length) return;
     const ids = await run("Importing", () => SpriteService.ImportImages(paths));
     if (ids?.length) {
@@ -288,7 +288,7 @@ export const commands = {
   async replaceSprite() {
     const id = app.selectedSprites[0];
     if (!guard() || !id) return;
-    const paths = await DialogService.OpenFiles(`Replace sprite #${id}`, IMAGES, false);
+    const paths = await DialogService.OpenFiles("replaceSprite", `Replace sprite #${id}`, IMAGES, false);
     if (!paths?.length) return;
     await run("Replacing", () => SpriteService.Replace(id, paths[0]));
   },
@@ -296,7 +296,7 @@ export const commands = {
   /** Exports every object with sprites, one folder per category. */
   async exportAllObjects() {
     if (!guard()) return;
-    const dir = await DialogService.PickDirectory("Export all objects to");
+    const dir = await DialogService.PickDirectory("exportAllObjects", "Export all objects to");
     if (!dir) return;
     const sum = await run("Exporting objects", () => ThingService.ExportAll(dir, true, prefs.settings.objectFormat));
     if (sum) toast(`Exported ${sum.files.toLocaleString()} object(s), skipped ${sum.skipped.toLocaleString()} empty.`, "success");
@@ -354,7 +354,7 @@ export const commands = {
 
   async exportSprites() {
     if (!guard() || app.selectedSprites.length === 0) return;
-    const dir = await DialogService.PickDirectory("Export sprites to");
+    const dir = await DialogService.PickDirectory("exportSprites", "Export sprites to");
     if (!dir) return;
     const files = await run("Exporting", () => SpriteService.Export(app.selectedSprites, dir, prefs.settings.exportFormat));
     if (files) toast(`Exported ${files.length} sprite(s).`, "success");

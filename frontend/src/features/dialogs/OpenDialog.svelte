@@ -46,7 +46,7 @@
   });
 
   async function browse() {
-    const dir = await DialogService.PickDirectory("Open client folder");
+    const dir = await DialogService.PickDirectory(other ? "compareClient" : "openClient", "Open client folder");
     if (!dir) return;
     await inspect(dir);
   }

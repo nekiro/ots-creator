@@ -54,7 +54,7 @@ func main() {
 			application.NewService(app.NewThingService(session)),
 			application.NewService(app.NewSpriteService(session)),
 			application.NewService(app.NewCompareService(session)),
-			application.NewService(&app.DialogService{}),
+			application.NewService(app.NewDialogService(prefs)),
 			application.NewService(&app.ViewerService{}),
 			application.NewService(updates),
 			application.NewService(windows),

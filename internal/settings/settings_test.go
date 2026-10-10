@@ -70,3 +70,23 @@ func TestCorruptFileKeepsDefaults(t *testing.T) {
 		t.Fatal("store must fall back to defaults")
 	}
 }
+
+func TestLastDirs(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "settings.json")
+	st, _ := Open(path)
+	if err := st.SetLastDir("openClient", filepath.Join("c", "client")); err != nil {
+		t.Fatal(err)
+	}
+	s := st.Get()
+	s.LastDirs = nil // ignored by Update
+	if err := st.Update(s); err != nil {
+		t.Fatal(err)
+	}
+	re, _ := Open(path)
+	if got := re.LastDir("openClient"); got != filepath.Join("c", "client") {
+		t.Fatalf("openClient = %q", got)
+	}
+	if got := re.LastDir("exportSprites"); got != "" {
+		t.Fatalf("exportSprites = %q", got)
+	}
+}

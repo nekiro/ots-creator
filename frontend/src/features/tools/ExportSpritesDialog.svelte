@@ -27,7 +27,7 @@
   const sheetCount = $derived(Math.ceil(total / Math.max(1, perSheet)));
 
   async function exportAll() {
-    const dir = await DialogService.PickDirectory("Export all sprites to");
+    const dir = await DialogService.PickDirectory("exportAllSprites", "Export all sprites to");
     if (dir) await commands.exportAllSpritesTo(dir, { sheets, format, skipEmpty, columns, rows, transparent });
   }
 

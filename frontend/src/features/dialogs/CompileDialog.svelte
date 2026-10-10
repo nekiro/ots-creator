@@ -36,7 +36,7 @@
   });
 
   async function browse() {
-    const d = await DialogService.PickDirectory("Output folder");
+    const d = await DialogService.PickDirectory("compileOutput", "Output folder");
     if (d) dir = d;
   }
 

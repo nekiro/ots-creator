@@ -68,7 +68,7 @@
   });
 
   async function browse() {
-    const paths = await DialogService.OpenFiles("View objects and images", FILTERS, false);
+    const paths = await DialogService.OpenFiles("objectViewer", "View objects and images", FILTERS, false);
     if (paths?.length) await open(paths[0]);
   }
 
