@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 
 	"github.com/nekiro/ots-creator/internal/assets"
 	"github.com/nekiro/ots-creator/internal/client"
@@ -190,6 +191,36 @@ type CompileOptions struct {
 	Features client.Features
 	// WriteOTFI also writes an OTClient feature file next to the dat.
 	WriteOTFI bool
+	// Progress, when set, is called with the work done so far, possibly
+	// from several goroutines and very often.
+	Progress func(done, total int)
+}
+
+// counter reports work done to a CompileOptions.Progress.
+type counter struct {
+	done   atomic.Int64
+	total  int
+	report func(done, total int)
+}
+
+func newCounter(total int, report func(done, total int)) *counter {
+	if report == nil {
+		report = func(int, int) {}
+	}
+	return &counter{total: total, report: report}
+}
+
+func (c *counter) tick() { c.report(int(c.done.Add(1)), c.total) }
+
+// countingSource ticks a counter for every sprite read.
+type countingSource struct {
+	spr.Source
+	c *counter
+}
+
+func (s countingSource) Compressed(id uint32) ([]byte, error) {
+	s.c.tick()
+	return s.Source.Compressed(id)
 }
 
 // Compile writes the project to disk. Files are written to temporary files
@@ -200,7 +231,7 @@ func (p *Project) Compile(o CompileOptions) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if o.Format == FormatAssets {
-		if err := p.compileAssets(o.DatPath); err != nil {
+		if err := p.compileAssets(o.DatPath, o.Progress); err != nil {
 			return err
 		}
 		p.saved()
@@ -218,6 +249,9 @@ func (p *Project) Compile(o CompileOptions) error {
 	}
 	var sprBuf bytes.Buffer
 	src := p.sprites.source(f.Transparency)
+	// Every sprite is read three times: for the size and by both passes of
+	// spr.Encode.
+	src = countingSource{src, newCounter(3*int(src.Count()), o.Progress)}
 	if size, err := encodedSize(src, f.Extended); err == nil {
 		sprBuf.Grow(size) // one allocation instead of repeated doubling
 	}

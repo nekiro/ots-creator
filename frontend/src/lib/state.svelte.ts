@@ -212,7 +212,7 @@ export async function initState(): Promise<void> {
   Events.On("app:progress", (ev) => {
     const p = ev.data;
     if ((app.busy || app.stoppable) && p.done < p.total) {
-      app.busy = `${p.label} ${p.done.toLocaleString()}/${p.total.toLocaleString()}`;
+      app.busy = p.percent ? `${p.label} ${Math.floor((p.done / p.total) * 100)}%` : `${p.label} ${p.done.toLocaleString()}/${p.total.toLocaleString()}`;
       app.progress = { done: p.done, total: p.total };
     }
   });

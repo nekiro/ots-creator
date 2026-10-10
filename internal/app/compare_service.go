@@ -241,7 +241,7 @@ func (cs *CompareService) Compile() error {
 		return err
 	}
 	info := p.Info()
-	err = p.Compile(project.CompileOptions{Format: info.Format, DatPath: info.DatPath, SprPath: info.SprPath, Version: info.Version, Features: info.Features})
+	err = p.Compile(project.CompileOptions{Format: info.Format, DatPath: info.DatPath, SprPath: info.SprPath, Version: info.Version, Features: info.Features, Progress: cs.s.reporter("Compiling B")})
 	cs.s.OtherChanged()
 	return err
 }

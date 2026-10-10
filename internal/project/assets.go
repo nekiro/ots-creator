@@ -288,7 +288,7 @@ func hash(data []byte) string {
 
 // compileAssets writes the project as an asset folder in dir. Sheets that
 // already exist are kept; new and edited sprites go to new sheets.
-func (p *Project) compileAssets(dir string) error {
+func (p *Project) compileAssets(dir string, progress func(done, total int)) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
@@ -313,13 +313,18 @@ func (p *Project) compileAssets(dir string) error {
 
 	// Copy the files of the source folder when writing somewhere else
 	// (thousands of sheets: in parallel, hard links where possible).
+	var names []string
 	if p.assets != nil && !sameDir(p.assets.dir, dir) {
-		names := base.Files()
+		names = base.Files()
+	}
+	done := newCounter(len(names)+len(groups), progress)
+	if len(names) > 0 {
 		err := parallelRange(0, uint32(len(names)-1), 16, func(from, to uint32) error {
 			for _, name := range names[from : to+1] {
 				if err := copyFile(filepath.Join(p.assets.dir, name), filepath.Join(dir, name)); err != nil {
 					return err
 				}
+				done.tick()
 			}
 			return nil
 		})
@@ -341,6 +346,7 @@ func (p *Project) compileAssets(dir string) error {
 				if data, sheets[i], errs[i] = encodeSheet(groups[i]); errs[i] == nil {
 					errs[i] = writeAtomic(filepath.Join(dir, sheets[i].File), data)
 				}
+				done.tick()
 			}
 		}()
 	}

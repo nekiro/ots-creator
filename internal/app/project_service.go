@@ -202,7 +202,7 @@ func (ps *ProjectService) CompileAs(req CompileRequest) error {
 	if err != nil {
 		return err
 	}
-	err = p.Compile(project.CompileOptions{Format: req.Format, DatPath: req.DatPath, SprPath: req.SprPath, Version: req.Version, Features: req.Features, WriteOTFI: req.WriteOTFI})
+	err = p.Compile(project.CompileOptions{Format: req.Format, DatPath: req.DatPath, SprPath: req.SprPath, Version: req.Version, Features: req.Features, WriteOTFI: req.WriteOTFI, Progress: ps.s.reporter("Compiling")})
 	ps.s.Changed()
 	if err == nil {
 		ps.s.saved()

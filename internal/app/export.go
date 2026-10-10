@@ -26,6 +26,8 @@ type Progress struct {
 	Label string `json:"label"`
 	Done  int    `json:"done"`
 	Total int    `json:"total"`
+	// Percent shows the progress as a percentage instead of done/total.
+	Percent bool `json:"percent"`
 }
 
 // ExportSummary reports an export of a whole client.
@@ -40,6 +42,22 @@ var ErrCanceled = errors.New("canceled")
 
 // progressEvery is the minimum time between progress events.
 const progressEvery = 150 * time.Millisecond
+
+// reporter returns a progress callback for label that sends at most one
+// event per progressEvery. It is safe for concurrent use.
+func (s *Session) reporter(label string) func(done, total int) {
+	var mu sync.Mutex
+	var last time.Time
+	return func(done, total int) {
+		mu.Lock()
+		defer mu.Unlock()
+		if time.Since(last) < progressEvery {
+			return
+		}
+		last = time.Now()
+		s.notify(EventProgress, Progress{Label: label, Done: done, Total: total, Percent: true})
+	}
+}
 
 // parallel runs fn for 0..n-1 on all cores and reports progress. It stops
 // at the first error and returns it, or ErrCanceled after Session.Cancel.
