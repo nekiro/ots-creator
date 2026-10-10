@@ -201,7 +201,7 @@
             <button class="t-btn" onclick={() => load(true)}>Try again</button>
           </div>
         {:else if filtered.length === 0}
-          <div class="msg t-label">{entries.length ? "Nothing matches the filters." : "Nothing here yet. Be the first to share something!"}</div>
+          <div class="msg t-label">{entries.length ? "Nothing matches the filters." : "Nothing here yet. Be the first to publish something!"}</div>
         {:else}
           <div class="grid">
             {#each filtered.slice(0, shown) as e (e.id)}
@@ -288,8 +288,8 @@
     </div>
   </div>
   {#snippet footer()}
-    <button class="t-btn share" title="Share an object, sprites or a file" onclick={() => commands.sharePick()}
-      ><Icon name="export" />Share…</button
+    <button class="t-btn share" title="Publish an object, sprites or a file" onclick={() => commands.sharePick()}
+      ><Icon name="export" />Publish…</button
     >
     <span class="t-label status">{filtered.length} of {entries.length}{loading && index ? " · reloading…" : ""}</span>
     <span class="grow"></span>

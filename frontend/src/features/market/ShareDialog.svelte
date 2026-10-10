@@ -67,7 +67,7 @@
   const fileGet = (id: number) => (id > 0 ? fileThing?.pixels[id - 1] : undefined);
 
   async function chooseFile() {
-    const paths = await DialogService.OpenFiles("marketShare", "Share a file", FILE_FILTERS, false);
+    const paths = await DialogService.OpenFiles("marketShare", "Publish a file", FILE_FILTERS, false);
     if (paths?.length) await pickFile(paths[0]);
   }
 
@@ -199,15 +199,15 @@
   }
 </script>
 
-<Dialog title="Share to Market" width={470} onclose={() => (app.dialog = null)}>
+<Dialog title="Publish to Market" width={470} onclose={() => (app.dialog = null)}>
   {#if sharedId}
     <div class="col done">
-      <strong class="ok">Shared!</strong>
+      <strong class="ok">Published!</strong>
       <p><b>{name}</b> is in the market now. You can delete it later from the market window on this computer.</p>
       <button class="t-btn" onclick={() => (app.dialog = "market")}>Open the market</button>
     </div>
   {:else if configError || (config && !config.share)}
-    <p class="err">{configError || "This build has no market to share to."}</p>
+    <p class="err">{configError || "This build has no market to publish to."}</p>
   {:else}
     <div class="col gap">
       {#if pick}
@@ -217,14 +217,14 @@
               class="t-tab"
               class:on={target.kind === "object"}
               disabled={!app.open}
-              title={app.open ? "" : "Open a client to share its objects"}
+              title={app.open ? "" : "Open a client to publish its objects"}
               onclick={() => pickObject(app.category, app.focused ?? minId(app.category))}>Object</button
             >
             <button
               class="t-tab"
               class:on={target.kind === "sprites"}
               disabled={!app.open}
-              title={app.open ? "" : "Open a client to share its sprites"}
+              title={app.open ? "" : "Open a client to publish its sprites"}
               onclick={() => pickSprites(spriteText)}>Sprites</button
             >
             <button class="t-tab" class:on={target.kind === "file"} onclick={() => pickFile(target.kind === "file" ? target.path : "")}>File</button>
@@ -307,7 +307,7 @@
       </div>
       <label class="row agree">
         <input type="checkbox" class="t-check" bind:checked={allowed} />
-        <span>I made this or may share it. It will be public.</span>
+        <span>I made this or may publish it. It will be public.</span>
       </label>
       {#if config?.captchaUrl}
         {#key frameKey}
@@ -329,7 +329,7 @@
         class="t-btn primary"
         disabled={!!problem || empty || !allowed || !captcha || !!app.busy}
         title={captcha ? "" : "Solve the captcha first"}
-        onclick={share}>Share</button
+        onclick={share}>Publish</button
       >
       <button class="t-btn" onclick={() => (app.dialog = null)}>Cancel</button>
     {/if}

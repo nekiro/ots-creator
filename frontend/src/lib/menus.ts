@@ -70,7 +70,7 @@ export function objectMenu(context = false): MenuEntry[] {
     "-",
     { label: "Import sprite sheet…", action: () => commands.importSheet(0), disabled: notSingle },
     { label: "Export sprite sheet…", action: () => commands.exportSheet(0), disabled: notSingle },
-    { label: "Share to market…", action: commands.shareObject, disabled: notSingle },
+    { label: "Publish to market…", action: commands.shareObject, disabled: notSingle },
     ...(context
       ? (["-", ...clipboardEntries(), "-", { label: "Copy id", action: () => copy(app.selection.join(", ")), disabled: noThing }] as MenuEntry[])
       : []),
@@ -101,7 +101,7 @@ export function spriteMenu(context = false): MenuEntry[] {
     { label: "Export selected…", action: commands.exportSprites, disabled: noSprite },
     ...(context ? [] : [{ label: "Export all sprites…", action: commands.exportAllSprites, disabled: noProject }]),
     { label: "Replace uses with…", action: commands.replaceRefs, disabled: noSprite },
-    { label: "Share to market…", action: commands.shareSprites, disabled: noSprite },
+    { label: "Publish to market…", action: commands.shareSprites, disabled: noSprite },
     "-",
     { label: "Clear selected", keys: "Del", action: commands.removeSprites, disabled: noSprite },
     ...(context

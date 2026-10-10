@@ -92,7 +92,7 @@ and sprites with other users. Built with [Wails v3](https://v3.wails.io) (Go) an
 
 - Browse objects and sprite packs shared by other users, with categories, tags, search,
   a live preview and one-click import.
-- Share an object, sprites or an `.otobj` / `.obd` / image file from disk. No account is needed: you
+- Publish an object, sprites or an `.otobj` / `.obd` / image file from disk. No account is needed: you
   pick a nickname, Tibia-style tags and a license. You can later delete your own entries.
 
 **Updates**
