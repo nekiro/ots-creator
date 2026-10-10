@@ -109,6 +109,44 @@ func TestTransferReplaceAndExtend(t *testing.T) {
 	}
 }
 
+func TestRestoreThings(t *testing.T) {
+	a := New(v1098(), client.Features{})
+	b := New(v1098(), client.Features{})
+	a.AddSprites([][]byte{solid(255, 0, 0)})
+	b.AddSprites([][]byte{solid(0, 0, 255)})
+	setItem(t, a, 100, false, 1)
+	setItem(t, a, 101, false, 1)
+	setItem(t, b, 100, true, 1)
+	setItem(t, b, 101, true, 1)
+	setItem(t, b, 102, true, 1)
+
+	res, err := Transfer(a, b, thing.CategoryItem, []uint32{100, 101, 102}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Revert one copy only, then the copy past the end.
+	if err := a.RestoreThings(thing.CategoryItem, map[uint32]*thing.Thing{100: res.Before[100]}); err != nil {
+		t.Fatal(err)
+	}
+	if it, _ := a.Thing(thing.CategoryItem, 100); it.Props.Pickupable || it.FrameGroups[0].Sprites[0] != 1 {
+		t.Fatalf("100 not restored: %+v", it)
+	}
+	if it, _ := a.Thing(thing.CategoryItem, 101); !it.Props.Pickupable {
+		t.Fatal("101 was reverted too")
+	}
+	if err := a.RestoreThings(thing.CategoryItem, map[uint32]*thing.Thing{102: res.Before[102]}); err != nil {
+		t.Fatal(err)
+	}
+	if a.Info().Counts.Items != 101 {
+		t.Fatalf("items %d", a.Info().Counts.Items)
+	}
+	// Each revert is its own undo step.
+	a.Undo()
+	if a.Info().Counts.Items != 102 {
+		t.Fatalf("after undo %d", a.Info().Counts.Items)
+	}
+}
+
 func TestTransferAppend(t *testing.T) {
 	a := New(v1098(), client.Features{})
 	b := New(v1098(), client.Features{})

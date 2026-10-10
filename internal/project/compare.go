@@ -3,6 +3,7 @@ package project
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"slices"
 
@@ -252,6 +253,9 @@ type TransferResult struct {
 	IDs []uint32 `json:"ids"`
 	// Sprites counts the sprites added to the target.
 	Sprites int `json:"sprites"`
+	// Before holds the things the copies replaced (nil: the id did not
+	// exist), for copies that kept their ids. See RestoreThings.
+	Before map[uint32]*thing.Thing `json:"-"`
 }
 
 // Transfer copies things of category c from src into dst together with
@@ -296,7 +300,7 @@ func Transfer(dst, src *Project, c thing.Category, ids []uint32, appendNew bool)
 		label += " from " + snap.name
 	}
 	r := dst.record(label)
-	res := TransferResult{IDs: make([]uint32, 0, len(things))}
+	res := TransferResult{IDs: make([]uint32, 0, len(things)), Before: map[uint32]*thing.Thing{}}
 	mapped := map[uint32]uint32{}
 	added := map[string]uint32{}
 	for _, t := range things {
@@ -317,6 +321,9 @@ func Transfer(dst, src *Project, c thing.Category, ids []uint32, appendNew bool)
 			t.ID = dst.things.MaxID(c) + 1
 		} else {
 			cur = dst.things.Get(c, t.ID)
+			if _, ok := res.Before[t.ID]; !ok {
+				res.Before[t.ID] = cur
+			}
 			for id := dst.things.MaxID(c) + 1; id < t.ID; id++ {
 				r.setThing(c, id, thing.New(id, c))
 			}
@@ -333,6 +340,39 @@ func Transfer(dst, src *Project, c thing.Category, ids []uint32, appendNew bool)
 	}
 	r.commit()
 	return res, nil
+}
+
+// RestoreThings puts back things of category c as they were before a
+// Transfer (see TransferResult.Before), as one undoable edit. A nil thing
+// did not exist: it is removed when it is the last one, else emptied.
+func (p *Project) RestoreThings(c thing.Category, before map[uint32]*thing.Thing) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	ids := slices.Sorted(maps.Keys(before))
+	slices.Reverse(ids)
+	for _, id := range ids {
+		if t := before[id]; t != nil {
+			if err := p.checkSpriteIDs(t); err != nil {
+				return fmt.Errorf("%s %d: %w", c, id, err)
+			}
+		}
+	}
+	r := p.record(fmt.Sprintf("Revert %d %s(s)", len(ids), c))
+	for _, id := range ids {
+		t := before[id]
+		switch {
+		case t != nil:
+		case id == p.things.MaxID(c) && id != c.MinID():
+		default:
+			t = thing.New(id, c)
+		}
+		if t == nil && p.things.Get(c, id) == nil {
+			continue
+		}
+		r.setThing(c, id, t)
+	}
+	r.commit()
+	return nil
 }
 
 // thingSnapshot holds copies of things and their sprites, compressed with

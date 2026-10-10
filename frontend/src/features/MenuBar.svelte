@@ -11,6 +11,8 @@
   import MenuEntries from "../lib/ui/MenuEntries.svelte";
 
   const noProject = () => !app.open;
+  // Compiling only makes sense with changes, or for a client never saved.
+  const nothingToCompile = () => !app.open || !(app.project?.info.changed || app.dirty || !app.project?.info.datPath);
 
   // The maximize button turns into "restore" while the window is maximized.
   let maximised = $state(false);
@@ -40,7 +42,7 @@
         { label: "Open client…", keys: "Ctrl+O", action: () => commands.open() },
         ...(recentItems.length ? (["-", ...recentItems] as MenuEntry[]) : []),
         "-",
-        { label: "Compile", keys: "Ctrl+S", action: commands.compile, disabled: noProject },
+        { label: "Compile", keys: "Ctrl+S", action: commands.compile, disabled: nothingToCompile },
         { label: "Compile as…", keys: "Ctrl+Shift+S", action: commands.compileAs, disabled: noProject },
         "-",
         { label: "Object viewer…", action: () => commands.viewObd() },
@@ -118,7 +120,7 @@
 
   <div class="toolbar">
     <button class="t-icon-btn" title="Open client (Ctrl+O)" onclick={() => commands.open()}><Icon name="open" /></button>
-    <button class="t-icon-btn" title="Compile (Ctrl+S)" disabled={!app.open} onclick={commands.compile}><Icon name="save" /></button>
+    <button class="t-icon-btn" title="Compile (Ctrl+S)" disabled={nothingToCompile()} onclick={commands.compile}><Icon name="save" /></button>
     <span class="t-vsep"></span>
     <button class="t-icon-btn" title="Undo (Ctrl+Z)" disabled={!app.project?.info.canUndo} onclick={commands.undo}><Icon name="undo" /></button>
     <button class="t-icon-btn" title="Redo (Ctrl+Y)" disabled={!app.project?.info.canRedo} onclick={commands.redo}><Icon name="redo" /></button>

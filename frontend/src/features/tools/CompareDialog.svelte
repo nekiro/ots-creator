@@ -7,6 +7,7 @@
   import { otherSpriteCache, spriteCache } from "../../lib/render/sprites";
   import { app, otherVersions, run, toast, versions } from "../../lib/state.svelte";
   import { ask } from "../../lib/confirm.svelte";
+  import { commands } from "../../lib/commands";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import ThingCanvas from "../../lib/ui/ThingCanvas.svelte";
@@ -76,6 +77,7 @@
   const picked = $derived(entries.filter((e) => selected.includes(e.id)));
   const fromA = $derived(picked.filter((e) => e.status !== "onlyB" && e.status !== "copied"));
   const fromB = $derived(picked.filter((e) => e.status !== "onlyA" && e.status !== "copied"));
+  const pickedCopies = $derived(picked.filter((e) => copied[e.id]).map((e) => e.id));
 
   // Compare again after every change of either client.
   let seq = 0;
@@ -138,6 +140,21 @@
     if (!appendNew) for (const id of ids) copied[id] = target;
     const what = `${ids.length} ${CATEGORY_NAMES[category]}(s)`;
     toast(`Copied ${what} to ${target}${appendNew ? ` as #${r.ids?.[0]}…` : ""}, ${r.sprites} new sprite(s).`, "success");
+  }
+
+  /** Puts copied objects back as they were before they were copied. */
+  async function revert(ids: number[]) {
+    for (const to of ["A", "B"] as const) {
+      const list = ids.filter((id) => copied[id] === to);
+      if (!list.length) continue;
+      const ok = await run("Reverting", async () => {
+        await CompareService.Revert(to === "B", category, list);
+        return true;
+      });
+      if (!ok) return;
+      for (const id of list) delete copied[id];
+      toast(`Reverted ${list.length} ${CATEGORY_NAMES[category]}(s) in ${to}.`);
+    }
   }
 
   /** Copies everything B has and A lacks or has differently, in every category. */
@@ -211,6 +228,8 @@
           <span class="name" title={a?.datPath}>{clientName(a)}{a?.changed ? " *" : ""}</span>
           <span class="t-label">{a?.version.name} · {a?.counts.sprites.toLocaleString()} sprites</span>
         </div>
+        <span class="grow"></span>
+        <button class="t-icon-btn" title="Undo the last change in A" disabled={!a?.canUndo || !!app.busy} onclick={commands.undo}><Icon name="undo" /></button>
       </div>
       <div class="client t-panel">
         <strong class="side">B</strong>
@@ -273,6 +292,10 @@
               </span>
               <span class="state {e.status}">{e.status === "copied" ? "Copied" : STATUS_LABELS[e.status as Status]}</span>
               <span class="t-label changes">{(e.changes ?? []).map((c) => CHANGE_LABELS[c] ?? c).join(", ")}</span>
+              {#if copied[e.id]}
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <span class="revert" role="button" tabindex="-1" title="Revert this copy" onclick={(ev) => (ev.stopPropagation(), revert([e.id]))}><Icon name="undo" /></span>
+              {/if}
             </button>
           {/snippet}
         </VirtualGrid>
@@ -283,6 +306,10 @@
     <div class="row actions">
       <span class="t-label">{selected.length ? `${picked.length} selected` : "Select objects to copy (Ctrl+A, Shift, Ctrl)."}</span>
       <span class="grow"></span>
+      <button class="t-btn" title="Put the selected copies back as they were" disabled={!pickedCopies.length || !!app.busy} onclick={() => revert(pickedCopies)}
+        >Revert copy</button
+      >
+      <span class="t-sep v"></span>
       <button class="t-btn" title="Replace in A, or add with the same id" disabled={!fromB.length || !!app.busy} onclick={() => transfer(false, false, fromB)}
         >B → A</button
       >
@@ -410,6 +437,18 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .revert {
+    margin-left: auto;
+    flex: none;
+    display: flex;
+    padding: 2px;
+    color: var(--text-dim);
+    pointer-events: auto !important;
+    cursor: pointer;
+  }
+  .revert:hover {
+    color: var(--text-bright);
   }
   .msg {
     margin: auto;
