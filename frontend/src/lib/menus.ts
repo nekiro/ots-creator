@@ -35,6 +35,7 @@ export function editMenu(): MenuEntry[] {
 function clipboardEntries(): MenuEntry[] {
   return [
     { label: "Copy object", keys: "Ctrl+C", action: commands.copyObject, disabled: () => !app.draft },
+    { label: "Copy sprite sheet", keys: "Ctrl+Shift+C", action: () => commands.copySheet(0), disabled: notSingle },
     { label: "Paste object", keys: "Ctrl+V", action: () => commands.paste("object"), disabled: noClip },
     { label: "Paste properties", keys: "Ctrl+Shift+V", action: () => commands.paste("properties"), disabled: noClip },
   ];

@@ -10,6 +10,7 @@ import {
   encodeBytes,
   errorMessage,
   minId,
+  res,
   type PropsPatch,
   type Recent,
   type Thing,
@@ -18,7 +19,7 @@ import {
 import { clipboardThing, copyThing, pasteInto, type PasteMode } from "./clipboard";
 import { ask } from "./confirm.svelte";
 import { prefs } from "./prefs.svelte";
-import { app, applyDraft, revertDraft, run, select, toast } from "./state.svelte";
+import { app, applyDraft, revertDraft, run, select, toast, versions } from "./state.svelte";
 
 const OBJECTS = [
   { name: "Object files (*.otobj, *.obd)", pattern: "*.otobj;*.obd" },
@@ -372,6 +373,23 @@ export const commands = {
     toast(`Cleared ${n} sprite(s). Ctrl+Z to undo.`);
   },
 
+  /** Puts the sprite sheet of the focused object on the clipboard as a
+   * PNG with transparency; Ctrl+V on another object pastes it there. */
+  async copySheet(group = 0) {
+    if (!guard() || app.focused === null) return;
+    const c = app.category;
+    const id = app.focused;
+    try {
+      const r = await fetch(res.sheet(c, id, group, true, versions.thing(c, id)));
+      if (!r.ok) throw new Error((await r.text()) || r.statusText);
+      const blob = await r.blob();
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      toast(`Copied the sprite sheet of ${CATEGORY_NAMES[c]} #${id}.`);
+    } catch (e) {
+      toast(errorMessage(e), "error");
+    }
+  },
+
   copyObject() {
     if (!app.draft) return;
     copyThing(snapshot(app.draft));
@@ -536,6 +554,7 @@ export function handleShortcut(e: KeyboardEvent): void {
   if (mod && key === "d") return run(commands.duplicate);
   if (mod && key === "i") return run(() => commands.importObd());
   if (mod && key === "e") return run(() => commands.exportObd());
+  if (mod && e.shiftKey && key === "c") return run(() => commands.copySheet(0));
   if (mod && key === "c") return run(commands.copyObject);
   if (mod && e.shiftKey && key === "v") return run(() => commands.paste("properties"));
   // Plain Ctrl+V arrives as a paste event (handlePaste) with the clipboard.
