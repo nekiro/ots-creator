@@ -49,7 +49,7 @@ func TestCompareService(t *testing.T) {
 	// A: a new empty client.
 	ps.New(v1098(), client.Features{})
 	d, err := cs.Diff(thing.CategoryItem)
-	if err != nil || len(d.Entries) != 1 || d.Entries[0].Changes[0] != project.ChangeSprites {
+	if err != nil || len(d.Entries) != 1 || d.Entries[0].Status != project.DiffOnlyB {
 		t.Fatalf("diff %+v %v", d, err)
 	}
 

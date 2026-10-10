@@ -270,6 +270,8 @@
     <div class="list t-panel">
       {#if error}
         <div class="msg err">{error}</div>
+      {:else if !diff}
+        <div class="msg loading t-label"><span class="spinner"></span>Comparing clients…</div>
       {:else if diff && entries.length === 0}
         <div class="msg t-label">
           {diff.entries?.length ? "Nothing matches the filters." : `All ${diff.same.toLocaleString()} ${CATEGORY_LABELS[category].toLowerCase()} are the same.`}
@@ -307,7 +309,7 @@
           {/snippet}
         </VirtualGrid>
       {/if}
-      {#if loading}<span class="spinner corner"></span>{/if}
+      {#if loading && diff}<span class="spinner corner"></span>{/if}
     </div>
 
     <div class="row actions">
@@ -459,6 +461,11 @@
   }
   .msg {
     margin: auto;
+  }
+  .loading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
   .err {
     color: #ff9c9c;

@@ -14,8 +14,8 @@ import (
 // Diff statuses of one id in two clients.
 const (
 	DiffChanged = "changed"
-	DiffOnlyA   = "onlyA" // the id does not exist in B
-	DiffOnlyB   = "onlyB" // the id does not exist in A
+	DiffOnlyA   = "onlyA" // the id does not exist in B, or is empty there
+	DiffOnlyB   = "onlyB" // the id does not exist in A, or is empty there
 )
 
 // Parts of a thing that can differ (DiffEntry.Changes).
@@ -113,7 +113,17 @@ func diffRange(a, b *Project, c thing.Category, from, to uint32, cmp *thingCompa
 			}
 			if len(ch) == 0 {
 				res.Same++
-			} else {
+				continue
+			}
+			// An empty placeholder against a real object is a new object,
+			// not a change.
+			ea, eb := !a.hasPixels(ta), !b.hasPixels(tb)
+			switch {
+			case ea && !eb:
+				res.Entries = append(res.Entries, DiffEntry{ID: id, Status: DiffOnlyB})
+			case eb && !ea:
+				res.Entries = append(res.Entries, DiffEntry{ID: id, Status: DiffOnlyA})
+			default:
 				res.Entries = append(res.Entries, DiffEntry{ID: id, Status: DiffChanged, Changes: ch})
 			}
 		}

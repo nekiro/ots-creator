@@ -53,7 +53,9 @@ func TestDiff(t *testing.T) {
 	setItem(t, a, 103, false, 1, 2)
 	setItem(t, b, 103, false, 2) // size differs
 	setItem(t, b, 104, false, 3) // only in b
-	setItem(t, b, 105, false, 0) // only in b, no sprites
+	setItem(t, a, 105, false, 0)
+	setItem(t, b, 105, false, 3) // empty in a
+	setItem(t, b, 106, false, 0) // only in b, no sprites
 
 	res, err := Diff(a, b, thing.CategoryItem)
 	if err != nil {
@@ -64,7 +66,8 @@ func TestDiff(t *testing.T) {
 		{ID: 102, Status: DiffChanged, Changes: []string{ChangeSprites}},
 		{ID: 103, Status: DiffChanged, Changes: []string{ChangeSize}},
 		{ID: 104, Status: DiffOnlyB},
-		{ID: 105, Status: DiffOnlyB, Empty: true},
+		{ID: 105, Status: DiffOnlyB},
+		{ID: 106, Status: DiffOnlyB, Empty: true},
 	}
 	if res.Same != 1 || !slices.EqualFunc(res.Entries, want, func(x, y DiffEntry) bool {
 		return x.ID == y.ID && x.Status == y.Status && x.Empty == y.Empty && slices.Equal(x.Changes, y.Changes)
@@ -248,7 +251,7 @@ func TestDiffChunksKeepOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 100+n-5 differs in flag and sprite, the last 5 ids exist only in a.
+	// 100+n-5 is empty in a, the last 5 ids exist only in a.
 	if len(d.Entries) != 6 || d.Same != n-5 {
 		t.Fatalf("%d entries, %d same", len(d.Entries), d.Same)
 	}
@@ -257,7 +260,7 @@ func TestDiffChunksKeepOrder(t *testing.T) {
 			t.Fatalf("out of order: %+v", d.Entries)
 		}
 	}
-	if d.Entries[0].Status != DiffChanged || d.Entries[5].Status != DiffOnlyA {
+	if d.Entries[0].Status != DiffOnlyB || d.Entries[5].Status != DiffOnlyA {
 		t.Fatalf("entries %+v", d.Entries)
 	}
 }
