@@ -1,9 +1,25 @@
+<div align="center">
+
+<img src=".github/assets/icon.png" width="128" height="128" alt="OTS Creator icon">
+
 # OTS Creator
 
-Object editor for Open Tibia clients, from classic `Tibia.dat` / `Tibia.spr` to Tibia 12+
-protobuf assets. It looks and feels like the Tibia client, and it has a built-in market to
-share objects and sprites with other users. Built with [Wails v3](https://v3.wails.io) (Go)
-and Svelte 5.
+**Object editor for Open Tibia clients, from `Tibia.dat` / `Tibia.spr` to Tibia 12+ assets.**
+
+[![Latest release](https://img.shields.io/github/v/release/nekiro/ots-creator?style=flat-square&color=e8c46a)](https://github.com/nekiro/ots-creator/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/nekiro/ots-creator/total?style=flat-square&color=d4930a)](https://github.com/nekiro/ots-creator/releases)
+![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-555?style=flat-square)
+[![License](https://img.shields.io/badge/license-Apache%202.0%20%2B%20Commons%20Clause-555?style=flat-square)](LICENSE)
+
+[Download](https://github.com/nekiro/ots-creator/releases/latest) ·
+[Features](#features) ·
+[OTOBJ format](#otobj-object-format) ·
+[Development](#development)
+
+</div>
+
+It looks and feels like the Tibia client, and it has a built-in market to share objects
+and sprites with other users. Built with [Wails v3](https://v3.wails.io) (Go) and Svelte 5.
 
 ![OTS Creator](.github/assets/promo.gif)
 
