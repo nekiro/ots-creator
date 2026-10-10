@@ -8,6 +8,7 @@
   import { app, toast } from "../../lib/state.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import NumberField from "../../lib/ui/NumberField.svelte";
+  import ProgressBar from "../../lib/ui/ProgressBar.svelte";
   import Select from "../../lib/ui/Select.svelte";
 
   const total = app.project?.info.counts.sprites ?? 0;
@@ -67,9 +68,11 @@
   </div>
   {#snippet footer()}
     {#if running}
-      <div class="progress grow">
-        <div class="bar" style="width:{percent}%"></div>
-        <span>{app.stopping ? "Stopping…" : app.progress ? `${app.progress.done.toLocaleString()} / ${app.progress.total.toLocaleString()}` : "Exporting…"}</span>
+      <div class="grow center">
+        <ProgressBar
+          {percent}
+          label={app.stopping ? "Stopping…" : app.progress ? `${app.progress.done.toLocaleString()} / ${app.progress.total.toLocaleString()}` : "Exporting…"}
+        />
       </div>
       <button class="t-btn" title="Close this window, the export keeps running" onclick={close}>Hide</button>
       <button class="t-btn danger" disabled={app.stopping} onclick={commands.stopTask}>Stop</button>
@@ -88,30 +91,11 @@
   p {
     margin: 0;
   }
+  .center {
+    align-self: center;
+  }
   .off {
     opacity: 0.5;
     pointer-events: none;
-  }
-  .progress {
-    position: relative;
-    height: 18px;
-    align-self: center;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    background: rgba(0, 0, 0, 0.3);
-  }
-  .bar {
-    position: absolute;
-    inset: 0 auto 0 0;
-    background: var(--gold);
-    opacity: 0.45;
-    transition: width 0.15s linear;
-  }
-  .progress span {
-    position: relative;
-    display: block;
-    text-align: center;
-    line-height: 18px;
-    font-size: 11px;
-    color: var(--text-bright);
   }
 </style>

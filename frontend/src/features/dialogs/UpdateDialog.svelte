@@ -3,6 +3,7 @@
   import { app } from "../../lib/state.svelte";
   import { installUpdate, REPO_URL, updates } from "../../lib/updates.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
+  import ProgressBar from "../../lib/ui/ProgressBar.svelte";
 
   const release = $derived(updates.info?.release ?? null);
   const busy = $derived(updates.stage !== "idle");
@@ -23,12 +24,11 @@
         <div class="notes t-panel">{release.notes}</div>
       {/if}
       {#if busy}
-        <div class="progress" title={STAGES[updates.stage]}>
-          <div class="fill" style="width:{updates.stage === 'downloading' ? percent : 100}%"></div>
-          <span>
-            {#if updates.stage === "downloading" && updates.progress}{mb(updates.progress.written)} / {mb(updates.progress.total)} MB{:else}{STAGES[updates.stage]}{/if}
-          </span>
-        </div>
+        <ProgressBar
+          title={STAGES[updates.stage]}
+          percent={updates.stage === "downloading" ? percent : 100}
+          label={updates.stage === "downloading" && updates.progress ? `${mb(updates.progress.written)} / ${mb(updates.progress.total)} MB` : STAGES[updates.stage]}
+        />
         <p class="t-label">OTS Creator restarts into the new version when the update is installed.</p>
       {/if}
     </div>
@@ -54,36 +54,5 @@
     padding: 6px 8px;
     white-space: pre-wrap;
     user-select: text;
-  }
-  /* OTClient ProgressBar: progressbar.png, image-border 2, color drawn behind */
-  .progress {
-    position: relative;
-    height: 16px;
-    display: grid;
-    place-items: center;
-    color: var(--text-bright);
-    text-shadow: 1px 1px 0 #000;
-  }
-  .progress::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-style: solid;
-    border-width: 2px;
-    border-image: url("../../assets/ui/progressbar.png") 2 fill / 2px repeat;
-    image-rendering: pixelated;
-    pointer-events: none;
-  }
-  .fill {
-    position: absolute;
-    left: 2px;
-    top: 2px;
-    bottom: 2px;
-    max-width: calc(100% - 4px);
-    background: #3c9a3c;
-  }
-  .progress span {
-    position: relative;
-    z-index: 1;
   }
 </style>
