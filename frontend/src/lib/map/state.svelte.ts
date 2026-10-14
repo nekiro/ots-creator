@@ -76,7 +76,6 @@ export const DEFAULT_VIEW: ViewOptions = {
   tooltips: false,
   coords: false,
   ghostItems: false,
-  asMinimap: false,
   clientBox: false,
   lights: false,
 };

@@ -54,7 +54,8 @@ func (m *openMap) name() string {
 type MapService struct {
 	s     *Session
 	store *MapStore
-	mu    sync.Mutex
+	// mu guards everything; requests that only read the map share it.
+	mu    sync.RWMutex
 	maps  map[int]*openMap
 	next  int
 	data  *mapData
@@ -206,6 +207,31 @@ func (ms *MapService) get(id int) (*openMap, *mapData, error) {
 		return nil, nil, ErrNoMap
 	}
 	return m, d, nil
+}
+
+// read read-locks the service and returns an open map and the item data
+// with the function that unlocks. Loading the item data, the first time,
+// takes the write lock.
+func (ms *MapService) read(id int) (*openMap, *mapData, func(), error) {
+	for {
+		ms.mu.RLock()
+		p, err := ms.s.Project()
+		if err == nil && ms.data != nil && ms.data.project == p {
+			m := ms.maps[id]
+			if m == nil {
+				ms.mu.RUnlock()
+				return nil, nil, nil, ErrNoMap
+			}
+			return m, ms.data, ms.mu.RUnlock, nil
+		}
+		ms.mu.RUnlock()
+		ms.mu.Lock()
+		_, _, err = ms.get(id)
+		ms.mu.Unlock()
+		if err != nil {
+			return nil, nil, nil, err
+		}
+	}
 }
 
 // DataInfo describes the item and brush data of the map editor.

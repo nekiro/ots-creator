@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/nekiro/ots-creator/internal/imaging"
 	"github.com/nekiro/ots-creator/internal/otmap"
@@ -74,7 +75,10 @@ func (w *chunkWriter) item(it otmap.Item) {
 }
 
 // serveMap handles /res/map/{id}/chunks?k=key,key and
-// /res/map/{id}/minimap?x=&y=&z=&w=&h=.
+// /res/map/{id}/minimap?x=&y=&z=&w=&h= and
+// /res/map/{id}/geo?k=key,key&o=&h=&b= (chunk quads, see buildGeo).
+//
+// Requests only read the map: they run side by side (read lock).
 //
 // Chunk format (little endian), per requested chunk:
 //
@@ -97,13 +101,12 @@ func (ms *MapService) serveMap(w http.ResponseWriter, r *http.Request, parts []s
 		http.Error(w, "bad map id", http.StatusBadRequest)
 		return
 	}
-	ms.mu.Lock()
-	defer ms.mu.Unlock()
-	m, d, err := ms.get(id)
+	m, d, unlock, err := ms.read(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
+	defer unlock()
 	w.Header().Set("Cache-Control", "no-store")
 	switch parts[1] {
 	case "chunks":
@@ -122,6 +125,34 @@ func (ms *MapService) serveMap(w http.ResponseWriter, r *http.Request, parts []s
 		}
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Write(cw.b)
+	case "geo":
+		q := r.URL.Query()
+		keys := strings.Split(q.Get("k"), ",")
+		if len(keys) > maxChunksPerRequest {
+			http.Error(w, "too many chunks", http.StatusBadRequest)
+			return
+		}
+		p, err := ms.s.Project()
+		if err != nil {
+			http.Error(w, errNoClient.Error(), http.StatusNotFound)
+			return
+		}
+		ks := make([]otmap.ChunkKey, 0, len(keys))
+		for _, s := range keys {
+			if k, err := strconv.ParseUint(s, 10, 32); err == nil {
+				ks = append(ks, otmap.ChunkKey(k))
+			}
+		}
+		num := func(k string) int { n, _ := strconv.Atoi(q.Get(k)); return n }
+		o := GeoOptions{Opts: uint32(num("o")), House: uint32(num("h")), Block: min(max(num("b"), 1), 8)}
+		start := time.Now()
+		data, raw := ms.buildGeo(m, d, p, ks, o)
+		// Raw deflate: the page inflates it (DecompressionStream "deflate-raw").
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("X-Build-Ms", strconv.FormatFloat(float64(time.Since(start).Microseconds())/1000, 'f', 2, 64))
+		w.Header().Set("X-Raw-Bytes", strconv.Itoa(raw))
+		w.Header().Set("X-Packed-Bytes", strconv.Itoa(len(data)))
+		w.Write(data)
 	case "minimap":
 		q := r.URL.Query()
 		num := func(k string) int { n, _ := strconv.Atoi(q.Get(k)); return n }

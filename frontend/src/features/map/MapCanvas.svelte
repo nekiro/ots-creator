@@ -4,11 +4,13 @@
   import { openContextMenu, type MenuEntry } from "../../lib/menu.svelte";
   import { spriteCache } from "../../lib/render/sprites";
   import { app, toast } from "../../lib/state.svelte";
-  import { MapService, fmtPos, pos, res, type Clip, type DoodadBuffer, type DrawRequest, type Position } from "../../lib/map/api";
+  import { MapService, fmtPos, pos, type Clip, type DoodadBuffer, type DrawRequest, type Position } from "../../lib/map/api";
   import { Appearances } from "../../lib/map/appearances";
   import { ChunkStore, IF, TF, keyOf, type CreatureData } from "../../lib/map/chunks";
+  import { GeoStore } from "../../lib/map/geo";
+  import { rendered } from "../../lib/map/rendered";
   import { floorAdjust, mapCommands, spriteSize } from "../../lib/map/commands";
-  import { MapRenderer, MinimapLayer, type GhostTile, type Label, type Marker, type RectMark } from "../../lib/map/renderer";
+  import { MapRenderer, type GhostTile, type Label, type Marker, type RectMark } from "../../lib/map/renderer";
   import { applyChange, edit, map, onMapChange, selectBrush, setCam, type BrushSel } from "../../lib/map/state.svelte";
   import { mapContextMenu } from "../../lib/map/menus";
   import FloorLadder from "./FloorLadder.svelte";
@@ -26,7 +28,7 @@
   let height = 0;
 
   const stores = new Map<number, ChunkStore>();
-  const minimaps = new Map<number, MinimapLayer>();
+  const geos = new Map<number, GeoStore>();
   const looks = new Appearances(() => requestDraw());
 
   function store(id: number): ChunkStore {
@@ -38,15 +40,13 @@
     return s;
   }
 
-  function minimapOf(id: number): MinimapLayer | null {
-    if (!renderer) return null;
-    let m = minimaps.get(id);
-    if (!m) {
-      m = new MinimapLayer(renderer.gl, (x, y, z, w, h) => res.minimap(id, x, y, z, w, h, 0));
-      m.onload = () => requestDraw();
-      minimaps.set(id, m);
+  function geoOf(id: number): GeoStore {
+    let g = geos.get(id);
+    if (!g) {
+      g = new GeoStore(id, () => requestDraw());
+      geos.set(id, g);
     }
-    return m;
+    return g;
   }
 
   // ----- drawing -----
@@ -67,11 +67,16 @@
   // Frames drawn in the last second. The map draws on demand, so it reads 0 when nothing changes.
   let frameTimes: number[] = [];
   let fps = $state(0);
+  /** Chunk geometry loading in the last second (shown next to the FPS). */
+  let loadInfo = $state("");
   $effect(() => {
     const t = setInterval(() => {
       const now = performance.now();
       frameTimes = frameTimes.filter((f) => now - f < 1000);
       fps = frameTimes.length;
+      const id = map.activeId;
+      const st = id !== null ? geos.get(id)?.stats() : undefined;
+      loadInfo = st?.count ? `${st.count} req/s · ${Math.round(st.total)} ms (Go ${st.build.toFixed(1)} ms)` : "";
     }, 250);
     return () => clearInterval(t);
   });
@@ -106,6 +111,7 @@
         scale,
         floor: cam.floor,
         chunks: store(id),
+        geo: geoOf(id),
         items: map.items,
         looks,
         sprites: spriteCache,
@@ -117,7 +123,6 @@
         rects,
         markers,
         moveOffset: drag?.kind === "move" && (drag.dx || drag.dy) ? { dx: drag.dx, dy: drag.dy, dz: 0 } : null,
-        minimap: minimapOf(id),
         hover: map.hover,
       });
     } catch (e) {
@@ -129,8 +134,10 @@
     if (result.more) requestDraw();
     else if (result.pending) animTimer = window.setTimeout(requestDraw, 60);
     else if (result.animated) animTimer = window.setTimeout(requestDraw, 90);
+    if (!result.more && !result.pending) rendered(id);
     // Keep memory bounded on long sessions.
-    store(id).trim((k) => Math.abs((Math.floor(k / 16) & 15) - cam.floor) < 4);
+    store(id).trim((k) => (k & 15) === cam.floor);
+    geoOf(id).trim((k) => Math.abs((k & 15) - cam.floor) < 4);
   }
 
   function drawLabels(labels: Label[]) {
@@ -671,7 +678,7 @@
     const offChange = onMapChange((id, ch) => {
       const s = stores.get(id);
       s?.invalidate(ch.all ? null : (ch.chunks ?? []), ch.info?.rev ?? 0);
-      minimaps.get(id)?.invalidate(ch.all ? null : (ch.chunks ?? []));
+      geos.get(id)?.invalidate(ch.all ? null : (ch.chunks ?? []));
       if (id === map.activeId) requestDraw();
     });
     const offSprites = spriteCache.onInvalidate((ids) => {
@@ -684,7 +691,6 @@
       offSprites();
       cancelAnimationFrame(raf);
       clearTimeout(animTimer);
-      for (const m of minimaps.values()) m.dispose();
       renderer?.dispose();
       renderer = null;
     };
@@ -700,7 +706,9 @@
   // Object edits change items and sprites: reload their appearances.
   $effect(() => {
     void app.rev;
+    void map.items;
     looks.clear();
+    for (const g of geos.values()) g.invalidate(null);
     requestDraw();
   });
 
@@ -710,8 +718,7 @@
     for (const id of [...stores.keys()]) {
       if (!ids.has(id)) {
         stores.delete(id);
-        minimaps.get(id)?.dispose();
-        minimaps.delete(id);
+        geos.delete(id);
       }
     }
   });
@@ -740,7 +747,7 @@
   {:else if map.pasting}
     <div class="pickhint">Click to paste · Shift+click pastes again · Esc cancels</div>
   {/if}
-  <div class="fps t-label">{fps} FPS</div>
+  <div class="fps t-label">{fps} FPS{loadInfo ? ` · ${loadInfo}` : ""}</div>
   {#if glError}
     <div class="err t-label">The map cannot be drawn: {glError}</div>
   {/if}

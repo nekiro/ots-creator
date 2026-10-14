@@ -27,6 +27,8 @@ export class Atlas {
   pending = false;
   /** Bumped whenever a cell is freed: cells remembered from before may hold other pixels now. */
   epoch = 0;
+  /** Called with the key of every freed cell. */
+  onRelease: (key: AtlasKey) => void = () => {};
 
   constructor(
     private gl: WebGL2RenderingContext,
@@ -69,6 +71,11 @@ export class Atlas {
     const used = this.used;
     const f = this.frame;
     for (let i = 0; i < cells.length; i++) used[cells[i]] = f;
+  }
+
+  /** Marks one cell used this frame. */
+  use(cell: number): void {
+    this.used[cell] = this.frame;
   }
 
   /** Cell of a key, uploading its pixels when needed; -1 when the pixels
@@ -145,7 +152,10 @@ export class Atlas {
 
   private release(slot: number): void {
     const k = this.keys[slot];
-    if (k !== undefined) this.slots.delete(k);
+    if (k !== undefined) {
+      this.slots.delete(k);
+      this.onRelease(k);
+    }
     this.keys[slot] = undefined;
     this.free.push(slot);
     this.epoch++;
@@ -155,9 +165,10 @@ export class Atlas {
    * depend on a sprite are dropped by prefix match on "id:". */
   invalidate(ids: number[] | null): void {
     if (ids === null) {
-      for (const [, s] of this.slots) {
+      for (const [k, s] of this.slots) {
         this.keys[s] = undefined;
         this.free.push(s);
+        this.onRelease(k);
       }
       this.slots.clear();
       this.epoch++;

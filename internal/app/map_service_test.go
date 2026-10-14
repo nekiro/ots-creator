@@ -15,7 +15,7 @@ import (
 	"github.com/nekiro/ots-creator/internal/thing"
 )
 
-func mapTestService(t *testing.T) (*MapService, *Session) {
+func mapTestService(t testing.TB) (*MapService, *Session) {
 	t.Helper()
 	s := NewSession(nil)
 	v := client.FindByValue(1098)[0]

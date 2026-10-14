@@ -2,9 +2,14 @@ package app
 
 import (
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/nekiro/ots-creator/internal/imaging"
 	"github.com/nekiro/ots-creator/internal/project"
@@ -54,6 +59,10 @@ func (h *Resources) Middleware(next http.Handler) http.Handler {
 
 func (h *Resources) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, ResourcePrefix), "/")
+	if len(parts) == 1 && parts[0] == "perflog" && r.Method == http.MethodPost {
+		appendPerfLog(w, r)
+		return
+	}
 	if len(parts) > 0 && parts[0] == "map" && h.Maps != nil {
 		h.Maps.serveMap(w, r, parts[1:])
 		return
@@ -242,4 +251,30 @@ func (h *Resources) texture(w http.ResponseWriter, r *http.Request, p *project.P
 	}
 	w.Header().Set("Content-Type", "image/png")
 	w.Write(data)
+}
+
+// appendPerfLog appends the request body (one line of timings from the map
+// renderer) to map-perf.log in the user's config directory, where it can be
+// read without devtools.
+func appendPerfLog(w http.ResponseWriter, r *http.Request) {
+	line, err := io.ReadAll(io.LimitReader(r.Body, 4096))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	dir = filepath.Join(dir, "OTS Creator")
+	_ = os.MkdirAll(dir, 0o755)
+	f, err := os.OpenFile(filepath.Join(dir, "map-perf.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer f.Close()
+	fmt.Fprintf(f, "%s %s\n", time.Now().Format("15:04:05.000"), strings.TrimSpace(string(line)))
+	w.WriteHeader(http.StatusNoContent)
 }

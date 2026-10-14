@@ -5,6 +5,7 @@ import { ask } from "../confirm.svelte";
 import { openContextMenu, type MenuEntry } from "../menu.svelte";
 import { app, toast } from "../state.svelte";
 import { MapService, SpawnFormat, pos, type Position } from "./api";
+import { whenRendered } from "./rendered";
 import { applyChange, edit, loadMapData, map, refreshTile, selectBrush, setCam, warningCount, ZOOMS, type Focus } from "./state.svelte";
 
 const MAPS = [{ name: "OTBM maps (*.otbm)", pattern: "*.otbm" }];
@@ -92,6 +93,9 @@ export const mapCommands = {
       await loadMapData(!map.items);
       if (!map.maps.some((m) => m.id === r.info.id)) map.maps = [...map.maps, r.info];
       await afterOpen(r.info.id);
+      // The loader stays until the first view is drawn, not on a black map.
+      map.loading = { name, step: "Drawing the map", percent: 99 };
+      await whenRendered(r.info.id);
       const w = (r.warnings ?? []).filter((x): x is string => !!x);
       map.loadWarnings = { ...map.loadWarnings, [r.info.id]: w };
       // Whole open: reading the file, the item data and the first view.

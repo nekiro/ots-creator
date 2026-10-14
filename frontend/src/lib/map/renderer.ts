@@ -1,13 +1,17 @@
 // WebGL2 map renderer. Tiles are drawn as instanced quads (one per sprite
-// piece or colored rectangle). Each 32x32 chunk keeps its quads in its own
-// GPU buffer in world pixels, built once and redrawn with a camera offset;
-// only animated pieces are patched per frame. Previews and overlays are
-// built every frame in screen pixels. Sprites live in a texture array atlas.
+// piece or colored rectangle). The backend builds the quads of each 32x32
+// chunk (geo.ts, app/map_geo.go) with sprite ids; they go to a GPU buffer
+// as they come and are redrawn with a camera offset. The shader finds the
+// atlas cell of a sprite in a cell index texture, so atlas changes never
+// rebuild chunks; only animated pieces are patched per frame. Previews
+// and overlays are built every frame in screen pixels. Sprites live in a
+// texture array atlas.
 import { colorize } from "../render/outfit";
 import type { SpriteCache } from "../render/sprites";
 import { AF, frameAt, type Appearances, type Look } from "./appearances";
 import { Atlas } from "./atlas";
-import { CHUNK, IF, TF, chunkKey, splitKey, type ChunkData, type ChunkStore, type CreatureData, type TileData } from "./chunks";
+import { CHUNK, IF, TF, chunkKey, splitKey, type ChunkStore, type CreatureData, type TileData } from "./chunks";
+import { GEO, GEO_BLOCK, GEO_COMPOSED, GEO_HIDDEN, QUAD_BYTES, geoBits, type GeoChunk, type GeoStore } from "./geo";
 import type { ItemIndex } from "./items";
 
 export interface ViewOptions {
@@ -32,7 +36,6 @@ export interface ViewOptions {
   /** x, y, z written on every tile. */
   coords: boolean;
   ghostItems: boolean;
-  asMinimap: boolean;
   clientBox: boolean;
   lights: boolean;
 }
@@ -87,7 +90,10 @@ export interface Scene {
   /** Device pixels per world pixel. */
   scale: number;
   floor: number;
+  /** Tiles, for overlays and previews (only the floor in view is loaded). */
   chunks: ChunkStore;
+  /** Chunk quads. */
+  geo: GeoStore;
   items: ItemIndex;
   looks: Appearances;
   sprites: SpriteCache;
@@ -101,7 +107,6 @@ export interface Scene {
   markers: Marker[];
   /** Selected things drawn again at this offset (dragging a selection). */
   moveOffset: { dx: number; dy: number; dz: number } | null;
-  minimap: MinimapLayer | null;
   /** Tile under the mouse (labelled with its position when coords is on). */
   hover: { x: number; y: number; z: number } | null;
 }
@@ -112,7 +117,7 @@ export interface FrameResult {
   /** Data is still loading: draw again when it arrives. */
   pending: boolean;
   labels: Label[];
-  /** The frame used the minimap instead of sprites. */
+  /** Zoomed out past drawing sprites: only overlays show. */
   far: boolean;
   /** Chunks are still being built: draw again on the next frame. */
   more: boolean;
@@ -152,6 +157,58 @@ void main() {
   v_color = vec4(a_color.rgb, a_color.a * u_alpha);
 }`;
 
+// Chunk quads (QUAD_BYTES each, see geo.ts): the sprite id is looked up in
+// the cell index (composed outfit pieces in their own index).
+const VERT_CHUNK = `#version 300 es
+layout(location=0) in vec2 a_corner;
+layout(location=1) in vec2 a_pos;
+layout(location=2) in uint a_sprite;
+layout(location=3) in vec4 a_color;
+uniform vec2 u_screen;
+uniform vec2 u_off;
+uniform float u_S;
+uniform float u_scale;
+uniform vec2 u_half;
+uniform float u_alpha;
+uniform uint u_perRow;
+uniform uint u_perLayer;
+uniform float u_uvCell;
+uniform highp usampler2D u_ind;
+uniform highp usampler2D u_indC;
+out vec3 v_uv;
+out vec4 v_color;
+const uint MISSING = 0xFFFFFFFFu;
+uint lookup(highp usampler2D t, uint i) {
+  ivec2 size = textureSize(t, 0);
+  uint w = uint(size.x);
+  if (i >= w * uint(size.y)) return MISSING;
+  return texelFetch(t, ivec2(int(i % w), int(i / w)), 0).r;
+}
+void main() {
+  uint cell = MISSING;
+  vec2 size = vec2(u_S);
+  if (a_sprite != MISSING) {
+    if ((a_sprite & 0x80000000u) != 0u) cell = lookup(u_indC, a_sprite & 0x7FFFFFFFu);
+    else if ((a_sprite & 0x40000000u) != 0u) {
+      // A colored rectangle: the white cell, its size in the value.
+      cell = 0u;
+      size = vec2(float((a_sprite >> 15) & 0x7FFFu), float(a_sprite & 0x7FFFu));
+    } else cell = lookup(u_ind, a_sprite);
+  }
+  if (cell == MISSING) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    v_uv = vec3(0.0);
+    v_color = vec4(0.0);
+    return;
+  }
+  vec2 w = a_pos + a_corner * size;
+  vec2 p = floor((w + u_off) * u_scale + u_half + 0.5);
+  gl_Position = vec4(p.x / u_screen.x * 2.0 - 1.0, 1.0 - p.y / u_screen.y * 2.0, 0.0, 1.0);
+  uint c = cell % u_perLayer;
+  v_uv = vec3((vec2(float(c % u_perRow), float(c / u_perRow)) + a_corner) * u_uvCell, float(cell / u_perLayer));
+  v_color = vec4(a_color.rgb, a_color.a * u_alpha);
+}`;
+
 const FRAG = `#version 300 es
 precision mediump float;
 precision mediump sampler2DArray;
@@ -165,29 +222,19 @@ void main() {
   outColor = t * v_color;
 }`;
 
-const VERT2 = `#version 300 es
-layout(location=0) in vec2 a_corner;
-uniform vec4 u_rect;
-uniform vec2 u_screen;
-out vec2 v_uv;
-void main() {
-  vec2 p = u_rect.xy + a_corner * u_rect.zw;
-  gl_Position = vec4(p.x / u_screen.x * 2.0 - 1.0, 1.0 - p.y / u_screen.y * 2.0, 0.0, 1.0);
-  v_uv = a_corner;
-}`;
-
-const FRAG2 = `#version 300 es
-precision mediump float;
-uniform sampler2D u_tex;
-in vec2 v_uv;
-out vec4 outColor;
-void main() { outColor = texture(u_tex, v_uv); }`;
-
 const FLOATS = 10;
-/** Time spent building chunk buffers per frame; the rest wait for the next frames. */
-const BUILD_MS = 8;
+/** Bytes of chunk quads uploaded per frame; the rest wait for the next frames. */
+const UPLOAD_BYTES = 32 << 20;
+/** Time spent uploading chunk quads per frame (ms); the rest wait for the next frames. */
+const UPLOAD_MS = 6;
+/** Chunks a side of the blocks drawn far out. */
+const BLOCK = 4;
 /** Chunk buffers kept before the least recently drawn are freed. */
-const MAX_GEOS = 3000;
+const MAX_GEOS = 12000;
+/** Tiles drawn over all floors before the farthest lower floors are left out. */
+const MAX_FLOOR_TILES = 3_000_000;
+/** Tiles of one floor in view above which sprites are not drawn. */
+const MAX_VISIBLE_TILES = 6_000_000;
 
 type DrawItem = (id: number, sub: number, x: number, y: number, z: number, ax: number, ay: number, r: number, g: number, b: number, a: number, hook: number) => number;
 type DrawCreature = (c: CreatureData, ax: number, ay: number, x: number, y: number, z: number, alpha: number) => void;
@@ -196,30 +243,94 @@ type DrawCreature = (c: CreatureData, ax: number, ay: number, x: number, y: numb
 interface ChunkGeo {
   vao: WebGLVertexArrayObject;
   buf: WebGLBuffer;
-  n: number;
-  /** What the quads were built for; another value means rebuild. */
-  sig: string;
-  atlas: Atlas;
-  epoch: number;
-  items: ItemIndex;
-  looksRev: number;
-  /** Sprites or appearances were missing: rebuild once they arrive. */
-  incomplete: boolean;
+  /** The geometry uploaded; a new one from the store uploads again. */
+  src: GeoChunk;
   /** Atlas cells the quads use, kept alive in the atlas while drawn. */
   cells: Int32Array;
+  /** The cells are valid for this atlas and epoch, and every sprite was in it. */
+  atlas: Atlas | null;
+  epoch: number;
+  ready: boolean;
   used: number;
-  /** Animated pieces: quad index, frame 0 sprite index and look. The quad data stays on the CPU to patch them. */
-  data: Float32Array | null;
-  animI: number[];
-  animBase: number[];
-  animLook: Look[];
+  /** The quads, kept on the CPU to patch animated pieces. */
+  data: Uint8Array | null;
 }
 
-interface Recorder {
-  cells: Set<number>;
-  animI: number[];
-  animBase: number[];
-  animLook: Look[];
+const MISSING = 0xffffffff;
+const NO_QUADS = new Uint8Array(0);
+
+/** Atlas cells of ids in a R32UI texture the chunk shader reads (MISSING: not in the atlas). */
+class CellIndex {
+  private data: Uint32Array;
+  private tex: WebGLTexture;
+  private rows: number;
+  private lo = Infinity;
+  private hi = -1;
+  private grown = true;
+  /** Nothing else binds its texture unit: once bound it stays. */
+  private bound = false;
+
+  constructor(
+    private gl: WebGL2RenderingContext,
+    readonly unit: number,
+    private width: number,
+    rows: number,
+  ) {
+    this.rows = rows;
+    this.data = new Uint32Array(width * rows).fill(MISSING);
+    this.tex = gl.createTexture()!;
+  }
+
+  get(id: number): number {
+    return id < this.data.length ? this.data[id] : MISSING;
+  }
+
+  set(id: number, cell: number): void {
+    if (id >= this.data.length) {
+      let rows = this.rows;
+      while (id >= this.width * rows) rows *= 2;
+      const d = new Uint32Array(this.width * rows).fill(MISSING);
+      d.set(this.data);
+      this.data = d;
+      this.rows = rows;
+      this.grown = true;
+    }
+    if (this.data[id] === cell) return;
+    this.data[id] = cell;
+    const row = Math.floor(id / this.width);
+    this.lo = Math.min(this.lo, row);
+    this.hi = Math.max(this.hi, row);
+  }
+
+  clear(): void {
+    this.data.fill(MISSING);
+    this.grown = true;
+  }
+
+  /** Uploads changes and binds the texture to its unit (leaves unit 0 active). */
+  bind(): void {
+    if (this.bound && !this.grown && this.hi < 0) return;
+    this.bound = true;
+    const gl = this.gl;
+    gl.activeTexture(gl.TEXTURE0 + this.unit);
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    if (this.grown) {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32UI, this.width, this.rows, 0, gl.RED_INTEGER, gl.UNSIGNED_INT, this.data);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      this.grown = false;
+    } else if (this.hi >= 0) {
+      const rows = this.data.subarray(this.lo * this.width, (this.hi + 1) * this.width);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, this.lo, this.width, this.hi - this.lo + 1, gl.RED_INTEGER, gl.UNSIGNED_INT, rows);
+    }
+    this.lo = Infinity;
+    this.hi = -1;
+    gl.activeTexture(gl.TEXTURE0);
+  }
+
+  dispose(): void {
+    this.gl.deleteTexture(this.tex);
+  }
 }
 
 function compile(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgram {
@@ -239,120 +350,53 @@ function compile(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgr
   return p;
 }
 
-/** Minimap textures for far zoom levels: one per 256x256 tile block. */
-export class MinimapLayer {
-  static BLOCK = 256;
-  private tex = new Map<string, { t: WebGLTexture | null; rev: number; loading: boolean }>();
-  private dirty = new Set<string>();
-  onload: () => void = () => {};
-
-  constructor(
-    private gl: WebGL2RenderingContext,
-    private url: (x: number, y: number, z: number, w: number, h: number) => string,
-  ) {}
-
-  private key(bx: number, by: number, z: number): string {
-    return `${bx},${by},${z}`;
-  }
-
-  /** Marks blocks holding changed chunks (keys from chunks.ts) stale. */
-  invalidate(chunkKeys: number[] | null): void {
-    if (chunkKeys === null) {
-      for (const k of this.tex.keys()) this.dirty.add(k);
-      return;
-    }
-    for (const k of chunkKeys) {
-      const cx = Math.floor(k / 32768);
-      const cy = Math.floor(k / 16) & 0x7ff;
-      const z = k & 15;
-      this.dirty.add(this.key(cx >> 3, cy >> 3, z));
-    }
-  }
-
-  get(bx: number, by: number, z: number): WebGLTexture | null {
-    const k = this.key(bx, by, z);
-    let e = this.tex.get(k);
-    if (!e || (this.dirty.has(k) && !e.loading)) {
-      this.dirty.delete(k);
-      const entry = e ?? { t: null, rev: 0, loading: false };
-      this.tex.set(k, entry);
-      entry.loading = true;
-      const img = new Image();
-      img.onload = () => {
-        const gl = this.gl;
-        if (!entry.t) entry.t = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, entry.t);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        entry.loading = false;
-        this.onload();
-      };
-      img.onerror = () => (entry.loading = false);
-      const B = MinimapLayer.BLOCK;
-      img.src = this.url(bx * B, by * B, z, B, B) + `&n=${Date.now()}`;
-      e = entry;
-    }
-    return e.t;
-  }
-
-  dispose(): void {
-    for (const e of this.tex.values()) if (e.t) this.gl.deleteTexture(e.t);
-    this.tex.clear();
-  }
-}
-
 export class MapRenderer {
   readonly gl: WebGL2RenderingContext;
   private prog: WebGLProgram;
-  private prog2: WebGLProgram;
+  private progChunk: WebGLProgram;
   private vao: WebGLVertexArrayObject;
-  private vao2: WebGLVertexArrayObject;
   private inst: WebGLBuffer;
   private quad: WebGLBuffer;
   private data = new Float32Array(FLOATS * 4096);
   private n = 0;
-  /** Scratch buffer chunk builds write into. */
-  private buildData = new Float32Array(FLOATS * 4096);
   atlas: Atlas | null = null;
   private u: Record<string, WebGLUniformLocation | null> = {};
-  private u2: Record<string, WebGLUniformLocation | null> = {};
+  private uc: Record<string, WebGLUniformLocation | null> = {};
   private missing = new Set<number>();
-  /** Sprite pieces that could not be placed in the atlas (counted to spot incomplete builds). */
-  private misses = 0;
   private composed = new Map<string, Uint8ClampedArray | null>();
-  private geos = new Map<ChunkData, ChunkGeo>();
-  private rec: Recorder | null = null;
+  private geos = new Map<number, ChunkGeo>();
+  /** Atlas cells of sprite ids, and of composed outfit pieces by their index in composedIds. */
+  private ind: CellIndex;
+  private indC: CellIndex;
+  private composedIds = new Map<string, number>();
+  private composedKeys: string[] = [];
   private frameNo = 0;
-  private deadline = 0;
-  private built = 0;
+  /** Chunk drawing state is bound (with this alpha); anything else drawn clears it. */
+  private chunkAlpha = -1;
+  private boundTex: WebGLTexture | null = null;
+  private uploaded = 0;
+  private uploadEnd = 0;
 
   constructor(readonly canvas: HTMLCanvasElement) {
     const gl = canvas.getContext("webgl2", { alpha: false, antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: true });
     if (!gl) throw new Error("WebGL 2 is not available");
     this.gl = gl;
     this.prog = compile(gl, VERT, FRAG);
-    this.prog2 = compile(gl, VERT2, FRAG2);
+    this.progChunk = compile(gl, VERT_CHUNK, FRAG);
+    for (const k of ["u_screen", "u_off", "u_S", "u_scale", "u_half", "u_alpha", "u_perRow", "u_perLayer", "u_uvCell", "u_tex", "u_ind", "u_indC"]) this.uc[k] = gl.getUniformLocation(this.progChunk, k);
+    this.ind = new CellIndex(gl, 2, 2048, 64);
+    this.indC = new CellIndex(gl, 3, 1024, 4);
     for (const k of ["u_screen", "u_off", "u_scale", "u_half", "u_alpha", "u_perRow", "u_uvCell", "u_tex"]) this.u[k] = gl.getUniformLocation(this.prog, k);
-    for (const k of ["u_screen", "u_rect", "u_tex"]) this.u2[k] = gl.getUniformLocation(this.prog2, k);
     const quad = gl.createBuffer()!;
     this.quad = quad;
     gl.bindBuffer(gl.ARRAY_BUFFER, quad);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]), gl.STATIC_DRAW);
     this.inst = gl.createBuffer()!;
     this.vao = this.instanceVao(this.inst);
-    this.vao2 = gl.createVertexArray()!;
-    gl.bindVertexArray(this.vao2);
-    gl.bindBuffer(gl.ARRAY_BUFFER, quad);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-    gl.bindVertexArray(null);
   }
 
-  /** A vertex array reading quads from an instance buffer. */
-  private instanceVao(buf: WebGLBuffer): WebGLVertexArrayObject {
+  /** A vertex array reading quads from an instance buffer (compact: the chunk format). */
+  private instanceVao(buf: WebGLBuffer, compact = false): WebGLVertexArrayObject {
     const gl = this.gl;
     const vao = gl.createVertexArray()!;
     gl.bindVertexArray(vao);
@@ -360,21 +404,27 @@ export class MapRenderer {
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    const stride = FLOATS * 4;
     gl.enableVertexAttribArray(1);
-    gl.vertexAttribPointer(1, 4, gl.FLOAT, false, stride, 0);
-    gl.vertexAttribDivisor(1, 1);
     gl.enableVertexAttribArray(2);
-    gl.vertexAttribPointer(2, 2, gl.FLOAT, false, stride, 16);
-    gl.vertexAttribDivisor(2, 1);
     gl.enableVertexAttribArray(3);
-    gl.vertexAttribPointer(3, 4, gl.FLOAT, false, stride, 24);
+    if (compact) {
+      gl.vertexAttribPointer(1, 2, gl.SHORT, false, QUAD_BYTES, 0);
+      gl.vertexAttribIPointer(2, 1, gl.UNSIGNED_INT, QUAD_BYTES, 4);
+      gl.vertexAttribPointer(3, 4, gl.UNSIGNED_BYTE, true, QUAD_BYTES, 8);
+    } else {
+      const stride = FLOATS * 4;
+      gl.vertexAttribPointer(1, 4, gl.FLOAT, false, stride, 0);
+      gl.vertexAttribPointer(2, 2, gl.FLOAT, false, stride, 16);
+      gl.vertexAttribPointer(3, 4, gl.FLOAT, false, stride, 24);
+    }
+    gl.vertexAttribDivisor(1, 1);
+    gl.vertexAttribDivisor(2, 1);
     gl.vertexAttribDivisor(3, 1);
     gl.bindVertexArray(null);
     return vao;
   }
 
-  /** Sprites changed in the client: drop them from the atlas (chunk buffers follow the atlas epoch). */
+  /** Sprites changed in the client: drop them from the atlas (the cell index follows). */
   invalidateSprites(ids: number[] | null): void {
     this.atlas?.invalidate(ids);
     this.composed.clear();
@@ -389,6 +439,8 @@ export class MapRenderer {
     for (const g of this.geos.values()) this.freeGeo(g);
     this.geos.clear();
     this.atlas?.dispose();
+    this.ind.dispose();
+    this.indC.dispose();
     const ext = this.gl.getExtension("WEBGL_lose_context");
     ext?.loseContext();
   }
@@ -412,7 +464,6 @@ export class MapRenderer {
     } else {
       d[o + 4] = Math.floor(cell / atlas.perLayer);
       d[o + 5] = cell % atlas.perLayer;
-      this.rec?.cells.add(cell);
     }
     d[o + 6] = r;
     d[o + 7] = g;
@@ -432,12 +483,22 @@ export class MapRenderer {
     if (!this.atlas || this.atlas.cell !== sc.S) {
       this.atlas?.dispose();
       this.atlas = new Atlas(gl, sc.S);
+      this.ind.clear();
+      this.indC.clear();
+      this.atlas.onRelease = (key) => {
+        if (typeof key === "number") this.ind.set(key, MISSING);
+        else {
+          const i = this.composedIds.get(key);
+          if (i !== undefined) this.indC.set(i, MISSING);
+        }
+      };
     }
     const atlas = this.atlas;
     atlas.begin();
     this.frameNo++;
-    this.deadline = performance.now() + BUILD_MS;
-    this.built = 0;
+    this.chunkAlpha = -1;
+    this.uploaded = 0;
+    this.uploadEnd = performance.now() + UPLOAD_MS;
     this.n = 0;
     this.missing.clear();
     gl.viewport(0, 0, sc.width, sc.height);
@@ -460,54 +521,112 @@ export class MapRenderer {
     if (floor <= 7) for (let z = sc.opts.lowerFloors ? 7 : floor; z >= floor; z--) zs.push(z);
     else for (let z = sc.opts.lowerFloors ? Math.min(15, floor + 2) : floor; z >= floor; z--) zs.push(z);
     const visibleTiles = ((sc.width / T + 6) * (sc.height / T + 6)) | 0;
-    if (zs.length * visibleTiles > 160_000) zs = [floor, ...zs.filter((z) => z !== floor)].slice(0, Math.max(1, Math.floor(160_000 / visibleTiles))).sort((a, b) => b - a);
-    const far = sc.opts.asMinimap || T < 4 || visibleTiles > 260_000;
+    if (zs.length * visibleTiles > MAX_FLOOR_TILES) zs = [floor, ...zs.filter((z) => z !== floor)].slice(0, Math.max(1, Math.floor(MAX_FLOOR_TILES / visibleTiles))).sort((a, b) => b - a);
+    const far = T < MapRenderer.NEAR_T || visibleTiles > MAX_VISIBLE_TILES;
     result.far = far;
 
-    // Everything chunk quads depend on besides the chunk itself.
-    const sigBase = `${JSON.stringify(sc.opts)}|${sc.house}`;
+    // What chunk quads are built for besides the chunk itself.
+    // Far out, movable items and creatures are too small to see and
+    // animation (all the water) would patch thousands of chunks per frame.
+    // Far out, chunks also come in blocks of BLOCK x BLOCK: fewer draws.
+    const farDetail = T < MapRenderer.DETAIL_T;
+    const block = farDetail ? BLOCK : 1;
+    let bits = geoBits(sc.opts);
+    if (farDetail) bits = (bits & ~(GEO.animation | GEO.creatures | GEO.ghostItems)) | GEO.far;
+    const sigBase = `${bits}|${sc.opts.houses ? sc.house : 0}|`;
+    const sig = `${sigBase}${block}`;
 
-    if (far && sc.minimap) {
-      this.drawMinimap(sc, tileX, tileY, T);
+    if (far) {
       // Overlays only.
       this.overlays(sc, result, tileX, tileY, T);
       this.flushScreen(sc);
-      if (!sc.opts.asMinimap) this.prefetch(sc, sigBase, result);
       return result;
     }
 
     const { drawItem, drawCreature } = this.drawers(sc, scale, T, result);
-    // Chunks of the current floor still loading or not built yet.
+    // Chunks of the current floor still loading or not uploaded yet.
     let notReady = 0;
-    const chunksOf = (z: number): ChunkData[] => {
+    // Blocks loaded before, drawn under chunks still loading (right after zooming in).
+    const under = new Map<number, GeoChunk[]>();
+    const chunksOf = (z: number, request = true): GeoChunk[] => {
       const a = adj(z);
       const tx0 = Math.floor((sc.camX - halfW / scale) / S + a) - 1;
       const ty0 = Math.floor((sc.camY - halfH / scale) / S + a) - 1;
       // Sprites reach up and left of their tile: take the chunks right and below too.
       const tx1 = Math.ceil((sc.camX + halfW / scale) / S + a) + 3;
       const ty1 = Math.ceil((sc.camY + halfH / scale) / S + a) + 3;
-      const out: ChunkData[] = [];
+      const out: GeoChunk[] = [];
       if (tx1 < 0 || ty1 < 0) return out;
+      if (!request) {
+        // Floors next to the view, loaded while idle so changing floors finds them.
+        for (let cy = Math.max(0, ty0) >> 5; cy <= ty1 >> 5; cy += block) {
+          for (let cx = Math.max(0, tx0) >> 5; cx <= tx1 >> 5; cx += block) {
+            const k = chunkKey(cx - (cx % block), cy - (cy % block), z) + (block > 1 ? GEO_BLOCK : 0);
+            const c = sc.geo.get(k, sig);
+            if (c) out.push(c);
+          }
+        }
+        return out;
+      }
+      const align = (c: number) => c - (c % block);
       // Row by row: a sprite only overlaps tiles up and left of it, which
       // this order has already drawn, as a tile by tile walk would.
-      for (let cy = Math.max(0, ty0) >> 5; cy <= ty1 >> 5; cy++) {
-        for (let cx = Math.max(0, tx0) >> 5; cx <= tx1 >> 5; cx++) {
-          const c = sc.chunks.get(chunkKey(cx, cy, z));
+      for (let cy = align(Math.max(0, ty0) >> 5); cy <= ty1 >> 5; cy += block) {
+        for (let cx = align(Math.max(0, tx0) >> 5); cx <= tx1 >> 5; cx += block) {
+          const k = chunkKey(cx, cy, z);
+          if (block === 1) {
+            // Tiles of the floor in view feed the overlays and previews.
+            if (z === floor && (T >= MapRenderer.TILES_T || sc.moveOffset)) sc.chunks.get(k);
+            const c = sc.geo.get(k, sig);
+            if (c) out.push(c);
+            else if (c === undefined) {
+              const bk = chunkKey(cx - (cx % BLOCK), cy - (cy % BLOCK), z) + GEO_BLOCK;
+              const b = sc.geo.peek(bk);
+              if (b) {
+                let list = under.get(z);
+                if (!list) under.set(z, (list = []));
+                if (!list.includes(b)) list.push(b);
+              }
+              if (z === floor) notReady++;
+            }
+            continue;
+          }
+          const c = sc.geo.get(k + GEO_BLOCK, sig);
           if (c) out.push(c);
-          else if (c === undefined && z === floor) notReady++;
+          else if (c === undefined) {
+            // Until the block arrives, its chunks loaded before show.
+            for (let y = cy; y < cy + block; y++) {
+              for (let x = cx; x < cx + block; x++) {
+                const p = sc.geo.peek(chunkKey(x, y, z));
+                if (p) out.push(p);
+              }
+            }
+            if (z === floor) notReady++;
+          }
         }
       }
       return out;
     };
-    const lists = new Map<number, ChunkData[]>();
-    for (const z of zs) lists.set(z, chunksOf(z));
+    // The floor in view requests first.
+    const lists = new Map<number, GeoChunk[]>();
+    lists.set(floor, chunksOf(floor));
+    for (const z of zs) if (z !== floor) lists.set(z, chunksOf(z));
     const ghostZ = sc.opts.ghostHigher && floor > 0 && floor !== 8 ? floor - 1 : -1;
     if (ghostZ >= 0) lists.set(ghostZ, chunksOf(ghostZ));
-    // The current floor gets the build time first.
-    for (const c of lists.get(floor) ?? []) if (!this.geoOf(sc, c, floor, true, sigBase, result)) notReady++;
-    // Right after zooming in, parts of the view are not ready: the minimap
-    // shows under them instead of black.
-    if (notReady && sc.minimap) this.drawMinimap(sc, tileX, tileY, T);
+    // The current floor uploads first.
+    for (const c of lists.get(floor) ?? []) if (!this.geoOf(c)) notReady++;
+    // What is in view has upload time first; the floors above and below take what is left.
+    for (const z of zs) for (const c of lists.get(z)!) this.geoOf(c);
+    // Only while nothing else loads: those requests would hold up what comes into view.
+    if (!notReady && sc.geo.idle()) {
+      for (const z of [floor - 1, floor + 1]) {
+        if (z < 0 || z > 15 || lists.has(z)) continue;
+        for (const c of chunksOf(z, false)) {
+          const g = this.geoOf(c, true);
+          if (g) g.used = this.frameNo;
+        }
+      }
+    }
 
     // Draw floors from the bottom up.
     for (const z of zs) {
@@ -516,7 +635,8 @@ export class MapRenderer {
         this.rect(0, 0, sc.width, sc.height, [0, 0, 0, 0.45]);
         this.flushScreen(sc);
       }
-      for (const c of lists.get(z)!) this.drawGeo(sc, c, z, isCur, 1, sigBase, adj(z), result);
+      for (const c of under.get(z) ?? []) this.drawGeo(sc, c, 1, adj(z), result);
+      for (const c of lists.get(z)!) this.drawGeo(sc, c, 1, adj(z), result);
       if (isCur && sc.moveOffset) {
         const a = adj(z);
         const tx0 = Math.floor((sc.camX - halfW / scale) / S + a) - 1;
@@ -528,7 +648,7 @@ export class MapRenderer {
       }
     }
     // Ghost of the floor above.
-    if (ghostZ >= 0) for (const c of lists.get(ghostZ)!) this.drawGeo(sc, c, ghostZ, false, 0.3, sigBase, adj(ghostZ), result);
+    if (ghostZ >= 0) for (const c of lists.get(ghostZ)!) this.drawGeo(sc, c, 0.3, adj(ghostZ), result);
     // Brush preview and paste ghost.
     for (const g of sc.ghosts) {
       if (g.z !== floor) continue;
@@ -549,182 +669,164 @@ export class MapRenderer {
       void sc.sprites.load([...this.missing]);
     }
     if (atlas.pending) result.pending = true;
+    if (notReady) result.pending = true;
     this.flushScreen(sc);
-    this.sweep();
+    this.sweep(sc);
     return result;
   }
 
-  /** Smallest tile size in device pixels that still draws sprites (below it the minimap shows). */
-  static readonly NEAR_T = 4;
+  /** Smallest tile size in device pixels that still draws sprites. */
+  static readonly NEAR_T = 1;
+  /** Smallest tile size in device pixels that draws every item, creatures and animation. */
+  static readonly DETAIL_T = 4;
+  /** Smallest tile size in device pixels that loads tile data for overlays. */
+  static readonly TILES_T = 8;
 
-  /**
-   * While the minimap shows (zoomed far out), loads and builds the chunks of
-   * the current floor that zooming in to the nearest sprite zoom would show,
-   * from the center out, so the first close frame is not black.
-   */
-  private prefetch(sc: Scene, sigBase: string, result: FrameResult): void {
-    const { S, floor } = sc;
-    const T = MapRenderer.NEAR_T;
-    const a = floor <= 7 ? 7 - floor : 0;
-    const cx = sc.camX / S + a;
-    const cy = sc.camY / S + a;
-    const rx = sc.width / 2 / T + 4;
-    const ry = sc.height / 2 / T + 4;
-    const x0 = Math.max(0, Math.floor(cx - rx)) >> 5;
-    const x1 = Math.max(0, Math.ceil(cx + rx)) >> 5;
-    const y0 = Math.max(0, Math.floor(cy - ry)) >> 5;
-    const y1 = Math.max(0, Math.ceil(cy + ry)) >> 5;
-    const ccx = cx / CHUNK;
-    const ccy = cy / CHUNK;
-    const keys: [number, number, number][] = [];
-    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) keys.push([x, y, (x + 0.5 - ccx) ** 2 + (y + 0.5 - ccy) ** 2]);
-    keys.sort((p, q) => p[2] - q[2]);
-    // Building only uses the frame's leftover time; no time drawn for it is wasted.
-    const scratch: FrameResult = { animated: false, pending: false, labels: [], far: true, more: false };
-    for (const [x, y] of keys) {
-      const c = sc.chunks.get(chunkKey(x, y, floor));
-      if (!c) continue;
-      const g = this.geos.get(c);
-      if (g) g.used = this.frameNo;
-      if (performance.now() >= this.deadline) {
-        scratch.more = true;
-        break;
-      }
-      this.geoOf(sc, c, floor, true, sigBase, scratch);
-      if (g) this.atlas!.touch(g.cells);
+  /** The chunk's GPU buffer, uploaded when the store has a new version and the frame has upload budget left. */
+  private geoOf(chunk: GeoChunk, spare = false): ChunkGeo | null {
+    let g = this.geos.get(chunk.key) ?? null;
+    if (g && g.src === chunk) return g;
+    // Something always uploads, unless only spare time is asked for.
+    if ((this.uploaded > 0 || spare) && (this.uploaded + chunk.quads.byteLength > UPLOAD_BYTES || performance.now() > this.uploadEnd)) return g;
+    this.uploaded += chunk.quads.byteLength;
+    const gl = this.gl;
+    if (!g) {
+      const buf = gl.createBuffer()!;
+      g = { vao: this.instanceVao(buf, true), buf, src: chunk, cells: new Int32Array(0), atlas: null, epoch: 0, ready: false, used: 0, data: null };
+      this.geos.set(chunk.key, g);
     }
-    // Keep going on the next frames until the area is ready; not when only
-    // sprites are loading (they come back through their own redraw).
-    if (scratch.more) result.more = true;
-    else if (scratch.pending) result.pending = true;
-    if (this.missing.size) void sc.sprites.load([...this.missing]);
-  }
-
-  /** The chunk's quads, built (again) when stale and the frame has build time left. */
-  private geoOf(sc: Scene, chunk: ChunkData, z: number, isCur: boolean, sigBase: string, result: FrameResult): ChunkGeo | null {
-    const atlas = this.atlas!;
-    const sig = `${sigBase}|${isCur ? 1 : 0}`;
-    let g = this.geos.get(chunk) ?? null;
-    const usable = !!g && g.atlas === atlas && g.epoch === atlas.epoch;
-    const fresh = usable && g!.sig === sig && g!.items === sc.items && g!.looksRev === sc.looks.rev && !g!.incomplete;
-    if (!fresh) {
-      if (this.built === 0 || performance.now() < this.deadline) {
-        g = this.build(sc, chunk, z, isCur, sig, g);
-        this.built++;
-      } else {
-        // Out of time: draw what there is (cells are still right) and finish next frame.
-        result.more = true;
-        if (!usable) return null;
+    // Composed outfit pieces point at their entry in the composed index.
+    const q = chunk.quads;
+    if (chunk.comp.length) {
+      const v = new DataView(q.buffer, q.byteOffset, q.byteLength);
+      const c = chunk.comp;
+      for (let i = 0; i < c.length; i += 4) {
+        const key = composedKey(c[i + 1], c[i + 2], c[i + 3]);
+        let id = this.composedIds.get(key);
+        if (id === undefined) {
+          id = this.composedKeys.length;
+          this.composedIds.set(key, id);
+          this.composedKeys.push(key);
+        }
+        v.setUint32(c[i] * QUAD_BYTES + 4, (GEO_COMPOSED | id) >>> 0, true);
       }
     }
-    if (g!.incomplete) result.pending = true;
+    gl.bindBuffer(gl.ARRAY_BUFFER, g.buf);
+    gl.bufferData(gl.ARRAY_BUFFER, q, chunk.anim.length ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW);
+    g.src = chunk;
+    g.atlas = null;
+    g.data = chunk.anim.length ? q : null;
+    // Only animated chunks patch their quads: the others need no CPU copy.
+    if (!chunk.anim.length) chunk.quads = NO_QUADS;
     return g;
   }
 
-  private drawGeo(sc: Scene, chunk: ChunkData, z: number, isCur: boolean, alpha: number, sigBase: string, a: number, result: FrameResult): void {
-    const g = this.geoOf(sc, chunk, z, isCur, sigBase, result);
-    if (!g || !g.n) return;
+  /** Puts every sprite of a chunk in the atlas and the cell index. */
+  private ensure(sc: Scene, g: ChunkGeo, result: FrameResult): void {
     const atlas = this.atlas!;
-    g.used = this.frameNo;
+    if (g.atlas === atlas && g.epoch === atlas.epoch && g.ready) {
+      atlas.touch(g.cells);
+      return;
+    }
+    const cells: number[] = [];
+    let ready = true;
+    for (const sid of g.src.sprites) {
+      const c = this.cellOfSprite(sc, sid);
+      if (c < 0) ready = false;
+      else cells.push(c);
+    }
+    const comp = g.src.comp;
+    for (let i = 0; i < comp.length; i += 4) {
+      const key = composedKey(comp[i + 1], comp[i + 2], comp[i + 3]);
+      const id = this.composedIds.get(key)!;
+      let c = this.indC.get(id);
+      if (c === MISSING) {
+        const sid = comp[i + 1];
+        const tpl = comp[i + 2];
+        const k = comp[i + 3];
+        const colors = { head: k & 255, body: (k >> 8) & 255, legs: (k >> 16) & 255, feet: k >>> 24 };
+        c = atlas.cellOf(key, () => this.compose(sc.sprites, sid, tpl, colors));
+        if (c < 0) {
+          ready = false;
+          if (!sc.sprites.get(sid)) this.missing.add(sid);
+          if (tpl && !sc.sprites.get(tpl)) this.missing.add(tpl);
+          continue;
+        }
+        this.indC.set(id, c);
+      }
+      cells.push(c);
+    }
+    g.cells = Int32Array.from(cells);
     atlas.touch(g.cells);
-    if (g.animI.length && sc.opts.animation) {
+    g.atlas = atlas;
+    g.epoch = atlas.epoch;
+    g.ready = ready;
+    if (!ready) result.pending = true;
+  }
+
+  /** The atlas cell of a sprite, uploading it when needed (-1: not loaded yet). */
+  private cellOfSprite(sc: Scene, sid: number): number {
+    const c = this.ind.get(sid);
+    if (c !== MISSING) return c;
+    const cell = this.atlas!.cellOf(sid, () => sc.sprites.get(sid)?.pixels);
+    if (cell < 0) {
+      if (!sc.sprites.get(sid)) this.missing.add(sid);
+      return -1;
+    }
+    this.ind.set(sid, cell);
+    return cell;
+  }
+
+  private drawGeo(sc: Scene, chunk: GeoChunk, alpha: number, a: number, result: FrameResult): void {
+    const g = this.geoOf(chunk);
+    if (!g) {
+      result.more = true;
+      return;
+    }
+    if (g.src !== chunk) result.more = true;
+    g.used = this.frameNo;
+    this.ensure(sc, g, result);
+    if (g.data && sc.opts.animation) {
       result.animated = true;
-      this.animate(sc, g);
+      this.animate(sc, g, result);
     }
     const gl = this.gl;
-    const [cx, cy] = splitKey(chunk.key);
-    this.useSprites(sc);
-    gl.uniform2f(this.u.u_off, (cx * CHUNK - a) * sc.S - sc.camX, (cy * CHUNK - a) * sc.S - sc.camY);
-    gl.uniform1f(this.u.u_scale, sc.scale);
-    gl.uniform2f(this.u.u_half, sc.width / 2, sc.height / 2);
-    gl.uniform1f(this.u.u_alpha, alpha);
+    const [cx, cy] = splitKey(g.src.key % GEO_BLOCK);
+    this.bindChunks(sc, alpha);
+    gl.uniform2f(this.uc.u_off, (cx * CHUNK - a) * sc.S - sc.camX, (cy * CHUNK - a) * sc.S - sc.camY);
     gl.bindVertexArray(g.vao);
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, g.n);
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, g.src.n);
     gl.bindVertexArray(null);
   }
 
-  /** Builds the quads of one chunk in world pixels relative to its corner. */
-  private build(sc: Scene, chunk: ChunkData, z: number, isCur: boolean, sig: string, old: ChunkGeo | null): ChunkGeo {
-    const gl = this.gl;
-    const atlas = this.atlas!;
-    const S = sc.S;
-    const [cx, cy] = splitKey(chunk.key);
-    const ox = cx * CHUNK;
-    const oy = cy * CHUNK;
-    const savedData = this.data;
-    const savedN = this.n;
-    this.data = this.buildData;
-    this.n = 0;
-    const misses = this.misses;
-    const rec: Recorder = { cells: new Set(), animI: [], animBase: [], animLook: [] };
-    this.rec = rec;
-    const st = { pending: false, animated: false };
-    const { drawItem, drawCreature } = this.drawers(sc, 1, S, st);
-    try {
-      this.drawChunk(sc, chunk, z, isCur, (x) => (x - ox) * S, (y) => (y - oy) * S, S, 1, drawItem, drawCreature);
-    } finally {
-      this.rec = null;
-    }
-    const n = this.n;
-    const quads = this.data.subarray(0, n * FLOATS);
-    this.buildData = this.data;
-    this.data = savedData;
-    this.n = savedN;
-
-    const g: ChunkGeo = old ?? (() => {
-      const buf = gl.createBuffer()!;
-      return { vao: this.instanceVao(buf), buf, n: 0, sig: "", atlas, epoch: 0, items: sc.items, looksRev: 0, incomplete: false, cells: new Int32Array(0), used: 0, data: null, animI: [], animBase: [], animLook: [] };
-    })();
-    const animated = rec.animI.length > 0;
-    gl.bindBuffer(gl.ARRAY_BUFFER, g.buf);
-    gl.bufferData(gl.ARRAY_BUFFER, quads, animated ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW);
-    g.n = n;
-    g.sig = sig;
-    g.atlas = atlas;
-    g.epoch = atlas.epoch;
-    g.items = sc.items;
-    g.looksRev = sc.looks.rev;
-    g.incomplete = st.pending || this.misses !== misses;
-    g.cells = Int32Array.from(rec.cells);
-    g.used = this.frameNo;
-    g.data = animated ? quads.slice() : null;
-    g.animI = rec.animI;
-    g.animBase = rec.animBase;
-    g.animLook = rec.animLook;
-    this.geos.set(chunk, g);
-    return g;
-  }
-
-  /** Points animated pieces of a chunk at their current frame. */
-  private animate(sc: Scene, g: ChunkGeo): void {
-    const atlas = this.atlas!;
+  /** Points animated pieces of a chunk at the sprites of their current frame. */
+  private animate(sc: Scene, g: ChunkGeo, result: FrameResult): void {
     const d = g.data!;
-    const per = atlas.perLayer;
+    const v = new DataView(d.buffer, d.byteOffset, d.byteLength);
+    const anim = g.src.anim;
     let dirty = false;
-    let last: Look | null = null;
+    let lastId = -1;
+    let look: Look | null | undefined = null;
     let frameOff = 0;
-    for (let k = 0; k < g.animI.length; k++) {
-      const look = g.animLook[k];
-      if (look !== last) {
-        last = look;
-        frameOff = frameAt(look, sc.time) * look.pz * look.py * look.px * look.l * look.h * look.w;
+    for (let k = 0; k < anim.length; k += 3) {
+      if (anim[k + 1] !== lastId) {
+        lastId = anim[k + 1];
+        look = sc.looks.items.get(lastId);
+        if (look === undefined) result.pending = true;
+        if (look) frameOff = frameAt(look, sc.time) * look.pz * look.py * look.px * look.l * look.h * look.w;
       }
-      const sid = look.s[g.animBase[k] + frameOff];
-      let layer = -1;
-      let col = -1;
+      if (!look) continue;
+      const sid = look.s[anim[k + 2] + frameOff] ?? 0;
+      let val = GEO_HIDDEN;
       if (sid) {
-        const cell = atlas.cellOf(sid, () => sc.sprites.get(sid)?.pixels);
-        if (cell < 0) {
-          if (!sc.sprites.get(sid)) this.missing.add(sid);
-          continue;
-        }
-        layer = Math.floor(cell / per);
-        col = cell % per;
+        const c = this.cellOfSprite(sc, sid);
+        if (c < 0) continue;
+        this.atlas!.use(c);
+        val = sid;
       }
-      const o = g.animI[k] * FLOATS;
-      if (d[o + 4] !== layer || d[o + 5] !== col) {
-        d[o + 4] = layer;
-        d[o + 5] = col;
+      const o = anim[k] * QUAD_BYTES + 4;
+      if (v.getUint32(o, true) !== val) {
+        v.setUint32(o, val, true);
         dirty = true;
       }
     }
@@ -735,14 +837,15 @@ export class MapRenderer {
     }
   }
 
-  /** Frees chunk buffers not drawn for a while once there are many. */
-  private sweep(): void {
+  /** Frees chunk buffers not drawn for a while once there are many (the store fetches them again). */
+  private sweep(sc: Scene): void {
     if (this.geos.size <= MAX_GEOS) return;
     const old = this.frameNo - 60;
-    for (const [c, g] of this.geos) {
+    for (const [k, g] of this.geos) {
       if (g.used < old) {
         this.freeGeo(g);
-        this.geos.delete(c);
+        this.geos.delete(k);
+        sc.geo.drop(k);
       }
     }
   }
@@ -798,7 +901,7 @@ export class MapRenderer {
         st.animated = sc.opts.animation || st.animated;
         frame = frameAt(look, time);
       }
-      this.drawLook(sc, look, px, py, pz, frame, ax - look.ox * scale, ay - look.oy * scale, T, cr, cg, cb, ca, null, sc.opts.animation);
+      this.drawLook(sc, look, px, py, pz, frame, ax - look.ox * scale, ay - look.oy * scale, T, cr, cg, cb, ca, null);
       return look.el;
     };
 
@@ -841,124 +944,6 @@ export class MapRenderer {
       }
     };
     return { drawItem, drawCreature };
-  }
-
-  /** Draws the tiles of one chunk in tile order. */
-  private drawChunk(
-    sc: Scene,
-    chunk: ChunkData,
-    z: number,
-    isCur: boolean,
-    tileX: (x: number) => number,
-    tileY: (y: number) => number,
-    T: number,
-    scale: number,
-    drawItem: DrawItem,
-    drawCreature: DrawCreature,
-  ): void {
-    const { opts, items } = sc;
-    const tops = items.top;
-    const hookSouthBit = items.bits.hookSouth ?? 0;
-    const hookEastBit = items.bits.hookEast ?? 0;
-    const pickBit = items.bits.pickupable ?? 0;
-    const [cx, cy] = splitKey(chunk.key);
-    for (let idx = 0; idx < CHUNK * CHUNK; idx++) {
-      const t = chunk.tiles[idx];
-      if (!t) continue;
-      if (opts.onlyModified && !(t.flags & TF.modified)) continue;
-      const tx = cx * CHUNK + (idx & 31);
-      const ty = cy * CHUNK + (idx >> 5);
-      const ax0 = tileX(tx);
-      const ay0 = tileY(ty);
-      let r = 1;
-      let g = 1;
-      let b = 1;
-      const f = t.flags;
-      if (opts.pathing && f & TF.blocking && t.ids.length) {
-        g *= 2 / 3;
-        b *= 2 / 3;
-      }
-      if (opts.houses && f & TF.house) {
-        if (t.house === sc.house) r *= 0.5;
-        else {
-          r *= 0.5;
-          g *= 0.5;
-        }
-      } else if (opts.special && f & TF.pz) {
-        r *= 0.5;
-        b *= 0.5;
-      }
-      if (opts.special && f & TF.pvpZone) {
-        g = r / 4;
-        b = (b * 2) / 3;
-      }
-      if (opts.special && f & TF.noLogout) b /= 2;
-      if (opts.special && f & TF.noPvp) g /= 2;
-      if (opts.zones && f & TF.zones) {
-        r *= 0.85;
-        g *= 0.7;
-      }
-      if (opts.spawns && f & (TF.spawn | TF.spawnNpc)) {
-        g *= 0.7;
-        b *= 0.7;
-      }
-      if (opts.highlightItems) {
-        const n = t.ids.length - (f & TF.ground ? 1 : 0);
-        if (n > 0) {
-          const factor = [0.75, 0.6, 0.48, 0.4, 0.33][Math.min(n, 5) - 1];
-          r *= factor;
-          g *= factor;
-        }
-      }
-      let hook = 0;
-      for (let i = 0; i < t.ids.length; i++) {
-        const fl = items.flags[t.ids[i]] ?? 0;
-        if (fl & hookSouthBit) hook = 1;
-        else if (fl & hookEastBit) hook = 2;
-      }
-      const ids = t.ids;
-      const n = ids.length;
-      let elev = 0;
-      let i = 0;
-      const sel = (k: number) => (t.iflags[k] & IF.selected ? 0.5 : 1);
-      if (f & TF.ground && n) {
-        const d = sel(0);
-        elev += drawItem(ids[0], t.subs[0], tx, ty, z, ax0, ay0, r * d, g * d, b * d, 1, hook);
-        i = 1;
-      }
-      // As the client stacks them, whatever the order in the file: borders
-      // (1), bottom items (2), common items, creatures, top items (3).
-      const tops3: number[] = [];
-      for (const pass of [1, 2, 0]) {
-        for (let k = i; k < n; k++) {
-          const o = tops[ids[k]];
-          if (o === 3) {
-            if (pass === 0) tops3.push(k);
-            continue;
-          }
-          if (o !== pass) continue;
-          const d = sel(k);
-          let a = 1;
-          if (opts.ghostItems && o === 0 && items.flags[ids[k]] & pickBit) a *= 0.5;
-          const tint = o === 1 || o === 2;
-          elev += drawItem(ids[k], t.subs[k], tx, ty, z, ax0 - elev * scale, ay0 - elev * scale, (tint ? r : 1) * d, (tint ? g : 1) * d, (tint ? b : 1) * d, a, hook);
-          elev = Math.min(elev, 24);
-        }
-      }
-      if (opts.creatures && t.creatures) {
-        for (const c of t.creatures) drawCreature(c, ax0 - elev * scale, ay0 - elev * scale, tx, ty, z, 1);
-      }
-      for (const k of tops3) {
-        const d = sel(k);
-        drawItem(ids[k], t.subs[k], tx, ty, z, ax0 - elev * scale, ay0 - elev * scale, d, d, d, 1, hook);
-      }
-      if (!n && (opts.special || opts.houses) && f & (TF.pz | TF.house)) {
-        this.rect(ax0, ay0, T, T, [r, g, b, 0.3]);
-      }
-      if (isCur && f & TF.selected && !n && t.creatures === null && (t.spawn || t.spawnNpc)) {
-        this.rect(ax0, ay0, T, T, [0.4, 0.6, 1, 0.3]);
-      }
-    }
   }
 
   /** Draws the selected things of the current floor at the drag offset. */
@@ -1010,37 +995,24 @@ export class MapRenderer {
     b: number,
     a: number,
     colors: CreatureData | null = null,
-    animate = false,
   ): void {
     const atlas = this.atlas!;
     const sprites = sc.sprites;
     const layers = colors ? 1 : look.l;
-    // In a chunk build, animated pieces are recorded so later frames can patch them.
-    const rec = animate && !colors && look.f > 1 ? this.rec : null;
     const fr = frame % Math.max(look.f, 1);
-    const frameSize = look.pz * look.py * look.px * look.l * look.h * look.w;
     for (let l = 0; l < layers; l++) {
       for (let cy = 0; cy < look.h; cy++) {
         for (let cx = 0; cx < look.w; cx++) {
           const idx = (((((fr * look.pz + pz) * look.py + py) * look.px + px) * look.l + l) * look.h + cy) * look.w + cx;
           const sid = look.s[idx];
-          if (rec) {
-            rec.animI.push(this.n);
-            rec.animBase.push(idx - fr * frameSize);
-            rec.animLook.push(look);
-          }
-          if (!sid) {
-            if (rec) this.push(ax - cx * T, ay - cy * T, T, T, -1, r, g, b, a);
-            continue;
-          }
+          if (!sid) continue;
           let cell: number;
           if (colors) {
             const tidx = idx + look.h * look.w; // layer 1 of the same texture
             const tpl = look.s[tidx] ?? 0;
-            const key = `o:${sid}:${tpl}:${colors.head}.${colors.body}.${colors.legs}.${colors.feet}`;
+            const key = composedKey(sid, tpl, colors.head | (colors.body << 8) | (colors.legs << 16) | (colors.feet << 24));
             cell = atlas.cellOf(key, () => this.compose(sc.sprites, sid, tpl, colors));
             if (cell < 0) {
-              this.misses++;
               if (!sprites.get(sid)) this.missing.add(sid);
               if (tpl && !sprites.get(tpl)) this.missing.add(tpl);
               continue;
@@ -1048,9 +1020,7 @@ export class MapRenderer {
           } else {
             cell = atlas.cellOf(sid, () => sprites.get(sid)?.pixels);
             if (cell < 0) {
-              this.misses++;
               if (!sprites.get(sid)) this.missing.add(sid);
-              if (rec) this.push(ax - cx * T, ay - cy * T, T, T, -1, r, g, b, a);
               continue;
             }
           }
@@ -1060,7 +1030,7 @@ export class MapRenderer {
     }
   }
 
-  private compose(sprites: SpriteCache, sid: number, tpl: number, c: CreatureData): Uint8ClampedArray | undefined {
+  private compose(sprites: SpriteCache, sid: number, tpl: number, c: Pick<CreatureData, "head" | "body" | "legs" | "feet">): Uint8ClampedArray | undefined {
     const base = sprites.get(sid)?.pixels;
     if (!base) return undefined;
     if (!tpl) return base;
@@ -1069,34 +1039,6 @@ export class MapRenderer {
     const out = new Uint8ClampedArray(base);
     colorize(out, t, { head: c.head, body: c.body, legs: c.legs, feet: c.feet });
     return out;
-  }
-
-  private drawMinimap(sc: Scene, tileX: (x: number, z: number) => number, tileY: (y: number, z: number) => number, T: number): void {
-    // Drawn immediately with the second program; sprite instances follow.
-    const gl = this.gl;
-    const mm = sc.minimap!;
-    const B = MinimapLayer.BLOCK;
-    const z = sc.floor;
-    const a = sc.floor <= 7 ? 7 - z : 0;
-    const x0 = Math.floor(((sc.camX - sc.width / 2 / sc.scale) / sc.S + a) / B);
-    const y0 = Math.floor(((sc.camY - sc.height / 2 / sc.scale) / sc.S + a) / B);
-    const x1 = Math.floor(((sc.camX + sc.width / 2 / sc.scale) / sc.S + a) / B);
-    const y1 = Math.floor(((sc.camY + sc.height / 2 / sc.scale) / sc.S + a) / B);
-    gl.useProgram(this.prog2);
-    gl.bindVertexArray(this.vao2);
-    gl.uniform2f(this.u2.u_screen, sc.width, sc.height);
-    gl.activeTexture(gl.TEXTURE1);
-    gl.uniform1i(this.u2.u_tex, 1);
-    for (let by = Math.max(0, y0); by <= y1; by++) {
-      for (let bx = Math.max(0, x0); bx <= x1; bx++) {
-        const tex = mm.get(bx, by, z);
-        if (!tex) continue;
-        gl.bindTexture(gl.TEXTURE_2D, tex);
-        gl.uniform4f(this.u2.u_rect, tileX(bx * B, z), tileY(by * B, z), B * T, B * T);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      }
-    }
-    gl.activeTexture(gl.TEXTURE0);
   }
 
   private overlays(sc: Scene, result: FrameResult, tileX: (x: number, z: number) => number, tileY: (y: number, z: number) => number, T: number): void {
@@ -1121,7 +1063,7 @@ export class MapRenderer {
       for (let y = ty0; y <= ty1; y++) this.rect(0, tileY(y, z), sc.width, 1, c);
     }
     // Spawn radius outlines of the current floor.
-    if (sc.opts.spawns && !result.far) {
+    if (sc.opts.spawns && T >= MapRenderer.TILES_T) {
       const halfW = sc.width / 2 / sc.scale / sc.S;
       const halfH = sc.height / 2 / sc.scale / sc.S;
       const a = sc.floor <= 7 ? 7 - z : 0;
@@ -1233,9 +1175,39 @@ export class MapRenderer {
     }
   }
 
+  /** Binds the chunk program, unless it still is. */
+  private bindChunks(sc: Scene, alpha: number): void {
+    const gl = this.gl;
+    // Uploads to the atlas or the cell index may have happened since.
+    if (this.chunkAlpha < 0 || this.boundTex !== this.atlas!.tex) {
+      const atlas = this.atlas!;
+      gl.useProgram(this.progChunk);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, atlas.tex);
+      this.boundTex = atlas.tex;
+      gl.uniform1i(this.uc.u_tex, 0);
+      gl.uniform1i(this.uc.u_ind, this.ind.unit);
+      gl.uniform1i(this.uc.u_indC, this.indC.unit);
+      gl.uniform2f(this.uc.u_screen, sc.width, sc.height);
+      gl.uniform1ui(this.uc.u_perRow, atlas.perRow);
+      gl.uniform1ui(this.uc.u_perLayer, atlas.perLayer);
+      gl.uniform1f(this.uc.u_uvCell, atlas.uvCell);
+      gl.uniform1f(this.uc.u_scale, sc.scale);
+      gl.uniform1f(this.uc.u_S, sc.S);
+      gl.uniform2f(this.uc.u_half, sc.width / 2, sc.height / 2);
+      this.chunkAlpha = -1;
+    }
+    this.ind.bind();
+    this.indC.bind();
+    if (this.chunkAlpha !== alpha) gl.uniform1f(this.uc.u_alpha, alpha);
+    this.chunkAlpha = alpha;
+  }
+
   /** Binds the sprite program and atlas (the atlas texture can change while building). */
   private useSprites(sc: Scene): void {
     const gl = this.gl;
+    this.chunkAlpha = -1;
+    this.boundTex = this.atlas!.tex;
     gl.useProgram(this.prog);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.atlas!.tex);
@@ -1265,3 +1237,8 @@ export class MapRenderer {
 
 /** Light-weight per-tile draw description shared by palettes and ghosts. */
 export type { TileData };
+
+/** Atlas key of a colored outfit piece (colors: head, body, legs, feet bytes). */
+function composedKey(sid: number, tpl: number, colors: number): string {
+  return `o:${sid}:${tpl}:${colors & 255}.${(colors >> 8) & 255}.${(colors >> 16) & 255}.${colors >>> 24}`;
+}

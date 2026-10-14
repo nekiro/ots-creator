@@ -103,7 +103,6 @@ export function mapMenus(): { label: string; items: MenuEntry[] }[] {
         toggle("tooltips", "Item ids and attributes"),
         toggle("coords", "Tile coordinates"),
         toggle("onlyModified", "Only changed tiles"),
-        toggle("asMinimap", "Minimap colors"),
       ],
     },
     {

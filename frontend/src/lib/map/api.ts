@@ -68,6 +68,8 @@ export const TILE_FLAGS = { pz: 1, noPvp: 4, noLogout: 8, pvpZone: 16, refresh: 
 
 export const res = {
   chunks: (map: number, keys: number[], rev: number) => `/res/map/${map}/chunks?k=${keys.join(",")}&r=${rev}`,
+  geo: (map: number, keys: number[], opts: number, house: number, block: number) =>
+    `/res/map/${map}/geo?k=${keys.join(",")}&o=${opts}&h=${house}&b=${block}`,
   minimap: (map: number, x: number, y: number, z: number, w: number, h: number, rev: number) =>
     `/res/map/${map}/minimap?x=${x}&y=${y}&z=${z}&w=${w}&h=${h}&r=${rev}`,
 };
