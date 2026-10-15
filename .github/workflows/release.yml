@@ -147,6 +147,11 @@ jobs:
     needs: [windows, macos]
     runs-on: ubuntu-latest
     steps:
+      # Full history and tags, for the commit list in the release notes.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: actions/download-artifact@v4
         with:
           pattern: release-*
@@ -158,6 +163,16 @@ jobs:
           cd dist && sha256sum * > checksums.txt
           cat checksums.txt
 
+      - name: Release notes
+        run: |
+          # Commits since the previous version tag (all commits for the first one).
+          prev="$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)"
+          range="$GITHUB_REF_NAME"
+          if [ -n "$prev" ]; then range="$prev..$GITHUB_REF_NAME"; fi
+          git log "$range" --no-merges --pretty='- %s (%h)' > notes.md
+          if [ ! -s notes.md ]; then echo "No changes." > notes.md; fi
+          cat notes.md
+
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -166,4 +181,4 @@ jobs:
           prerelease=""
           if [ "$version" != "${version%%[-+]*}" ]; then prerelease="--prerelease"; fi
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
-            --title "OTS Creator $version" --generate-notes $prerelease
+            --title "OTS Creator $version" --notes-file notes.md $prerelease
