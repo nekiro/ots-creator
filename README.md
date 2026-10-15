@@ -13,144 +13,144 @@
 
 [Download](https://github.com/nekiro/ots-creator/releases/latest) ·
 [Features](#features) ·
+[Map editor](#map-editor) ·
 [OTOBJ format](#otobj-object-format) ·
 [Development](#development)
 
 </div>
 
-It looks and feels like the Tibia client, and it has a built-in market to share objects
-and sprites with other users. Built with [Wails v3](https://v3.wails.io) (Go) and Svelte 5.
+It looks and feels like the Tibia client and has a built-in market to share objects and
+sprites. Built with [Wails v3](https://v3.wails.io) (Go) and Svelte 5.
 
 ![OTS Creator](.github/assets/promo.gif)
 
+## Install
+
+Download the latest build from [Releases](https://github.com/nekiro/ots-creator/releases).
+Later versions install from the built-in updater.
+
+- **Windows:** `otscreator-amd64-installer.exe`, or the portable `otscreator-windows-amd64.exe`.
+- **macOS 12+:** `otscreator-darwin-arm64.zip` (Apple Silicon) or `otscreator-darwin-amd64.zip`
+  (Intel). Move `otscreator.app` to Applications. The app is not notarized, so the first
+  start is blocked: click "Open Anyway" in System Settings > Privacy & Security, or run
+  `xattr -dr com.apple.quarantine /Applications/otscreator.app`.
+
 ## Features
 
-**Clients**
+### Clients
 
-- Open and compile `Tibia.dat` / `Tibia.spr` for every client version. The version is
-  detected from the file signatures, and OTFI files are supported. Extended sprites,
-  transparency, improved animations and frame groups are all handled.
-- Tibia 12+ assets: `catalog-content.json`, `appearances.dat` (protobuf) and LZMA sprite
-  sheets, including object names and descriptions. Files are written back byte for byte
-  when nothing changed.
-- Create new clients, and convert between versions and between dat/spr and assets
-  ("compile as"). Flags the target version cannot store are reported as warnings.
+- **Every `Tibia.dat` / `Tibia.spr` version**, detected from the file signatures, with OTFI
+  files, extended sprites, transparency, improved animations and frame groups.
+- **Tibia 12+ assets:** `catalog-content.json`, protobuf `appearances.dat` and LZMA sprite
+  sheets, with object names and descriptions. Unchanged files are written back byte for byte.
+- **New clients and conversion** between versions and between dat/spr and assets
+  ("Compile as"), with a warning for every flag the target cannot store.
+- **Optional `items.otb` sync** for servers that map server ids to client ids with it (TFS,
+  OTServ). Pick the file in Open client or in File > Server items; it is remembered per
+  client. Compiling also updates it: server items follow moved client items, edited items
+  get their client data reloaded (flags, light, minimap color, sprite hash…) and new client
+  items get new server ids. Server ids and server-only data are kept, and an unchanged file
+  is not rewritten.
 
-**Editing**
+### Object editing
 
-- Object list with categories (items, outfits, effects, missiles), search by id or name,
-  and filters by flag.
-- Live preview: animation, directions, idle and walking groups, addons, mounts, outfit
-  colors, zoom and pixel grid.
-- Properties editor for layout, patterns, frame durations and every flag, with a flag
-  filter.
-- Sprite list per object or for the whole client, with multi-select, replace, import and
-  export. Draw on sprites in the sprite view, with a pixel grid, zoom and pan.
-- Undo/redo, copy and paste of whole objects or only their properties, bulk edit of
-  several objects, and duplicate and remove.
+- **Object list** with items, outfits, effects and missiles, search by id or name, and flag
+  filters.
+- **Live preview** of animations, directions, idle and walking groups, addons, mounts and
+  outfit colors, with zoom and a pixel grid.
+- **Properties** for layout, patterns, frame durations and every flag.
+- **Sprites** per object or for the whole client: multi-select, replace, import, export, and
+  drawing with a pixel grid, zoom and pan.
+- Undo/redo, copy and paste of whole objects or only their properties, bulk edit,
+  duplicate and remove.
 
-**Import and export**
+### Import and export
 
-- Objects as `.otobj`, the native format (see [OTOBJ](#otobj-object-format) below), or as
-  OBD (ObjectBuilder): import of OBD versions 1 to 3, export as version 3. Settings choose
-  the export format. An object viewer shows both without an open client.
-- Export all objects (one folder per category) or all sprites (single files or sprite
-  sheets) at once. Exports run in the background (see [Performance](#performance)).
-- Sprite sheets: export one frame group or the whole outfit. On import the layout is
-  detected from the image (directions, mask layer, mounts, addons, frames).
-- Drop images, `.otobj` or `.obd` files anywhere, onto the preview or onto an object in the list, or
-  paste a PNG with Ctrl+V.
-- Slicer to cut images into sprites.
+- **Objects** as `.otobj` (the native format, see [below](#otobj-object-format)) or OBD from
+  ObjectBuilder (import of versions 1 to 3, export as version 3). The export format is a
+  setting. The object viewer opens both without a client.
+- **Export everything** at once: all objects (one folder per category) or all sprites
+  (single files or sheets).
+- **Sprite sheets** of one frame group or a whole outfit. On import the layout (directions,
+  mask layer, mounts, addons, frames) is detected from the image.
+- **Drop** images, `.otobj` or `.obd` files anywhere, onto the preview or onto an object, or
+  paste a PNG with Ctrl+V. A slicer cuts images into sprites.
 
-**Compare and merge clients**
+### Compare and merge clients
 
-- Open a second client next to the current one and compare them category by category.
-  Sprites are compared by their pixels, not by their ids, and differences that only come
-  from the client formats are ignored.
-- Every difference shows both versions side by side, animated on hover, with what changed
-  (flags, size, patterns, frames, animation, sprites). An empty placeholder against a real
-  object counts as a new object, and a filter hides ids that are empty in the only client
-  that has them.
-- Copy objects in both directions, keeping their ids or appending them as new objects,
-  or merge everything B has into A at once. Objects of B can also be queued (double
-  click) and dropped one by one into the slots of A shown next to the list, or all at
-  once into the free ids from a slot. A sprite with the same pixels under the same
-  id in the target is reused instead of added again.
-- Every copy is one undo step in its target client. Copies that kept their ids can also
-  be reverted one by one from the list. The second client can be compiled from the
-  same window.
+- **Side by side** by category. Sprites are compared by pixels, not ids, and differences
+  that only come from the client formats are ignored.
+- **Every difference** shows both versions, animated on hover, and what changed (flags,
+  size, patterns, frames, animation, sprites). An empty placeholder against a real object
+  counts as new; a filter hides ids that are empty in the only client that has them.
+- **Copy in both directions**, keeping ids or appending, or merge all of B into A. Objects
+  of B can be queued (double click) and dropped into slots of A one by one, or all at once
+  into free ids. Sprites with the same pixels under the same id are reused.
+- Every copy is one undo step, copies that kept their ids can be reverted one by one, and
+  the second client can be compiled from the same window.
 
-**Tools**
+### Tools
 
-- Optimize sprites (duplicates, empty and unused ones), bulk frame durations, and split
-  or merge outfit frame groups.
-- Reorder objects within a client: drag them to other ids, or cut and click a slot. They
-  swap places with the objects there, or are inserted and the objects between shift.
-  Item ids stored in items (market, NPC currency) follow the moved items.
+- Optimize sprites (duplicate, empty and unused ones), set frame durations in bulk, and
+  split or merge outfit frame groups.
+- Reorder objects: drag them to other ids, or cut and click a slot. They swap places, or
+  are inserted and the objects between shift. Item ids stored in items (market, NPC
+  currency) follow the moved items.
 
-**Map editor**
+### Market
 
-Switch between **Objects** and **Map** at the top left. The map editor draws with the
-sprites of the open client, so objects changed in the object editor show on the map
-after **Reload from client**.
+- Browse objects and sprite packs from other users: categories, tags, search, live preview
+  and one-click import.
+- Publish an object, sprites or an `.otobj` / `.obd` / image file. No account: pick a
+  nickname, Tibia-style tags and a license, and delete your own entries later.
 
-- OTBM version 2 (what servers load), with houses, spawns (one spawn file, or
-  separate monster and NPC files), zones, towns and waypoints. OTBM files of versions 1
-  to 4 open and are saved as version 2.
-  Several maps can be open in tabs.
-- Item ids are detected automatically: server ids (translated with `items.otb`) or client
-  ids (used directly). Names and types come from `items.xml`.
-- Brushes for grounds with automatic borders, walls with doors and windows, doodads,
+### Performance
+
+- Heavy work (comparing, searching, optimizing, decoding Tibia 12+ sheets, exporting) uses
+  every CPU core, so clients with hundreds of thousands of sprites stay fast.
+- Long operations run in the background with progress in the status bar, and you can keep
+  editing during an export. The export window can be hidden and reopened. **Stop** asks
+  first and keeps the files written so far.
+- Closing the app asks first while an export runs or when changes are not applied or
+  compiled yet.
+
+## Map editor
+
+Switch between **Objects** and **Map** at the top left. Maps are drawn with the sprites of
+the open client; object changes show after **Reload from client**.
+
+- **Files:** OTBM versions 1 to 4 open and are saved as version 2 (what servers load), with
+  houses, spawns (one file, or separate monster and NPC files), zones, towns and
+  waypoints. Several maps open in tabs.
+- **Item ids:** server ids (translated with `items.otb`) or client ids, detected
+  automatically. Names and types come from `items.xml`.
+- **Brushes:** grounds with automatic borders, walls with doors and windows, doodads,
   carpets, tables, houses, creatures and spawns, waypoints, zones, PZ / no-PvP / no-logout
-  flags, and an eraser. Brush size, square or circle shape, and Shift+drag to fill a
-  rectangle. Any item can also be placed as is.
-- Brushes are kept in the editor's own JSON format and can be edited in the app. The
-  brushes, tilesets and creatures of Remere's Map Editor are imported from its data
-  folder, and a doodad brush can be made from a selection.
-- Built around the work, not around windows: a **Library** of everything to draw with
-  (terrain, decoration, items, creatures, one search), a **World** outline of towns,
-  houses, waypoints and areas, and an inspector that shows whatever you click: a tile, a
-  house, a town, or the map with its statistics. Changes apply as you type.
-- **Ctrl+K** goes to anything: a position (pasted in any format), a town, house or
-  waypoint, a brush, an item, a creature or a command.
-- Selection over one or several floors with a floating bar of actions (copy, move between
-  floors, redo borders, find, make a brush), and an undo history you can jump back in.
-- Find panel that stays open while you work, with replace and remove of what it found;
-  map tools (unknown items, corpses, empty spawns, unseen tiles, borders) that work on the
-  selection or the whole map; import of another map at an offset, and minimap export.
-- Fast on big maps: the map is streamed in 32×32 chunks and drawn with WebGL in one draw
-  call, and far zoom levels use the minimap.
-
-**Market**
-
-- Browse objects and sprite packs shared by other users, with categories, tags, search,
-  a live preview and one-click import.
-- Publish an object, sprites or an `.otobj` / `.obd` / image file from disk. No account is needed: you
-  pick a nickname, Tibia-style tags and a license. You can later delete your own entries.
-
-**Updates**
-
-- Built-in updater from GitHub releases.
-
-## Performance
-
-OTS Creator uses every CPU core for the heavy work: comparing clients, searching objects
-and sprites, optimizing sprites, decoding Tibia 12+ sprite sheets and exporting, so it
-stays fast on clients with hundreds of thousands of sprites.
-
-Long operations run in the background:
-
-- The status bar shows the progress, and you can keep editing while an export runs.
-- The export window can be hidden, and opened again to see the progress. **Stop** in the
-  window or in the status bar stops an export after asking. Files written so far stay in
-  the folder.
-- Closing the app asks first when an export is running, or when there are changes that
-  are not applied or compiled yet.
+  flags and an eraser. Size, square or circle shape, Shift+drag fills a rectangle, and any
+  item can be placed as is.
+- **Brush files** use the editor's own JSON format and are edited in the app. Brushes,
+  tilesets and creatures of Remere's Map Editor are imported from its data folder, and a
+  selection becomes a doodad brush.
+- **Layout:** a **Library** of everything to draw with (terrain, decoration, items,
+  creatures, one search), a **World** outline of towns, houses, waypoints and areas, and an
+  inspector for whatever you click (tile, house, town, or the map and its statistics).
+  Changes apply as you type.
+- **Ctrl+K** goes to anything: a position (pasted in any format), a town, house, waypoint,
+  brush, item, creature or command.
+- **Selection** over one or several floors, with a floating bar (copy, move between floors,
+  redo borders, find, make a brush) and an undo history you can jump back in.
+- **Find and tools:** a find panel with replace and remove; map tools (unknown items,
+  corpses, empty spawns, unseen tiles, borders) on the selection or the whole map; import
+  of another map at an offset; minimap export.
+- **Big maps:** the backend builds the drawing data of each 32×32 chunk once and the GPU
+  keeps it (WebGL2), so panning and zooming only move the camera and only animated sprites
+  update per frame. Plain tiles are stored packed, so maps with millions of tiles stay
+  small in memory.
 
 ## OTOBJ object format
 
-`.otobj` is the object format of OTS Creator: a ZIP file with a `manifest.json` and one PNG
-sprite sheet per frame group. The full specification is in [docs/otobj.md](docs/otobj.md).
+`.otobj` is a ZIP with a `manifest.json` and one PNG sprite sheet per frame group. Full
+specification: [docs/otobj.md](docs/otobj.md).
 
 ```
 manifest.json        category, name, flags by name, frame groups, animation, NPC trade
@@ -158,47 +158,30 @@ sprites/idle.png     sprite sheet in the ObjectBuilder layout
 sprites/walking.png
 ```
 
-Why a new format instead of OBD:
+Why not OBD:
 
-- **Readable.** The manifest is plain JSON: you can read an object in a text editor and
-  see what changed in a git diff. OBD is one LZMA-compressed binary block.
-- **Not tied to a client version.** Flags are stored by name (`pickupable`, `hasLight`), not
-  as the flag bytes of one dat version. On import the client keeps what it can store and
-  warns about the rest, like "compile as" does.
-- **Editable sprites.** The sheets are normal PNG files that open in any image editor, and
-  they use the ObjectBuilder sheet layout.
-- **Complete.** It stores what OBD cannot: names and descriptions, NPC trade, the Tibia 12+
-  flags and 64 px sprites.
-- **Easy to extend.** Readers ignore keys and files they do not know, so new fields do not
-  need a new version or break older readers.
+- **Readable:** plain JSON you can read in a text editor and diff in git. OBD is one
+  LZMA-compressed binary block.
+- **Version independent:** flags are stored by name (`pickupable`, `hasLight`), not as the
+  flag bytes of one dat version. On import the client keeps what it can store and warns
+  about the rest.
+- **Editable sprites:** normal PNG sheets in the ObjectBuilder layout.
+- **Complete:** also stores names, descriptions, NPC trade, Tibia 12+ flags and 64 px sprites.
+- **Extensible:** readers ignore unknown keys and files, so new fields need no new version.
 
 Measured on the current CipSoft client (one file at a time, one core):
 
 | | OBD | OTOBJ |
 |---|---|---|
-| Reading | 1x | 2 to 4x faster (PNG decodes faster than LZMA) |
+| Reading | 1x | 2 to 4x faster |
 | Writing 1 000 items | 3.6 s | 0.26 s |
-| Size, typical outfit (citizen) | 84 KB | 80 KB |
-| Size, outfit with many colors | 134 KB | 386 KB |
-| Size, all 1 978 outfits | 72 MB | 111 MB |
+| Typical outfit (citizen) | 84 KB | 80 KB |
+| Outfit with many colors | 134 KB | 386 KB |
+| All 1 978 outfits | 72 MB | 111 MB |
 
-Files are 1 to 3 times larger, because LZMA on raw pixels compresses better than PNG.
-Sheets with at most 256 colors use a palette, which brings most outfits to the size of
-OBD. We accepted the difference of a few kilobytes per object in exchange for a format
-that people can read and edit. OBD stays fully supported for exchanging objects with
-ObjectBuilder, and the market keeps storing objects as OBD.
-
-## Install
-
-Download the latest build from [Releases](https://github.com/nekiro/ots-creator/releases):
-
-- **Windows:** `otscreator-amd64-installer.exe`, or the portable `otscreator-windows-amd64.exe`.
-- **macOS 12+:** `otscreator-darwin-arm64.zip` (Apple Silicon) or `otscreator-darwin-amd64.zip`
-  (Intel). Unzip and move `otscreator.app` to Applications. The app is not notarized, so
-  macOS blocks the first start: open System Settings > Privacy & Security and click
-  "Open Anyway", or run `xattr -dr com.apple.quarantine /Applications/otscreator.app`.
-
-Later versions install from the built-in updater.
+Files can be up to 3 times larger, because LZMA compresses raw pixels better than PNG.
+Sheets with at most 256 colors use a palette, which brings most outfits to the size of OBD.
+OBD stays fully supported for ObjectBuilder, and the market keeps storing objects as OBD.
 
 ## Development
 

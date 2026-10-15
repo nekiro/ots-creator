@@ -95,6 +95,9 @@ func (p *Project) MoveThings(c thing.Category, ids []uint32, at uint32, o MoveOp
 	}
 
 	r := p.record(fmt.Sprintf("Move %d %s(s)", len(ids), c))
+	if c == thing.CategoryItem {
+		r.e.itemMoves = moves
+	}
 	targets := make([]uint32, 0, len(next))
 	for id := range next {
 		targets = append(targets, id)

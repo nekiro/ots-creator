@@ -71,7 +71,7 @@ func OpenAssets(path string) (*Project, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Project{
+	p := &Project{
 		version:  AssetsVersion(dir),
 		features: assetFeatures,
 		format:   FormatAssets,
@@ -79,7 +79,9 @@ func OpenAssets(path string) (*Project, error) {
 		things:   &dat.File{Things: st.file.Things},
 		sprites:  newSpriteStore(newSheetBase(dir, st.catalog, st.pieces), assetFeatures.SpriteSize, true),
 		assets:   st,
-	}, nil
+	}
+	p.resetBase()
+	return p, nil
 }
 
 func loadAssets(dir string) (*assetState, error) {

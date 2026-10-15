@@ -15,6 +15,7 @@ import {
   res,
   type CompileStats,
   type PropsPatch,
+  type State,
   type Recent,
   type Thing,
   OBJECT_EXT,
@@ -83,6 +84,27 @@ export function sheetsNote(s: CompileStats): string {
   if (!s.sheetsRemoved) return "";
   const freed = s.freed > 0 ? ` (${formatSize(s.freed)} freed)` : "";
   return ` Removed ${s.sheetsRemoved.toLocaleString()} unused sheet${s.sheetsRemoved === 1 ? "" : "s"}${freed}.`;
+}
+
+/** " Updated items.otb (2 moved, 1 reloaded)." after a compile; problems
+ * with the items.otb get their own toast (the client was compiled anyway). */
+export function otbNote(s: CompileStats): string {
+  const r = s.otb;
+  if (!r) return "";
+  if (r.error) {
+    toast(`items.otb was not updated: ${r.error}`, "error");
+    return "";
+  }
+  if (r.missing) toast(`${r.missing} server item(s) in items.otb point to client items that no longer exist.`);
+  if (!r.written) return "";
+  const parts = [r.remapped && `${r.remapped} moved`, r.updated && `${r.updated} reloaded`, r.added && `${r.added} new`].filter(Boolean);
+  return ` Updated items.otb${parts.length ? ` (${parts.join(", ")})` : ""}.`;
+}
+
+/** After opening a client: the remembered items.otb is optional, so a
+ * failure only shows a toast. */
+export function openedNote(st: State | undefined) {
+  if (st?.otbError) toast(`items.otb was not loaded: ${st.otbError}`, "error");
 }
 
 /**
@@ -180,10 +202,11 @@ export const commands = {
       commands.open(dir);
       return;
     }
-    const req = { format: files.format, datPath: files.datPath, sprPath: files.sprPath, version: null, features: files.features };
+    const req = { format: files.format, datPath: files.datPath, sprPath: files.sprPath, version: null, features: files.features, otbPath: null };
     const st = await run("Loading client", () => (other ? CompareService.Open(req) : ProjectService.Open(req)));
     if (!st?.open) return;
     if (other) app.dialog = "compare";
+    openedNote(st);
     toast(`Loaded ${files.detected.name}: ${st.info.counts.items - 99} items, ${st.info.counts.sprites} sprites.`, "success");
   },
   create: () => (app.dialog = "new"),
@@ -204,7 +227,7 @@ export const commands = {
     }
     if (!(await offerOptimize())) return;
     const stats = await run("Compiling", () => ProjectService.Compile());
-    if (stats) toast(`Client compiled.${sheetsNote(stats)}`, "success");
+    if (stats) toast(`Client compiled.${sheetsNote(stats)}${otbNote(stats)}`, "success");
   },
 
   async close() {
@@ -222,8 +245,10 @@ export const commands = {
         sprPath: r.sprPath,
         version: r.version,
         features: r.features,
+        otbPath: null,
       }),
     );
+    openedNote(st);
     if (st?.open) toast(`Loaded ${r.version.name}.`, "success");
   },
 

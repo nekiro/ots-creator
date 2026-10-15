@@ -66,6 +66,9 @@ type Settings struct {
 	// LastDirs maps a file dialog to the folder it last confirmed, so each
 	// dialog opens where it was left. Like Recent, Update keeps it as stored.
 	LastDirs map[string]string `json:"lastDirs"`
+	// ItemsOTB maps a client (its dat path or asset folder) to the
+	// items.otb kept in sync with it. Like Recent, Update keeps it as stored.
+	ItemsOTB map[string]string `json:"itemsOtb"`
 }
 
 // Object list columns range.
@@ -77,7 +80,7 @@ const (
 
 // Defaults returns the settings of a fresh install.
 func Defaults() Settings {
-	return Settings{CheckUpdates: true, SheetBackground: BackgroundMagenta, ExportFormat: "png", ObjectFormat: "otobj", ListColumns: DefaultListColumns, Recent: []Recent{}, MarketShared: map[string]string{}, LastDirs: map[string]string{}}
+	return Settings{CheckUpdates: true, SheetBackground: BackgroundMagenta, ExportFormat: "png", ObjectFormat: "otobj", ListColumns: DefaultListColumns, Recent: []Recent{}, MarketShared: map[string]string{}, LastDirs: map[string]string{}, ItemsOTB: map[string]string{}}
 }
 
 func (s *Settings) normalize() {
@@ -104,6 +107,9 @@ func (s *Settings) normalize() {
 	}
 	if s.LastDirs == nil {
 		s.LastDirs = map[string]string{}
+	}
+	if s.ItemsOTB == nil {
+		s.ItemsOTB = map[string]string{}
 	}
 	if len(s.Recent) > MaxRecent {
 		s.Recent = s.Recent[:MaxRecent]
@@ -154,6 +160,7 @@ func (st *Store) Get() Settings {
 	s.Recent = append([]Recent{}, st.s.Recent...)
 	s.MarketShared = maps.Clone(st.s.MarketShared)
 	s.LastDirs = maps.Clone(st.s.LastDirs)
+	s.ItemsOTB = maps.Clone(st.s.ItemsOTB)
 	return s
 }
 
@@ -165,6 +172,7 @@ func (st *Store) Update(s Settings) error {
 	s.Recent = st.s.Recent
 	s.MarketShared = st.s.MarketShared
 	s.LastDirs = st.s.LastDirs
+	s.ItemsOTB = st.s.ItemsOTB
 	s.normalize()
 	st.s = s
 	return st.saveLocked()
@@ -248,6 +256,40 @@ func (st *Store) RemoveRecent(datPath string) error {
 	}
 	st.s.Recent = list
 	return st.saveLocked()
+}
+
+// ItemsOTB returns the items.otb kept in sync with a client, or "".
+func (st *Store) ItemsOTB(client string) string {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	return st.s.ItemsOTB[pathKey(client)]
+}
+
+// SetItemsOTB remembers the items.otb of a client; "" forgets it.
+func (st *Store) SetItemsOTB(client, otb string) error {
+	if client == "" {
+		return nil
+	}
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if st.s.ItemsOTB == nil {
+		st.s.ItemsOTB = map[string]string{}
+	}
+	if otb == "" {
+		delete(st.s.ItemsOTB, pathKey(client))
+	} else {
+		st.s.ItemsOTB[pathKey(client)] = otb
+	}
+	return st.saveLocked()
+}
+
+// pathKey is a map key that is the same for paths samePath matches.
+func pathKey(p string) string {
+	p = filepath.Clean(p)
+	if runtime.GOOS == "windows" {
+		return strings.ToLower(p)
+	}
+	return p
 }
 
 func samePath(a, b string) bool {

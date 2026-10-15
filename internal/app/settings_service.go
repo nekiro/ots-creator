@@ -15,6 +15,7 @@ type SettingsService struct {
 func NewSettingsService(st *settings.Store, s *Session) *SettingsService {
 	ss := &SettingsService{st: st}
 	s.onSaved = ss.remember
+	s.otbPaths = st
 	return ss
 }
 

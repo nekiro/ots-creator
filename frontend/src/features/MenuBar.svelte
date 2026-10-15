@@ -47,6 +47,7 @@
         "-",
         { label: "Compile", keys: "Ctrl+S", action: commands.compile, disabled: nothingToCompile },
         { label: "Compile as…", keys: "Ctrl+Shift+S", action: commands.compileAs, disabled: noProject },
+        { label: "Server items (items.otb)…", action: () => (app.dialog = "itemsOtb"), disabled: noProject },
         "-",
         { label: "Close client", action: commands.close, disabled: noProject },
       ],

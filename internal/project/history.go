@@ -26,6 +26,8 @@ type edit struct {
 	things       []thingChange
 	sprites      []spriteChange
 	spritesCount [2]uint32 // before, after
+	// itemMoves maps item ids to the ids the edit moved them to.
+	itemMoves map[uint32]uint32
 }
 
 type history struct {
@@ -160,6 +162,7 @@ func (r *recorder) commit() {
 	if len(r.e.things) == 0 && len(r.e.sprites) == 0 && r.e.spritesCount[0] == r.e.spritesCount[1] {
 		return
 	}
+	r.p.applyMoves(r.e.itemMoves)
 	r.p.history.push(r.e)
 }
 
@@ -194,6 +197,11 @@ func (p *Project) applyEdit(e *edit, forward bool) {
 		if t != nil && i < len(p.things.Things[ch.cat]) {
 			p.things.Things[ch.cat][i] = t
 		}
+	}
+	if forward {
+		p.applyMoves(e.itemMoves)
+	} else {
+		p.applyMoves(invertMoves(e.itemMoves))
 	}
 	p.sprites.setCount(count)
 	for _, ch := range e.sprites {

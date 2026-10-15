@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { DialogService, Format, ProjectService, type Features, type Version } from "../../lib/api";
-  import { offerOptimize, sheetsNote } from "../../lib/commands";
+  import { offerOptimize, otbNote, sheetsNote } from "../../lib/commands";
   import { applyDraft, app, run, toast } from "../../lib/state.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Select from "../../lib/ui/Select.svelte";
@@ -50,7 +50,7 @@
       ProjectService.CompileAs({ format, datPath: dir, sprPath: "", version: info.version, features: info.features, writeOtfi: false }),
     );
     if (stats) {
-      toast(`Compiled assets to ${dir}.${sheetsNote(stats)}`, "success");
+      toast(`Compiled assets to ${dir}.${sheetsNote(stats)}${otbNote(stats)}`, "success");
     }
   }
 
@@ -61,12 +61,11 @@
     if (!(await offerOptimize())) return;
     const base = dir + sep + name;
     app.dialog = null;
-    const ok = await run("Compiling", async () => {
-      await ProjectService.CompileAs({ format, datPath: base + ".dat", sprPath: base + ".spr", version, features, writeOtfi });
-      return true;
-    });
-    if (ok) {
-      toast(`Compiled ${version.name} to ${base}.dat/.spr`, "success");
+    const stats = await run("Compiling", () =>
+      ProjectService.CompileAs({ format, datPath: base + ".dat", sprPath: base + ".spr", version, features, writeOtfi }),
+    );
+    if (stats) {
+      toast(`Compiled ${version.name} to ${base}.dat/.spr.${otbNote(stats)}`, "success");
     }
   }
 </script>
@@ -108,6 +107,9 @@
       </label>
       {#if version}<FeaturesEditor bind:features version={version.value} sizeLocked />{/if}
       <label class="row"><input class="t-check" type="checkbox" bind:checked={writeOtfi} />Write OTClient feature file (.otfi)</label>
+    {/if}
+    {#if info.itemsOtb}
+      <div class="t-label">Also updates {info.itemsOtb.path} to match the client.</div>
     {/if}
     {#if warnings.length}
       <div class="warn">

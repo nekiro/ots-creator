@@ -6,7 +6,7 @@
   import Select from "../../lib/ui/Select.svelte";
   import FeaturesEditor from "./FeaturesEditor.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
-  import { commands } from "../../lib/commands";
+  import { commands, openedNote } from "../../lib/commands";
   import { prefs, recentDir, shortPath } from "../../lib/prefs.svelte";
   import type { Recent } from "../../lib/api";
 
@@ -37,7 +37,7 @@
 
   async function openOther(r: Recent) {
     const format = r.format === Format.FormatAssets ? Format.FormatAssets : Format.FormatDat;
-    const req = { format, datPath: r.datPath, sprPath: r.sprPath, version: r.version, features: r.features };
+    const req = { format, datPath: r.datPath, sprPath: r.sprPath, version: r.version, features: r.features, otbPath: null };
     if ((await run("Loading client", () => CompareService.Open(req)))?.open) close();
   }
 
@@ -46,6 +46,11 @@
   let versionKey = $state("");
   let features = $state<Features>({ extended: false, transparency: false, improvedAnimations: false, frameGroups: false, spriteSize: 32 });
   let error = $state("");
+  /** Optional items.otb kept in sync with the client ("" = none). */
+  let otbPath = $state("");
+  /** Set once the user picked or cleared the items.otb; until then the one
+   * remembered for the client is used. */
+  let otbChosen = $state(false);
 
   const keyOf = (v: Version) => `${v.value}|${v.name}|${v.datSignature}|${v.sprSignature}`;
   const isAssets = $derived(files?.format === Format.FormatAssets);
@@ -70,11 +75,20 @@
     if (files?.detected && (isAssets || files.hasOtfi)) await open();
   }
 
+  async function browseOtb() {
+    const p = await DialogService.OpenFiles("itemsOtb", "items.otb", [{ name: "Server items (items.otb)", pattern: "*.otb" }], false);
+    if (p?.length) {
+      otbPath = p[0];
+      otbChosen = true;
+    }
+  }
+
   async function inspect(dir: string) {
     error = "";
     try {
       files = await ProjectService.Inspect(dir);
       features = { ...files.features };
+      if (!otbChosen) otbPath = files.otbPath;
       if (files.detected) versionKey = keyOf(files.detected);
       else error = `Unknown signatures (dat ${hex(files.datSignature)}, spr ${hex(files.sprSignature)}). Choose the version manually.`;
     } catch (e) {
@@ -94,10 +108,12 @@
   async function open() {
     if (!files || !version) return;
     const f = files;
-    const req = { format: f.format, datPath: f.datPath, sprPath: f.sprPath, version: f.detected ? null : version, features };
+    // The compared client never syncs an items.otb.
+    const req = { format: f.format, datPath: f.datPath, sprPath: f.sprPath, version: f.detected ? null : version, features, otbPath: other || !otbChosen ? null : otbPath };
     const st = await run("Loading client", () => (other ? CompareService.Open(req) : ProjectService.Open(req)));
     if (st?.open) {
       close();
+      openedNote(st);
       toast(`Loaded ${version.name}: ${st.info.counts.items - 99} items, ${st.info.counts.sprites} sprites.`, "success");
     }
   }
@@ -149,6 +165,14 @@ Click to choose features, double click to open as before`} onclick={() => pickRe
       </label>
       <div class="t-label">Features</div>
       <FeaturesEditor bind:features version={version?.value ?? 0} />
+    {/if}
+    {#if !other}
+      <div class="row" title="Optional. Servers that map server ids to client ids with an items.otb (TFS, OTServ) can keep it in sync: compiling the client then updates it too.">
+        <span class="t-label">items.otb</span>
+        <input class="t-input grow" readonly value={otbPath} placeholder="None (optional)" />
+        {#if otbPath}<button class="t-btn" title="Do not use an items.otb" onclick={() => ((otbPath = ""), (otbChosen = true))}>Clear</button>{/if}
+        <button class="t-btn" onclick={browseOtb}>Browse…</button>
+      </div>
     {/if}
     {#if error}<div class="err">{error}</div>{/if}
   </div>

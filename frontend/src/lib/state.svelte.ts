@@ -35,6 +35,7 @@ export type DialogName =
   | "reorder"
   | "replaceRefs"
   | "exportSprites"
+  | "itemsOtb"
   | null;
 
 /** What the share window publishes. */

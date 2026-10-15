@@ -37,6 +37,9 @@ type State struct {
 	// reloads those thumbnails and sprites. It is nil in snapshots that are
 	// not change events (treat as "all").
 	Delta *project.Delta `json:"delta"`
+	// OTBError is set by Open when the items.otb remembered for the client
+	// could not be read; the client is open without it.
+	OTBError string `json:"otbError,omitempty"`
 }
 
 // Session owns the currently open project and an optional second client
@@ -53,6 +56,14 @@ type Session struct {
 	exporting atomic.Int32
 	// onSaved is called after a client is opened or compiled to disk.
 	onSaved func(project.Info)
+	// otbPaths remembers the items.otb of each client (nil: not kept).
+	otbPaths otbPaths
+}
+
+// otbPaths stores which items.otb is kept in sync with a client.
+type otbPaths interface {
+	ItemsOTB(client string) string
+	SetItemsOTB(client, otb string) error
 }
 
 // NewSession returns an empty session. notify may be nil.

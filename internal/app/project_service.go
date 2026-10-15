@@ -46,11 +46,21 @@ type ClientFiles struct {
 	Detected     *client.Version `json:"detected"`
 	Features     client.Features `json:"features"`
 	HasOTFI      bool            `json:"hasOtfi"`
+	// OTBPath is the items.otb remembered for the client ("" when none).
+	OTBPath string `json:"otbPath"`
 }
 
 // Inspect looks at a client directory or any of its dat, spr or otfi files
 // and finds the matching files, signatures, version and OTFI features.
 func (ps *ProjectService) Inspect(path string) (ClientFiles, error) {
+	cf, err := inspectClient(path)
+	if err == nil {
+		cf.OTBPath = ps.otbPath(cf.DatPath)
+	}
+	return cf, err
+}
+
+func inspectClient(path string) (ClientFiles, error) {
 	var cf ClientFiles
 	// A dat or otfi in the chosen folder wins over an assets subfolder
 	// (some clients ship both).
@@ -149,6 +159,9 @@ type OpenRequest struct {
 	SprPath  string          `json:"sprPath"`
 	Version  *client.Version `json:"version"`
 	Features client.Features `json:"features"`
+	// OTBPath is the items.otb to keep in sync with the client: nil uses
+	// the one remembered for it, "" none. It is remembered for the client.
+	OTBPath *string `json:"otbPath"`
 }
 
 // Open loads a client and makes it the current project.
@@ -163,9 +176,75 @@ func (ps *ProjectService) Open(req OpenRequest) (State, error) {
 	if err != nil {
 		return ps.s.State(), err
 	}
+	// The items.otb remembered for the client is optional: a missing or
+	// broken file is reported, never stops the client from opening.
+	var otbErr error
+	path := ps.otbPath(p.Info().DatPath)
+	if req.OTBPath != nil {
+		path = *req.OTBPath
+		otbErr = ps.rememberOTB(p.Info().DatPath, path)
+	}
+	if path != "" {
+		if _, err := p.AttachOTB(path); err != nil {
+			otbErr = err
+		}
+	}
 	ps.s.Set(p)
 	ps.s.saved()
-	return ps.s.State(), nil
+	st := ps.s.State()
+	if otbErr != nil {
+		st.OTBError = otbErr.Error()
+	}
+	return st, nil
+}
+
+func (ps *ProjectService) otbPath(client string) string {
+	if ps.s.otbPaths == nil || client == "" {
+		return ""
+	}
+	return ps.s.otbPaths.ItemsOTB(client)
+}
+
+func (ps *ProjectService) rememberOTB(client, otb string) error {
+	if ps.s.otbPaths == nil || client == "" {
+		return nil
+	}
+	return ps.s.otbPaths.SetItemsOTB(client, otb)
+}
+
+// AttachItemsOTB keeps an items.otb in sync with the client: compiling
+// then updates it too. It is remembered for the client.
+func (ps *ProjectService) AttachItemsOTB(path string) (State, error) {
+	p, err := ps.s.Project()
+	if err != nil {
+		return ps.s.State(), err
+	}
+	if _, err := p.AttachOTB(path); err != nil {
+		return ps.s.State(), err
+	}
+	ps.s.Changed()
+	return ps.s.State(), ps.rememberOTB(p.Info().DatPath, path)
+}
+
+// DetachItemsOTB stops keeping the items.otb in sync and forgets it.
+func (ps *ProjectService) DetachItemsOTB() (State, error) {
+	p, err := ps.s.Project()
+	if err != nil {
+		return ps.s.State(), err
+	}
+	p.DetachOTB()
+	ps.s.Changed()
+	return ps.s.State(), ps.rememberOTB(p.Info().DatPath, "")
+}
+
+// ItemsOTBPreview reports what compiling would change in the attached
+// items.otb.
+func (ps *ProjectService) ItemsOTBPreview() (project.OTBReport, error) {
+	p, err := ps.s.Project()
+	if err != nil {
+		return project.OTBReport{}, err
+	}
+	return p.OTBPreview()
 }
 
 // New creates an empty client.
@@ -215,6 +294,10 @@ func (ps *ProjectService) CompileAs(req CompileRequest) (project.CompileStats, e
 	ps.s.Changed()
 	if err == nil {
 		ps.s.saved()
+		// Compiled to new files: the items.otb stays with the client.
+		if otb := p.OTB(); otb != nil {
+			_ = ps.rememberOTB(p.Info().DatPath, otb.Path)
+		}
 	}
 	return stats, err
 }

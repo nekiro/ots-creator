@@ -36,6 +36,8 @@ type Info struct {
 	FormatLabel string          `json:"formatLabel"`
 	// Supported lists property names the current format can store.
 	Supported []string `json:"supported"`
+	// ItemsOTB is the attached items.otb, kept in sync when compiling.
+	ItemsOTB *OTBInfo `json:"itemsOtb"`
 }
 
 // Counts holds the highest id of each category and the sprite count.
@@ -64,6 +66,11 @@ type Project struct {
 	unsaved bool
 	delta   deltaSet
 	assets  *assetState // FormatAssets only
+	otb     *itemsOTB   // attached items.otb, nil when none
+	// base holds the items as they are on disk and moves maps their ids
+	// to the ids they were moved to since (see otb.go).
+	base  []*thing.Thing
+	moves map[uint32]uint32
 }
 
 // OpenOptions control how a client is opened.
@@ -111,7 +118,7 @@ func Open(o OpenOptions) (*Project, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", filepath.Base(o.SprPath), err)
 	}
-	return &Project{
+	p := &Project{
 		version:  v,
 		features: f,
 		format:   FormatDat,
@@ -119,7 +126,9 @@ func Open(o OpenOptions) (*Project, error) {
 		sprPath:  o.SprPath,
 		things:   things,
 		sprites:  newSpriteStore(sprFile(sf), f.SpriteSize, f.Transparency),
-	}, nil
+	}
+	p.resetBase()
+	return p, nil
 }
 
 // New creates an empty client with one item, outfit, effect and missile,
@@ -152,6 +161,11 @@ func (p *Project) Info() Info {
 }
 
 func (p *Project) infoLocked() Info {
+	var otb *OTBInfo
+	if p.otb != nil {
+		in := p.otb.info
+		otb = &in
+	}
 	label, supported := dat.Table(client.MetadataFormat(p.version.Value)).Name(), dat.Table(client.MetadataFormat(p.version.Value)).Supported()
 	if p.format == FormatAssets {
 		label, supported = "Protobuf appearances", assets.Supported()
@@ -174,6 +188,7 @@ func (p *Project) infoLocked() Info {
 		CanRedo:     p.history.canRedo(),
 		FormatLabel: label,
 		Supported:   supported,
+		ItemsOTB:    otb,
 	}
 }
 
@@ -194,7 +209,8 @@ type CompileOptions struct {
 	// Progress, when set, is called with the work done so far, possibly
 	// from several goroutines and very often.
 	Progress func(done, total int)
-	// Stats, when set, receives what an asset compilation did to the sheets.
+	// Stats, when set, receives what an asset compilation did to the sheets
+	// and what happened to the attached items.otb.
 	Stats *CompileStats
 }
 
@@ -205,6 +221,8 @@ type CompileStats struct {
 	SheetsRemoved int `json:"sheetsRemoved"`
 	// Freed is the size of the removed sheets minus the new ones, in bytes.
 	Freed int64 `json:"freed"`
+	// OTB reports the update of the attached items.otb (nil when none).
+	OTB *OTBReport `json:"otb"`
 }
 
 // counter reports work done to a CompileOptions.Progress.
@@ -241,10 +259,16 @@ func (s countingSource) Compressed(id uint32) ([]byte, error) {
 func (p *Project) Compile(o CompileOptions) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	// The items.otb is synced against the items on disk, before they change.
+	otbFile, otbData, otbRep := p.prepareOTB()
+	if o.Stats != nil {
+		o.Stats.OTB = otbRep
+	}
 	if o.Format == FormatAssets {
 		if err := p.compileAssets(o.DatPath, o.Progress, o.Stats); err != nil {
 			return err
 		}
+		p.writeOTB(otbFile, otbData, otbRep)
 		p.saved()
 		return nil
 	}
@@ -282,6 +306,7 @@ func (p *Project) Compile(o CompileOptions) error {
 			return err
 		}
 	}
+	p.writeOTB(otbFile, otbData, otbRep)
 	// Reload sprites from the new file so the in-memory overlay is dropped.
 	sf, err := spr.Open(sprBuf.Bytes(), spr.Options{Extended: f.Extended, Transparent: f.Transparency, SpriteSize: f.SpriteSize})
 	if err != nil {
@@ -300,6 +325,7 @@ func (p *Project) Compile(o CompileOptions) error {
 func (p *Project) saved() {
 	p.unsaved = false
 	p.history.clear()
+	p.resetBase()
 	// Version and features (transparency) can change how sprites decode.
 	p.delta.everything()
 }
