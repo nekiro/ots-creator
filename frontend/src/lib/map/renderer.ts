@@ -66,6 +66,8 @@ export interface Marker {
   y: number;
   z: number;
   label: string;
+  /** Whole name, shown on hover when the label is shortened. */
+  full?: string;
   color: [number, number, number];
 }
 
@@ -79,6 +81,34 @@ export interface Label {
   align?: "center" | "left";
   /** Left out where it would cover another label (item texts). */
   cull?: boolean;
+  /** Drawn over the others, which keep clear of it (labels under the mouse). */
+  top?: boolean;
+}
+
+/** An item text as label lines: wrapped at words to width characters, at
+ * most maxLines (the last ends with "…" when the text goes on). */
+export function wrapText(text: string, width = 40, maxLines = 12): string[] {
+  const out: string[] = [];
+  for (const para of text.split(/\r?\n/)) {
+    let cur = "";
+    for (const word of para.trim().split(/\s+/)) {
+      if (!word) continue;
+      for (let w = word; w; ) {
+        // A word longer than a line is split.
+        const piece = w.slice(0, width);
+        w = w.slice(piece.length);
+        if (cur && cur.length + 1 + piece.length > width) {
+          out.push(cur);
+          cur = piece;
+        } else cur = cur ? `${cur} ${piece}` : piece;
+      }
+    }
+    if (cur) out.push(cur);
+  }
+  if (out.length <= maxLines) return out;
+  const lines = out.slice(0, maxLines);
+  lines[maxLines - 1] = lines[maxLines - 1].replace(/[\s,.;:\-–]+$/, "") + "…";
+  return lines;
 }
 
 /** Start of an item text short enough for a map label: its first line,
@@ -1113,10 +1143,13 @@ export class MapRenderer {
         const c = [mk.color[0], mk.color[1], mk.color[2], 0.9];
         stroke(x + line, y + line, T - 2 * line, T - 2 * line, c, Math.max(2, line * 2));
         if (T >= 12 && sc.opts.labels) {
+          // The whole name under the mouse, the short one elsewhere.
+          const hovered = !!sc.hover && sc.hover.x === mk.x && sc.hover.y === mk.y && sc.hover.z === z;
           result.labels.push({
             x: x + T / 2,
             y: y - 2,
-            text: mk.label,
+            text: hovered ? (mk.full ?? mk.label) : mk.label,
+            top: hovered,
             color: `rgb(${Math.round(mk.color[0] * 255)},${Math.round(mk.color[1] * 255)},${Math.round(mk.color[2] * 255)})`,
           });
         }
@@ -1158,8 +1191,17 @@ export class MapRenderer {
         for (let tx = Math.max(0, Math.floor(cx - halfW)); tx <= cx + halfW + 1; tx++) {
           const text = sc.chunks.peekTile(tx, ty, z)?.text;
           if (!text) continue;
+          const x = tileX(tx, z) + T / 2;
+          const y = tileY(ty, z) + T / 2;
+          if (sc.hover && sc.hover.x === tx && sc.hover.y === ty && sc.hover.z === z) {
+            // Under the mouse: the whole text, line by line, over the others.
+            const lines = wrapText(text);
+            const lh = 11 * Math.max(1, Math.round(globalThis.devicePixelRatio || 1));
+            lines.forEach((l, i) => result.labels.push({ x, y: y + (i - (lines.length - 1) / 2) * lh, text: l, color: "#e0d29a", small: true, top: true }));
+            continue;
+          }
           const line = labelText(text);
-          if (line) result.labels.push({ x: tileX(tx, z) + T / 2, y: tileY(ty, z) + T / 2, text: line, color: "#e0d29a", small: true, cull: true });
+          if (line) result.labels.push({ x, y, text: line, color: "#e0d29a", small: true, cull: true });
         }
       }
     }

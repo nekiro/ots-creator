@@ -29,8 +29,9 @@ const (
 	chunkText
 )
 
-// maxChunkText bounds the item text sent with a tile (labels show its start).
-const maxChunkText = 255
+// maxChunkText bounds the item text sent with a tile (hover labels show
+// at most 12 lines of 40 characters).
+const maxChunkText = 1024
 
 // Item flags of the chunk format.
 const (
@@ -95,7 +96,7 @@ func (w *chunkWriter) item(it otmap.Item) {
 //	   u16 mount, u16 look item, u8 name length, name],
 //	[spawn: u16 radius, u8 selected], [npc spawn: same],
 //	[zones: u8 count, u16 ids],
-//	[text of the topmost item with one: u8 length, text]
+//	[text of the topmost item with one: u16 length, text]
 func (ms *MapService) serveMap(w http.ResponseWriter, r *http.Request, parts []string) {
 	if len(parts) != 2 {
 		http.NotFound(w, r)
@@ -302,7 +303,7 @@ func (ms *MapService) writeChunk(cw *chunkWriter, m *openMap, d *mapData, k otma
 		}
 		if text != "" {
 			text = text[:min(len(text), maxChunkText)]
-			cw.u8(uint8(len(text)))
+			cw.u16(uint16(len(text)))
 			cw.b = append(cw.b, text...)
 		}
 	})

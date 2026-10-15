@@ -95,9 +95,9 @@
     if (info) {
       // The color tells the kind (green waypoint, blue house entrance, gold
       // temple), so labels carry only a short name.
-      for (const w of info.waypoints ?? []) if (w) markers.push({ ...w.pos, label: shortLabel(w.name), color: [0.3, 1, 0.4] });
-      for (const h of info.houses ?? []) if (h.exit && (h.exit.x || h.exit.y)) markers.push({ ...h.exit, label: shortLabel(houseLabel(h.name)), color: [0.4, 0.7, 1] });
-      for (const t of info.towns ?? []) if (t && t.temple.x) markers.push({ ...t.temple, label: shortLabel(t.name), color: [1, 0.85, 0.3] });
+      for (const w of info.waypoints ?? []) if (w) markers.push({ ...w.pos, label: shortLabel(w.name), full: w.name, color: [0.3, 1, 0.4] });
+      for (const h of info.houses ?? []) if (h.exit && (h.exit.x || h.exit.y)) markers.push({ ...h.exit, label: shortLabel(houseLabel(h.name)), full: h.name, color: [0.4, 0.7, 1] });
+      for (const t of info.towns ?? []) if (t && t.temple.x) markers.push({ ...t.temple, label: shortLabel(t.name), full: t.name, color: [1, 0.85, 0.3] });
     }
     computePreview();
     let result;
@@ -150,15 +150,19 @@
     const s = Math.max(1, Math.round(window.devicePixelRatio || 1));
     ctx.textAlign = "center";
     const big = `bold ${14 * s}px "Tibia Verdana", Verdana, sans-serif`;
+    // Labels under the mouse come last: drawn over the others.
+    const byTop = (a: Label, b: Label) => Number(!!a.top) - Number(!!b.top);
     const shown = labels
       .filter((l) => !l.small)
       .slice(0, 1000)
+      .sort(byTop)
       .map((l) => ({ ...l, x: Math.round(l.x), y: Math.round(l.y) }));
     // Item texts are many and long: one that would cover a name (or an
     // earlier text) is left out.
     const boxes: [number, number, number, number][] = [];
     const pad = 2 * s;
     const free = (b: [number, number, number, number]) => !boxes.some((o) => b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1]);
+    const smallBox = (l: Label, w: number): [number, number, number, number] => [l.x - w / 2 - pad, l.y - 6 * s, l.x + w / 2 + pad, l.y + 6 * s];
     ctx.font = big;
     for (const l of shown) {
       const w = ctx.measureText(l.text).width;
@@ -166,26 +170,27 @@
     }
     // Small labels (tile coordinates, item texts): the small pixel font, many
     // of them, so one stroke for the outline instead of eight copies.
-    const small = labels.filter((l) => l.small);
+    const small = labels
+      .filter((l) => l.small)
+      .sort(byTop)
+      .map((l) => ({ ...l, x: Math.round(l.x), y: Math.round(l.y) }));
     if (small.length) {
       ctx.font = `${9 * s}px "Tibia Small", Verdana, sans-serif`;
+      for (const l of small) if (l.top) boxes.push(smallBox(l, ctx.measureText(l.text).width));
       ctx.textBaseline = "middle";
       ctx.lineWidth = 2 * s;
       ctx.lineJoin = "round";
       ctx.strokeStyle = "#000";
       for (const l of small) {
-        const x = Math.round(l.x);
-        const y = Math.round(l.y);
         ctx.textAlign = l.align ?? "center";
         if (l.cull) {
-          const w = ctx.measureText(l.text).width;
-          const box: [number, number, number, number] = [x - w / 2 - pad, y - 6 * s, x + w / 2 + pad, y + 6 * s];
+          const box = smallBox(l, ctx.measureText(l.text).width);
           if (!free(box)) continue;
           boxes.push(box);
         }
-        ctx.strokeText(l.text, x, y);
+        ctx.strokeText(l.text, l.x, l.y);
         ctx.fillStyle = l.color;
-        ctx.fillText(l.text, x, y);
+        ctx.fillText(l.text, l.x, l.y);
       }
     }
     ctx.font = big;
@@ -641,9 +646,7 @@
         const h = map.active?.houses?.find((x) => x.id === t.house);
         text += ` · house ${h?.name ?? t.house}`;
       }
-      if (t.flags & TF.pz) text += " · PZ";
-      if (t.text) text += ` · "${t.text.length > 120 ? t.text.slice(0, 119) + "…" : t.text}"`;
-    }
+      if (t.flags & TF.pz) text += " · PZ";    }
     hoverText = text;
   }
 

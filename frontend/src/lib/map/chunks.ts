@@ -166,7 +166,8 @@ export function decodeChunks(buf: ArrayBuffer): ChunkData[] {
       }
       let text: string | null = null;
       if (flags & TF.text) {
-        const len = v.getUint8(p++);
+        const len = v.getUint16(p, true);
+        p += 2;
         text = decoder.decode(bytes.subarray(p, p + len));
         p += len;
       }
