@@ -9,5 +9,10 @@ export default defineConfig({
     port: Number(process.env.WAILS_VITE_PORT) || 9245,
     strictPort: true,
   },
+  build: {
+    // Bundle ships embedded in the Wails binary and loads from disk, so
+    // chunk size doesn't affect load time the way it would over a network.
+    chunkSizeWarningLimit: 1024,
+  },
   plugins: [svelte(), wails("./bindings")],
 });
