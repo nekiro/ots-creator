@@ -11,7 +11,7 @@
   let s = $state<EditorSettings>(
     map.settings
       ? { ...map.settings }
-      : { automagic: true, eraserLeaveUnique: true, houseRemoveItems: true, autoDoorId: true, doodadEraseLike: false, defaultSpawnTime: 60, autoCreateSpawn: true, rawReplaceBottom: false },
+      : { automagic: true, eraserLeaveUnique: true, houseRemoveItems: true, autoDoorId: true, doodadEraseLike: false, defaultSpawnTime: 60, autoCreateSpawn: true, rawReplaceBottom: false, countU16: false },
   );
   let tab = $state(map.settingsTab);
   onDestroy(() => (map.settingsTab = "general"));
@@ -24,6 +24,7 @@
     { key: "doodadEraseLike", label: "Doodad eraser only removes its own items", hint: "Ctrl with a doodad brush only removes items of that brush." },
     { key: "autoCreateSpawn", label: "Creatures create a spawn", hint: "A creature placed outside every spawn gets a spawn of radius 1." },
     { key: "rawReplaceBottom", label: "Raw walls replace walls", hint: "Placing a bottom item (wall) removes the bottom items already on the tile." },
+    { key: "countU16", label: "Item counts as 16-bit numbers", hint: "For servers that read the count attribute as uint16 (stacks above 255). Maps open and save in this format; standard servers cannot read them." },
   ];
 
   // Keyboard: only actions that differ from their defaults are stored.

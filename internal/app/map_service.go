@@ -514,7 +514,7 @@ func (ms *MapService) OpenMap(path string) (OpenResult, error) {
 	if err != nil {
 		return OpenResult{}, err
 	}
-	m, warns, err := otmap.LoadProgress(path, d.items, func(stage otmap.Stage, done, total int) {
+	m, warns, err := otmap.LoadProgress(path, d.items, ms.store.EditorSettings().Format(), func(stage otmap.Stage, done, total int) {
 		st := loadSteps[stage]
 		p := st.start
 		if total > 0 {
@@ -566,7 +566,7 @@ func (ms *MapService) SaveMap(id int, path string) (MapChange, error) {
 	if d.items.Mode == otitems.ModeOTB {
 		m.ed.Map.ItemsMajor, m.ed.Map.ItemsMinor = d.items.MajorVersion, d.items.MinorVersion
 	}
-	warns, err := otmap.Save(path, m.ed.Map, d.items)
+	warns, err := otmap.Save(path, m.ed.Map, d.items, m.ed.Settings.Format())
 	if err != nil {
 		return MapChange{}, err
 	}

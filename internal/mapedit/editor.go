@@ -29,6 +29,14 @@ type Settings struct {
 	// RawReplaceBottom replaces bottom items (walls) of the same kind when
 	// placing a raw bottom item.
 	RawReplaceBottom bool `json:"rawReplaceBottom"`
+	// CountU16 reads and writes item counts as uint16 (servers with stacks
+	// above 255).
+	CountU16 bool `json:"countU16"`
+}
+
+// Format is the OTBM format the settings ask for.
+func (s Settings) Format() otmap.Format {
+	return otmap.Format{CountU16: s.CountU16}
 }
 
 // DefaultSettings returns the defaults.

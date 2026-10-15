@@ -395,12 +395,12 @@ const (
 type Progress func(stage Stage, done, total int)
 
 // Load reads a map and its auxiliary files from disk.
-func Load(path string, items Items) (*Map, []string, error) {
-	return LoadProgress(path, items, nil)
+func Load(path string, items Items, f Format) (*Map, []string, error) {
+	return LoadProgress(path, items, f, nil)
 }
 
 // LoadProgress is Load that reports its progress (progress may be nil).
-func LoadProgress(path string, items Items, progress Progress) (*Map, []string, error) {
+func LoadProgress(path string, items Items, f Format, progress Progress) (*Map, []string, error) {
 	if progress == nil {
 		progress = func(Stage, int, int) {}
 	}
@@ -409,7 +409,7 @@ func LoadProgress(path string, items Items, progress Progress) (*Map, []string, 
 	if err != nil {
 		return nil, nil, err
 	}
-	m, warns, err := readOTBM(data, items, progress)
+	m, warns, err := readOTBM(data, items, f, progress)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -462,7 +462,7 @@ func (m *Map) ClearModified() {
 
 // Save writes the map and its auxiliary files next to it. File names come
 // from the map (defaults derive from the map name). It returns warnings.
-func Save(path string, m *Map, items Items) ([]string, error) {
+func Save(path string, m *Map, items Items, f Format) ([]string, error) {
 	dir := filepath.Dir(path)
 	base := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	def := func(name *string, suffix string) {
@@ -481,7 +481,7 @@ func Save(path string, m *Map, items Items) ([]string, error) {
 	if len(m.Zones) > 0 {
 		def(&m.ZoneFile, "-zones.xml")
 	}
-	data, err := EncodeOTBM(m, items)
+	data, err := EncodeOTBM(m, items, f)
 	if err != nil {
 		return nil, err
 	}

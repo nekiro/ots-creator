@@ -54,7 +54,7 @@ func TestSaveLoadTFS(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "world.otbm")
 	m := sampleMap()
-	warns, err := Save(path, m, items)
+	warns, err := Save(path, m, items, Format{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestSaveLoadTFS(t *testing.T) {
 			t.Fatalf("%s not written: %v", f, err)
 		}
 	}
-	got, warns, err := Load(path, items)
+	got, warns, err := Load(path, items, Format{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +119,7 @@ func TestSaveLoadSeparateSpawns(t *testing.T) {
 	npcTile.EnsureExt().SpawnNPC = &Spawn{Radius: 1}
 	m.Zones = []Zone{{ID: 3, Name: "arena"}}
 	m.Tile(Position{100, 100, 7}).Ext.Zones = []uint16{3}
-	if _, err := Save(path, m, items); err != nil {
+	if _, err := Save(path, m, items, Format{}); err != nil {
 		t.Fatal(err)
 	}
 	for _, f := range []string{"world-monster.xml", "world-npc.xml", "world-zones.xml"} {
@@ -131,7 +131,7 @@ func TestSaveLoadSeparateSpawns(t *testing.T) {
 	if !strings.Contains(string(data), `<npc name="Guide"`) {
 		t.Fatalf("npc file:\n%s", data)
 	}
-	got, warns, err := Load(path, items)
+	got, warns, err := Load(path, items, Format{})
 	if err != nil || len(warns) != 0 {
 		t.Fatal(err, warns)
 	}
@@ -149,7 +149,7 @@ func TestSaveLoadSeparateSpawns(t *testing.T) {
 func TestUnsavedCreatureWarning(t *testing.T) {
 	m := New(100, 100)
 	m.SetTile(Position{10, 10, 7}, &Tile{Ext: &TileExt{Creatures: []Creature{{Name: "Rat"}}}})
-	warns, err := Save(filepath.Join(t.TempDir(), "m.otbm"), m, testItems())
+	warns, err := Save(filepath.Join(t.TempDir(), "m.otbm"), m, testItems(), Format{})
 	if err != nil {
 		t.Fatal(err)
 	}

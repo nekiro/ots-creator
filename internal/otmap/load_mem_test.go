@@ -52,7 +52,7 @@ func TestMapMemory(t *testing.T) {
 			}
 		}
 	}()
-	m, warns, err := Load(path, items)
+	m, warns, err := Load(path, items, Format{})
 	close(done)
 	if err != nil {
 		t.Fatal(err)
@@ -81,12 +81,12 @@ func TestMapMemory(t *testing.T) {
 	t.Logf("heap retained %.0f MB, peak sampled %.0f MB, sys %.0f MB", float64(after-base)/1e6, float64(peak)/1e6, float64(ms.Sys)/1e6)
 	if os.Getenv("OTS_ROUNDTRIP") != "" {
 		start := time.Now()
-		data, err := EncodeOTBM(m, items)
+		data, err := EncodeOTBM(m, items, Format{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		enc := time.Since(start)
-		got, _, err := ReadOTBM(data, items)
+		got, _, err := ReadOTBM(data, items, Format{})
 		if err != nil {
 			t.Fatal(err)
 		}

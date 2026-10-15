@@ -66,9 +66,17 @@ type Items interface {
 	Get(id uint16) *otitems.Type
 }
 
+// Format holds OTBM variants of server forks. The zero value is the
+// standard format.
+type Format struct {
+	// CountU16 stores the count attribute as uint16 instead of uint8.
+	CountU16 bool `json:"countU16"`
+}
+
 type reader struct {
 	m        *Map
 	items    Items
+	format   Format
 	version  uint32
 	warnings []string
 	warned   map[string]int
@@ -94,11 +102,11 @@ func (r *reader) warn(format string, args ...any) {
 
 // ReadOTBM parses OTBM data. Unknown or broken parts are skipped and
 // reported as warnings.
-func ReadOTBM(data []byte, items Items) (*Map, []string, error) {
-	return readOTBM(data, items, nil)
+func ReadOTBM(data []byte, items Items, f Format) (*Map, []string, error) {
+	return readOTBM(data, items, f, nil)
 }
 
-func readOTBM(data []byte, items Items, progress Progress) (*Map, []string, error) {
+func readOTBM(data []byte, items Items, f Format, progress Progress) (*Map, []string, error) {
 	report := func(stage Stage, done, total int) {
 		if progress != nil {
 			progress(stage, done, total)
@@ -117,7 +125,7 @@ func readOTBM(data []byte, items Items, progress Progress) (*Map, []string, erro
 		}
 		m := New(w, h)
 		m.ItemsMajor, m.ItemsMinor = major, minor
-		r = &reader{m: m, items: items, version: version, warned: map[string]int{}}
+		r = &reader{m: m, items: items, format: f, version: version, warned: map[string]int{}}
 		if version > otbmNewest {
 			r.warn("OTBM version %d is newer than the editor knows; the map may load wrong", version)
 		}
@@ -319,7 +327,7 @@ func (r *reader) itemNode(n *otbnode.Node, pos Position) (Item, bool) {
 		r.warn("item without id at %d,%d,%d", pos.X, pos.Y, pos.Z)
 		return it, false
 	}
-	if err := readItemAttrs(ir, &it); err != nil {
+	if err := readItemAttrs(ir, &it, r.format); err != nil {
 		r.warn("item %d at %d,%d,%d: %v", it.ID, pos.X, pos.Y, pos.Z, err)
 	}
 	for _, cn := range n.Children {
@@ -342,11 +350,17 @@ var rawSizes = map[byte]int{
 	attrSleeperGUID: 4, attrSleepStart: 4,
 }
 
-func readItemAttrs(r *otbnode.Reader, it *Item) error {
+func readItemAttrs(r *otbnode.Reader, it *Item, f Format) error {
 	for r.More() {
 		a := r.U8()
 		switch a {
-		case attrCount, attrRuneCharges:
+		case attrCount:
+			if f.CountU16 {
+				it.Subtype = r.U16()
+			} else {
+				it.Subtype = uint16(r.U8())
+			}
+		case attrRuneCharges:
 			it.Subtype = uint16(r.U8())
 		case attrCharges:
 			it.Subtype = r.U16()
@@ -439,7 +453,7 @@ func (r *reader) waypoints(n *otbnode.Node) {
 }
 
 // WriteOTBM writes the map. Meta items (editor-only) are left out.
-func WriteOTBM(out io.Writer, m *Map, items Items) error {
+func WriteOTBM(out io.Writer, m *Map, items Items, f Format) error {
 	w := otbnode.NewWriter(out, [4]byte{'O', 'T', 'B', 'M'})
 	w.Start(nodeRoot)
 	w.U32(OTBMVersion)
@@ -466,7 +480,7 @@ func WriteOTBM(out io.Writer, m *Map, items Items) error {
 		w.U8(attrZoneFile)
 		w.String(baseName(m.ZoneFile))
 	}
-	ww := &writer{w: w, items: items}
+	ww := &writer{w: w, items: items, format: f}
 	area := struct {
 		x, y uint16
 		z    uint8
@@ -528,8 +542,9 @@ func baseName(p string) string {
 }
 
 type writer struct {
-	w     *otbnode.Writer
-	items Items
+	w      *otbnode.Writer
+	items  Items
+	format Format
 }
 
 func (w *writer) meta(id uint16) bool {
@@ -586,7 +601,11 @@ func (w *writer) item(it *Item) {
 			w.w.U16(it.Subtype)
 		} else {
 			w.w.U8(attrCount)
-			w.w.U8(uint8(min(it.Subtype, 255)))
+			if w.format.CountU16 {
+				w.w.U16(it.Subtype)
+			} else {
+				w.w.U8(uint8(min(it.Subtype, 255)))
+			}
 		}
 	}
 	if e := it.Ext; e != nil {
@@ -658,8 +677,8 @@ func (w *writer) item(it *Item) {
 }
 
 // EncodeOTBM returns the map as OTBM bytes.
-func EncodeOTBM(m *Map, items Items) ([]byte, error) {
+func EncodeOTBM(m *Map, items Items, f Format) ([]byte, error) {
 	var buf bytes.Buffer
-	err := WriteOTBM(&buf, m, items)
+	err := WriteOTBM(&buf, m, items, f)
 	return buf.Bytes(), err
 }

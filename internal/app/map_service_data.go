@@ -282,7 +282,7 @@ func (ms *MapService) ImportMap(id int, path string, o mapedit.ImportOptions) (M
 	if err != nil {
 		return MapChange{}, err
 	}
-	src, warns, err := otmap.Load(path, d.items)
+	src, warns, err := otmap.Load(path, d.items, ms.store.EditorSettings().Format())
 	if err != nil {
 		return MapChange{}, err
 	}
