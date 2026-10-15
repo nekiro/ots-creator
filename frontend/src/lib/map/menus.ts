@@ -4,7 +4,7 @@ import type { MenuEntry } from "../menu.svelte";
 import { MapService, fmtPos, type Position } from "./api";
 import { IF, TF, type TileData } from "./chunks";
 import { goTo, mapCommands } from "./commands";
-import { edit, map, selectBrush, warningCount } from "./state.svelte";
+import { edit, map, selectBrush, useCreature, warningCount } from "./state.svelte";
 import { addHouse, addTown, addWaypoint } from "./world";
 import { keyLabel } from "./keys";
 import type { ViewOptions } from "./renderer";
@@ -135,6 +135,9 @@ export function mapContextMenu(p: Position, t: TileData | null, actions: { pick:
     { label: `Inspect tile ${fmtPos(p)}`, action: () => mapCommands.inspect(p) },
     { label: "Copy position", action: () => copy(fmtPos(p)) },
   ];
+  if (t?.creatures?.length) {
+    out.push("-", ...t.creatures.map((c): MenuEntry => ({ label: `Use creature: ${c.name}`, action: () => useCreature(c) })));
+  }
   if (top && items) {
     out.push(
       "-",

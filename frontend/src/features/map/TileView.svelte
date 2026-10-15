@@ -2,7 +2,7 @@
   import { ask } from "../../lib/confirm.svelte";
   import { MapService, TILE_FLAGS, fmtPos, type Attr, type ItemRef, type TileItem, type Position, type ItemPatch } from "../../lib/map/api";
   import { goTo, mapCommands } from "../../lib/map/commands";
-  import { edit, map, selectBrush } from "../../lib/map/state.svelte";
+  import { edit, map, selectBrush, useCreature } from "../../lib/map/state.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import Select from "../../lib/ui/Select.svelte";
   import ItemIcon from "./ItemIcon.svelte";
@@ -343,6 +343,7 @@
                 <Select value={c.direction} width={70} options={DIRS} onchange={(v) => p && edit((id) => MapService.UpdateCreature(id, p!, ci, { direction: v, remove: false }))} />
               </div>
             </div>
+            <button class="t-icon-btn" title="Use as brush" onclick={() => useCreature(c)}><Icon name="pencil" /></button>
             <button class="t-icon-btn danger" title="Remove" onclick={() => p && edit((id) => MapService.UpdateCreature(id, p!, ci, { remove: true }))}><Icon name="trash" /></button>
           </div>
         {/each}

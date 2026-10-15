@@ -11,7 +11,7 @@
   import { rendered } from "../../lib/map/rendered";
   import { floorAdjust, mapCommands, spriteSize } from "../../lib/map/commands";
   import { MapRenderer, type GhostTile, type Label, type Marker, type RectMark } from "../../lib/map/renderer";
-  import { applyChange, edit, map, onMapChange, selectBrush, setCam, type BrushSel } from "../../lib/map/state.svelte";
+  import { applyChange, edit, map, onMapChange, selectBrush, setCam, useCreature, type BrushSel } from "../../lib/map/state.svelte";
   import { mapContextMenu } from "../../lib/map/menus";
   import FloorLadder from "./FloorLadder.svelte";
   import SelectionBar from "./SelectionBar.svelte";
@@ -640,6 +640,18 @@
     toast(`Brush: ${items.name(top)}`);
   }
 
+  /** Double click: a creature becomes the brush, anything else is inspected. */
+  function ondblclick(e: MouseEvent) {
+    const id = map.activeId;
+    if (map.tool !== "select" || id === null) return;
+    const p = tileAt(e);
+    const c = map.view.creatures ? store(id).peekTile(p.x, p.y, p.z)?.creatures?.at(-1) : undefined;
+    if (c) {
+      useCreature(c);
+      toast(`Brush: ${c.name}`);
+    } else mapCommands.inspect(p);
+  }
+
   function showMenu(e: MouseEvent, p: Position) {
     const id = map.activeId;
     if (id === null) return;
@@ -736,7 +748,7 @@
     onpointerleave={() => ((map.hover = null), (hoverText = ""), requestDraw())}
     onwheel={onwheel}
     oncontextmenu={(e) => e.preventDefault()}
-    ondblclick={(e) => map.tool === "select" && mapCommands.inspect(tileAt(e))}
+    ondblclick={ondblclick}
   ></canvas>
   <canvas class="labels" bind:this={overlay}></canvas>
   <FloorLadder />

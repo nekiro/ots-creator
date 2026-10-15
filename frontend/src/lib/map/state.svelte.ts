@@ -299,6 +299,11 @@ export function selectBrush(b: BrushSel): void {
   }
 }
 
+/** Selects a creature brush (from a creature on the map or the palette). */
+export function useCreature(c: { name: string; npc?: boolean }): void {
+  selectBrush({ kind: "creature", creature: c.name, npc: !!c.npc, label: c.name });
+}
+
 function brushKey(x: BrushSel): string {
   return `${x.kind}:${x.name ?? ""}:${x.item ?? ""}:${x.house ?? ""}:${x.creature ?? ""}:${x.flag ?? ""}:${x.zone ?? ""}:${x.waypoint ?? ""}:${x.doorType ?? ""}`;
 }
