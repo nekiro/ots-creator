@@ -11,11 +11,10 @@ type thingChange struct {
 }
 
 type spriteChange struct {
-	id            uint32
-	before, after []byte
-	// fromBase: before is the untouched sprite of the file, so undo marks
-	// the sprite unedited again (compiling then keeps it as it is).
-	fromBase bool
+	id uint32
+	// before and after are how the sprite resolved. Restoring a base slot
+	// marks the sprite unedited again (compiling then keeps it as it is).
+	before, after spriteSlot
 }
 
 // edit is one undoable operation. It records list lengths before and after
@@ -124,25 +123,27 @@ func setSlot(p *Project, c thing.Category, id uint32, t *thing.Thing) {
 }
 
 func (r *recorder) setSprite(id uint32, c []byte) {
-	if _, ok := r.sprIdx[id]; !ok {
-		before, _ := r.p.sprites.compressed(id)
-		r.setSpriteKnown(id, before, c)
-		return
+	if len(c) == 0 {
+		c = nil
 	}
-	r.e.sprites[r.sprIdx[id]].after = c
-	r.p.sprites.set(id, c)
-	r.p.delta.sprite(id)
+	r.setSpriteSlot(id, spriteSlot{kind: slotData, data: c})
 }
 
-// setSpriteKnown is setSprite for a caller that already read the current
-// data of the sprite (before), which saves a slow read for asset sheets.
-func (r *recorder) setSpriteKnown(id uint32, before, c []byte) {
-	if _, ok := r.sprIdx[id]; !ok {
-		r.sprIdx[id] = len(r.e.sprites)
-		r.e.sprites = append(r.e.sprites, spriteChange{id: id, before: before, fromBase: !r.p.sprites.edited(id)})
+// moveSprite makes sprite dst read what sprite src reads now, without
+// reading the sprite.
+func (r *recorder) moveSprite(dst, src uint32) {
+	r.setSpriteSlot(dst, r.p.sprites.slotOf(src))
+}
+
+func (r *recorder) setSpriteSlot(id uint32, sl spriteSlot) {
+	i, ok := r.sprIdx[id]
+	if !ok {
+		i = len(r.e.sprites)
+		r.sprIdx[id] = i
+		r.e.sprites = append(r.e.sprites, spriteChange{id: id, before: r.p.sprites.slot(id)})
 	}
-	r.e.sprites[r.sprIdx[id]].after = c
-	r.p.sprites.set(id, c)
+	r.p.sprites.setSlot(id, sl)
+	r.e.sprites[i].after = r.p.sprites.slot(id)
 	r.p.delta.sprite(id)
 }
 
@@ -200,13 +201,10 @@ func (p *Project) applyEdit(e *edit, forward bool) {
 		if ch.id > count {
 			continue
 		}
-		switch {
-		case forward:
-			p.sprites.set(ch.id, ch.after)
-		case ch.fromBase:
-			p.sprites.unset(ch.id)
-		default:
-			p.sprites.set(ch.id, ch.before)
+		if forward {
+			p.sprites.setSlot(ch.id, ch.after)
+		} else {
+			p.sprites.setSlot(ch.id, ch.before)
 		}
 	}
 }

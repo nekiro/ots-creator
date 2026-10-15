@@ -64,6 +64,8 @@ class AppState {
   busy = $state<string | null>(null);
   /** Progress of the running long operation, while it reports one. */
   progress = $state<{ done: number; total: number } | null>(null);
+  /** Label of the running operation that blocks the window with a loader (see run). */
+  modal = $state<string | null>(null);
   /** The running operation can be stopped (commands.stopTask). */
   stoppable = $state(false);
   stopping = $state(false);
@@ -176,9 +178,13 @@ export function hasToast(key: string): boolean {
   return app.toasts.some((x) => x.key === key);
 }
 
-/** Runs an async action with a busy indicator and error toast. */
-export async function run<T>(label: string, fn: () => Promise<T>): Promise<T | undefined> {
+/**
+ * Runs an async action with a busy indicator and error toast. A modal run
+ * also covers the window with a loader (BusyOverlay) until it ends.
+ */
+export async function run<T>(label: string, fn: () => Promise<T>, opts?: { modal?: boolean }): Promise<T | undefined> {
   app.busy = label;
+  if (opts?.modal) app.modal = label;
   try {
     return await fn();
   } catch (e) {
@@ -187,6 +193,7 @@ export async function run<T>(label: string, fn: () => Promise<T>): Promise<T | u
   } finally {
     app.busy = null;
     app.progress = null;
+    app.modal = null;
   }
 }
 

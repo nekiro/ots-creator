@@ -110,7 +110,7 @@ func BenchmarkBigClient(b *testing.B) {
 	})
 	b.Run("Optimize", func(b *testing.B) {
 		for range b.N {
-			p.OptimizeSprites(OptimizeOptions{Duplicates: true, Empty: true})
+			p.OptimizeSprites(OptimizeOptions{Duplicates: true, Empty: true}, nil)
 			p.Undo()
 		}
 	})

@@ -23,33 +23,50 @@ type OptimizeResult struct {
 	Empty      int    `json:"empty"`
 	// Things counts things whose sprite ids were rewritten.
 	Things int `json:"things"`
+	// Bytes is how much smaller the spr file gets. Asset folders keep their
+	// sheets, so it is 0 there.
+	Bytes int64 `json:"bytes"`
 }
 
-// OptimizeSprites removes duplicate, empty and unused sprites, renumbers
-// the remaining ones without gaps (keeping their order) and rewrites the
-// sprite ids of every thing. It is one undo step.
-func (p *Project) OptimizeSprites(o OptimizeOptions) (OptimizeResult, error) {
+// spritePlan is what OptimizeSprites would change.
+type spritePlan struct {
+	res OptimizeResult
+	// canon maps every id to the id that replaces it (0 = empty).
+	canon []uint32
+	// newID maps kept ids to their renumbered id (0 = dropped).
+	newID []uint32
+}
+
+// AnalyzeSprites reports what OptimizeSprites would remove without changing
+// anything. Things is not counted. progress may be nil.
+func (p *Project) AnalyzeSprites(o OptimizeOptions, progress func(done, total int)) (OptimizeResult, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	pl, err := p.planSprites(o, newCounter(int(p.sprites.count()), progress))
+	return pl.res, err
+}
+
+// planSprites finds duplicate, empty and unused sprites by content hash,
+// ticking prog for every sprite. The caller holds p.mu.
+func (p *Project) planSprites(o OptimizeOptions, prog *counter) (spritePlan, error) {
 	n := p.sprites.count()
 	res := OptimizeResult{Before: n, After: n}
 
-	data := make([][]byte, n+1)
-	err := p.sprites.eachCompressed(func(id uint32, c []byte) error {
-		data[id] = c
-		return nil
+	hashes := make([]spriteHash, n+1)
+	err := p.sprites.eachHash(func(id uint32, h spriteHash) {
+		hashes[id] = h
+		prog.tick()
 	})
 	if err != nil {
-		return res, err
+		return spritePlan{res: res}, err
 	}
 
-	// canon maps every id to the id that replaces it (0 = empty).
 	canon := make([]uint32, n+1)
-	first := map[string]uint32{}
+	first := make(map[spriteHash]uint32, n)
 	for id := uint32(1); id <= n; id++ {
 		canon[id] = id
-		c := data[id]
-		if len(c) == 0 {
+		h := hashes[id]
+		if h == (spriteHash{}) {
 			if o.Empty {
 				canon[id] = 0
 				res.Empty++
@@ -59,11 +76,11 @@ func (p *Project) OptimizeSprites(o OptimizeOptions) (OptimizeResult, error) {
 		if !o.Duplicates {
 			continue
 		}
-		if prev, ok := first[string(c)]; ok {
+		if prev, ok := first[h]; ok {
 			canon[id] = prev
 			res.Duplicates++
 		} else {
-			first[string(c)] = id
+			first[h] = id
 		}
 	}
 
@@ -85,7 +102,7 @@ func (p *Project) OptimizeSprites(o OptimizeOptions) (OptimizeResult, error) {
 	newID := make([]uint32, n+1)
 	var next uint32
 	for id := uint32(1); id <= n; id++ {
-		keep := canon[id] == id && (len(data[id]) > 0 || !o.Empty)
+		keep := canon[id] == id && (hashes[id] != (spriteHash{}) || !o.Empty)
 		if keep && o.Unused && !used[id] {
 			keep = false
 			res.Unused++
@@ -93,8 +110,39 @@ func (p *Project) OptimizeSprites(o OptimizeOptions) (OptimizeResult, error) {
 		if keep {
 			next++
 			newID[id] = next
+			continue
+		}
+		if p.format == FormatAssets {
+			continue
+		}
+		// A removed sprite frees its spr address and, unless empty, its data.
+		res.Bytes += 4
+		if hashes[id] != (spriteHash{}) {
+			size, err := p.sprites.dataSize(id)
+			if err != nil {
+				return spritePlan{res: res}, err
+			}
+			res.Bytes += 5 + int64(size)
 		}
 	}
+	res.After = next
+	return spritePlan{res: res, canon: canon, newID: newID}, nil
+}
+
+// OptimizeSprites removes duplicate, empty and unused sprites, renumbers
+// the remaining ones without gaps (keeping their order) and rewrites the
+// sprite ids of every thing. It is one undo step. progress may be nil.
+func (p *Project) OptimizeSprites(o OptimizeOptions, progress func(done, total int)) (OptimizeResult, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	// Hashing every sprite, then moving every sprite.
+	prog := newCounter(2*int(p.sprites.count()), progress)
+	pl, err := p.planSprites(o, prog)
+	if err != nil {
+		return pl.res, err
+	}
+	res, canon, newID := pl.res, pl.canon, pl.newID
+	n, next := res.Before, res.After
 	remap := func(id uint32) uint32 {
 		if id == 0 || id > n {
 			return id
@@ -125,18 +173,18 @@ func (p *Project) OptimizeSprites(o OptimizeOptions) (OptimizeResult, error) {
 			}
 		}
 	}
-	// Move kept sprites down, then record every dropped slot so undo can
-	// restore it, then shrink.
+	// Move kept sprites down (aliases: nothing is decoded), then record
+	// every dropped slot so undo can restore it, then shrink.
 	for id := uint32(1); id <= n; id++ {
 		if m := newID[id]; m != 0 && m != id {
-			r.setSpriteKnown(m, data[m], data[id]) // m < id: not written yet
+			r.moveSprite(m, id) // m < id: id is not written yet
 		}
+		prog.tick()
 	}
 	for id := next + 1; id <= n; id++ {
-		r.setSpriteKnown(id, data[id], nil)
+		r.setSprite(id, nil)
 	}
 	r.setSpriteCount(next)
 	r.commit()
-	res.After = next
 	return res, nil
 }

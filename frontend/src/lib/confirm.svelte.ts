@@ -8,26 +8,36 @@ export interface Question {
   ok: string;
   /** Red confirming button; on by default for removing words (Remove, Delete…). */
   danger?: boolean;
+  /** Label of a second, non-cancelling button (see choose). */
+  alt?: string;
 }
+
+/** The button that closed a question; null is Cancel. */
+export type Choice = "ok" | "alt" | null;
 
 /** Labels of buttons that destroy something: shown red. */
 export const DESTRUCTIVE = /^(remove|delete|discard|clear|erase|reset)\b/i;
 
-export const confirmState = $state<{ question: (Question & { resolve: (yes: boolean) => void }) | null }>({ question: null });
+export const confirmState = $state<{ question: (Question & { resolve: (c: Choice) => void }) | null }>({ question: null });
 
 /** Shows a confirmation dialog. A second question cancels the first. */
-export function ask(q: Question): Promise<boolean> {
-  confirmState.question?.resolve(false);
+export async function ask(q: Question): Promise<boolean> {
+  return (await choose({ ...q, alt: undefined })) === "ok";
+}
+
+/** Shows a confirmation dialog with an extra button. A second question cancels the first. */
+export function choose(q: Question): Promise<Choice> {
+  confirmState.question?.resolve(null);
   return new Promise((resolve) => {
     confirmState.question = { ...q, resolve };
   });
 }
 
-/** Answers the pending question. */
-export function answer(yes: boolean): void {
+/** Answers the pending question: true is the ok button, false is Cancel. */
+export function answer(c: boolean | "alt"): void {
   const q = confirmState.question;
   confirmState.question = null;
-  q?.resolve(yes);
+  q?.resolve(c === true ? "ok" : c === "alt" ? "alt" : null);
 }
 
 export interface TextQuestion {

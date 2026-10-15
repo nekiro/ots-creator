@@ -10,6 +10,7 @@ import {
   WindowService,
   encodeBytes,
   errorMessage,
+  formatSize,
   minId,
   res,
   type PropsPatch,
@@ -18,7 +19,7 @@ import {
   OBJECT_EXT,
 } from "./api";
 import { clipboardThing, copyThing, pasteInto, type PasteMode } from "./clipboard";
-import { ask } from "./confirm.svelte";
+import { ask, choose } from "./confirm.svelte";
 import { prefs } from "./prefs.svelte";
 import { app, applyDraft, revertDraft, run, select, toast, versions } from "./state.svelte";
 import { map } from "./map/state.svelte";
@@ -71,6 +72,38 @@ async function confirmLeave(title: string, ok: string): Promise<boolean> {
   if (!(await confirmDiscard())) return false;
   if (!app.project?.info.changed) return true;
   return ask({ title, message: "The client has uncompiled changes. Continue anyway?", ok });
+}
+
+/** ", saves 12.3 MB" for a spr file; asset folders keep their sheets. */
+const saved = (bytes: number) => (bytes > 0 ? `, saves ${formatSize(bytes)}` : "");
+
+/**
+ * Before a compile: when sprites can be optimized, asks whether to do it
+ * first. False when the user cancelled the compile.
+ */
+export async function offerOptimize(): Promise<boolean> {
+  const o = { duplicates: true, empty: true, unused: true };
+  const plan = await run("Checking sprites", () => SpriteService.Analyze(o), { modal: true });
+  if (!plan || plan.before === plan.after) return true;
+  const parts = [
+    plan.duplicates && `${plan.duplicates.toLocaleString()} duplicate`,
+    plan.empty && `${plan.empty.toLocaleString()} empty`,
+    plan.unused && `${plan.unused.toLocaleString()} unused`,
+  ].filter(Boolean);
+  const c = await choose({
+    title: "Optimize sprites",
+    message: `${(plan.before - plan.after).toLocaleString()} sprites can be removed (${parts.join(", ")}): ${plan.before.toLocaleString()} → ${plan.after.toLocaleString()}${saved(plan.bytes)}.
+Optimize them before compiling? Undo reverts it.`,
+    ok: "Optimize",
+    alt: "Compile as is",
+  });
+  if (c === null) return false;
+  if (c === "alt") return true;
+  const done = await run("Optimizing sprites", () => SpriteService.Optimize(o), { modal: true });
+  if (!done) return false;
+  app.selectedSprites = [];
+  toast(`Optimized sprites: ${done.before.toLocaleString()} → ${done.after.toLocaleString()}${saved(done.bytes)}.`, "success");
+  return true;
 }
 
 async function importSheetWith(load: (id: number) => Promise<void>): Promise<void> {
@@ -161,6 +194,7 @@ export const commands = {
       app.dialog = "compile";
       return;
     }
+    if (!(await offerOptimize())) return;
     const ok = await run("Compiling", async () => {
       await ProjectService.Compile();
       return true;

@@ -212,6 +212,8 @@ type assetWriter struct {
 	pieces *assets.PieceMap // nil when converting from dat/spr
 	known  map[string]*newSprite
 	order  []*newSprite
+	// byHash lists base pieces by content hash (see sameContent).
+	byHash map[spriteHash][]uint32
 }
 
 // resolve implements assets.Resolver. Untouched pieces of an existing
@@ -222,6 +224,9 @@ func (w *assetWriter) resolve(pieces []uint32, tw, th int) (uint32, error) {
 	if w.pieces != nil {
 		if id, ok := w.pieces.Sprite(pieces, tw, th); ok && id != 0 && !w.anyEdited(pieces) {
 			return id, nil
+		}
+		if id, ok, err := w.sameContent(pieces, tw, th); err != nil || ok {
+			return id, err
 		}
 	}
 	typ, _ := assets.SpriteTypeFor(tw, th)
@@ -249,6 +254,90 @@ func (w *assetWriter) resolve(pieces []uint32, tw, th int) (uint32, error) {
 		w.order = append(w.order, s)
 	}
 	return s.id, nil
+}
+
+// sameContent finds an existing sprite whose pieces look exactly like
+// pieces (by content hash), for pieces that were moved or merged by an
+// optimization. Hashes are cached, so this rarely decodes a sheet.
+func (w *assetWriter) sameContent(pieces []uint32, tw, th int) (uint32, bool, error) {
+	if len(pieces) != tw*th {
+		return 0, false, nil
+	}
+	hashes := make([]spriteHash, len(pieces))
+	var key spriteHash
+	for k, id := range pieces {
+		if id == 0 {
+			continue
+		}
+		h, err := w.p.sprites.hash(id)
+		if err != nil {
+			return 0, false, err
+		}
+		hashes[k] = h
+		if key == (spriteHash{}) {
+			key = h
+		}
+	}
+	if key == (spriteHash{}) {
+		return 0, false, nil // fully transparent
+	}
+	if w.byHash == nil {
+		if err := w.indexBase(); err != nil {
+			return 0, false, err
+		}
+	}
+	for _, b := range w.byHash[key] {
+		at, ok := w.pieces.Locate(b)
+		if !ok || at.Sprite == 0 {
+			continue
+		}
+		first, pw, ph, ok := w.pieces.Pieces(at.Sprite)
+		if !ok || pw != tw || ph != th {
+			continue
+		}
+		same := true
+		for k, h := range hashes {
+			want, err := w.p.sprites.baseHash(first + uint32(k))
+			if err != nil {
+				return 0, false, err
+			}
+			if h != want {
+				same = false
+				break
+			}
+		}
+		if same {
+			return at.Sprite, true, nil
+		}
+	}
+	return 0, false, nil
+}
+
+// indexBase lists the base pieces by content hash.
+func (w *assetWriter) indexBase() error {
+	s := w.p.sprites
+	n := s.baseCount()
+	hashes := make([]spriteHash, n+1)
+	err := parallelRange(1, n, spriteChunk, func(from, to uint32) error {
+		for b := from; b <= to; b++ {
+			h, err := s.baseHash(b)
+			if err != nil {
+				return err
+			}
+			hashes[b] = h
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	w.byHash = map[spriteHash][]uint32{}
+	for b := uint32(1); b <= n; b++ {
+		if h := hashes[b]; h != (spriteHash{}) {
+			w.byHash[h] = append(w.byHash[h], b)
+		}
+	}
+	return nil
 }
 
 func (w *assetWriter) anyEdited(pieces []uint32) bool {
@@ -357,6 +446,25 @@ func (p *Project) compileAssets(dir string, progress func(done, total int)) erro
 
 	sheets := make([]assets.Sheet, len(groups))
 	errs := make([]error, len(groups))
+	// Sheet files are named by the hash of their data: a name that exists
+	// already holds the same sheet (sprites of different types with the same
+	// pixels, or a sheet copied above), so it is written once.
+	var writtenMu sync.Mutex
+	written := map[string]bool{}
+	writeSheet := func(name string, data []byte) error {
+		writtenMu.Lock()
+		dup := written[name]
+		written[name] = true
+		writtenMu.Unlock()
+		if dup {
+			return nil
+		}
+		path := filepath.Join(dir, name)
+		if _, err := os.Stat(path); err == nil {
+			return nil
+		}
+		return writeAtomic(path, data)
+	}
 	jobs := make(chan int)
 	var wg sync.WaitGroup
 	for range min(runtime.NumCPU(), max(len(groups), 1)) {
@@ -366,7 +474,7 @@ func (p *Project) compileAssets(dir string, progress func(done, total int)) erro
 			for i := range jobs {
 				var data []byte
 				if data, sheets[i], errs[i] = encodeSheet(groups[i]); errs[i] == nil {
-					errs[i] = writeAtomic(filepath.Join(dir, sheets[i].File), data)
+					errs[i] = writeSheet(sheets[i].File, data)
 				}
 				done.tick()
 			}

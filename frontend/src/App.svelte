@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import AboutDialog from "./features/dialogs/AboutDialog.svelte";
   import CompileDialog from "./features/dialogs/CompileDialog.svelte";
+  import BusyOverlay from "./lib/ui/BusyOverlay.svelte";
   import NewDialog from "./features/dialogs/NewDialog.svelte";
   import OpenDialog from "./features/dialogs/OpenDialog.svelte";
   import UpdateDialog from "./features/dialogs/UpdateDialog.svelte";
@@ -189,6 +190,7 @@
 {#if app.dialog === "exportSprites" && app.open}<ExportSpritesDialog />{/if}
 {#if app.dialog === "share" && app.shareTarget && (app.open || app.shareTarget.kind === "file")}<ShareDialog />{/if}
 <ConfirmDialog />
+<BusyOverlay />
 <Toasts />
 <ContextMenu />
 

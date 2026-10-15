@@ -50,20 +50,3 @@ func parallelRange(first, last, size uint32, fn func(from, to uint32) error) err
 	wg.Wait()
 	return firstErr
 }
-
-// eachCompressed calls fn with the compressed data of every sprite, from
-// all cores (see parallelRange). Callers hold the project lock.
-func (s *spriteStore) eachCompressed(fn func(id uint32, c []byte) error) error {
-	return parallelRange(1, s.count(), spriteChunk, func(from, to uint32) error {
-		for id := from; id <= to; id++ {
-			c, err := s.compressed(id)
-			if err != nil {
-				return err
-			}
-			if err := fn(id, c); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-}

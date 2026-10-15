@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { DialogService, Format, ProjectService, type Features, type Version } from "../../lib/api";
+  import { offerOptimize } from "../../lib/commands";
   import { applyDraft, app, run, toast } from "../../lib/state.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Select from "../../lib/ui/Select.svelte";
@@ -42,6 +43,7 @@
 
   async function compileAssets() {
     if (app.dirty) await applyDraft();
+    if (!(await offerOptimize())) return;
     // The status bar shows the compile while it runs.
     app.dialog = null;
     const ok = await run("Compiling", async () => {
@@ -57,6 +59,7 @@
     if (toAssets) return compileAssets();
     if (!version || !dir || !name) return;
     if (app.dirty) await applyDraft();
+    if (!(await offerOptimize())) return;
     const base = dir + sep + name;
     app.dialog = null;
     const ok = await run("Compiling", async () => {

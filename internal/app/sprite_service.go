@@ -148,11 +148,20 @@ func (ss *SpriteService) Optimize(o project.OptimizeOptions) (project.OptimizeRe
 	if err != nil {
 		return project.OptimizeResult{}, err
 	}
-	res, err := p.OptimizeSprites(o)
+	res, err := p.OptimizeSprites(o, ss.s.reporter("Optimizing sprites"))
 	if err == nil && (res.Before != res.After || res.Things > 0) {
 		ss.s.Changed()
 	}
 	return res, err
+}
+
+// Analyze reports what Optimize would remove without changing anything.
+func (ss *SpriteService) Analyze(o project.OptimizeOptions) (project.OptimizeResult, error) {
+	p, err := ss.s.Project()
+	if err != nil {
+		return project.OptimizeResult{}, err
+	}
+	return p.AnalyzeSprites(o, ss.s.reporter("Checking sprites"))
 }
 
 // Find returns the ids of sprites matching a filter (see project.FindSprites).

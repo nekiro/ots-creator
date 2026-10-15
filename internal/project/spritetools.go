@@ -2,7 +2,6 @@ package project
 
 import (
 	"fmt"
-	"hash/maphash"
 	"slices"
 
 	"github.com/nekiro/ots-creator/internal/thing"
@@ -31,10 +30,7 @@ func (p *Project) FindSprites(filter string) ([]uint32, error) {
 		}
 	case SpritesEmpty:
 		empty := make([]bool, n+1)
-		err := p.sprites.eachCompressed(func(id uint32, c []byte) error {
-			empty[id] = len(c) == 0
-			return nil
-		})
+		err := p.sprites.eachHash(func(id uint32, h spriteHash) { empty[id] = h == spriteHash{} })
 		if err != nil {
 			return nil, err
 		}
@@ -146,22 +142,15 @@ func (p *Project) ReplaceSpriteRefs(from []uint32, to uint32) (int, error) {
 // a collision is practically impossible and nothing is read twice.
 func (p *Project) duplicateSprites() ([]uint32, error) {
 	n := p.sprites.count()
-	s1, s2 := maphash.MakeSeed(), maphash.MakeSeed()
-	hashes := make([][2]uint64, n+1)
-	err := p.sprites.eachCompressed(func(id uint32, c []byte) error {
-		if len(c) > 0 {
-			hashes[id] = [2]uint64{maphash.Bytes(s1, c) | 1, maphash.Bytes(s2, c)} // 0 marks empty
-		}
-		return nil
-	})
-	if err != nil {
+	hashes := make([]spriteHash, n+1)
+	if err := p.sprites.eachHash(func(id uint32, h spriteHash) { hashes[id] = h }); err != nil {
 		return nil, err
 	}
 	dups := make([]uint32, n+1)
-	first := make(map[[2]uint64]uint32, n)
+	first := make(map[spriteHash]uint32, n)
 	for id := uint32(1); id <= n; id++ {
 		h := hashes[id]
-		if h[0] == 0 {
+		if h == (spriteHash{}) {
 			continue
 		}
 		if f, ok := first[h]; ok {

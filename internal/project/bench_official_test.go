@@ -38,13 +38,63 @@ func TestProfileOfficialAssets(t *testing.T) {
 	step("FindThings used", func() error { _, err := p.FindThings(thing.CategoryItem, Filter{Content: ContentUsed}); return err })
 	step("Diff items (same client)", func() error { _, err := Diff(p, q, thing.CategoryItem); return err })
 	step("Diff outfits", func() error { _, err := Diff(p, q, thing.CategoryOutfit); return err })
+	all := OptimizeOptions{Duplicates: true, Empty: true, Unused: true}
+	step("AnalyzeSprites (cold)", func() error { _, err := p.AnalyzeSprites(all, nil); return err })
+	step("AnalyzeSprites (cached)", func() error { _, err := p.AnalyzeSprites(all, nil); return err })
 	step("FindSprites empty", func() error { _, err := p.FindSprites(SpritesEmpty); return err })
 	step("FindSprites duplicate", func() error { _, err := p.FindSprites(SpritesDuplicate); return err })
 	step("FindSprites unused", func() error { _, err := p.FindSprites(SpritesUnused); return err })
 	step("Optimize (dry: undo)", func() error {
-		_, err := p.OptimizeSprites(OptimizeOptions{Duplicates: true, Empty: true})
+		_, err := p.OptimizeSprites(OptimizeOptions{Duplicates: true, Empty: true}, nil)
 		p.Undo()
 		return err
+	})
+	out := t.TempDir()
+	step("Optimize + Compile", func() error {
+		if _, err := q.OptimizeSprites(OptimizeOptions{Duplicates: true, Empty: true, Unused: true}, nil); err != nil {
+			return err
+		}
+		return q.Compile(CompileOptions{Format: FormatAssets, DatPath: out})
+	})
+	// Every sprite of every object must look the same after optimizing and
+	// compiling (p is back at the original after the undo above).
+	step("Verify optimized output", func() error {
+		r, err := OpenAssets(out)
+		if err != nil {
+			return err
+		}
+		hashOf := func(x *Project, id uint32) spriteHash {
+			if id == 0 {
+				return spriteHash{}
+			}
+			h, err := x.sprites.hash(id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return h
+		}
+		for _, c := range thing.Categories {
+			for i, a := range p.things.Things[c] {
+				b := r.things.Things[c][i]
+				if a == nil {
+					continue
+				}
+				for gi, g := range a.FrameGroups {
+					for si, id := range g.Sprites {
+						// Hashes use per-store seeds: compare pixels on mismatch.
+						pa, _ := p.sprites.pixels(id)
+						if hashOf(p, id) == (spriteHash{}) && hashOf(r, b.FrameGroups[gi].Sprites[si]) == (spriteHash{}) {
+							continue
+						}
+						pb, _ := r.sprites.pixels(b.FrameGroups[gi].Sprites[si])
+						if string(pa) != string(pb) {
+							t.Fatalf("%v %d group %d sprite %d differs", c, a.ID, gi, si)
+						}
+					}
+				}
+			}
+		}
+		return nil
 	})
 	step("Edit + Compile", func() error {
 		it, _ := p.Thing(thing.CategoryItem, 3031)

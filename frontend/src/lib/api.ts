@@ -113,6 +113,11 @@ export function encodeBytes(bytes: Uint8Array | Uint8ClampedArray): string {
   return btoa(bin);
 }
 
+/** Formats a byte count as KB or MB. */
+export function formatSize(bytes: number): string {
+  return bytes < 1048576 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1048576).toFixed(1)} MB`;
+}
+
 /** Normalizes Go errors (strings or Error objects) into a message. */
 export function errorMessage(e: unknown): string {
   if (e instanceof Error) return e.message;
