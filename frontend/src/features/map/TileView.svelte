@@ -100,6 +100,13 @@
     sel = null;
   }
 
+  async function removeAt(index: number) {
+    if (!p) return;
+    const pos = p;
+    await edit((id) => MapService.RemoveItem(id, { pos, index, path: [] }));
+    if (sel && !sel.path.length && (sel.index === index || (index >= 0 && sel.index > index))) sel =sel.index === index ? null : { index: sel.index - 1, path: [] };
+  }
+
   async function move(index: number, to: number) {
     if (!p || !t || to < 0 || to >= (t.items?.length ?? 0)) return;
     await edit((id) => MapService.MoveItem(id, p, index, to));
@@ -223,12 +230,7 @@
                 </span>
               </span>
             </button>
-            {#if index >= 0}
-              <span class="ord">
-                <button class="mini" title="Move up" disabled={index >= (t.items?.length ?? 0) - 1} onclick={() => move(index, index + 1)}>▲</button>
-                <button class="mini" title="Move down" disabled={index <= 0} onclick={() => move(index, index - 1)}>▼</button>
-              </span>
-            {/if}
+            <button class="t-icon-btn danger del" title="Remove {it.name}" onclick={() => removeAt(index)}><Icon name="trash" /></button>
           </div>
         {:else}
           <div class="t-label empty">Empty tile</div>
@@ -256,7 +258,7 @@
             <label>Action id<input class="t-input" value={it.ext?.actionId || ""} placeholder="0" onchange={(e) => patch({ actionId: num(e.currentTarget.value) })} /></label>
             <label>Unique id<input class="t-input" value={it.ext?.uniqueId || ""} placeholder="0" onchange={(e) => patch({ uniqueId: num(e.currentTarget.value) })} /></label>
             {#if it.kind === "stackable"}
-              <label>Count<input class="t-input" value={it.subtype} onchange={(e) => patch({ subtype: Math.max(1, Math.min(255, num(e.currentTarget.value))) })} /></label>
+              <label>Count<input class="t-input" value={it.subtype} onchange={(e) => patch({ subtype: Math.max(1, Math.min(map.settings?.countU16 ? 65535 : 255, num(e.currentTarget.value))) })} /></label>
             {:else if it.kind === "charges" || it.kind === "rune"}
               <label>Charges<input class="t-input" value={it.subtype} onchange={(e) => patch({ subtype: num(e.currentTarget.value) })} /></label>
             {:else if it.kind === "fluid"}
@@ -459,21 +461,19 @@
     font: var(--fs-small) / 11px var(--font-small);
     color: var(--text-dim);
   }
-  .ord {
-    display: flex;
-    flex-direction: column;
+  .del {
+    flex: none;
+    margin-right: 2px;
+    color: #fff;
+    border-width: 3px;
+    border-image: url("../../assets/ui/btn-danger-idle.png") 3 fill / 3px stretch;
   }
-  .mini {
-    background: none;
-    border: 0;
-    color: var(--text-dim);
-    font-size: 8px;
-    line-height: 10px;
-    padding: 0 3px;
-    cursor: pointer;
+  .del:active:not(:disabled) {
+    border-image-source: url("../../assets/ui/btn-danger-pressed.png");
   }
-  .mini:disabled {
-    opacity: 0.3;
+  .del :global(svg) {
+    width: 12px;
+    height: 12px;
   }
   .empty {
     padding: 6px;
@@ -498,8 +498,12 @@
   }
   .grid2 {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 4px;
+  }
+  .grid2 :global(.t-input) {
+    width: 100%;
+    box-sizing: border-box;
   }
   .grid2 label {
     display: flex;
