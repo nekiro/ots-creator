@@ -249,8 +249,7 @@ body {
 .t-btn:active:not(:disabled),
 .t-btn.on {
   border-image-source: url("./assets/ui/button-grey-down.png");
-  padding-top: 2px;
-  padding-left: 11px;
+  padding: 2px 9px 0 11px;
 }
 .t-btn:disabled {
   color: #dfdfdf88;
