@@ -77,7 +77,7 @@
   const fit = $derived.by(() => {
     if (!stageSize[0]) return 1;
     const r = Math.min((stageSize[0] - 24) / sheetW, (stageSize[1] - 24) / sheetH);
-    return Math.min(8, Math.max(1, Math.floor(r)));
+    return Math.min(4, Math.max(1, Math.floor(r))); // like the preview: no huge zoom on big screens
   });
   $effect(() => {
     fitZoom = fit;

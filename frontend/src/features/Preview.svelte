@@ -38,8 +38,9 @@
   const readonly = $derived(!!source);
 
   let canvas = $state<HTMLCanvasElement>();
-  // Zoom follows the window (largest whole zoom that fits) until the user
-  // zooms by hand; selecting another object returns to fitting.
+  // Zoom follows the window (largest whole zoom that fits, up to
+  // MAX_FIT_ZOOM) until the user zooms by hand; a hand zoom stays when
+  // another object is selected, until Fit.
   let manualZoom = $state<number | null>(null);
   let stage = $state<HTMLDivElement>();
   let stageSize = $state<[number, number]>([0, 0]);
@@ -69,13 +70,16 @@
   const size = $derived(source ? source.size : loaded >= 0 ? spriteCache.size : 32);
 
   const MAX_ZOOM = 16;
+  // Fitting a small object to a big window would blow it up past what is
+  // useful to look at.
+  const MAX_FIT_ZOOM = 4;
   const fitZoom = $derived.by(() => {
     if (!g || !stageSize[0]) return 4;
     const w = canvasSize[0] || g.width * size;
     const h = canvasSize[1] || g.height * size;
     const margin = 34; // canvas-wrap margin and borders
     const r = Math.min((stageSize[0] - margin) / w, (stageSize[1] - margin) / h);
-    return Math.min(12, Math.max(1, Math.floor(r)));
+    return Math.min(MAX_FIT_ZOOM, Math.max(1, Math.floor(r)));
   });
   const zoom = $derived(manualZoom ?? fitZoom);
 
@@ -204,7 +208,6 @@
     lastKey = key;
     // Keep the idle/walking tab when the new thing has that group too.
     if (group >= (thing?.frameGroups.length ?? 1)) group = 0;
-    manualZoom = null;
     view.reset();
     paintImage = null;
     stroke = null;
