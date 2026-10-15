@@ -454,6 +454,12 @@ func (r *reader) waypoints(n *otbnode.Node) {
 
 // WriteOTBM writes the map. Meta items (editor-only) are left out.
 func WriteOTBM(out io.Writer, m *Map, items Items, f Format) error {
+	return writeOTBM(out, m, items, f, nil)
+}
+
+// writeOTBM is WriteOTBM that reports the chunks written (progress may be
+// nil).
+func writeOTBM(out io.Writer, m *Map, items Items, f Format, progress func(done, total int)) error {
 	w := otbnode.NewWriter(out, [4]byte{'O', 'T', 'B', 'M'})
 	w.Start(nodeRoot)
 	w.U32(OTBMVersion)
@@ -486,7 +492,11 @@ func WriteOTBM(out io.Writer, m *Map, items Items, f Format) error {
 		z    uint8
 		open bool
 	}{}
-	for _, c := range m.Chunks() {
+	chunks := m.Chunks()
+	for i, c := range chunks {
+		if progress != nil && i%64 == 0 {
+			progress(i, len(chunks))
+		}
 		c.Each(func(p Position, t *Tile) {
 			if t.Ground.ID == 0 && len(t.Items) == 0 && t.HouseID == 0 && t.Flags == 0 && len(t.Zones()) == 0 {
 				return // creature or spawn only: saved in the spawn file

@@ -126,9 +126,17 @@ export const mapCommands = {
       path = await DialogService.SaveFile("saveMap", "Save map", m.name, MAPS);
       if (!path) return false;
     }
-    map.busy = "Saving map";
+    const name = path.split(/[\\/]/).pop() ?? path;
+    const title = "Saving map";
+    map.loading = { name, step: "Starting", percent: 0, title };
+    const off = Events.On("map:progress", (ev: { data: { label: string; done: number; total: number } }) => {
+      const p = ev.data;
+      if (map.loading) map.loading = { name, step: p.label, percent: p.total > 0 ? (p.done / p.total) * 100 : 0, title };
+    });
     try {
       const ch = await MapService.SaveMap(m.id, path);
+      off();
+      map.loading = { name, step: "Reloading the item data", percent: 100, title };
       applyChange(m.id, ch);
       await loadMapData();
       toast(`Saved ${ch.info.name}.`, "success");
@@ -137,7 +145,8 @@ export const mapCommands = {
       toast(errorMessage(e), "error");
       return false;
     } finally {
-      map.busy = null;
+      off();
+      map.loading = null;
     }
   },
 

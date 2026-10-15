@@ -485,6 +485,15 @@ var loadSteps = map[otmap.Stage]struct {
 	otmap.StageFiles: {"Reading houses and spawns", 900, 960},
 }
 
+// saveSteps are the steps of saving a map, like loadSteps.
+var saveSteps = map[otmap.Stage]struct {
+	label      string
+	start, end int
+}{
+	otmap.StageEncode: {"Writing tiles", 0, 800},
+	otmap.StageWrite:  {"Writing the files", 800, 1000},
+}
+
 // mapProgress returns a progress callback that sends EventMapProgress at
 // most once per progressEvery, and always when the step changes.
 func (ms *MapService) mapProgress() func(label string, permille int) {
@@ -566,7 +575,15 @@ func (ms *MapService) SaveMap(id int, path string) (MapChange, error) {
 	if d.items.Mode == otitems.ModeOTB {
 		m.ed.Map.ItemsMajor, m.ed.Map.ItemsMinor = d.items.MajorVersion, d.items.MinorVersion
 	}
-	warns, err := otmap.Save(path, m.ed.Map, d.items, m.ed.Settings.Format())
+	report := ms.mapProgress()
+	warns, err := otmap.SaveProgress(path, m.ed.Map, d.items, m.ed.Settings.Format(), func(stage otmap.Stage, done, total int) {
+		st := saveSteps[stage]
+		p := st.start
+		if total > 0 {
+			p += (st.end - st.start) * min(done, total) / total
+		}
+		report(st.label, p)
+	})
 	if err != nil {
 		return MapChange{}, err
 	}

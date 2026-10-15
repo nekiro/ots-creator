@@ -1,7 +1,7 @@
 <script lang="ts">
-  // Modal window shown while a map opens: the file, the current step and a
-  // progress bar over the whole load. It cannot be closed: the load runs to
-  // the end or fails with a message.
+  // Modal window shown while a map opens or saves: the file, the current
+  // step and a progress bar over the whole job. It cannot be closed: the job
+  // runs to the end or fails with a message.
   import { map } from "../../lib/map/state.svelte";
   import { backdrop, pop } from "../../lib/ui/motion";
   import ProgressBar from "../../lib/ui/ProgressBar.svelte";
@@ -12,8 +12,8 @@
 </script>
 
 <div class="overlay" transition:backdrop|global>
-  <div class="t-window dialog" transition:pop|global role="dialog" aria-modal="true" aria-label="Opening map">
-    <div class="t-window-title">Opening map</div>
+  <div class="t-window dialog" transition:pop|global role="dialog" aria-modal="true" aria-label={l.title ?? "Opening map"}>
+    <div class="t-window-title">{l.title ?? "Opening map"}</div>
     <div class="body">
       <div class="name" title={l.name}>{l.name}</div>
       <ProgressBar percent={l.percent} label="{Math.floor(l.percent)}%" />

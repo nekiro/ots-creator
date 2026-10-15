@@ -389,6 +389,8 @@ const (
 	StageRead  Stage = iota // reading the file
 	StageTiles              // reading tiles (done/total in bytes of the file)
 	StageFiles              // reading houses, spawns and zones (done/total in files)
+	StageEncode             // saving: encoding tiles (done/total in chunks)
+	StageWrite              // saving: writing the files (done/total in files)
 )
 
 // Progress is called while a map loads.
@@ -463,6 +465,14 @@ func (m *Map) ClearModified() {
 // Save writes the map and its auxiliary files next to it. File names come
 // from the map (defaults derive from the map name). It returns warnings.
 func Save(path string, m *Map, items Items, f Format) ([]string, error) {
+	return SaveProgress(path, m, items, f, nil)
+}
+
+// SaveProgress is Save that reports its progress (progress may be nil).
+func SaveProgress(path string, m *Map, items Items, f Format, progress Progress) ([]string, error) {
+	if progress == nil {
+		progress = func(Stage, int, int) {}
+	}
 	dir := filepath.Dir(path)
 	base := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	def := func(name *string, suffix string) {
@@ -481,17 +491,20 @@ func Save(path string, m *Map, items Items, f Format) ([]string, error) {
 	if len(m.Zones) > 0 {
 		def(&m.ZoneFile, "-zones.xml")
 	}
-	data, err := EncodeOTBM(m, items, f)
-	if err != nil {
+	var buf bytes.Buffer
+	if err := writeOTBM(&buf, m, items, f, func(done, total int) { progress(StageEncode, done, total) }); err != nil {
 		return nil, err
 	}
 	var warns []string
-	if err := writeAtomic(path, data); err != nil {
+	progress(StageWrite, 0, 4)
+	if err := writeAtomic(path, buf.Bytes()); err != nil {
 		return nil, err
 	}
+	progress(StageWrite, 1, 4)
 	if err := writeAtomic(filepath.Join(dir, m.HouseFile), WriteHouses(m)); err != nil {
 		return nil, err
 	}
+	progress(StageWrite, 2, 4)
 	monsters, npcs, unsaved := WriteSpawns(m)
 	if err := writeAtomic(filepath.Join(dir, m.SpawnFile), monsters); err != nil {
 		return nil, err
@@ -501,11 +514,13 @@ func Save(path string, m *Map, items Items, f Format) ([]string, error) {
 			return nil, err
 		}
 	}
+	progress(StageWrite, 3, 4)
 	if m.ZoneFile != "" {
 		if err := writeAtomic(filepath.Join(dir, m.ZoneFile), WriteZones(m)); err != nil {
 			return nil, err
 		}
 	}
+	progress(StageWrite, 4, 4)
 	if unsaved > 0 {
 		warns = append(warns, fmt.Sprintf("%d creatures are outside every spawn and were not saved", unsaved))
 	}

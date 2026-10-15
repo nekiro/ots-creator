@@ -159,8 +159,8 @@ class MapState {
   /** A click on the map picks a position for this callback (teleport destinations). */
   pick = $state<{ label: string; done: (p: Position) => void } | null>(null);
   busy = $state<string | null>(null);
-  /** A map being opened: its file name, the current step and how far the whole load is (0-100). */
-  loading = $state<{ name: string; step: string; percent: number } | null>(null);
+  /** A map being opened or saved: its file name, the current step and how far the whole job is (0-100). */
+  loading = $state<{ name: string; step: string; percent: number; title?: string } | null>(null);
 
   get active(): MapInfo | null {
     return this.maps.find((m) => m.id === this.activeId) ?? null;
