@@ -3,7 +3,7 @@ import { errorMessage } from "../api";
 import { toast } from "../state.svelte";
 import { MapService, type DataInfo, type EditorSettings, type MapChange, type MapInfo, type Palette, type Position, type RecentMap, type TileInfo } from "./api";
 import { ItemIndex } from "./items";
-import type { ViewOptions } from "./renderer";
+import type { ViewOptions } from "./scene";
 
 export type EditorMode = "objects" | "map";
 export type Tool = "select" | "brush";

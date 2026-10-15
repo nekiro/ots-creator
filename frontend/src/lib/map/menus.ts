@@ -7,7 +7,7 @@ import { goTo, mapCommands } from "./commands";
 import { edit, map, selectBrush, useCreature, warningCount } from "./state.svelte";
 import { addHouse, addTown, addWaypoint } from "./world";
 import { keyLabel } from "./keys";
-import type { ViewOptions } from "./renderer";
+import type { ViewOptions } from "./scene";
 
 const noMap = () => map.activeId === null;
 const noSel = () => !map.active?.selection;

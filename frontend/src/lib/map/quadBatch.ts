@@ -1,0 +1,108 @@
+// Quads built on the CPU every frame (brush previews, overlays, dragged
+// selections) and drawn in screen pixels with the sprite program.
+import type { Atlas } from "./atlas";
+import { FLOATS_PER_QUAD, compileProgram, createQuadVao } from "./gpu";
+import type { Scene } from "./scene";
+import QUAD_VERT from "./shaders/quad.vert?raw";
+import SPRITE_FRAG from "./shaders/sprite.frag?raw";
+
+export type Color = readonly [number, number, number, number] | readonly number[];
+
+export class QuadBatch {
+  private program: WebGLProgram;
+  private vao: WebGLVertexArrayObject;
+  private instances: WebGLBuffer;
+  private quads = new Float32Array(FLOATS_PER_QUAD * 4096);
+  private quadCount = 0;
+  private uniforms: Record<string, WebGLUniformLocation | null> = {};
+  /** The atlas the cells of pushed quads are in. */
+  atlas: Atlas | null = null;
+
+  constructor(
+    private gl: WebGL2RenderingContext,
+    corners: WebGLBuffer,
+  ) {
+    this.program = compileProgram(gl, QUAD_VERT, SPRITE_FRAG);
+    for (const name of ["u_screen", "u_off", "u_scale", "u_half", "u_alpha", "u_perRow", "u_uvCell", "u_tex"]) this.uniforms[name] = gl.getUniformLocation(this.program, name);
+    this.instances = gl.createBuffer()!;
+    this.vao = createQuadVao(gl, corners, this.instances);
+  }
+
+  /** Drops the quads pushed so far without drawing them. */
+  clear(): void {
+    this.quadCount = 0;
+  }
+
+  /** A sprite quad (cell: atlas cell, -1 hides it) tinted with r, g, b, a. */
+  push(x: number, y: number, width: number, height: number, cell: number, r: number, g: number, b: number, a: number): void {
+    if ((this.quadCount + 1) * FLOATS_PER_QUAD > this.quads.length) {
+      const grown = new Float32Array(this.quads.length * 2);
+      grown.set(this.quads);
+      this.quads = grown;
+    }
+    const offset = this.quadCount * FLOATS_PER_QUAD;
+    const atlas = this.atlas!;
+    const quads = this.quads;
+    quads[offset] = x;
+    quads[offset + 1] = y;
+    quads[offset + 2] = width;
+    quads[offset + 3] = height;
+    if (cell < 0) {
+      quads[offset + 4] = -1;
+      quads[offset + 5] = -1;
+    } else {
+      quads[offset + 4] = Math.floor(cell / atlas.perLayer);
+      quads[offset + 5] = cell % atlas.perLayer;
+    }
+    quads[offset + 6] = r;
+    quads[offset + 7] = g;
+    quads[offset + 8] = b;
+    quads[offset + 9] = a;
+    this.quadCount++;
+  }
+
+  /** A colored rectangle in screen pixels. */
+  rect(x: number, y: number, width: number, height: number, color: Color): void {
+    this.push(x, y, width, height, 0, color[0], color[1], color[2], color[3]);
+  }
+
+  /** The outline of a rectangle, lineWidth pixels wide inside it. */
+  stroke(x: number, y: number, width: number, height: number, color: Color, lineWidth: number): void {
+    this.rect(x, y, width, lineWidth, color);
+    this.rect(x, y + height - lineWidth, width, lineWidth, color);
+    this.rect(x, y, lineWidth, height, color);
+    this.rect(x + width - lineWidth, y, lineWidth, height, color);
+  }
+
+  /** Draws the quads pushed so far. False when there were none: the
+   * program bound before is still bound. */
+  flush(scene: Scene): boolean {
+    const gl = this.gl;
+    if (!this.quadCount) return false;
+    this.useSprites(scene);
+    gl.uniform2f(this.uniforms.u_off, 0, 0);
+    gl.uniform1f(this.uniforms.u_scale, 1);
+    gl.uniform2f(this.uniforms.u_half, 0, 0);
+    gl.uniform1f(this.uniforms.u_alpha, 1);
+    gl.bindVertexArray(this.vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.instances);
+    gl.bufferData(gl.ARRAY_BUFFER, this.quads.subarray(0, this.quadCount * FLOATS_PER_QUAD), gl.STREAM_DRAW);
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, this.quadCount);
+    gl.bindVertexArray(null);
+    this.quadCount = 0;
+    return true;
+  }
+
+  /** Binds the sprite program and atlas (the atlas texture can change while building). */
+  private useSprites(scene: Scene): void {
+    const gl = this.gl;
+    const atlas = this.atlas!;
+    gl.useProgram(this.program);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, atlas.tex);
+    gl.uniform1i(this.uniforms.u_tex, 0);
+    gl.uniform2f(this.uniforms.u_screen, scene.width, scene.height);
+    gl.uniform1f(this.uniforms.u_perRow, atlas.perRow);
+    gl.uniform1f(this.uniforms.u_uvCell, atlas.uvCell);
+  }
+}

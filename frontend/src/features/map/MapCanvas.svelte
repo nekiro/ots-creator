@@ -10,7 +10,8 @@
   import { GeoStore } from "../../lib/map/geo";
   import { rendered } from "../../lib/map/rendered";
   import { floorAdjust, mapCommands, spriteSize } from "../../lib/map/commands";
-  import { MapRenderer, type GhostTile, type Label, type Marker, type RectMark } from "../../lib/map/renderer";
+  import { MapRenderer } from "../../lib/map/renderer";
+  import type { GhostTile, Label, Marker, RectMark } from "../../lib/map/scene";
   import { applyChange, edit, map, onMapChange, selectBrush, setCam, useCreature, type BrushSel } from "../../lib/map/state.svelte";
   import { mapContextMenu, openText, readableIndex } from "../../lib/map/menus";
   import FloorLadder from "./FloorLadder.svelte";
@@ -105,7 +106,7 @@
       result = renderer.render({
         width,
         height,
-        S,
+        spriteSize: S,
         camX: cam.x,
         camY: cam.y,
         scale,
