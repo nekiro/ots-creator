@@ -280,7 +280,7 @@
               {#if it.ext?.dest}<button class="t-icon-btn" title="Go to destination" onclick={() => it.ext?.dest && goTo(it.ext.dest)}><Icon name="arrowE" /></button>{/if}
             </div>
           {/if}
-          {#if it.kind === "writeable" || it.ext?.text}
+          {#if it.kind === "writeable" || it.ext?.text || map.items?.is(it.id, "readable")}
             <label class="col">Text<textarea class="t-input text" value={it.ext?.text ?? ""} onchange={(e) => patch({ text: e.currentTarget.value })}></textarea></label>
           {/if}
           <label class="col">Description<input class="t-input" value={it.ext?.description ?? ""} onchange={(e) => patch({ description: e.currentTarget.value })} /></label>

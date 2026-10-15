@@ -12,7 +12,7 @@
   import { floorAdjust, mapCommands, spriteSize } from "../../lib/map/commands";
   import { MapRenderer, type GhostTile, type Label, type Marker, type RectMark } from "../../lib/map/renderer";
   import { applyChange, edit, map, onMapChange, selectBrush, setCam, useCreature, type BrushSel } from "../../lib/map/state.svelte";
-  import { mapContextMenu } from "../../lib/map/menus";
+  import { mapContextMenu, openText, readableIndex } from "../../lib/map/menus";
   import FloorLadder from "./FloorLadder.svelte";
   import SelectionBar from "./SelectionBar.svelte";
   import ZoomControl from "./ZoomControl.svelte";
@@ -149,8 +149,23 @@
     // size, with a hard 1px black outline drawn as offset copies.
     const s = Math.max(1, Math.round(window.devicePixelRatio || 1));
     ctx.textAlign = "center";
-    // Tile coordinates: the small pixel font, many of them, so one stroke
-    // for the outline instead of eight copies.
+    const big = `bold ${14 * s}px "Tibia Verdana", Verdana, sans-serif`;
+    const shown = labels
+      .filter((l) => !l.small)
+      .slice(0, 1000)
+      .map((l) => ({ ...l, x: Math.round(l.x), y: Math.round(l.y) }));
+    // Item texts are many and long: one that would cover a name (or an
+    // earlier text) is left out.
+    const boxes: [number, number, number, number][] = [];
+    const pad = 2 * s;
+    const free = (b: [number, number, number, number]) => !boxes.some((o) => b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1]);
+    ctx.font = big;
+    for (const l of shown) {
+      const w = ctx.measureText(l.text).width;
+      boxes.push([l.x - w / 2 - pad, l.y - 15 * s, l.x + w / 2 + pad, l.y]);
+    }
+    // Small labels (tile coordinates, item texts): the small pixel font, many
+    // of them, so one stroke for the outline instead of eight copies.
     const small = labels.filter((l) => l.small);
     if (small.length) {
       ctx.font = `${9 * s}px "Tibia Small", Verdana, sans-serif`;
@@ -162,19 +177,21 @@
         const x = Math.round(l.x);
         const y = Math.round(l.y);
         ctx.textAlign = l.align ?? "center";
+        if (l.cull) {
+          const w = ctx.measureText(l.text).width;
+          const box: [number, number, number, number] = [x - w / 2 - pad, y - 6 * s, x + w / 2 + pad, y + 6 * s];
+          if (!free(box)) continue;
+          boxes.push(box);
+        }
         ctx.strokeText(l.text, x, y);
         ctx.fillStyle = l.color;
         ctx.fillText(l.text, x, y);
       }
     }
-    ctx.font = `bold ${14 * s}px "Tibia Verdana", Verdana, sans-serif`;
+    ctx.font = big;
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
     ctx.fillStyle = "#000";
-    const shown = labels
-      .filter((l) => !l.small)
-      .slice(0, 1000)
-      .map((l) => ({ ...l, x: Math.round(l.x), y: Math.round(l.y) }));
     for (const l of shown) {
       for (const [dx, dy] of OUTLINE) ctx.fillText(l.text, l.x + dx * s, l.y + dy * s);
     }
@@ -625,6 +642,7 @@
         text += ` · house ${h?.name ?? t.house}`;
       }
       if (t.flags & TF.pz) text += " · PZ";
+      if (t.text) text += ` · "${t.text.length > 120 ? t.text.slice(0, 119) + "…" : t.text}"`;
     }
     hoverText = text;
   }
@@ -640,12 +658,16 @@
     toast(`Brush: ${items.name(top)}`);
   }
 
-  /** Double click: a creature becomes the brush, anything else is inspected. */
+  /** Double click: an item with text opens it, a creature becomes the
+   * brush, anything else is inspected. */
   function ondblclick(e: MouseEvent) {
     const id = map.activeId;
     if (map.tool !== "select" || id === null) return;
     const p = tileAt(e);
-    const c = map.view.creatures ? store(id).peekTile(p.x, p.y, p.z)?.creatures?.at(-1) : undefined;
+    const t = store(id).peekTile(p.x, p.y, p.z);
+    const readable = readableIndex(t);
+    if (readable >= 0) return openText(p, readable);
+    const c = map.view.creatures ? t?.creatures?.at(-1) : undefined;
     if (c) {
       useCreature(c);
       toast(`Brush: ${c.name}`);

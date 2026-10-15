@@ -25,7 +25,7 @@ export interface BrushSel {
   label: string;
 }
 
-export type MapDialog = "data" | "import" | "minimap" | "brush" | "settings" | "tools" | "shortcuts" | "warnings" | null;
+export type MapDialog = "data" | "import" | "minimap" | "brush" | "settings" | "tools" | "shortcuts" | "warnings" | "text" | null;
 
 /** What the inspector shows: a tile, a part of the world, or the map itself. */
 export type Focus =
@@ -150,6 +150,8 @@ class MapState {
   /** Command palette: null closed, otherwise the text it opens with. */
   command = $state<string | null>(null);
   dialog = $state<MapDialog>(null);
+  /** Item shown in the text dialog (index among the tile items, ground excluded). */
+  textItem = $state<{ pos: Position; index: number } | null>(null);
   /** Brush edited in the brush editor ("" for a new brush). */
   editBrush = $state<{ name: string; type: string } | null>(null);
   /** The clipboard follows the mouse until a click pastes it. */

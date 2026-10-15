@@ -26,7 +26,11 @@ const (
 	chunkZones
 	chunkOptional
 	chunkBlocking
+	chunkText
 )
+
+// maxChunkText bounds the item text sent with a tile (labels show its start).
+const maxChunkText = 255
 
 // Item flags of the chunk format.
 const (
@@ -90,7 +94,8 @@ func (w *chunkWriter) item(it otmap.Item) {
 //	   dir<<2), u16 look type, u8 head, body, legs, feet, addons,
 //	   u16 mount, u16 look item, u8 name length, name],
 //	[spawn: u16 radius, u8 selected], [npc spawn: same],
-//	[zones: u8 count, u16 ids]
+//	[zones: u8 count, u16 ids],
+//	[text of the topmost item with one: u8 length, text]
 func (ms *MapService) serveMap(w http.ResponseWriter, r *http.Request, parts []string) {
 	if len(parts) != 2 {
 		http.NotFound(w, r)
@@ -229,6 +234,10 @@ func (ms *MapService) writeChunk(cw *chunkWriter, m *openMap, d *mapData, k otma
 		if t.Ground.ID != 0 {
 			f |= 0x4000
 		}
+		text := tileText(t)
+		if text != "" {
+			f |= chunkText
+		}
 		cw.u16(f)
 		if t.HouseID != 0 {
 			cw.u32(t.HouseID)
@@ -291,6 +300,24 @@ func (ms *MapService) writeChunk(cw *chunkWriter, m *openMap, d *mapData, k otma
 				cw.u16(id)
 			}
 		}
+		if text != "" {
+			text = text[:min(len(text), maxChunkText)]
+			cw.u8(uint8(len(text)))
+			cw.b = append(cw.b, text...)
+		}
 	})
 	binary.LittleEndian.PutUint16(cw.b[countAt:], uint16(n))
+}
+
+// tileText is the text of the topmost item of the tile that has one.
+func tileText(t *otmap.Tile) string {
+	for i := len(t.Items) - 1; i >= 0; i-- {
+		if e := t.Items[i].Ext; e != nil && e.Text != "" {
+			return e.Text
+		}
+	}
+	if e := t.Ground.Ext; e != nil {
+		return e.Text
+	}
+	return ""
 }

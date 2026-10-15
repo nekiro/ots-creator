@@ -186,3 +186,28 @@ func TestChunks(t *testing.T) {
 		t.Fatalf("EachIn found %d", n)
 	}
 }
+
+func TestCountU16(t *testing.T) {
+	items := testItems()
+	m := New(256, 256)
+	m.SetTile(Position{10, 10, 7}, &Tile{Ground: Item{ID: 100}, Items: []Item{{ID: 2148, Subtype: 1000, Ext: &ItemExt{ActionID: 7}}}})
+	f := Format{CountU16: true}
+	data, err := EncodeOTBM(m, items, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, warns, err := ReadOTBM(data, items, f)
+	if err != nil || len(warns) > 0 {
+		t.Fatal(err, warns)
+	}
+	it := got.Tile(Position{10, 10, 7}).Items[0]
+	if it.Subtype != 1000 || it.Ext == nil || it.Ext.ActionID != 7 {
+		t.Fatalf("got %+v", it)
+	}
+	// The standard format caps counts at 255.
+	data, _ = EncodeOTBM(m, items, Format{})
+	got, _, _ = ReadOTBM(data, items, Format{})
+	if it := got.Tile(Position{10, 10, 7}).Items[0]; it.Subtype != 255 {
+		t.Fatalf("standard format: count %d", it.Subtype)
+	}
+}

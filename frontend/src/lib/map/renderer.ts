@@ -77,6 +77,18 @@ export interface Label {
   /** Small font, centered on y (coordinate rulers). */
   small?: boolean;
   align?: "center" | "left";
+  /** Left out where it would cover another label (item texts). */
+  cull?: boolean;
+}
+
+/** Start of an item text short enough for a map label: its first line,
+ * cut at a word. */
+export function labelText(text: string, max = 18): string {
+  const line = text.trim().split(/\r?\n/, 1)[0].trim();
+  if (line.length <= max) return line;
+  const cut = line.slice(0, max);
+  const space = cut.lastIndexOf(" ");
+  return (space > max / 2 ? cut.slice(0, space) : cut).replace(/[\s,.;:\-–]+$/, "") + "…";
 }
 
 export interface Scene {
@@ -1131,6 +1143,23 @@ export class MapRenderer {
           const t = sc.chunks.peekTile(tx, ty, z);
           if (!t?.creatures) continue;
           for (const c of t.creatures) result.labels.push({ x: tileX(tx, z) + T / 2 - d, y: tileY(ty, z) - d - 2, text: c.name, color: "#00c000" });
+        }
+      }
+    }
+    if (sc.opts.labels && T >= 24 && !result.far) {
+      // Text of signs, books and other readable items: its first line over
+      // the tile.
+      const halfW = sc.width / 2 / sc.scale / sc.S;
+      const halfH = sc.height / 2 / sc.scale / sc.S;
+      const a = sc.floor <= 7 ? 7 - z : 0;
+      const cx = sc.camX / sc.S + a;
+      const cy = sc.camY / sc.S + a;
+      for (let ty = Math.max(0, Math.floor(cy - halfH)); ty <= cy + halfH + 1; ty++) {
+        for (let tx = Math.max(0, Math.floor(cx - halfW)); tx <= cx + halfW + 1; tx++) {
+          const text = sc.chunks.peekTile(tx, ty, z)?.text;
+          if (!text) continue;
+          const line = labelText(text);
+          if (line) result.labels.push({ x: tileX(tx, z) + T / 2, y: tileY(ty, z) + T / 2, text: line, color: "#e0d29a", small: true, cull: true });
         }
       }
     }

@@ -126,6 +126,25 @@ export function mapMenus(): { label: string; items: MenuEntry[] }[] {
   ];
 }
 
+/** Index (among tile items, ground excluded) of the topmost item with
+ * text to read or write, or -1. */
+export function readableIndex(t: TileData | null | undefined): number {
+  const items = map.items;
+  if (!t || !items) return -1;
+  const ground = t.flags & TF.ground ? 1 : 0;
+  for (let i = t.ids.length - 1; i >= ground; i--) {
+    const id = t.ids[i];
+    if (t.iflags[i] & IF.text || items.is(id, "readable") || items.is(id, "writable")) return i - ground;
+  }
+  return -1;
+}
+
+/** Opens the text of an item like the game shows it. */
+export function openText(pos: Position, index: number): void {
+  map.textItem = { pos, index };
+  map.dialog = "text";
+}
+
 /** Context menu of a map tile. */
 export function mapContextMenu(p: Position, t: TileData | null, actions: { pick: () => void }): MenuEntry[] {
   const items = map.items;
@@ -135,6 +154,10 @@ export function mapContextMenu(p: Position, t: TileData | null, actions: { pick:
     { label: `Inspect tile ${fmtPos(p)}`, action: () => mapCommands.inspect(p) },
     { label: "Copy position", action: () => copy(fmtPos(p)) },
   ];
+  const readable = readableIndex(t);
+  if (readable >= 0) {
+    out.push("-", { label: "Read and edit text…", keys: "Double click", action: () => openText(p, readable) });
+  }
   if (t?.creatures?.length) {
     out.push("-", ...t.creatures.map((c): MenuEntry => ({ label: `Use creature: ${c.name}`, action: () => useCreature(c) })));
   }

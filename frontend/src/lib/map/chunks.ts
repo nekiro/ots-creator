@@ -19,6 +19,7 @@ export const TF = {
   zones: 1024,
   optional: 2048,
   blocking: 4096,
+  text: 8192,
   ground: 0x4000,
 } as const;
 
@@ -51,6 +52,8 @@ export interface TileData {
   spawn: { radius: number; selected: boolean } | null;
   spawnNpc: { radius: number; selected: boolean } | null;
   zones: number[] | null;
+  /** Text of the topmost item with one (its start). */
+  text: string | null;
 }
 
 export interface ChunkData {
@@ -161,7 +164,13 @@ export function decodeChunks(buf: ArrayBuffer): ChunkData[] {
           p += 2;
         }
       }
-      tiles[idx] = { flags, house, ids, subs, iflags, creatures, spawn, spawnNpc, zones };
+      let text: string | null = null;
+      if (flags & TF.text) {
+        const len = v.getUint8(p++);
+        text = decoder.decode(bytes.subarray(p, p + len));
+        p += len;
+      }
+      tiles[idx] = { flags, house, ids, subs, iflags, creatures, spawn, spawnNpc, zones, text };
     }
     out.push({ key, tiles, count });
   }

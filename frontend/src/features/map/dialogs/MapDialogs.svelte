@@ -7,6 +7,7 @@
   import MinimapExportDialog from "./MinimapExportDialog.svelte";
   import SettingsDialog from "./SettingsDialog.svelte";
   import ShortcutsDialog from "./ShortcutsDialog.svelte";
+  import TextDialog from "./TextDialog.svelte";
   import WarningsDialog from "./WarningsDialog.svelte";
 
   const has = $derived(map.activeId !== null);
@@ -21,4 +22,5 @@
   {#if map.dialog === "minimap"}<MinimapExportDialog />{/if}
   {#if map.dialog === "tools"}<MapToolsDialog />{/if}
   {#if map.dialog === "warnings"}<WarningsDialog />{/if}
+  {#if map.dialog === "text" && map.textItem}<TextDialog />{/if}
 {/if}
