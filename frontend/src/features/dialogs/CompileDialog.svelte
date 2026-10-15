@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { DialogService, Format, ProjectService, type Features, type Version } from "../../lib/api";
-  import { offerOptimize } from "../../lib/commands";
+  import { offerOptimize, sheetsNote } from "../../lib/commands";
   import { applyDraft, app, run, toast } from "../../lib/state.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Select from "../../lib/ui/Select.svelte";
@@ -46,12 +46,11 @@
     if (!(await offerOptimize())) return;
     // The status bar shows the compile while it runs.
     app.dialog = null;
-    const ok = await run("Compiling", async () => {
-      await ProjectService.CompileAs({ format, datPath: dir, sprPath: "", version: info.version, features: info.features, writeOtfi: false });
-      return true;
-    });
-    if (ok) {
-      toast(`Compiled assets to ${dir}`, "success");
+    const stats = await run("Compiling", () =>
+      ProjectService.CompileAs({ format, datPath: dir, sprPath: "", version: info.version, features: info.features, writeOtfi: false }),
+    );
+    if (stats) {
+      toast(`Compiled assets to ${dir}.${sheetsNote(stats)}`, "success");
     }
   }
 

@@ -34,7 +34,7 @@ func TestCompareService(t *testing.T) {
 		t.Fatal(err)
 	}
 	datPath, sprPath := filepath.Join(dir, "Tibia.dat"), filepath.Join(dir, "Tibia.spr")
-	if err := ps.CompileAs(CompileRequest{DatPath: datPath, SprPath: sprPath, Version: v1098(), Features: ps.State().Info.Features}); err != nil {
+	if _, err := ps.CompileAs(CompileRequest{DatPath: datPath, SprPath: sprPath, Version: v1098(), Features: ps.State().Info.Features}); err != nil {
 		t.Fatal(err)
 	}
 	v := v1098()

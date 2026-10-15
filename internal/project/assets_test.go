@@ -123,7 +123,8 @@ func TestAssetsRoundTrip(t *testing.T) {
 		}
 	}
 
-	// Edit one piece and a flag: only one new sheet, old ones stay.
+	// Edit one piece and a flag: the 1x1 sheet stays; the 2x2 sheet is now
+	// partly used, so its other sprite moves to the new sheet and it goes.
 	if err := p.ReplaceSprite(g.Sprites[0], solid(1, 2, 3)); err != nil {
 		t.Fatal(err)
 	}
@@ -134,8 +135,11 @@ func TestAssetsRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	cat2, _ := assets.ReadCatalog(dir)
-	if len(cat2.Sheets) != 3 || cat2.Sheets[0] != cat.Sheets[0] || cat2.Sheets[1] != cat.Sheets[1] || cat2.Sheets[2].SpriteType != assets.Sprite64x64 {
+	if len(cat2.Sheets) != 2 || cat2.Sheets[0] != cat.Sheets[0] || cat2.Sheets[1].SpriteType != assets.Sprite64x64 || cat2.Sheets[1].Count() != 2 {
 		t.Fatalf("sheets %+v", cat2.Sheets)
+	}
+	if _, err := os.Stat(filepath.Join(dir, cat.Sheets[1].File)); !os.IsNotExist(err) {
+		t.Fatal("repacked sheet file must be removed")
 	}
 	if _, err := os.Stat(filepath.Join(dir, cat.Appearances)); !os.IsNotExist(err) {
 		t.Fatal("old appearances file must be removed")
@@ -215,5 +219,54 @@ func TestOfficialAssetsEdit(t *testing.T) {
 	it2, _ := q.Thing(thing.CategoryItem, 3031)
 	if !it2.Props.Rotatable || q.Info().Counts != p.Info().Counts {
 		t.Fatal("edit lost")
+	}
+}
+
+// Removing the only object of a sheet drops the sheet from the catalog and
+// the disk, and a copy to another folder leaves it out.
+func TestAssetsDropUnusedSheet(t *testing.T) {
+	dir := buildAssets(t)
+	p, err := OpenAssets(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cat, _ := assets.ReadCatalog(dir)
+	if err := p.RemoveThings(thing.CategoryItem, []uint32{101}); err != nil {
+		t.Fatal(err)
+	}
+	other := t.TempDir()
+	if err := p.Compile(CompileOptions{Format: FormatAssets, DatPath: other}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(other, cat.Sheets[1].File)); !os.IsNotExist(err) {
+		t.Fatal("unused sheet must not be copied")
+	}
+	if _, err := os.Stat(filepath.Join(other, cat.Appearances)); !os.IsNotExist(err) {
+		t.Fatal("old appearances must not be copied")
+	}
+
+	p, _ = OpenAssets(dir)
+	p.RemoveThings(thing.CategoryItem, []uint32{101})
+	var stats CompileStats
+	if err := p.Compile(CompileOptions{Format: FormatAssets, DatPath: dir, Stats: &stats}); err != nil {
+		t.Fatal(err)
+	}
+	if gone, _ := os.Stat(filepath.Join(other, cat.Sheets[0].File)); stats.SheetsRemoved != 1 || stats.Freed <= 0 || gone == nil {
+		t.Fatalf("stats %+v", stats)
+	}
+	cat2, _ := assets.ReadCatalog(dir)
+	if len(cat2.Sheets) != 1 || cat2.Sheets[0] != cat.Sheets[0] {
+		t.Fatalf("sheets %+v", cat2.Sheets)
+	}
+	if _, err := os.Stat(filepath.Join(dir, cat.Sheets[1].File)); !os.IsNotExist(err) {
+		t.Fatal("unused sheet file must be removed")
+	}
+	q, err := OpenAssets(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	it, _ := q.Thing(thing.CategoryItem, 100)
+	if !bytes.Equal(piece(t, q, it.FrameGroups[0].Sprites[0]), solid(9, 0, 0)) {
+		t.Fatal("kept sprite lost")
 	}
 }

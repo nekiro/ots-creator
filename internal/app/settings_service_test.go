@@ -19,7 +19,7 @@ func TestCompiledClientsBecomeRecent(t *testing.T) {
 	}
 	dir := t.TempDir()
 	dat := filepath.Join(dir, "Tibia.dat")
-	if err := ps.CompileAs(CompileRequest{DatPath: dat, SprPath: filepath.Join(dir, "Tibia.spr"), Version: v1098(), Features: ps.State().Info.Features}); err != nil {
+	if _, err := ps.CompileAs(CompileRequest{DatPath: dat, SprPath: filepath.Join(dir, "Tibia.spr"), Version: v1098(), Features: ps.State().Info.Features}); err != nil {
 		t.Fatal(err)
 	}
 	r := svc.Get().Recent

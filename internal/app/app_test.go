@@ -213,10 +213,10 @@ func TestEndToEnd(t *testing.T) {
 
 	// Compile, then reopen via Inspect.
 	datPath, sprPath := filepath.Join(dir, "Tibia.dat"), filepath.Join(dir, "Tibia.spr")
-	if err := ps.Compile(); err == nil {
+	if _, err := ps.Compile(); err == nil {
 		t.Fatal("compile without paths must fail")
 	}
-	if err := ps.CompileAs(CompileRequest{DatPath: datPath, SprPath: sprPath, Version: v1098(), Features: ps.State().Info.Features, WriteOTFI: true}); err != nil {
+	if _, err := ps.CompileAs(CompileRequest{DatPath: datPath, SprPath: sprPath, Version: v1098(), Features: ps.State().Info.Features, WriteOTFI: true}); err != nil {
 		t.Fatal(err)
 	}
 	cf, err := ps.Inspect(filepath.Join(dir, "Tibia.otfi"))

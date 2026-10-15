@@ -10,9 +10,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/nekiro/ots-creator/internal/assets"
 	"github.com/nekiro/ots-creator/internal/client"
@@ -214,6 +216,10 @@ type assetWriter struct {
 	order  []*newSprite
 	// byHash lists base pieces by content hash (see sameContent).
 	byHash map[spriteHash][]uint32
+	// used marks the existing sprites the things still reference;
+	// repacked maps the ones moved out of a partly used sheet.
+	used     map[uint32]bool
+	repacked map[uint32]*newSprite
 }
 
 // resolve implements assets.Resolver. Untouched pieces of an existing
@@ -223,10 +229,10 @@ type assetWriter struct {
 func (w *assetWriter) resolve(pieces []uint32, tw, th int) (uint32, error) {
 	if w.pieces != nil {
 		if id, ok := w.pieces.Sprite(pieces, tw, th); ok && id != 0 && !w.anyEdited(pieces) {
-			return id, nil
+			return w.existing(id), nil
 		}
 		if id, ok, err := w.sameContent(pieces, tw, th); err != nil || ok {
-			return id, err
+			return w.existing(id), err
 		}
 	}
 	typ, _ := assets.SpriteTypeFor(tw, th)
@@ -246,6 +252,11 @@ func (w *assetWriter) resolve(pieces []uint32, tw, th int) (uint32, error) {
 			copy(px[((y+row)*pw+x)*4:((y+row)*pw+x+t)*4], piece[row*t*4:(row+1)*t*4])
 		}
 	}
+	return w.add(typ, px).id, nil
+}
+
+// add queues a new sprite; identical ones share one.
+func (w *assetWriter) add(typ int, px []byte) *newSprite {
 	key := strconv.Itoa(typ) + string(px)
 	s, ok := w.known[key]
 	if !ok {
@@ -253,7 +264,62 @@ func (w *assetWriter) resolve(pieces []uint32, tw, th int) (uint32, error) {
 		w.known[key] = s
 		w.order = append(w.order, s)
 	}
-	return s.id, nil
+	return s
+}
+
+// existing returns the id an existing sprite gets in the output.
+func (w *assetWriter) existing(id uint32) uint32 {
+	if s, ok := w.repacked[id]; ok {
+		return s.id
+	}
+	if w.used == nil {
+		w.used = map[uint32]bool{}
+	}
+	w.used[id] = true
+	return id
+}
+
+// repack decides what happens to the sheets of the folder after the first
+// pass: fully used sheets stay, unused ones are dropped and the used
+// sprites of the others move to new sheets, so removed sprites free disk
+// space. It returns the sheets that stay.
+func (w *assetWriter) repack(base *assets.Catalog) ([]assets.Sheet, error) {
+	sb, ok := w.p.sprites.base.(*sheetBase)
+	if !ok || w.pieces == nil {
+		return base.Sheets, nil
+	}
+	var keep []assets.Sheet
+	for i, sh := range base.Sheets {
+		n := 0
+		for id := sh.First; id <= sh.Last; id++ {
+			if w.used[id] {
+				n++
+			}
+		}
+		switch n {
+		case sh.Count():
+			keep = append(keep, sh)
+		case 0:
+		default:
+			sheet, err := sb.sheet(i)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", sh.File, err)
+			}
+			for id := sh.First; id <= sh.Last; id++ {
+				if !w.used[id] {
+					continue
+				}
+				x, y, sw, sh2 := assets.SpriteRect(sh.SpriteType, int(id-sh.First))
+				px := make([]byte, sw*sh2*4)
+				for row := range sh2 {
+					o := ((y+row)*assets.SheetSize + x) * 4
+					copy(px[row*sw*4:(row+1)*sw*4], sheet[o:o+sw*4])
+				}
+				w.repacked[id] = w.add(sh.SpriteType, px)
+			}
+		}
+	}
+	return keep, nil
 }
 
 // sameContent finds an existing sprite whose pieces look exactly like
@@ -399,12 +465,12 @@ func hash(data []byte) string {
 
 // compileAssets writes the project as an asset folder in dir. Sheets that
 // already exist are kept; new and edited sprites go to new sheets.
-func (p *Project) compileAssets(dir string, progress func(done, total int)) error {
+func (p *Project) compileAssets(dir string, progress func(done, total int), stats *CompileStats) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
 	base := &assets.Catalog{}
-	w := &assetWriter{p: p, known: map[string]*newSprite{}}
+	w := &assetWriter{p: p, known: map[string]*newSprite{}, repacked: map[uint32]*newSprite{}}
 	f := &assets.File{Things: p.things.Things}
 	if p.assets != nil {
 		base = p.assets.catalog
@@ -416,17 +482,35 @@ func (p *Project) compileAssets(dir string, progress func(done, total int)) erro
 	if _, err := assets.Encode(f, w.resolve); err != nil {
 		return err
 	}
+	keep, err := w.repack(base)
+	if err != nil {
+		return err
+	}
 	groups := w.assign(base.NextSpriteID())
 	data, err := assets.Encode(f, w.resolve)
 	if err != nil {
 		return err
 	}
 
+	// Sheets of the folder that are not kept (dropped or repacked) and its
+	// appearances file, which is replaced.
+	gone := map[string]bool{base.Appearances: true}
+	for _, sh := range base.Sheets {
+		gone[sh.File] = true
+	}
+	for _, sh := range keep {
+		delete(gone, sh.File)
+	}
+
 	// Copy the files of the source folder when writing somewhere else
 	// (thousands of sheets: in parallel, hard links where possible).
 	var names []string
 	if p.assets != nil && !sameDir(p.assets.dir, dir) {
-		names = base.Files()
+		for _, name := range base.Files() {
+			if !gone[name] {
+				names = append(names, name)
+			}
+		}
 	}
 	done := newCounter(len(names)+len(groups), progress)
 	if len(names) > 0 {
@@ -451,6 +535,7 @@ func (p *Project) compileAssets(dir string, progress func(done, total int)) erro
 	// pixels, or a sheet copied above), so it is written once.
 	var writtenMu sync.Mutex
 	written := map[string]bool{}
+	var added atomic.Int64 // bytes of new sheet files
 	writeSheet := func(name string, data []byte) error {
 		writtenMu.Lock()
 		dup := written[name]
@@ -463,6 +548,7 @@ func (p *Project) compileAssets(dir string, progress func(done, total int)) erro
 		if _, err := os.Stat(path); err == nil {
 			return nil
 		}
+		added.Add(int64(len(data)))
 		return writeAtomic(path, data)
 	}
 	jobs := make(chan int)
@@ -493,7 +579,7 @@ func (p *Project) compileAssets(dir string, progress func(done, total int)) erro
 	if err := writeAtomic(filepath.Join(dir, appearances), data); err != nil {
 		return err
 	}
-	cat := base.With(appearances, sheets)
+	cat := base.With(appearances, append(slices.Clone(keep), sheets...))
 	catData, err := cat.Marshal()
 	if err != nil {
 		return err
@@ -501,9 +587,30 @@ func (p *Project) compileAssets(dir string, progress func(done, total int)) erro
 	if err := writeAtomic(filepath.Join(dir, assets.CatalogFile), catData); err != nil {
 		return err
 	}
-	// The previous appearances file of this folder is no longer listed.
-	if p.assets != nil && sameDir(p.assets.dir, dir) && base.Appearances != appearances {
-		os.Remove(filepath.Join(dir, base.Appearances))
+	// A new sheet can have the name of a gone one (same content): it stays.
+	for _, sh := range sheets {
+		delete(gone, sh.File)
+	}
+	if stats != nil {
+		*stats = CompileStats{Freed: -added.Load()}
+		for _, sh := range base.Sheets {
+			if gone[sh.File] {
+				stats.SheetsRemoved++
+				if p.assets != nil {
+					if st, err := os.Stat(filepath.Join(p.assets.dir, sh.File)); err == nil {
+						stats.Freed += st.Size()
+					}
+				}
+			}
+		}
+	}
+	// The previous appearances file and the dropped or repacked sheets of
+	// this folder are no longer listed.
+	if p.assets != nil && sameDir(p.assets.dir, dir) {
+		delete(gone, appearances)
+		for name := range gone {
+			os.Remove(filepath.Join(dir, name))
+		}
 	}
 
 	// Reload so piece ids match the new sheets.

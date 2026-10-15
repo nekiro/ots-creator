@@ -27,7 +27,7 @@ export type {
   TargetPlan,
 } from "../../bindings/github.com/nekiro/ots-creator/internal/app/models";
 export type { Settings, Recent } from "../../bindings/github.com/nekiro/ots-creator/internal/settings/models";
-export type { OptimizeOptions, OptimizeResult, ConvertResult, PropsPatch, DiffEntry, DiffResult, TransferResult } from "../../bindings/github.com/nekiro/ots-creator/internal/project/models";
+export type { OptimizeOptions, OptimizeResult, CompileStats, ConvertResult, PropsPatch, DiffEntry, DiffResult, TransferResult } from "../../bindings/github.com/nekiro/ots-creator/internal/project/models";
 export { Format } from "../../bindings/github.com/nekiro/ots-creator/internal/project/models";
 export type { Version, Features } from "../../bindings/github.com/nekiro/ots-creator/internal/client/models";
 export type { FrameDuration, NpcSale, Properties } from "../../bindings/github.com/nekiro/ots-creator/internal/thing/models";

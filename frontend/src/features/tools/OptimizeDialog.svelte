@@ -51,8 +51,7 @@
       <span>Unused removed</span><strong>{result.unused.toLocaleString()}</strong>
       <span>Objects updated</span><strong>{result.things.toLocaleString()}</strong>
       {#if app.project?.info.format === Format.FormatAssets}
-        <span>Size saved</span><strong>none on disk</strong>
-        <span class="note t-label">Asset folders keep their sprite sheets; only the sprite count shrinks.</span>
+        <span class="note t-label">Sheets with no used sprite are removed from the folder when you compile.</span>
       {:else}
         <span>Size saved</span><strong>{formatSize(result.bytes)}</strong>
       {/if}

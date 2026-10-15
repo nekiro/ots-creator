@@ -13,6 +13,7 @@ import {
   formatSize,
   minId,
   res,
+  type CompileStats,
   type PropsPatch,
   type Recent,
   type Thing,
@@ -74,8 +75,15 @@ async function confirmLeave(title: string, ok: string): Promise<boolean> {
   return ask({ title, message: "The client has uncompiled changes. Continue anyway?", ok });
 }
 
-/** ", saves 12.3 MB" for a spr file; asset folders keep their sheets. */
+/** ", saves 12.3 MB" for a spr file; asset folders free space when compiled. */
 const saved = (bytes: number) => (bytes > 0 ? `, saves ${formatSize(bytes)}` : "");
+
+/** " Removed 3 unused sheets (1.2 MB freed)." after an asset compilation. */
+export function sheetsNote(s: CompileStats): string {
+  if (!s.sheetsRemoved) return "";
+  const freed = s.freed > 0 ? ` (${formatSize(s.freed)} freed)` : "";
+  return ` Removed ${s.sheetsRemoved.toLocaleString()} unused sheet${s.sheetsRemoved === 1 ? "" : "s"}${freed}.`;
+}
 
 /**
  * Before a compile: when sprites can be optimized, asks whether to do it
@@ -195,11 +203,8 @@ export const commands = {
       return;
     }
     if (!(await offerOptimize())) return;
-    const ok = await run("Compiling", async () => {
-      await ProjectService.Compile();
-      return true;
-    });
-    if (ok) toast("Client compiled.", "success");
+    const stats = await run("Compiling", () => ProjectService.Compile());
+    if (stats) toast(`Client compiled.${sheetsNote(stats)}`, "success");
   },
 
   async close() {

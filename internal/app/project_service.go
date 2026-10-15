@@ -191,30 +191,32 @@ type CompileRequest struct {
 }
 
 // Compile saves to the current files with the current settings.
-func (ps *ProjectService) Compile() error {
+func (ps *ProjectService) Compile() (project.CompileStats, error) {
 	p, err := ps.s.Project()
 	if err != nil {
-		return err
+		return project.CompileStats{}, err
 	}
 	info := p.Info()
 	if info.DatPath == "" || (info.Format != project.FormatAssets && info.SprPath == "") {
-		return errors.New("the client has never been saved, use Compile As")
+		return project.CompileStats{}, errors.New("the client has never been saved, use Compile As")
 	}
 	return ps.CompileAs(CompileRequest{Format: info.Format, DatPath: info.DatPath, SprPath: info.SprPath, Version: info.Version, Features: info.Features})
 }
 
 // CompileAs saves to new files, optionally with another version/features.
-func (ps *ProjectService) CompileAs(req CompileRequest) error {
+// For an asset folder it reports the sheets it removed.
+func (ps *ProjectService) CompileAs(req CompileRequest) (project.CompileStats, error) {
 	p, err := ps.s.Project()
 	if err != nil {
-		return err
+		return project.CompileStats{}, err
 	}
-	err = p.Compile(project.CompileOptions{Format: req.Format, DatPath: req.DatPath, SprPath: req.SprPath, Version: req.Version, Features: req.Features, WriteOTFI: req.WriteOTFI, Progress: ps.s.reporter("Compiling")})
+	var stats project.CompileStats
+	err = p.Compile(project.CompileOptions{Format: req.Format, DatPath: req.DatPath, SprPath: req.SprPath, Version: req.Version, Features: req.Features, WriteOTFI: req.WriteOTFI, Progress: ps.s.reporter("Compiling"), Stats: &stats})
 	ps.s.Changed()
 	if err == nil {
 		ps.s.saved()
 	}
-	return err
+	return stats, err
 }
 
 // Warnings lists properties that would be lost when compiling to a format

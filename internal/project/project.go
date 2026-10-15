@@ -194,6 +194,17 @@ type CompileOptions struct {
 	// Progress, when set, is called with the work done so far, possibly
 	// from several goroutines and very often.
 	Progress func(done, total int)
+	// Stats, when set, receives what an asset compilation did to the sheets.
+	Stats *CompileStats
+}
+
+// CompileStats reports the sheets of an asset compilation.
+type CompileStats struct {
+	// SheetsRemoved counts sheets of the folder that no longer hold a used
+	// sprite as they were (dropped, or repacked into new sheets).
+	SheetsRemoved int `json:"sheetsRemoved"`
+	// Freed is the size of the removed sheets minus the new ones, in bytes.
+	Freed int64 `json:"freed"`
 }
 
 // counter reports work done to a CompileOptions.Progress.
@@ -231,7 +242,7 @@ func (p *Project) Compile(o CompileOptions) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if o.Format == FormatAssets {
-		if err := p.compileAssets(o.DatPath, o.Progress); err != nil {
+		if err := p.compileAssets(o.DatPath, o.Progress, o.Stats); err != nil {
 			return err
 		}
 		p.saved()

@@ -188,11 +188,9 @@ func FindDir(path string) (string, error) {
 }
 
 // With returns a copy of the catalog with another appearances file and
-// extra sprite sheets (with ids after every existing sheet).
+// these sprite sheets in place of the current ones.
 func (c *Catalog) With(appearances string, sheets []Sheet) *Catalog {
-	out := &Catalog{Appearances: appearances, others: c.others}
-	out.Sheets = append(slices.Clone(c.Sheets), sheets...)
-	return out
+	return &Catalog{Appearances: appearances, Sheets: slices.Clone(sheets), others: c.others}
 }
 
 // ClientVersion reads the client version ("15.33") from the package.json

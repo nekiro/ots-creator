@@ -56,6 +56,7 @@ func TestProfileOfficialAssets(t *testing.T) {
 		}
 		return q.Compile(CompileOptions{Format: FormatAssets, DatPath: out})
 	})
+	t.Logf("folder size %d MB -> %d MB", dirSize(src)>>20, dirSize(out)>>20)
 	// Every sprite of every object must look the same after optimizing and
 	// compiling (p is back at the original after the undo above).
 	step("Verify optimized output", func() error {
@@ -104,4 +105,15 @@ func TestProfileOfficialAssets(t *testing.T) {
 		}
 		return p.Compile(CompileOptions{Format: FormatAssets, DatPath: t.TempDir()})
 	})
+}
+
+func dirSize(dir string) int64 {
+	var n int64
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if info, err := e.Info(); err == nil && !e.IsDir() {
+			n += info.Size()
+		}
+	}
+	return n
 }
