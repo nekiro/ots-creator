@@ -113,6 +113,8 @@ class MapState {
   /** Bumped to generate a new doodad placement. */
   reroll = $state(0);
   recentBrushes = $state<BrushSel[]>([]);
+  /** Item the library should show and scroll to (set by picking a brush from the map). */
+  revealItem = $state<{ id: number } | null>(null);
 
   view = $state<ViewOptions>(loadJson(VIEW_KEY, DEFAULT_VIEW));
   cams = $state<Record<number, Camera>>({});

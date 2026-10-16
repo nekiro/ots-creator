@@ -1,6 +1,7 @@
 <script lang="ts">
   // What to draw with: brushes, items and creatures. The search field filters
   // the open tab; the tabs show how many of theirs match.
+  import { untrack } from "svelte";
   import { errorMessage } from "../../lib/api";
   import { ask, askText } from "../../lib/confirm.svelte";
   import { openContextMenu } from "../../lib/menu.svelte";
@@ -102,6 +103,37 @@
           return !ground && !edge && !itemIndex.is(id, "pickupable") && !itemIndex.is(id, "container");
       }
     });
+  });
+  /** A kind tab that lists the item (an item can be in more than one). */
+  function kindOf(id: number): Exclude<ItemKind, "all"> {
+    const itemIndex = map.items;
+    if (!itemIndex) return "other";
+    if (itemIndex.is(id, "ground")) return "ground";
+    if (itemIndex.top[id] > 0) return "edge";
+    if (itemIndex.is(id, "container")) return "container";
+    if (itemIndex.is(id, "pickupable")) return "pickup";
+    return "other";
+  }
+
+  // An item picked from the map: open the items tab on its kind, drop the
+  // filters that hide it and scroll to it while it stays the brush.
+  let revealed = $state<number | null>(null);
+  $effect(() => {
+    const request = map.revealItem;
+    if (!request) return;
+    untrack(() => {
+      map.revealItem = null;
+      view = "items";
+      itemKind = kindOf(request.id);
+      if (!items.includes(request.id)) query = "";
+      if (!items.includes(request.id)) collection = "";
+      revealed = request.id;
+    });
+  });
+  const revealIndex = $derived.by(() => {
+    if (revealed === null || map.brush?.kind !== "raw" || map.brush.item !== revealed) return null;
+    const index = items.indexOf(revealed);
+    return index >= 0 ? index : null;
   });
 
   // ----- creatures -----
@@ -282,7 +314,7 @@
     </div>
     <div class="m-body t-panel grid-host">
       {#if items.length}
-        <VirtualGrid count={items.length} cellWidth={ITEM_CELL} cellHeight={ITEM_CELL} gap={2}>
+        <VirtualGrid count={items.length} cellWidth={ITEM_CELL} cellHeight={ITEM_CELL} gap={2} scrollTo={revealIndex}>
           {#snippet cell(i)}{@render itemCell(items[i])}{/snippet}
         </VirtualGrid>
       {:else if search}

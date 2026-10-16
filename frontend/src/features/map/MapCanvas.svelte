@@ -435,6 +435,8 @@
     if (!tileData || !tileData.ids.length) return;
     const top = tileData.ids[tileData.ids.length - 1];
     selectBrush({ kind: "raw", item: top, look: top, label: items.name(top) });
+    map.side = "library";
+    map.revealItem = { id: top };
     toast(`Brush: ${items.name(top)}`);
   }
 
