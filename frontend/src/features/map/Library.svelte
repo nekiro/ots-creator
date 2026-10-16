@@ -5,7 +5,7 @@
   import { errorMessage } from "../../lib/api";
   import { ask, askText } from "../../lib/confirm.svelte";
   import { openContextMenu } from "../../lib/menu.svelte";
-  import { toast } from "../../lib/state/app.svelte";
+  import { app, toast } from "../../lib/state/app.svelte";
   import { readJson, saveJson } from "../../lib/state/storage";
   import { MapService, SpawnFormat, type CreatureType, type PaletteBrush } from "../../lib/map/data/api";
   import { mapCommands } from "../../lib/map/view/commands";
@@ -55,8 +55,8 @@
   $effect(() => saveJson(PREFS_KEY, { view, collection }));
 
   const palette = $derived(map.palette);
-  /** The item table and palette are on their way (none when the client has no map data). */
-  const loadingData = $derived((map.data === null || map.data.ready) && (!map.items || !map.palette));
+  /** A client is open and its item table or palette is still loading. */
+  const loadingData = $derived(app.open && (!map.items || !map.palette));
   const sets = $derived(palette?.tilesets?.filter((tileset) => !!tileset) ?? []);
   const set = $derived(sets.find((tileset) => tileset.name === collection) ?? null);
   const collections = $derived([{ value: "", label: "All collections" }, ...sets.map((tileset) => ({ value: tileset.name, label: tileset.name }))]);

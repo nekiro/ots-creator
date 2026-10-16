@@ -148,7 +148,7 @@
                     <div class="t-label hint">Without brushes you can still place any item (Library › Items). Import brushes for automatic borders, walls and decoration.</div>
                   {/if}
                 {:else}
-                  <div class="t-label">Loading the item data…</div>
+                  <div class="t-label loading"><span class="t-spinner"></span>Loading the item data…</div>
                 {/if}
                 <button class="t-btn" onclick={() => (map.dialog = "data")}>Items and brushes…</button>
               </div>
@@ -319,6 +319,11 @@
   }
   .ritem:hover .rdel {
     visibility: visible;
+  }
+  .loading {
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
   .data {
     padding: 8px;
