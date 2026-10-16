@@ -1,7 +1,8 @@
 // Quads built on the CPU every frame (brush previews, overlays, dragged
 // selections) and drawn in screen pixels with the sprite program.
 import type { Atlas } from "./atlas";
-import { FLOATS_PER_QUAD, compileProgram, createQuadVao } from "./gpu";
+import { GPU } from "./constants";
+import { compileProgram, createQuadVao } from "./gpu";
 import type { Scene } from "./scene";
 import QUAD_VERT from "./shaders/quad.vert?raw";
 import SPRITE_FRAG from "./shaders/sprite.frag?raw";
@@ -12,7 +13,7 @@ export class QuadBatch {
   private program: WebGLProgram;
   private vao: WebGLVertexArrayObject;
   private instances: WebGLBuffer;
-  private quads = new Float32Array(FLOATS_PER_QUAD * 4096);
+  private quads = new Float32Array(GPU.floatsPerQuad * 4096);
   private quadCount = 0;
   private uniforms: Record<string, WebGLUniformLocation | null> = {};
   /** The atlas the cells of pushed quads are in. */
@@ -35,12 +36,12 @@ export class QuadBatch {
 
   /** A sprite quad (cell: atlas cell, -1 hides it) tinted with r, g, b, a. */
   push(x: number, y: number, width: number, height: number, cell: number, r: number, g: number, b: number, a: number): void {
-    if ((this.quadCount + 1) * FLOATS_PER_QUAD > this.quads.length) {
+    if ((this.quadCount + 1) * GPU.floatsPerQuad > this.quads.length) {
       const grown = new Float32Array(this.quads.length * 2);
       grown.set(this.quads);
       this.quads = grown;
     }
-    const offset = this.quadCount * FLOATS_PER_QUAD;
+    const offset = this.quadCount * GPU.floatsPerQuad;
     const atlas = this.atlas!;
     const quads = this.quads;
     quads[offset] = x;
@@ -86,7 +87,7 @@ export class QuadBatch {
     gl.uniform1f(this.uniforms.u_alpha, 1);
     gl.bindVertexArray(this.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.instances);
-    gl.bufferData(gl.ARRAY_BUFFER, this.quads.subarray(0, this.quadCount * FLOATS_PER_QUAD), gl.STREAM_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, this.quads.subarray(0, this.quadCount * GPU.floatsPerQuad), gl.STREAM_DRAW);
     gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, this.quadCount);
     gl.bindVertexArray(null);
     this.quadCount = 0;

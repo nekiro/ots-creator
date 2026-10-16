@@ -4,23 +4,15 @@
 // chunks again; only animated pieces are patched.
 import { frameAt, type Look } from "./appearances";
 import type { Atlas } from "./atlas";
-import { CellIndex, MISSING } from "./cellIndex";
+import { CellIndex } from "./cellIndex";
 import { CHUNK, splitKey } from "./chunks";
 import { composedKey, composeOutfit, unpackColors } from "./composed";
+import { GPU, LIMITS } from "./constants";
 import { GEO_BLOCK, GEO_COMPOSED, GEO_HIDDEN, QUAD_BYTES, type GeoChunk } from "./geo";
 import { compileProgram, createQuadVao } from "./gpu";
 import type { FrameResult, Scene } from "./scene";
 import CHUNK_VERT from "./shaders/chunk.vert?raw";
 import SPRITE_FRAG from "./shaders/sprite.frag?raw";
-
-/** Bytes of chunk quads uploaded per frame; the rest wait for the next frames. */
-const UPLOAD_BYTES = 32 << 20;
-/** Time spent uploading chunk quads per frame (ms); the rest wait for the next frames. */
-const UPLOAD_MS = 6;
-/** Chunk buffers kept before the least recently drawn are freed. */
-const MAX_BUFFERS = 12000;
-/** Frames a chunk buffer is kept after it was last drawn, once there are MAX_BUFFERS. */
-const KEEP_FRAMES = 60;
 
 /** The quads of one chunk on the GPU. */
 interface ChunkBuffer {
@@ -78,10 +70,10 @@ export class ChunkBuffers {
     this.spriteCells.clear();
     this.composedCells.clear();
     atlas.onRelease = (key) => {
-      if (typeof key === "number") this.spriteCells.set(key, MISSING);
+      if (typeof key === "number") this.spriteCells.set(key, GPU.missingCell);
       else {
         const index = this.composedIds.get(key);
-        if (index !== undefined) this.composedCells.set(index, MISSING);
+        if (index !== undefined) this.composedCells.set(index, GPU.missingCell);
       }
     };
   }
@@ -91,7 +83,7 @@ export class ChunkBuffers {
     this.frameNumber++;
     this.boundAlpha = -1;
     this.uploadedBytes = 0;
-    this.uploadDeadline = performance.now() + UPLOAD_MS;
+    this.uploadDeadline = performance.now() + LIMITS.uploadMs;
   }
 
   /** Another program was bound: the next chunk drawn binds the chunk program again. */
@@ -125,7 +117,7 @@ export class ChunkBuffers {
     let buffer = this.buffers.get(chunk.key) ?? null;
     if (buffer && buffer.source === chunk) return buffer;
     // Something always uploads, unless only spare time is asked for.
-    if ((this.uploadedBytes > 0 || spareTimeOnly) && (this.uploadedBytes + chunk.quads.byteLength > UPLOAD_BYTES || performance.now() > this.uploadDeadline)) return buffer;
+    if ((this.uploadedBytes > 0 || spareTimeOnly) && (this.uploadedBytes + chunk.quads.byteLength > LIMITS.uploadBytes || performance.now() > this.uploadDeadline)) return buffer;
     this.uploadedBytes += chunk.quads.byteLength;
     const gl = this.gl;
     if (!buffer) {
@@ -178,7 +170,7 @@ export class ChunkBuffers {
       const key = composedKey(composed[i + 1], composed[i + 2], composed[i + 3]);
       const index = this.composedIds.get(key)!;
       let cell = this.composedCells.get(index);
-      if (cell === MISSING) {
+      if (cell === GPU.missingCell) {
         const spriteId = composed[i + 1];
         const templateId = composed[i + 2];
         const colors = unpackColors(composed[i + 3]);
@@ -204,7 +196,7 @@ export class ChunkBuffers {
   /** The atlas cell of a sprite, uploading it when needed (-1: not loaded yet). */
   private cellOfSprite(scene: Scene, spriteId: number): number {
     const indexed = this.spriteCells.get(spriteId);
-    if (indexed !== MISSING) return indexed;
+    if (indexed !== GPU.missingCell) return indexed;
     const cell = this.atlas!.cellOf(spriteId, () => scene.sprites.get(spriteId)?.pixels);
     if (cell < 0) {
       if (!scene.sprites.get(spriteId)) this.missing.add(spriteId);
@@ -278,8 +270,8 @@ export class ChunkBuffers {
 
   /** Frees chunk buffers not drawn for a while once there are many (the store fetches them again). */
   sweep(scene: Scene): void {
-    if (this.buffers.size <= MAX_BUFFERS) return;
-    const oldest = this.frameNumber - KEEP_FRAMES;
+    if (this.buffers.size <= LIMITS.chunkBuffers) return;
+    const oldest = this.frameNumber - LIMITS.keepFrames;
     for (const [key, buffer] of this.buffers) {
       if (buffer.lastDrawn < oldest) {
         this.free(buffer);

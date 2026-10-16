@@ -1,9 +1,7 @@
 // Sprite id to atlas cell lookup the chunk shader reads.
+import { GPU } from "./constants";
 
-/** Index value of an id that is not in the atlas. */
-export const MISSING = 0xffffffff;
-
-/** Atlas cells of ids in a R32UI texture the chunk shader reads (MISSING: not in the atlas). */
+/** Atlas cells of ids in a R32UI texture the chunk shader reads (GPU.missingCell: not in the atlas). */
 export class CellIndex {
   private cells: Uint32Array;
   private texture: WebGLTexture;
@@ -23,19 +21,19 @@ export class CellIndex {
     rows: number,
   ) {
     this.rows = rows;
-    this.cells = new Uint32Array(width * rows).fill(MISSING);
+    this.cells = new Uint32Array(width * rows).fill(GPU.missingCell);
     this.texture = gl.createTexture()!;
   }
 
   get(id: number): number {
-    return id < this.cells.length ? this.cells[id] : MISSING;
+    return id < this.cells.length ? this.cells[id] : GPU.missingCell;
   }
 
   set(id: number, cell: number): void {
     if (id >= this.cells.length) {
       let rows = this.rows;
       while (id >= this.width * rows) rows *= 2;
-      const grown = new Uint32Array(this.width * rows).fill(MISSING);
+      const grown = new Uint32Array(this.width * rows).fill(GPU.missingCell);
       grown.set(this.cells);
       this.cells = grown;
       this.rows = rows;
@@ -49,7 +47,7 @@ export class CellIndex {
   }
 
   clear(): void {
-    this.cells.fill(MISSING);
+    this.cells.fill(GPU.missingCell);
     this.grown = true;
   }
 

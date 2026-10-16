@@ -3,6 +3,7 @@
 import { AF, frameAt, type Look } from "./appearances";
 import { IF, TF, type CreatureData } from "./chunks";
 import { composedKey, composeOutfit, packColors } from "./composed";
+import { ALPHA, COLORS } from "./constants";
 import type { QuadBatch } from "./quadBatch";
 import type { Scene } from "./scene";
 import type { Camera, TileRange } from "./view";
@@ -29,17 +30,6 @@ function stackPattern(count: number): [number, number] {
   return [3, 1];
 }
 
-/** Tints of missing things: an unknown item id, an item without appearance, an unknown creature. */
-const UNKNOWN_ITEM = [0.8, 0, 0, 0.6] as const;
-const ITEM_WITHOUT_LOOK = [0.8, 0, 0, 0.5] as const;
-const UNKNOWN_NPC = [0.3, 0.6, 1, 0.8] as const;
-const UNKNOWN_MONSTER = [1, 0.5, 0.2, 0.8] as const;
-/** Darkening of selected creatures. */
-const SELECTED_SHADE = 0.5;
-/** Alpha of dragged things and the tint over their tiles. */
-const MOVED_ALPHA = 0.6;
-const MOVED_TILE = [0.4, 0.7, 1, 0.15] as const;
-
 export class ThingDrawer {
   /** missing: where sprites not loaded yet are added. */
   constructor(
@@ -58,7 +48,7 @@ export class ThingDrawer {
 
     const drawItem: DrawItem = (itemId, subtype, x, y, z, screenX, screenY, r, g, b, a, hookSide) => {
       if (!items.has(itemId)) {
-        this.batch.rect(screenX, screenY, tilePx, tilePx, [UNKNOWN_ITEM[0], UNKNOWN_ITEM[1], UNKNOWN_ITEM[2], UNKNOWN_ITEM[3] * a]);
+        this.batch.rect(screenX, screenY, tilePx, tilePx, [COLORS.unknownItem[0], COLORS.unknownItem[1], COLORS.unknownItem[2], COLORS.unknownItem[3] * a]);
         return 0;
       }
       const itemFlags = items.flags[itemId];
@@ -69,7 +59,7 @@ export class ThingDrawer {
         return 0;
       }
       if (look === null) {
-        this.batch.rect(screenX, screenY, tilePx, tilePx, [ITEM_WITHOUT_LOOK[0], ITEM_WITHOUT_LOOK[1], ITEM_WITHOUT_LOOK[2], ITEM_WITHOUT_LOOK[3] * a]);
+        this.batch.rect(screenX, screenY, tilePx, tilePx, [COLORS.itemWithoutLook[0], COLORS.itemWithoutLook[1], COLORS.itemWithoutLook[2], COLORS.itemWithoutLook[3] * a]);
         return 0;
       }
       let patternX = 0;
@@ -97,14 +87,14 @@ export class ThingDrawer {
     };
 
     const drawCreature: DrawCreature = (creature, screenX, screenY, x, y, z, alpha) => {
-      const shade = creature.selected ? SELECTED_SHADE : 1;
+      const shade = creature.selected ? ALPHA.selectedShade : 1;
       if (creature.lookItem) {
         drawItem(creature.lookItem, 0, x, y, z, screenX, screenY, shade, shade, shade, alpha, 0);
         return;
       }
       if (!creature.lookType) {
         // Unknown creature: a marker so it is not invisible.
-        const color = creature.npc ? UNKNOWN_NPC : UNKNOWN_MONSTER;
+        const color = creature.npc ? COLORS.unknownNpc : COLORS.unknownMonster;
         this.batch.rect(screenX + tilePx * 0.25, screenY + tilePx * 0.25, tilePx * 0.5, tilePx * 0.5, [color[0], color[1], color[2], color[3] * alpha]);
         return;
       }
@@ -153,10 +143,10 @@ export class ThingDrawer {
         let elevation = 0;
         for (let i = 0; i < tile.ids.length; i++) {
           if (!(tile.iflags[i] & IF.selected)) continue;
-          elevation += drawItem(tile.ids[i], tile.subs[i], movedX, movedY, z, screenX - elevation * scene.scale, screenY - elevation * scene.scale, 1, 1, 1, MOVED_ALPHA, 0);
+          elevation += drawItem(tile.ids[i], tile.subs[i], movedX, movedY, z, screenX - elevation * scene.scale, screenY - elevation * scene.scale, 1, 1, 1, ALPHA.moved, 0);
         }
-        for (const creature of tile.creatures ?? []) if (creature.selected) drawCreature(creature, screenX, screenY, movedX, movedY, z, MOVED_ALPHA);
-        this.batch.rect(screenX, screenY, tilePx, tilePx, MOVED_TILE);
+        for (const creature of tile.creatures ?? []) if (creature.selected) drawCreature(creature, screenX, screenY, movedX, movedY, z, ALPHA.moved);
+        this.batch.rect(screenX, screenY, tilePx, tilePx, COLORS.movedTile);
       }
     }
   }

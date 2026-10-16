@@ -3,11 +3,7 @@
 // outfits) by a string. The texture grows by layers up to a limit, then
 // the least recently used cells are reused.
 
-const DIM = 1024;
-const START_LAYERS = 4;
-const MAX_LAYERS = 64;
-/** Uploads per frame; more wait for the next frame so panning stays smooth. */
-const MAX_UPLOADS = 1500;
+import { ATLAS } from "./constants";
 
 export type AtlasKey = number | string;
 
@@ -15,7 +11,7 @@ export class Atlas {
   tex: WebGLTexture;
   readonly perRow: number;
   readonly perLayer: number;
-  layers = START_LAYERS;
+  layers: number = ATLAS.startLayers;
   private slots = new Map<AtlasKey, number>();
   private keys: (AtlasKey | undefined)[] = [];
   private used = new Uint32Array(0);
@@ -34,7 +30,7 @@ export class Atlas {
     private gl: WebGL2RenderingContext,
     readonly cell: number,
   ) {
-    this.perRow = Math.floor(DIM / cell);
+    this.perRow = Math.floor(ATLAS.size / cell);
     this.perLayer = this.perRow * this.perRow;
     this.tex = this.create(this.layers);
     this.used = new Uint32Array(this.layers * this.perLayer);
@@ -43,14 +39,14 @@ export class Atlas {
   }
 
   get uvCell(): number {
-    return this.cell / DIM;
+    return this.cell / ATLAS.size;
   }
 
   private create(layers: number): WebGLTexture {
     const gl = this.gl;
     const tex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex);
-    gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.RGBA8, DIM, DIM, layers);
+    gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.RGBA8, ATLAS.size, ATLAS.size, layers);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -86,7 +82,7 @@ export class Atlas {
       this.used[s] = this.frame;
       return s;
     }
-    if (this.uploads >= MAX_UPLOADS) {
+    if (this.uploads >= ATLAS.uploadsPerFrame) {
       this.pending = true;
       return -1;
     }
@@ -112,8 +108,8 @@ export class Atlas {
     const f = this.free.pop();
     if (f !== undefined) return f;
     if (this.next < this.layers * this.perLayer) return this.next++;
-    if (this.layers < MAX_LAYERS) {
-      this.grow(Math.min(this.layers * 2, MAX_LAYERS));
+    if (this.layers < ATLAS.maxLayers) {
+      this.grow(Math.min(this.layers * 2, ATLAS.maxLayers));
       return this.next++;
     }
     this.evict();
@@ -128,7 +124,7 @@ export class Atlas {
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, fb);
     for (let l = 0; l < this.layers; l++) {
       gl.framebufferTextureLayer(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, old, 0, l);
-      gl.copyTexSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, l, 0, 0, DIM, DIM);
+      gl.copyTexSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, l, 0, 0, ATLAS.size, ATLAS.size);
     }
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
     gl.deleteFramebuffer(fb);

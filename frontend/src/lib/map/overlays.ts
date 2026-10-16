@@ -2,32 +2,11 @@
 // radiuses, selection and area rectangles, markers, the client view box,
 // and labels (creature names, item texts, positions, item tooltips).
 import { IF, TF } from "./chunks";
+import { ALPHA, COLORS, LABEL_COLORS, LIMITS, ZOOM } from "./constants";
 import { labelText, wrapText } from "./itemText";
 import type { QuadBatch } from "./quadBatch";
 import type { FrameResult, Scene } from "./scene";
-import { TILES_TILE_PX, type Camera } from "./view";
-
-/** Smallest tile size in device pixels with grid lines, marker names and other labels. */
-const GRID_TILE_PX = 8;
-const MARKER_LABEL_TILE_PX = 12;
-const LABEL_TILE_PX = 24;
-/** Tiles around the view searched for spawns whose radius reaches into it. */
-const SPAWN_SEARCH = 30;
-
-const GRID_COLOR = [1, 1, 1, 0.12];
-const SPAWN_SELECTED = [1, 1, 0.4, 0.9];
-const SPAWN_NPC = [0.4, 0.7, 1, 0.7];
-const SPAWN_MONSTER = [1, 0.45, 0.45, 0.7];
-/** Alpha of the spawn center tile and of marker outlines. */
-const SPAWN_CENTER_ALPHA = 0.25;
-const MARKER_ALPHA = 0.9;
-const CLIENT_BOX_COLOR = [1, 1, 1, 0.6];
-const HOVER_TILE = [1, 1, 1, 0.12];
-const POSITION_TAG = [0, 0, 0, 0.75];
-const CREATURE_NAME_COLOR = "#00c000";
-const ITEM_TEXT_COLOR = "#e0d29a";
-const POSITION_TEXT_COLOR = "#e8e8e8";
-const TOOLTIP_COLOR = "#ffd75e";
+import { type Camera } from "./view";
 
 /** What every overlay draws with in a frame. */
 interface Overlay {
@@ -47,15 +26,15 @@ export function drawOverlays(scene: Scene, result: FrameResult, camera: Camera, 
   const { opts } = scene;
   const tilePx = camera.tilePx;
   const near = !result.far;
-  if (opts.grid && tilePx >= GRID_TILE_PX) drawGrid(overlay);
-  if (opts.spawns && tilePx >= TILES_TILE_PX) drawSpawns(overlay);
+  if (opts.grid && tilePx >= ZOOM.grid) drawGrid(overlay);
+  if (opts.spawns && tilePx >= ZOOM.tileData) drawSpawns(overlay);
   drawRects(overlay);
   if (opts.markers) drawMarkers(overlay);
   if (opts.clientBox) drawClientBox(overlay);
-  if (opts.creatures && opts.labels && tilePx >= LABEL_TILE_PX && near) labelCreatures(overlay);
-  if (opts.labels && tilePx >= LABEL_TILE_PX && near) labelItemTexts(overlay);
+  if (opts.creatures && opts.labels && tilePx >= ZOOM.labels && near) labelCreatures(overlay);
+  if (opts.labels && tilePx >= ZOOM.labels && near) labelItemTexts(overlay);
   if (opts.coords && scene.hover && scene.hover.z === overlay.z) labelHoverPosition(overlay);
-  if (opts.tooltips && tilePx >= LABEL_TILE_PX && near) labelItemTooltips(overlay);
+  if (opts.tooltips && tilePx >= ZOOM.labels && near) labelItemTooltips(overlay);
 }
 
 /** Calls visit for the tiles of the floor in view, from `before` tiles up
@@ -82,23 +61,23 @@ function pixelRatio(): number {
 
 function drawGrid({ scene, camera, batch, z }: Overlay): void {
   const range = camera.tiles(z, 0, 0);
-  for (let x = range.x0; x <= range.x1; x++) batch.rect(camera.tileX(x, z), 0, 1, scene.height, GRID_COLOR);
-  for (let y = range.y0; y <= range.y1; y++) batch.rect(0, camera.tileY(y, z), scene.width, 1, GRID_COLOR);
+  for (let x = range.x0; x <= range.x1; x++) batch.rect(camera.tileX(x, z), 0, 1, scene.height, COLORS.grid);
+  for (let y = range.y0; y <= range.y1; y++) batch.rect(0, camera.tileY(y, z), scene.width, 1, COLORS.grid);
 }
 
 /** Spawn radius outlines of the current floor. */
 function drawSpawns(overlay: Overlay): void {
   const { scene, camera, batch, z, tilePx, lineWidth } = overlay;
-  forEachTile(overlay, SPAWN_SEARCH, SPAWN_SEARCH, (x, y) => {
+  forEachTile(overlay, LIMITS.spawnSearch, LIMITS.spawnSearch, (x, y) => {
     const tile = scene.chunks.peekTile(x, y, z);
     if (!tile || !(tile.flags & (TF.spawn | TF.spawnNpc))) return;
     for (const spawn of [tile.spawn, tile.spawnNpc]) {
       if (!spawn) continue;
       const radius = spawn.radius;
-      const color = spawn.selected ? SPAWN_SELECTED : tile.spawnNpc === spawn ? SPAWN_NPC : SPAWN_MONSTER;
+      const color = spawn.selected ? COLORS.spawn.selected : tile.spawnNpc === spawn ? COLORS.spawn.npc : COLORS.spawn.monster;
       const size = (2 * radius + 1) * tilePx;
       batch.stroke(camera.tileX(x - radius, z), camera.tileY(y - radius, z), size, size, color, lineWidth);
-      batch.rect(camera.tileX(x, z), camera.tileY(y, z), tilePx, tilePx, [color[0], color[1], color[2], SPAWN_CENTER_ALPHA]);
+      batch.rect(camera.tileX(x, z), camera.tileY(y, z), tilePx, tilePx, [color[0], color[1], color[2], ALPHA.spawnCenter]);
     }
   });
 }
@@ -123,8 +102,8 @@ function drawMarkers({ scene, result, camera, batch, z, tilePx, lineWidth }: Ove
     const x = camera.tileX(marker.x, z);
     const y = camera.tileY(marker.y, z);
     const [r, g, b] = marker.color;
-    batch.stroke(x + lineWidth, y + lineWidth, tilePx - 2 * lineWidth, tilePx - 2 * lineWidth, [r, g, b, MARKER_ALPHA], Math.max(2, lineWidth * 2));
-    if (tilePx >= MARKER_LABEL_TILE_PX && scene.opts.labels) {
+    batch.stroke(x + lineWidth, y + lineWidth, tilePx - 2 * lineWidth, tilePx - 2 * lineWidth, [r, g, b, ALPHA.marker], Math.max(2, lineWidth * 2));
+    if (tilePx >= ZOOM.markerNames && scene.opts.labels) {
       // The whole name under the mouse, the short one elsewhere.
       const hovered = isHovered(scene, marker.x, marker.y, z);
       result.labels.push({
@@ -142,7 +121,7 @@ function drawMarkers({ scene, result, camera, batch, z, tilePx, lineWidth }: Ove
 function drawClientBox({ camera, batch, z, tilePx, lineWidth }: Overlay): void {
   const playerX = Math.floor(camera.centerX(z));
   const playerY = Math.floor(camera.centerY(z));
-  batch.stroke(camera.tileX(playerX - 7, z), camera.tileY(playerY - 5, z), 15 * tilePx, 11 * tilePx, CLIENT_BOX_COLOR, Math.max(2, lineWidth));
+  batch.stroke(camera.tileX(playerX - 7, z), camera.tileY(playerY - 5, z), 15 * tilePx, 11 * tilePx, COLORS.clientBox, Math.max(2, lineWidth));
 }
 
 /** Names over creatures as the client shows them: green (full health),
@@ -154,7 +133,7 @@ function labelCreatures(overlay: Overlay): void {
     const tile = scene.chunks.peekTile(x, y, z);
     if (!tile?.creatures) return;
     for (const creature of tile.creatures) {
-      result.labels.push({ x: camera.tileX(x, z) + tilePx / 2 - spriteOffset, y: camera.tileY(y, z) - spriteOffset - 2, text: creature.name, color: CREATURE_NAME_COLOR });
+      result.labels.push({ x: camera.tileX(x, z) + tilePx / 2 - spriteOffset, y: camera.tileY(y, z) - spriteOffset - 2, text: creature.name, color: LABEL_COLORS.creatureName });
     }
   });
 }
@@ -172,11 +151,11 @@ function labelItemTexts(overlay: Overlay): void {
       // Line by line, over the other labels.
       const lines = wrapText(text);
       const lineHeight = 11 * pixelRatio();
-      lines.forEach((line, i) => result.labels.push({ x: centerX, y: centerY + (i - (lines.length - 1) / 2) * lineHeight, text: line, color: ITEM_TEXT_COLOR, small: true, top: true }));
+      lines.forEach((line, i) => result.labels.push({ x: centerX, y: centerY + (i - (lines.length - 1) / 2) * lineHeight, text: line, color: LABEL_COLORS.itemText, small: true, top: true }));
       return;
     }
     const firstLine = labelText(text);
-    if (firstLine) result.labels.push({ x: centerX, y: centerY, text: firstLine, color: ITEM_TEXT_COLOR, small: true, cull: true });
+    if (firstLine) result.labels.push({ x: centerX, y: centerY, text: firstLine, color: LABEL_COLORS.itemText, small: true, cull: true });
   });
 }
 
@@ -191,9 +170,9 @@ function labelHoverPosition({ scene, result, camera, batch, z, tilePx }: Overlay
   const y = camera.tileY(hover.y, z);
   const tagX = Math.min(Math.max(0, x + tilePx / 2 - tagWidth / 2), scene.width - tagWidth);
   const tagY = y - tagHeight - 2 * ratio >= 0 ? y - tagHeight - 2 * ratio : y + tilePx + 2 * ratio;
-  batch.rect(x, y, tilePx, tilePx, HOVER_TILE);
-  batch.rect(tagX, tagY, tagWidth, tagHeight, POSITION_TAG);
-  result.labels.push({ x: tagX + tagWidth / 2, y: tagY + tagHeight / 2, text, color: POSITION_TEXT_COLOR, small: true });
+  batch.rect(x, y, tilePx, tilePx, COLORS.hoverTile);
+  batch.rect(tagX, tagY, tagWidth, tagHeight, COLORS.positionTag);
+  result.labels.push({ x: tagX + tagWidth / 2, y: tagY + tagHeight / 2, text, color: LABEL_COLORS.position, small: true });
 }
 
 /** The id of the first item on a tile with an action id, unique id, text,
@@ -211,7 +190,7 @@ function labelItemTooltips(overlay: Overlay): void {
       if (itemFlags & IF.text) tags.push("text");
       if (itemFlags & IF.teleport) tags.push("tp");
       if (itemFlags & IF.doorId) tags.push("door");
-      result.labels.push({ x: camera.tileX(x, z) + tilePx / 2, y: camera.tileY(y, z) + tilePx / 2, text: `${tile.ids[i]} ${tags.join(" ")}`, color: TOOLTIP_COLOR });
+      result.labels.push({ x: camera.tileX(x, z) + tilePx / 2, y: camera.tileY(y, z) + tilePx / 2, text: `${tile.ids[i]} ${tags.join(" ")}`, color: LABEL_COLORS.tooltip });
       break;
     }
   });

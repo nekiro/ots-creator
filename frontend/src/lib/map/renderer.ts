@@ -9,19 +9,13 @@
 import { Atlas } from "./atlas";
 import { ChunkBuffers } from "./chunkBuffers";
 import { chunkKey } from "./chunks";
+import { ALPHA, BLOCK_CHUNKS, COLORS, LIMITS, ZOOM } from "./constants";
 import { GEO, GEO_BLOCK, geoBits, type GeoChunk } from "./geo";
 import { drawOverlays } from "./overlays";
 import { QuadBatch } from "./quadBatch";
 import type { FrameResult, Scene } from "./scene";
 import { ThingDrawer } from "./things";
-import { Camera, DETAIL_TILE_PX, MAX_VISIBLE_TILES, NEAR_TILE_PX, TILES_TILE_PX, floorsToDraw } from "./view";
-
-/** Chunks a side of the blocks drawn far out. */
-const BLOCK = 4;
-/** Alpha of the floor above drawn over the floor in view (ghostHigher). */
-const GHOST_FLOOR_ALPHA = 0.3;
-/** Shade over the lower floors under the floor in view. */
-const LOWER_FLOORS_SHADE = [0, 0, 0, 0.45];
+import { Camera, floorsToDraw } from "./view";
 
 /** The chunk a tile is in (one coordinate). */
 function chunkOfTile(tile: number): number {
@@ -32,7 +26,7 @@ function chunkOfTile(tile: number): number {
 interface ChunkPlan {
   /** What the chunk quads are built for (view options, house, block size). */
   signature: string;
-  /** Chunks a side of what is drawn: 1, or BLOCK far out. */
+  /** Chunks a side of what is drawn: 1, or BLOCK_CHUNKS far out. */
   blockSize: number;
   /** Chunks of the floor in view still loading or not uploaded yet. */
   notReady: number;
@@ -97,7 +91,7 @@ export class MapRenderer {
     const camera = new Camera(scene);
     const tilePx = camera.tilePx;
     const floors = floorsToDraw(scene, camera.visibleTiles);
-    result.far = tilePx < NEAR_TILE_PX || camera.visibleTiles > MAX_VISIBLE_TILES;
+    result.far = tilePx < ZOOM.sprites || camera.visibleTiles > LIMITS.visibleTiles;
     if (result.far) {
       // Overlays only.
       drawOverlays(scene, result, camera, this.batch);
@@ -129,7 +123,7 @@ export class MapRenderer {
     for (const z of floors) {
       const isFloorInView = z === floor;
       if (isFloorInView && floors.length > 1 && scene.opts.shade) {
-        this.batch.rect(0, 0, scene.width, scene.height, LOWER_FLOORS_SHADE);
+        this.batch.rect(0, 0, scene.width, scene.height, COLORS.lowerFloorsShade);
         this.flushScreen(scene);
       }
       for (const chunk of plan.underneath.get(z) ?? []) this.chunks.draw(scene, chunk, 1, camera.shift(z), result);
@@ -139,7 +133,7 @@ export class MapRenderer {
         this.flushScreen(scene);
       }
     }
-    if (ghostFloor >= 0) for (const chunk of chunksByFloor.get(ghostFloor)!) this.chunks.draw(scene, chunk, GHOST_FLOOR_ALPHA, camera.shift(ghostFloor), result);
+    if (ghostFloor >= 0) for (const chunk of chunksByFloor.get(ghostFloor)!) this.chunks.draw(scene, chunk, ALPHA.ghostFloor, camera.shift(ghostFloor), result);
     this.things.drawGhosts(scene, camera, drawItem, drawCreature);
     drawOverlays(scene, result, camera, this.batch);
     if (this.missing.size) {
@@ -156,10 +150,10 @@ export class MapRenderer {
   /** What chunk quads are built for besides the chunk itself. Far out,
    * movable items and creatures are too small to see and animation (all
    * the water) would patch thousands of chunks per frame. Far out, chunks
-   * also come in blocks of BLOCK x BLOCK: fewer draws. */
+   * also come in blocks of BLOCK_CHUNKS x BLOCK_CHUNKS: fewer draws. */
   private planChunks(scene: Scene, tilePx: number): ChunkPlan {
-    const farDetail = tilePx < DETAIL_TILE_PX;
-    const blockSize = farDetail ? BLOCK : 1;
+    const farDetail = tilePx < ZOOM.detail;
+    const blockSize = farDetail ? BLOCK_CHUNKS : 1;
     let bits = geoBits(scene.opts);
     if (farDetail) bits = (bits & ~(GEO.animation | GEO.creatures | GEO.ghostItems)) | GEO.far;
     const signature = `${bits}|${scene.opts.houses ? scene.house : 0}|${blockSize}`;
@@ -184,11 +178,11 @@ export class MapRenderer {
         const key = chunkKey(chunkX, chunkY, z);
         if (blockSize === 1) {
           // Tiles of the floor in view feed the overlays and previews.
-          if (z === scene.floor && (camera.tilePx >= TILES_TILE_PX || scene.moveOffset)) scene.chunks.get(key);
+          if (z === scene.floor && (camera.tilePx >= ZOOM.tileData || scene.moveOffset)) scene.chunks.get(key);
           const chunk = scene.geo.get(key, signature);
           if (chunk) out.push(chunk);
           else if (chunk === undefined) {
-            const blockKey = chunkKey(chunkX - (chunkX % BLOCK), chunkY - (chunkY % BLOCK), z) + GEO_BLOCK;
+            const blockKey = chunkKey(chunkX - (chunkX % BLOCK_CHUNKS), chunkY - (chunkY % BLOCK_CHUNKS), z) + GEO_BLOCK;
             const block = scene.geo.peek(blockKey);
             if (block) {
               let list = underneath.get(z);

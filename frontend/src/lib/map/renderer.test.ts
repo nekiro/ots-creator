@@ -10,6 +10,7 @@ import { QUAD_BYTES, type GeoChunk, type GeoStore } from "./geo";
 import type { ItemIndex } from "./items";
 import type { SpriteCache } from "../render/sprites";
 import { MapRenderer } from "./renderer";
+import { fakeGl } from "./testing/fakeGl";
 import type { Scene, ViewOptions } from "./scene";
 
 /** A small deterministic hash. */
@@ -21,54 +22,6 @@ function mix(...values: number[]): number {
     h ^= h >>> 13;
   }
   return h >>> 0;
-}
-
-function hashBytes(bytes: Uint8Array): string {
-  let h = 2166136261;
-  for (let i = 0; i < bytes.length; i++) h = Math.imul(h ^ bytes[i], 16777619);
-  return (h >>> 0).toString(16);
-}
-
-/** A WebGL2 context that records its calls. Objects it creates are numbered
- * per kind (Buffer1, Texture3), uniform locations named after their program. */
-function recordingGl(log: string[]): WebGL2RenderingContext {
-  const counts = new Map<string, number>();
-  const ids = new WeakMap<object, string>();
-  const fmt = (v: unknown): string => {
-    if (v === null || v === undefined) return String(v);
-    if (ArrayBuffer.isView(v)) {
-      const bytes = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
-      return `${v.constructor.name}[${bytes.length}]#${hashBytes(bytes)}`;
-    }
-    if (typeof v === "object") return ids.get(v) ?? JSON.stringify(v);
-    return String(v);
-  };
-  const make = (kind: string) => {
-    const o = {};
-    const n = (counts.get(kind) ?? 0) + 1;
-    counts.set(kind, n);
-    ids.set(o, `${kind}${n}`);
-    return o;
-  };
-  const named = (name: string) => {
-    const o = {};
-    ids.set(o, name);
-    return o;
-  };
-  return new Proxy({} as WebGL2RenderingContext, {
-    get(_, name: string) {
-      if (/^[A-Z0-9_]+$/.test(name)) return `${name}`;
-      return (...args: unknown[]) => {
-        let out: unknown;
-        if (name.startsWith("create")) out = make(name.slice(6));
-        else if (name === "getUniformLocation") out = named(`${fmt(args[0])}.${args[1]}`);
-        else if (name === "getShaderParameter" || name === "getProgramParameter") out = true;
-        else if (name === "getExtension") out = null;
-        log.push(`${name}(${args.map(fmt).join(", ")})${out !== undefined && typeof out === "object" && out ? ` -> ${fmt(out)}` : ""}`);
-        return out;
-      };
-    },
-  });
 }
 
 const SPRITE = 32;
@@ -276,8 +229,8 @@ describe("MapRenderer", () => {
 
   it("makes the same WebGL calls as before", async () => {
     const log: string[] = [];
-    const gl = recordingGl(log);
-    const canvas = { getContext: () => gl } as unknown as HTMLCanvasElement;
+    const fake = fakeGl((call) => log.push(fake.format(call)));
+    const canvas = { getContext: () => fake.gl } as unknown as HTMLCanvasElement;
     const renderer = new MapRenderer(canvas);
     // Setup in any order: only what is created counts.
     const setup = [...log].sort();

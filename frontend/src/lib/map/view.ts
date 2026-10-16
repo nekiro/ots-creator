@@ -1,17 +1,7 @@
 // Where the map is on screen in a frame: tile positions in device pixels,
 // the tiles in view and the floors drawn.
+import { LIMITS } from "./constants";
 import type { Scene } from "./scene";
-
-/** Smallest tile size in device pixels that still draws sprites. */
-export const NEAR_TILE_PX = 1;
-/** Smallest tile size in device pixels that draws every item, creatures and animation. */
-export const DETAIL_TILE_PX = 4;
-/** Smallest tile size in device pixels that loads tile data for overlays. */
-export const TILES_TILE_PX = 8;
-/** Tiles drawn over all floors before the farthest lower floors are left out. */
-const MAX_FLOOR_TILES = 3_000_000;
-/** Tiles of one floor in view above which sprites are not drawn. */
-export const MAX_VISIBLE_TILES = 6_000_000;
 
 /** A rectangle of tiles (inclusive). */
 export interface TileRange {
@@ -92,9 +82,11 @@ export function floorsToDraw(scene: Scene, visibleTiles: number): number[] {
   let floors: number[] = [];
   if (floor <= 7) for (let z = scene.opts.lowerFloors ? 7 : floor; z >= floor; z--) floors.push(z);
   else for (let z = scene.opts.lowerFloors ? Math.min(15, floor + 2) : floor; z >= floor; z--) floors.push(z);
-  if (floors.length * visibleTiles > MAX_FLOOR_TILES) {
-    const kept = Math.max(1, Math.floor(MAX_FLOOR_TILES / visibleTiles));
-    floors = [floor, ...floors.filter((z) => z !== floor)].slice(0, kept).sort((a, b) => b - a);
+  if (floors.length * visibleTiles > LIMITS.floorTiles) {
+    const kept = Math.max(1, Math.floor(LIMITS.floorTiles / visibleTiles));
+    // Keep the floor in view and the floors right under it.
+    const nearestFirst = [floor, ...floors.filter((z) => z !== floor).sort((a, b) => a - b)];
+    floors = nearestFirst.slice(0, kept).sort((a, b) => b - a);
   }
   return floors;
 }

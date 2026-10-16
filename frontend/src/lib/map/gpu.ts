@@ -1,8 +1,6 @@
 // WebGL programs and vertex layouts of the map renderer.
+import { GPU } from "./constants";
 import { QUAD_BYTES } from "./geo";
-
-/** Floats per screen quad: rectangle (4), atlas cell (2), color (4). */
-export const FLOATS_PER_QUAD = 10;
 
 export function compileProgram(gl: WebGL2RenderingContext, vertexSource: string, fragmentSource: string): WebGLProgram {
   const program = gl.createProgram()!;
@@ -37,7 +35,7 @@ export function createQuadVao(gl: WebGL2RenderingContext, corners: WebGLBuffer, 
     gl.vertexAttribIPointer(2, 1, gl.UNSIGNED_INT, QUAD_BYTES, 4);
     gl.vertexAttribPointer(3, 4, gl.UNSIGNED_BYTE, true, QUAD_BYTES, 8);
   } else {
-    const stride = FLOATS_PER_QUAD * 4;
+    const stride = GPU.floatsPerQuad * 4;
     gl.vertexAttribPointer(1, 4, gl.FLOAT, false, stride, 0);
     gl.vertexAttribPointer(2, 2, gl.FLOAT, false, stride, 16);
     gl.vertexAttribPointer(3, 4, gl.FLOAT, false, stride, 24);
