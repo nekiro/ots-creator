@@ -85,8 +85,8 @@ export function floorsToDraw(scene: Scene, visibleTiles: number): number[] {
   if (floors.length * visibleTiles > LIMITS.floorTiles) {
     const kept = Math.max(1, Math.floor(LIMITS.floorTiles / visibleTiles));
     // Keep the floor in view and the floors right under it.
-    const nearestFirst = [floor, ...floors.filter((z) => z !== floor).sort((a, b) => a - b)];
-    floors = nearestFirst.slice(0, kept).sort((a, b) => b - a);
+    const nearestFirst = [floor, ...floors.filter((z) => z !== floor).sort((first, second) => first - second)];
+    floors = nearestFirst.slice(0, kept).sort((first, second) => second - first);
   }
   return floors;
 }

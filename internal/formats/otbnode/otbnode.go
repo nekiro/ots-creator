@@ -43,7 +43,7 @@ const progressStep = 1 << 20
 // ParseProgress is Parse that calls progress (when not nil) with the bytes
 // parsed so far and the total.
 func ParseProgress(data []byte, progress func(done, total int)) (root *Node, ident [4]byte, err error) {
-	return parse(data, &parser{buf: make([]byte, 0, len(data)), progress: progress})
+	return (&parser{buf: make([]byte, 0, len(data)), progress: progress}).parse(data)
 }
 
 // Stream parses a node file without keeping all of it: every node at depth
@@ -53,10 +53,10 @@ func ParseProgress(data []byte, progress func(done, total int)) (root *Node, ide
 // streamed nodes). Nodes above depth are returned in root as usual.
 // Properties and nodes passed to visit are only valid during the call.
 func Stream(data []byte, depth int, progress func(done, total int), visit func(stack []*Node, node *Node) error) (root *Node, ident [4]byte, err error) {
-	return parse(data, &parser{progress: progress, depth: depth, visit: visit})
+	return (&parser{progress: progress, depth: depth, visit: visit}).parse(data)
 }
 
-func parse(data []byte, p *parser) (root *Node, ident [4]byte, err error) {
+func (p *parser) parse(data []byte) (root *Node, ident [4]byte, err error) {
 	if len(data) < 6 {
 		return nil, ident, fmt.Errorf("%w: file too small", ErrFormat)
 	}

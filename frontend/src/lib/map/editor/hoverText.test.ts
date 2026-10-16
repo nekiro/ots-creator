@@ -7,7 +7,7 @@ const position = { x: 100, y: 200, z: 7 };
 const itemName = (id: number) => `item${id}`;
 
 function tile(change: Partial<TileData>): TileData {
-  return { flags: 0, house: 0, ids: new Uint16Array(0), subs: new Uint16Array(0), iflags: new Uint8Array(0), creatures: null, spawn: null, spawnNpc: null, zones: null, text: null, ...change };
+  return { flags: 0, house: 0, ids: new Uint16Array(0), subs: new Uint16Array(0), itemFlags: new Uint8Array(0), creatures: null, spawn: null, spawnNpc: null, zones: null, text: null, ...change };
 }
 
 describe("describeTile", () => {

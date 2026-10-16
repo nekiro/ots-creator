@@ -6,35 +6,35 @@
   import Dialog from "../../../lib/ui/Dialog.svelte";
   import Select from "../../../lib/ui/Select.svelte";
 
-  const d = map.data;
-  let cfg = $state<MapDataConfig>(d?.config ? { ...d.config } : { itemsMode: "auto", otbPath: "", xmlPath: "", materialsPath: "", serverDir: "" });
+  const data = map.data;
+  let config = $state<MapDataConfig>(data?.config ? { ...data.config } : { itemsMode: "auto", otbPath: "", xmlPath: "", materialsPath: "", serverDir: "" });
   let busy = $state<string | null>(null);
   let warnings = $state<string[]>([]);
 
   async function file(key: "otbPath" | "xmlPath" | "materialsPath", title: string, pattern: string) {
-    const p = await DialogService.OpenFiles("mapData", title, [{ name: pattern, pattern }], false);
-    if (p?.length) cfg[key] = p[0];
+    const paths = await DialogService.OpenFiles("mapData", title, [{ name: pattern, pattern }], false);
+    if (paths?.length) config[key] = paths[0];
   }
 
   async function detect() {
     const dir = await DialogService.PickDirectory("mapData", "Server or data folder");
     if (!dir) return;
     const found = await MapService.DetectData(dir);
-    cfg.otbPath = found.otbPath || cfg.otbPath;
-    cfg.xmlPath = found.xmlPath || cfg.xmlPath;
-    cfg.serverDir = found.serverDir || dir;
+    config.otbPath = found.otbPath || config.otbPath;
+    config.xmlPath = found.xmlPath || config.xmlPath;
+    config.serverDir = found.serverDir || dir;
     toast(found.xmlPath ? `Found ${[found.otbPath && "items.otb", found.xmlPath && "items.xml"].filter(Boolean).join(" and ")}.` : "No items.xml found there; the folder is still used for monsters and NPCs.");
   }
 
   async function serverDir() {
     const dir = await DialogService.PickDirectory("mapData", "Server data folder (monsters and NPCs)");
-    if (dir) cfg.serverDir = dir;
+    if (dir) config.serverDir = dir;
   }
 
   async function apply() {
     busy = "Loading items";
     try {
-      const info = await MapService.SetData($state.snapshot(cfg));
+      const info = await MapService.SetData($state.snapshot(config));
       warnings = info.warnings ?? [];
       await loadMapData(true);
       toast(`${info.items.toLocaleString()} items, ${info.brushes} brushes.`, "success");
@@ -51,10 +51,10 @@
     if (!dir) return;
     busy = "Importing brushes";
     try {
-      const r = await MapService.ImportRME(dir);
-      warnings = r.warnings ?? [];
+      const imported = await MapService.ImportRME(dir);
+      warnings = imported.warnings ?? [];
       await loadMapData(true);
-      toast(`Brushes: ${r.data.brushes}, tilesets: ${r.data.tilesets}, creatures: ${r.data.creatures}.`, "success");
+      toast(`Brushes: ${imported.data.brushes}, tilesets: ${imported.data.tilesets}, creatures: ${imported.data.creatures}.`, "success");
     } catch (err) {
       toast(errorMessage(err), "error");
     } finally {
@@ -63,10 +63,10 @@
   }
 
   async function importJSON() {
-    const p = await DialogService.OpenFiles("materials", "Brush file", [{ name: "Brushes (*.json)", pattern: "*.json" }], false);
-    if (!p?.length) return;
+    const paths = await DialogService.OpenFiles("materials", "Brush file", [{ name: "Brushes (*.json)", pattern: "*.json" }], false);
+    if (!paths?.length) return;
     try {
-      await MapService.ImportMaterials(p[0]);
+      await MapService.ImportMaterials(paths[0]);
       await loadMapData(true);
       toast("Brushes added.", "success");
     } catch (err) {
@@ -75,10 +75,10 @@
   }
 
   async function exportJSON() {
-    const p = await DialogService.SaveFile("materials", "Save brushes", "brushes.json", [{ name: "Brushes (*.json)", pattern: "*.json" }]);
-    if (!p) return;
+    const path = await DialogService.SaveFile("materials", "Save brushes", "brushes.json", [{ name: "Brushes (*.json)", pattern: "*.json" }]);
+    if (!path) return;
     try {
-      await MapService.ExportMaterials(p);
+      await MapService.ExportMaterials(path);
       toast("Brushes saved.", "success");
     } catch (err) {
       toast(errorMessage(err), "error");
@@ -106,11 +106,11 @@
       <p class="t-label hint">Server ids are translated to the client with items.otb. Client ids are used as they are, without items.otb. Names and types come from items.xml.</p>
       <div class="row">
         <span class="t-label lbl">Item ids</span>
-        <Select grow value={cfg.itemsMode} options={[{ value: "auto", label: "Automatic: items.otb when set" }, { value: "otb", label: "Server ids (items.otb)" }, { value: "client", label: "Client ids (no items.otb)" }]} onchange={(value) => (cfg.itemsMode = value)} />
+        <Select grow value={config.itemsMode} options={[{ value: "auto", label: "Automatic: items.otb when set" }, { value: "otb", label: "Server ids (items.otb)" }, { value: "client", label: "Client ids (no items.otb)" }]} onchange={(value) => (config.itemsMode = value)} />
       </div>
-      <div class="row"><span class="t-label lbl">items.otb</span><input class="t-input grow" bind:value={cfg.otbPath} placeholder="not used" /><button class="t-btn" onclick={() => file("otbPath", "items.otb", "*.otb")}>…</button></div>
-      <div class="row"><span class="t-label lbl">items.xml</span><input class="t-input grow" bind:value={cfg.xmlPath} placeholder="names from the client" /><button class="t-btn" onclick={() => file("xmlPath", "items.xml", "*.xml")}>…</button></div>
-      <div class="row"><span class="t-label lbl">Server data</span><input class="t-input grow" bind:value={cfg.serverDir} placeholder="monsters and NPCs" /><button class="t-btn" onclick={serverDir}>…</button></div>
+      <div class="row"><span class="t-label lbl">items.otb</span><input class="t-input grow" bind:value={config.otbPath} placeholder="not used" /><button class="t-btn" onclick={() => file("otbPath", "items.otb", "*.otb")}>…</button></div>
+      <div class="row"><span class="t-label lbl">items.xml</span><input class="t-input grow" bind:value={config.xmlPath} placeholder="names from the client" /><button class="t-btn" onclick={() => file("xmlPath", "items.xml", "*.xml")}>…</button></div>
+      <div class="row"><span class="t-label lbl">Server data</span><input class="t-input grow" bind:value={config.serverDir} placeholder="monsters and NPCs" /><button class="t-btn" onclick={serverDir}>…</button></div>
       <div class="row">
         <button class="t-btn" onclick={detect}>Find in a server folder…</button>
         <button class="t-btn" onclick={reload} title="After editing objects">Reload from client</button>
@@ -118,8 +118,8 @@
     </div>
     <div class="sect">
       <div class="h">Brushes</div>
-      <div class="row"><span class="t-label lbl">Brush file</span><input class="t-input grow" bind:value={cfg.materialsPath} placeholder={d?.materials || "default for this client"} /><button class="t-btn" onclick={() => file("materialsPath", "Brush file", "*.json")}>…</button></div>
-      <p class="t-label hint">{d?.brushes ?? 0} brushes, {d?.tilesets ?? 0} tilesets, {d?.creatures ?? 0} creatures. Brushes are kept in the editor's own format (JSON), shared by all maps of the client.</p>
+      <div class="row"><span class="t-label lbl">Brush file</span><input class="t-input grow" bind:value={config.materialsPath} placeholder={data?.materials || "default for this client"} /><button class="t-btn" onclick={() => file("materialsPath", "Brush file", "*.json")}>…</button></div>
+      <p class="t-label hint">{data?.brushes ?? 0} brushes, {data?.tilesets ?? 0} tilesets, {data?.creatures ?? 0} creatures. Brushes are kept in the editor's own format (JSON), shared by all maps of the client.</p>
       <div class="row wrap">
         <button class="t-btn primary" onclick={importRME}>Import from Remere's Map Editor…</button>
         <button class="t-btn" onclick={importJSON}>Add from file…</button>
@@ -128,7 +128,7 @@
     </div>
     {#if warnings.length}
       <div class="warn t-panel">
-        {#each warnings.slice(0, 60) as w}<div>{w}</div>{/each}
+        {#each warnings.slice(0, 60) as warning}<div>{warning}</div>{/each}
         {#if warnings.length > 60}<div class="t-label">…and {warnings.length - 60} more</div>{/if}
       </div>
     {/if}

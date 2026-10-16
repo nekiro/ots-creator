@@ -25,13 +25,13 @@ func (ms *MapService) SelectRect(id int, rect mapedit.Rect, floors string, add, 
 }
 
 // SelectAt selects the top thing of a tile.
-func (ms *MapService) SelectAt(id int, p otmap.Position, toggle, creatures, spawns bool) (MapChange, error) {
-	return ms.selectionEdit(id, func(editor *mapedit.Editor) { editor.SelectAt(p, toggle, creatures, spawns) })
+func (ms *MapService) SelectAt(id int, pos otmap.Position, toggle, creatures, spawns bool) (MapChange, error) {
+	return ms.selectionEdit(id, func(editor *mapedit.Editor) { editor.SelectAt(pos, toggle, creatures, spawns) })
 }
 
 // SelectItem selects one item of a tile.
-func (ms *MapService) SelectItem(id int, p otmap.Position, index int, add bool) (MapChange, error) {
-	return ms.selectionEdit(id, func(editor *mapedit.Editor) { editor.SelectItem(p, index, add) })
+func (ms *MapService) SelectItem(id int, pos otmap.Position, index int, add bool) (MapChange, error) {
+	return ms.selectionEdit(id, func(editor *mapedit.Editor) { editor.SelectItem(pos, index, add) })
 }
 
 // SelectTiles selects whole tiles.
@@ -56,8 +56,8 @@ func (ms *MapService) SelectAll(id int, floor int) (MapChange, error) {
 // Copy copies the selection to the clipboard (shared by all maps) and
 // returns the number of copied tiles.
 func (ms *MapService) Copy(id int) (tiles int, err error) {
-	err = ms.withMap(id, func(m *openMap, _ *mapData) error {
-		clip := m.editor.Copy()
+	err = ms.withMap(id, func(opened *openMap, _ *mapData) error {
+		clip := opened.editor.Copy()
 		if clip == nil {
 			return errNothingSelected
 		}
@@ -87,9 +87,9 @@ func (ms *MapService) Clipboard() *mapedit.Clip {
 	return ms.clipboard
 }
 
-// Paste puts the clipboard with its top-left corner at p.
-func (ms *MapService) Paste(id int, p otmap.Position) (MapChange, error) {
-	return ms.editMap(id, func(editor *mapedit.Editor) error { return editor.Paste(ms.clipboard, p) })
+// Paste puts the clipboard with its top-left corner at pos.
+func (ms *MapService) Paste(id int, pos otmap.Position) (MapChange, error) {
+	return ms.editMap(id, func(editor *mapedit.Editor) error { return editor.Paste(ms.clipboard, pos) })
 }
 
 // DeleteSelection removes everything selected.

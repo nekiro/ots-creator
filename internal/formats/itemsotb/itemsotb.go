@@ -17,8 +17,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/nekiro/ots-creator/internal/formats/otbnode"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/otbnode"
 )
 
 // Group is the item group (node type).

@@ -5,6 +5,7 @@ import { toast } from "../state/app.svelte";
 import { MapService, type DataInfo, type EditorSettings, type MapChange, type MapInfo, type Palette, type Position, type RecentMap, type TileInfo } from "./data/api";
 import { ItemIndex } from "./data/items";
 import type { ViewOptions } from "./render/scene";
+import { GROUND_FLOOR } from "./constants";
 
 export type EditorMode = "objects" | "map";
 export type Tool = "select" | "brush";
@@ -53,6 +54,8 @@ export interface Camera {
   floor: number;
 }
 
+const DEFAULT_CAMERA: Readonly<Camera> = { x: 0, y: 0, zoom: 1, floor: GROUND_FLOOR };
+
 const VIEW_KEY = "map:view";
 const BRUSH_KEY = "map:brush";
 const MODE_KEY = "map:mode";
@@ -85,7 +88,7 @@ export const DEFAULT_VIEW: ViewOptions = {
 class MapState {
   mode = $state<EditorMode>(loadJson<{ mode: EditorMode }>(MODE_KEY, { mode: "objects" }).mode);
   data = $state<DataInfo | null>(null);
-  maps = $state<MapInfo[]>([]);
+  maps = $state.raw<MapInfo[]>([]);
   recent = $state<RecentMap[]>([]);
   activeId = $state<number | null>(null);
   settings = $state<EditorSettings | null>(null);
@@ -95,7 +98,7 @@ class MapState {
   loadWarnings = $state.raw<Record<number, string[]>>({});
   /** Tab the settings window opens on. */
   settingsTab = $state<"general" | "keys">("general");
-  items =$state.raw<ItemIndex | null>(null);
+  items = $state.raw<ItemIndex | null>(null);
   palette = $state.raw<Palette | null>(null);
   /** Bumped when the item table or palette is reloaded. */
   dataRev = $state(0);
@@ -119,17 +122,17 @@ class MapState {
 
   view = $state<ViewOptions>(loadJson(VIEW_KEY, DEFAULT_VIEW));
   cams = $state<Record<number, Camera>>({});
-  hover = $state<Position | null>(null);
+  hover = $state.raw<Position | null>(null);
   /** Tile shown in the inspector. */
-  inspect = $state<Position | null>(null);
-  tile = $state<TileInfo | null>(null);
+  inspect = $state.raw<Position | null>(null);
+  tile = $state.raw<TileInfo | null>(null);
   /** Inspector content; null shows the map. */
   focus = $state<Focus | null>(null);
   side = $state<SidePanel>("library");
   /** Find panel: open, the values it opens with, and its results. */
   findOpen = $state(false);
   findPreset = $state<{ ids?: number[]; inSelection?: boolean; replace?: boolean } | null>(null);
-  results = $state<{ title: string; items: FindResultRow[]; more: boolean } | null>(null);
+  results = $state.raw<{ title: string; items: FindResultRow[]; more: boolean } | null>(null);
   /** Command palette: null closed, otherwise the text it opens with. */
   command = $state<string | null>(null);
   dialog = $state<MapDialog>(null);
@@ -147,13 +150,11 @@ class MapState {
   /** A map being opened or saved: its file name, the current step and how far the whole job is (0-100). */
   loading = $state<{ name: string; step: string; percent: number; title?: string } | null>(null);
 
-  get active(): MapInfo | null {
-    return this.maps.find((open) => open.id === this.activeId) ?? null;
-  }
+  readonly active = $derived<MapInfo | null>(this.maps.find((open) => open.id === this.activeId) ?? null);
 
   get cam(): Camera {
     const id = this.activeId;
-    return (id !== null && this.cams[id]) || { x: 0, y: 0, zoom: 1, floor: 7 };
+    return (id !== null && this.cams[id]) || DEFAULT_CAMERA;
   }
 
   get floor(): number {
@@ -176,12 +177,12 @@ $effect.root(() => {
 }
 
 /** Listeners of map changes (the canvas redraws touched chunks). */
-type ChangeListener = (id: number, ch: MapChange) => void;
+type ChangeListener = (id: number, change: MapChange) => void;
 const listeners = new Set<ChangeListener>();
 
-export function onMapChange(fn: ChangeListener): () => void {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
+export function onMapChange(listener: ChangeListener): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
 /** Applies a change from the backend: map info and redraw. */
@@ -193,7 +194,7 @@ export function applyChange(id: number, change: MapChange | null | undefined): v
     if (index >= 0) {
       // Towns, houses and waypoints are only sent with meta changes.
       const old = map.maps[index];
-      map.maps[index] = change.meta ? info : { ...info, towns: old.towns, houses: old.houses, waypoints: old.waypoints, zones: old.zones, bounds: old.bounds, hasBounds: old.hasBounds };
+      map.maps = map.maps.with(index, change.meta ? info : { ...info, towns: old.towns, houses: old.houses, waypoints: old.waypoints, zones: old.zones, bounds: old.bounds, hasBounds: old.hasBounds });
     }
   }
   for (const listener of listeners) listener(id, change);
@@ -202,11 +203,11 @@ export function applyChange(id: number, change: MapChange | null | undefined): v
 }
 
 /** Runs a backend call that returns a change of the active map. */
-export async function edit(fn: (id: number) => Promise<MapChange>): Promise<MapChange | null> {
+export async function edit(call: (id: number) => Promise<MapChange>): Promise<MapChange | null> {
   const id = map.activeId;
   if (id === null) return null;
   try {
-    const change = await fn(id);
+    const change = await call(id);
     applyChange(id, change);
     return change;
   } catch (err) {
@@ -273,7 +274,7 @@ export function warningCount(list: string[] | undefined): number {
 }
 
 export function setCam(id: number, change: Partial<Camera>): void {
-  const current = map.cams[id] ?? { x: 0, y: 0, zoom: 1, floor: 7 };
+  const current = map.cams[id] ?? DEFAULT_CAMERA;
   map.cams[id] = { ...current, ...change };
 }
 

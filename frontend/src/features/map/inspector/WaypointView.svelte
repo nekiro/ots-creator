@@ -4,20 +4,20 @@
   import { removeWaypoint, renameWaypoint } from "../../../lib/map/editor/world";
   import PosField from "./PosField.svelte";
 
-  let { waypoint: w, pending = false }: { waypoint: Waypoint; pending?: boolean } = $props();
+  let { waypoint, pending = false }: { waypoint: Waypoint; pending?: boolean } = $props();
 </script>
 
 <div class="m-form">
   {#if pending}
-    <p class="t-label hint">Click the map to place “{w.name}”.</p>
+    <p class="t-label hint">Click the map to place “{waypoint.name}”.</p>
   {:else}
-    <div class="m-field"><span class="m-lbl">Name</span><input class="t-input" value={w.name} onchange={(event) => renameWaypoint(w.name, event.currentTarget.value.trim())} /></div>
+    <div class="m-field"><span class="m-lbl">Name</span><input class="t-input" value={waypoint.name} onchange={(event) => renameWaypoint(waypoint.name, event.currentTarget.value.trim())} /></div>
     <div class="m-field">
       <span class="m-lbl">Position</span>
-      <PosField value={w.pos} pickLabel="Click the new place of {w.name}" onchange={(p) => edit((id) => MapService.SaveWaypoint(id, w.name, { name: w.name, pos: p }))} />
+      <PosField value={waypoint.pos} pickLabel="Click the new place of {waypoint.name}" onchange={(position) => edit((id) => MapService.SaveWaypoint(id, waypoint.name, { name: waypoint.name, pos: position }))} />
     </div>
     <p class="t-label hint">Scripts and NPCs refer to it by its name.</p>
-    <div class="acts"><span class="grow"></span><button class="t-btn danger" onclick={() => removeWaypoint(w.name)}>Remove</button></div>
+    <div class="acts"><span class="grow"></span><button class="t-btn danger" onclick={() => removeWaypoint(waypoint.name)}>Remove</button></div>
   {/if}
 </div>
 

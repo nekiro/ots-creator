@@ -5,11 +5,11 @@
 
   // Changeable keys first (as currently set), then the fixed mouse gestures.
   const groups = $derived(
-    KEY_GROUPS.map((g) => ({
-      title: g,
+    KEY_GROUPS.map((group) => ({
+      title: group,
       rows: [
-        ...KEY_ACTIONS.filter((a) => a.group === g).map((a) => [keysOf(a).join(", ") || "—", a.label]),
-        ...FIXED_KEYS.filter((f) => f.group === g).map((f) => [f.keys, f.label]),
+        ...KEY_ACTIONS.filter((action) => action.group === group).map((action) => [keysOf(action).join(", ") || "—", action.label]),
+        ...FIXED_KEYS.filter((fixed) => fixed.group === group).map((fixed) => [fixed.keys, fixed.label]),
       ],
     })),
   );
@@ -18,11 +18,11 @@
 <Dialog title="Map editor shortcuts" width={880} onclose={() => (map.dialog = null)}>
   <!-- Key and action on one line, groups flowing over two balanced columns. -->
   <div class="cols">
-    {#each groups as g}
+    {#each groups as group}
       <div class="grp">
-        <div class="t-label h">{g.title}</div>
-        {#each g.rows as [k, v]}
-          <kbd>{k}</kbd><span>{v}</span>
+        <div class="t-label h">{group.title}</div>
+        {#each group.rows as [keys, label]}
+          <kbd>{keys}</kbd><span>{label}</span>
         {/each}
       </div>
     {/each}

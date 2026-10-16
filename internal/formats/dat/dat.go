@@ -5,9 +5,9 @@ package dat
 import (
 	"fmt"
 
-	"github.com/nekiro/ots-creator/internal/formats/binio"
 	"github.com/nekiro/ots-creator/internal/core/client"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/binio"
 )
 
 // maxSpritesPerGroup guards against corrupted layouts allocating huge slices.
@@ -220,18 +220,23 @@ func WriteThing(w *binio.Writer, object *thing.Thing, opts Options) error {
 	}
 	for i, group := range groups {
 		if withGroups {
-			// ObjectBuilder marks a lone outfit group as "walking" (1).
-			groupType := uint8(i)
-			if len(groups) < 2 {
-				groupType = 1
-			}
-			w.U8(groupType)
+			w.U8(GroupType(i, len(groups)))
 		}
 		if err := WriteGroup(w, group, opts.hasPatternZ(), opts.Features.ImprovedAnimations, opts.Features.Extended); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// GroupType returns the type written for outfit frame group index of count
+// groups. ObjectBuilder marks a lone outfit group as "walking" (1). Shared
+// with the OBD codec.
+func GroupType(index, count int) uint8 {
+	if count < 2 {
+		return 1
+	}
+	return uint8(index)
 }
 
 // WriteGroup writes one frame group layout followed by its sprite ids.

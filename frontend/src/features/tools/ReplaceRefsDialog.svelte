@@ -16,7 +16,7 @@
     if (from.length > 200) return;
     Promise.all(from.map((id) => SpriteService.Users(id))).then((lists) => {
       const names = new Set<string>();
-      for (const list of lists) for (const u of list ?? []) names.add(`${CATEGORY_NAMES[u.category]} ${u.id}`);
+      for (const list of lists) for (const user of list ?? []) names.add(`${CATEGORY_NAMES[user.category]} ${user.id}`);
       users = [...names];
     }, () => (users = []));
   });
@@ -24,9 +24,9 @@
   const fromLabel = from.length > 6 ? `${from.slice(0, 6).join(", ")} and ${from.length - 6} more` : from.join(", ");
 
   async function replace() {
-    const n = await run("Replacing", () => SpriteService.ReplaceRefs(from, to));
-    if (n === undefined) return;
-    toast(n ? `Updated ${n} object(s).` : "No object uses these sprites.", n ? "success" : "info");
+    const updated = await run("Replacing", () => SpriteService.ReplaceRefs(from, to));
+    if (updated === undefined) return;
+    toast(updated ? `Updated ${updated} object(s).` : "No object uses these sprites.", updated ? "success" : "info");
     app.dialog = null;
   }
 </script>

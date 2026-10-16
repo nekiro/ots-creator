@@ -19,7 +19,7 @@ function chunk(chunkX: number, chunkY: number, z: number, lights: number[][], gr
     shades = new Uint8Array(128);
     for (const [x, y] of grounds) shades[(y * 32 + x) >> 3] |= 1 << ((y * 32 + x) & 7);
   }
-  return { key: chunkKey(chunkX, chunkY, z), quads: new Uint8Array(0), n: 0, anim: new Uint32Array(0), comp: new Uint32Array(0), sprites: new Uint32Array(0), lights: view, lightCount: lights.length, shades, sig: "" };
+  return { key: chunkKey(chunkX, chunkY, z), quads: new Uint8Array(0), quadCount: 0, animated: new Uint32Array(0), composed: new Uint32Array(0), sprites: new Uint32Array(0), lights: view, lightCount: lights.length, shades, signature: "" };
 }
 
 /** The red channel of each tile, row by row. */

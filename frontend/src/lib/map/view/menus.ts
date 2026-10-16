@@ -3,14 +3,14 @@ import { app, toast } from "../../state/app.svelte";
 import type { MenuEntry } from "../../menu.svelte";
 import { MapService, fmtPos, type Position } from "../data/api";
 import { ItemFlags, TileFlags, type TileData } from "../data/chunks";
-import { goTo, mapCommands } from "./commands";
+import { goTo, mapCommands, selectionScope } from "./commands";
 import { edit, map, selectBrush, useCreature, warningCount } from "../state.svelte";
 import { addHouse, addTown, addWaypoint } from "../editor/world";
 import { keyLabel } from "./keys";
 import type { ViewOptions } from "../render/scene";
 
 const noMap = () => map.activeId === null;
-const noSel = () => !map.active?.selection;
+const noSelection = () => !map.active?.selection;
 const noClient = () => !app.open;
 
 function copy(text: string) {
@@ -60,16 +60,16 @@ export function mapMenus(): { label: string; items: MenuEntry[] }[] {
         { label: undo ? `Undo ${undo.toLowerCase()}` : "Undo", keys: keyLabel("undo"), action: mapCommands.undo, disabled: () => !map.active?.canUndo },
         { label: redo ? `Redo ${redo.toLowerCase()}` : "Redo", keys: keyLabel("redo"), action: mapCommands.redo, disabled: () => !map.active?.canRedo },
         "-",
-        { label: "Cut", keys: keyLabel("cut"), action: mapCommands.cut, disabled: noSel },
-        { label: "Copy", keys: keyLabel("copy"), action: mapCommands.copy, disabled: noSel },
+        { label: "Cut", keys: keyLabel("cut"), action: mapCommands.cut, disabled: noSelection },
+        { label: "Copy", keys: keyLabel("copy"), action: mapCommands.copy, disabled: noSelection },
         { label: "Paste", keys: keyLabel("paste"), action: mapCommands.startPaste, disabled: noMap },
-        { label: "Delete", keys: keyLabel("delete"), action: mapCommands.remove, disabled: noSel },
+        { label: "Delete", keys: keyLabel("delete"), action: mapCommands.remove, disabled: noSelection },
         "-",
         { label: "Select everything on this floor", keys: keyLabel("selectAll"), action: mapCommands.selectAll, disabled: noMap },
-        { label: "Deselect", keys: "Esc", action: mapCommands.clearSelection, disabled: noSel },
+        { label: "Deselect", keys: "Esc", action: mapCommands.clearSelection, disabled: noSelection },
         "-",
-        { label: "Find on the map…", keys: keyLabel("find"), action: () => mapCommands.find({ inSelection: !!map.active?.selection }), disabled: noMap },
-        { label: "Replace items…", keys: keyLabel("replace"), action: () => mapCommands.find({ inSelection: !!map.active?.selection, replace: true }), disabled: noMap },
+        { label: "Find on the map…", keys: keyLabel("find"), action: () => mapCommands.find(selectionScope()), disabled: noMap },
+        { label: "Replace items…", keys: keyLabel("replace"), action: () => mapCommands.find({ ...selectionScope(), replace: true }), disabled: noMap },
         { label: "Go to anything…", keys: keyLabel("palette"), action: () => mapCommands.commandPalette() },
         "-",
         { label: "Automatic borders and walls", keys: keyLabel("automagic"), checked: () => !!map.settings?.automagic, action: mapCommands.toggleAutomagic },
@@ -137,7 +137,7 @@ export function readableIndex(tile: TileData | null | undefined): number {
   const ground = tile.flags & TileFlags.ground ? 1 : 0;
   for (let i = tile.ids.length - 1; i >= ground; i--) {
     const id = tile.ids[i];
-    if (tile.iflags[i] & ItemFlags.text || items.is(id, "readable") || items.is(id, "writable")) return i - ground;
+    if (tile.itemFlags[i] & ItemFlags.text || items.is(id, "readable") || items.is(id, "writable")) return i - ground;
   }
   return -1;
 }
@@ -178,7 +178,7 @@ export function mapContextMenu(position: Position, tileData: TileData | null, ac
         { label: "Open or close door", action: () => edit((id) => MapService.SwitchDoor(id, position, topIndex)) },
       );
     }
-    if (tileData && tileData.iflags[tileData.ids.length - 1] & ItemFlags.teleport) {
+    if (tileData && tileData.itemFlags[tileData.ids.length - 1] & ItemFlags.teleport) {
       out.push({
         label: "Go to teleport destination",
         action: async () => {
@@ -192,10 +192,10 @@ export function mapContextMenu(position: Position, tileData: TileData | null, ac
   out.push(
     "-",
     { label: "Select tile", action: () => edit((id) => MapService.SelectTiles(id, [position], false)) },
-    { label: "Copy", keys: keyLabel("copy"), action: mapCommands.copy, disabled: noSel },
-    { label: "Cut", keys: keyLabel("cut"), action: mapCommands.cut, disabled: noSel },
+    { label: "Copy", keys: keyLabel("copy"), action: mapCommands.copy, disabled: noSelection },
+    { label: "Cut", keys: keyLabel("cut"), action: mapCommands.cut, disabled: noSelection },
     { label: "Paste here", action: () => edit((id) => MapService.Paste(id, position)) },
-    { label: "Delete selection", keys: keyLabel("delete"), action: mapCommands.remove, disabled: noSel },
+    { label: "Delete selection", keys: keyLabel("delete"), action: mapCommands.remove, disabled: noSelection },
   );
   const house = tileData?.house;
   if (house) {

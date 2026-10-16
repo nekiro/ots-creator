@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nekiro/ots-creator/internal/formats/binio"
 	"github.com/nekiro/ots-creator/internal/core/client"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/binio"
 )
 
 // fullProps sets every property with distinct payload values.

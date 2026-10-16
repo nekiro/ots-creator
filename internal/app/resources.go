@@ -67,26 +67,26 @@ func (h *Resources) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if len(parts) > 1 && parts[0] == "b" {
 		client, parts = h.session.Other, parts[1:]
 	}
-	p, err := client()
+	proj, err := client()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
-	w.Header().Set("X-Sprite-Size", strconv.Itoa(p.SpriteSize()))
+	w.Header().Set("X-Sprite-Size", strconv.Itoa(proj.SpriteSize()))
 	w.Header().Set("Cache-Control", "max-age=31536000, immutable")
 	switch {
 	case len(parts) == 2 && parts[0] == "sprite":
-		h.sprite(w, p, parts[1])
+		h.sprite(w, proj, parts[1])
 	case len(parts) == 2 && parts[0] == "spritepng":
-		h.spritePNG(w, p, parts[1])
+		h.spritePNG(w, proj, parts[1])
 	case len(parts) == 1 && parts[0] == "sprites":
-		h.sprites(w, r, p)
+		h.sprites(w, r, proj)
 	case len(parts) == 3 && parts[0] == "thumb":
-		h.texture(w, r, p, parts[1], parts[2], true)
+		h.texture(w, r, proj, parts[1], parts[2], true)
 	case len(parts) == 3 && parts[0] == "texture":
-		h.texture(w, r, p, parts[1], parts[2], false)
+		h.texture(w, r, proj, parts[1], parts[2], false)
 	case len(parts) == 3 && parts[0] == "sheet":
-		h.sheet(w, r, p, parts[1], parts[2])
+		h.sheet(w, r, proj, parts[1], parts[2])
 	default:
 		http.NotFound(w, r)
 	}
@@ -114,13 +114,13 @@ func parseThing(w http.ResponseWriter, categoryText, idText string) (category th
 
 // spritePixels reads the sprite of an id URL part, answering errors
 // itself; ok is false then.
-func spritePixels(w http.ResponseWriter, p *project.Project, idText string) (pixels []byte, ok bool) {
+func spritePixels(w http.ResponseWriter, proj *project.Project, idText string) (pixels []byte, ok bool) {
 	id, err := parseID(idText)
 	if err != nil {
 		http.Error(w, "bad sprite id", http.StatusBadRequest)
 		return nil, false
 	}
-	pixels, err = p.SpritePixels(id)
+	pixels, err = proj.SpritePixels(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return nil, false
@@ -139,26 +139,26 @@ func servePNG(w http.ResponseWriter, img image.Image) {
 	w.Write(data)
 }
 
-func (h *Resources) sprite(w http.ResponseWriter, p *project.Project, idText string) {
-	if pixels, ok := spritePixels(w, p, idText); ok {
+func (h *Resources) sprite(w http.ResponseWriter, proj *project.Project, idText string) {
+	if pixels, ok := spritePixels(w, proj, idText); ok {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Write(pixels)
 	}
 }
 
-func (h *Resources) spritePNG(w http.ResponseWriter, p *project.Project, idText string) {
-	if pixels, ok := spritePixels(w, p, idText); ok {
-		servePNG(w, spriteImage(pixels, p.SpriteSize()))
+func (h *Resources) spritePNG(w http.ResponseWriter, proj *project.Project, idText string) {
+	if pixels, ok := spritePixels(w, proj, idText); ok {
+		servePNG(w, spriteImage(pixels, proj.SpriteSize()))
 	}
 }
 
-func (h *Resources) sprites(w http.ResponseWriter, r *http.Request, p *project.Project) {
+func (h *Resources) sprites(w http.ResponseWriter, r *http.Request, proj *project.Project) {
 	idTexts := strings.Split(r.URL.Query().Get("ids"), ",")
 	if len(idTexts) > maxBatch {
 		http.Error(w, "too many ids", http.StatusBadRequest)
 		return
 	}
-	spriteBytes := p.SpriteSize() * p.SpriteSize() * 4
+	spriteBytes := proj.SpriteSize() * proj.SpriteSize() * 4
 	out := make([]byte, 0, len(idTexts)*spriteBytes)
 	empty := make([]byte, spriteBytes)
 	for _, idText := range idTexts {
@@ -171,7 +171,7 @@ func (h *Resources) sprites(w http.ResponseWriter, r *http.Request, p *project.P
 			out = append(out, empty...)
 			continue
 		}
-		pixels, err := p.SpritePixels(id)
+		pixels, err := proj.SpritePixels(id)
 		if err != nil {
 			out = append(out, empty...) // missing sprites render empty
 			continue
@@ -182,13 +182,13 @@ func (h *Resources) sprites(w http.ResponseWriter, r *http.Request, p *project.P
 	w.Write(out)
 }
 
-func (h *Resources) sheet(w http.ResponseWriter, r *http.Request, p *project.Project, categoryText, idText string) {
+func (h *Resources) sheet(w http.ResponseWriter, r *http.Request, proj *project.Project, categoryText, idText string) {
 	category, id, ok := parseThing(w, categoryText, idText)
 	if !ok {
 		return
 	}
 	group := queryInt(r.URL.Query(), "g")
-	img, err := renderSheet(p, category, id, group, r.URL.Query().Get("bg") == "transparent")
+	img, err := renderSheet(proj, category, id, group, r.URL.Query().Get("bg") == "transparent")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -196,23 +196,23 @@ func (h *Resources) sheet(w http.ResponseWriter, r *http.Request, p *project.Pro
 	servePNG(w, img)
 }
 
-func (h *Resources) texture(w http.ResponseWriter, r *http.Request, p *project.Project, categoryText, idText string, thumb bool) {
+func (h *Resources) texture(w http.ResponseWriter, r *http.Request, proj *project.Project, categoryText, idText string, thumb bool) {
 	category, id, ok := parseThing(w, categoryText, idText)
 	if !ok {
 		return
 	}
 	var pos project.TexturePos
 	if thumb {
-		found, err := p.Thing(category, id)
+		found, err := proj.Thing(category, id)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
 		pos = project.ThumbnailPos(found)
-	} else if pos, ok = texturePos(w, r, p, category, id); !ok {
+	} else if pos, ok = texturePos(w, r, proj, category, id); !ok {
 		return
 	}
-	img, err := p.Render(category, id, pos)
+	img, err := proj.Render(category, id, pos)
 	if err != nil {
 		status := http.StatusBadRequest
 		if errors.Is(err, ErrNoProject) {
@@ -232,7 +232,7 @@ func (h *Resources) texture(w http.ResponseWriter, r *http.Request, p *project.P
 // texturePos reads the texture of a /res/texture request. wrap=1 takes
 // x, y, z as a map position: the pattern the client draws there (grounds
 // and borders vary by tile).
-func texturePos(w http.ResponseWriter, r *http.Request, p *project.Project, category thing.Category, id uint32) (project.TexturePos, bool) {
+func texturePos(w http.ResponseWriter, r *http.Request, proj *project.Project, category thing.Category, id uint32) (project.TexturePos, bool) {
 	query := r.URL.Query()
 	param := func(name string) int { return max(queryInt(query, name), 0) }
 	pos := project.TexturePos{
@@ -242,7 +242,7 @@ func texturePos(w http.ResponseWriter, r *http.Request, p *project.Project, cate
 	if query.Get("wrap") != "1" {
 		return pos, true
 	}
-	found, err := p.Thing(category, id)
+	found, err := proj.Thing(category, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return pos, false

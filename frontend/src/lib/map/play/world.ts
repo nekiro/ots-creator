@@ -2,12 +2,9 @@
 // limits the floors in view.
 import { AF, type Appearances } from "../data/appearances";
 import { TileFlags, type ChunkStore } from "../data/chunks";
-import type { ItemIndex } from "../data/items";
+import { TOP_ORDER, type ItemIndex } from "../data/items";
 import type { FloorItemFlags, FloorWorld } from "./floors";
 import type { WalkWorld } from "./player";
-
-/** Top orders of ItemIndex.top. */
-const TOP_ORDER = { border: 1, bottom: 2, top: 3 } as const;
 
 /** Walking: a tile with a ground, nothing that blocks and no creature (client Tile::isWalkable). */
 export function walkWorld(chunks: ChunkStore, items: ItemIndex): WalkWorld {
@@ -39,7 +36,7 @@ export function floorWorld(chunks: ChunkStore, items: ItemIndex, looks: Appearan
         border: top === TOP_ORDER.border,
         bottom: top === TOP_ORDER.bottom,
         top: top === TOP_ORDER.top,
-        dontHide: !!look && (look.fl & AF.dontHide) !== 0,
+        dontHide: !!look && (look.flags & AF.dontHide) !== 0,
         blockProjectile: items.is(id, "blockMissile"),
       };
     },

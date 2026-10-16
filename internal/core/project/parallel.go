@@ -2,8 +2,8 @@ package project
 
 import (
 	"runtime"
-	"sync"
-	"sync/atomic"
+
+	"github.com/nekiro/ots-creator/internal/workpool"
 )
 
 // spriteChunk is the number of sprite ids one worker reads at a time: about
@@ -25,28 +25,8 @@ func parallelRange(first, last, size uint32, fn func(from, to uint32) error) err
 		return nil
 	}
 	chunks := int((last-first)/size) + 1
-	var next atomic.Int64
-	var failed atomic.Bool
-	var firstErr error
-	var once sync.Once
-	var wg sync.WaitGroup
-	for range min(chunks, runtime.GOMAXPROCS(0)) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for !failed.Load() {
-				i := next.Add(1) - 1
-				if i >= int64(chunks) {
-					return
-				}
-				from := first + uint32(i)*size
-				if err := fn(from, min(from+size-1, last)); err != nil {
-					once.Do(func() { firstErr = err })
-					failed.Store(true)
-				}
-			}
-		}()
-	}
-	wg.Wait()
-	return firstErr
+	return workpool.Run(chunks, func(chunk int) error {
+		from := first + uint32(chunk)*size
+		return fn(from, min(from+size-1, last))
+	})
 }

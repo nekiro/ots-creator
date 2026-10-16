@@ -46,49 +46,42 @@ func (e *Editor) matchingWall(tile *otmap.Tile, wall *WallBrush) bool {
 // wallNeighborMask returns the wall neighbor bits of the tile at x, y, z
 // whose tiles hold a wall that connects to wall.
 func (e *Editor) wallNeighborMask(x, y, z int, wall *WallBrush) int {
+	return e.neighborMask(x, y, z, wallNeighborOffsets[:], func(neighbor *otmap.Tile) bool { return e.matchingWall(neighbor, wall) })
+}
+
+// neighborMask returns the bits of the neighbors of the tile at x, y, z
+// whose tiles have what has looks for.
+func (e *Editor) neighborMask(x, y, z int, neighbors []neighborOffset, has func(*otmap.Tile) bool) int {
 	mask := 0
-	for _, neighbor := range wallNeighborOffsets {
-		if e.matchingWall(e.Map.At(x+neighbor.dx, y+neighbor.dy, z), wall) {
+	for _, neighbor := range neighbors {
+		if has(e.peek(x+neighbor.dx, y+neighbor.dy, z)) {
 			mask |= neighbor.bit
 		}
 	}
 	return mask
 }
 
-// wallize reshapes the walls of the tile at pos to match their neighbors.
-func (e *Editor) wallize(tx *Tx, pos otmap.Position) {
+// fitWalls reshapes the walls of the tile at pos to match their neighbors.
+func (e *Editor) fitWalls(tx *Tx, pos otmap.Position) {
 	current := tx.Get(pos)
 	if current == nil || !e.hasWall(current) {
 		return
 	}
-	tile := tx.Edit(pos)
 	x, y, z := int(pos.X), int(pos.Y), int(pos.Z)
-	var reshaped []otmap.Item
-	items := tile.Items
+	var changes []pieceChange
+	items := current.Items
 	for i := 0; i < len(items); i++ {
-		item := items[i]
-		wallBrush, info := e.Brushes.wallOf(item.ID)
-		if wallBrush == nil {
-			reshaped = append(reshaped, item)
-			continue
-		}
-		if wallBrush.decoration {
-			// Decorations follow the wall below them (handled there).
-			reshaped = append(reshaped, item)
+		wallBrush, info := e.Brushes.wallOf(items[i].ID)
+		// Decorations follow the wall below them (handled there).
+		if wallBrush == nil || wallBrush.decoration || info.wallAlign == wallUntouchable {
 			continue
 		}
 		mask := e.wallNeighborMask(x, y, z, wallBrush)
-		if info.wallAlign == wallUntouchable {
-			reshaped = append(reshaped, item)
-			continue
-		}
-		newAlign, newID := e.fitWall(item.ID, wallBrush, info, mask)
+		newAlign, newID := e.fitWall(items[i].ID, wallBrush, info, mask)
 		if newAlign < 0 {
-			reshaped = append(reshaped, item)
 			continue
 		}
-		item.ID = newID
-		reshaped = append(reshaped, item)
+		changes = appendPieceChange(changes, items, i, newID)
 		// Decorations right above the wall take the same shape.
 		for i+1 < len(items) {
 			decoration, decorationInfo := e.Brushes.wallOf(items[i+1].ID)
@@ -96,10 +89,36 @@ func (e *Editor) wallize(tx *Tx, pos otmap.Position) {
 				break
 			}
 			i++
-			reshaped = append(reshaped, e.fitDecoration(items[i], decoration, decorationInfo, newAlign))
+			changes = appendPieceChange(changes, items, i, e.fitDecoration(items[i], decoration, decorationInfo, newAlign).ID)
 		}
 	}
-	tile.Items = reshaped
+	applyPieceChanges(tx, pos, changes)
+}
+
+// pieceChange is a new item id for the item at index of a tile.
+type pieceChange struct {
+	index int
+	id    uint16
+}
+
+// appendPieceChange records id for items[index] when it differs.
+func appendPieceChange(changes []pieceChange, items []otmap.Item, index int, id uint16) []pieceChange {
+	if items[index].ID == id {
+		return changes
+	}
+	return append(changes, pieceChange{index, id})
+}
+
+// applyPieceChanges edits the tile at pos only when a piece changed, so an
+// unchanged tile stays out of the undo history and is not marked modified.
+func applyPieceChanges(tx *Tx, pos otmap.Position, changes []pieceChange) {
+	if len(changes) == 0 {
+		return
+	}
+	tile := tx.Edit(pos)
+	for _, change := range changes {
+		tile.Items[change.index].ID = change.id
+	}
 }
 
 // fitWall returns the alignment and item of a wall for the neighbor mask,
@@ -162,19 +181,18 @@ func (w *WallBrush) doorFor(align, doorType int, open bool) uint16 {
 // cleanWalls removes the walls of a brush (all walls when wall is nil).
 func (e *Editor) cleanWalls(tile *otmap.Tile, wall *WallBrush) {
 	tile.Items = slices.DeleteFunc(tile.Items, func(item otmap.Item) bool {
-		wallBrush, _ := e.Brushes.wallOf(item.ID)
+		wallBrush, info := e.Brushes.wallOf(item.ID)
 		if wallBrush == nil {
 			return false
 		}
 		if wall == nil {
 			return true
 		}
-		_, info := e.Brushes.wallOf(item.ID)
 		return wall.hasWall(item.ID, info.wallAlign) || wallBrush == wall
 	})
 }
 
-// drawWall places a wall of the brush; the alignment is fixed by wallize.
+// drawWall places a wall of the brush; the alignment is fixed by fitWalls.
 func (e *Editor) drawWall(tile *otmap.Tile, wall *WallBrush) {
 	if wall.decoration {
 		e.drawDecoration(tile, wall)
@@ -372,17 +390,6 @@ func tablePiece(mask int) int {
 	return tableAlone
 }
 
-func (e *Editor) neighborMask(pos otmap.Position, has func(*otmap.Tile) bool) int {
-	mask := 0
-	x, y, z := int(pos.X), int(pos.Y), int(pos.Z)
-	for i, offset := range neighbors8 {
-		if has(e.Map.At(x+offset[0], y+offset[1], z)) {
-			mask |= 1 << i
-		}
-	}
-	return mask
-}
-
 func tileHas(tile *otmap.Tile, fn func(id uint16) bool) bool {
 	if tile == nil {
 		return false
@@ -395,95 +402,111 @@ func tileHas(tile *otmap.Tile, fn func(id uint16) bool) bool {
 	return false
 }
 
-// carpetize reshapes the carpets of the tile at pos.
-func (e *Editor) carpetize(tx *Tx, pos otmap.Position) {
-	current := tx.Get(pos)
-	if current == nil || !e.hasCarpet(current) {
-		return
-	}
-	tile := tx.Edit(pos)
-	for i, item := range tile.Items {
-		info := e.Brushes.info[item.ID]
+// joinedBrush is a carpet or table brush: its items join with neighbors
+// that hold the same brush.
+type joinedBrush interface {
+	// pieces returns the items of each piece of the brush.
+	pieces() []chanceList
+}
+
+func (c *CarpetBrush) pieces() []chanceList { return c.parts[:] }
+func (t *TableBrush) pieces() []chanceList  { return t.parts[:] }
+
+// joinedKind holds what differs between carpets and tables.
+type joinedKind struct {
+	// brushOf returns the brush of the kind an item belongs to and the
+	// piece it is; the brush is nil for other items.
+	brushOf func(info *itemInfo) (joinedBrush, int)
+	// piece returns the piece for the neighbors holding the same brush.
+	piece func(mask int) int
+	// fallback is the piece drawn first and used when the brush lacks the
+	// piece a shape wants.
+	fallback int
+}
+
+var carpetKind = joinedKind{
+	brushOf: func(info *itemInfo) (joinedBrush, int) {
 		if info == nil || info.carpet == nil {
-			continue
+			return nil, 0
 		}
-		carpet := info.carpet
-		mask := e.neighborMask(pos, func(neighbor *otmap.Tile) bool {
-			return tileHas(neighbor, func(id uint16) bool {
-				neighborInfo := e.Brushes.info[id]
-				return neighborInfo != nil && neighborInfo.carpet == carpet
-			})
-		})
-		piece := carpetPiece(mask)
-		if piece == info.carpetAlign {
-			continue
-		}
-		if id := carpet.parts[piece].pick(e.rng); id != 0 {
-			tile.Items[i].ID = id
-		} else if id := carpet.parts[edgeCenter].pick(e.rng); id != 0 {
-			tile.Items[i].ID = id
-		}
-	}
+		return info.carpet, info.carpetAlign
+	},
+	piece:    carpetPiece,
+	fallback: edgeCenter,
 }
 
-// tableize reshapes the tables of the tile at pos.
-func (e *Editor) tableize(tx *Tx, pos otmap.Position) {
-	current := tx.Get(pos)
-	if current == nil || !e.hasTable(current) {
-		return
-	}
-	tile := tx.Edit(pos)
-	for i, item := range tile.Items {
-		info := e.Brushes.info[item.ID]
+var tableKind = joinedKind{
+	brushOf: func(info *itemInfo) (joinedBrush, int) {
 		if info == nil || info.table == nil {
-			continue
+			return nil, 0
 		}
-		table := info.table
-		mask := e.neighborMask(pos, func(neighbor *otmap.Tile) bool {
-			return tileHas(neighbor, func(id uint16) bool {
-				neighborInfo := e.Brushes.info[id]
-				return neighborInfo != nil && neighborInfo.table == table
-			})
-		})
-		piece := tablePiece(mask)
-		if piece == info.tableAlign {
-			continue
-		}
-		if id := table.parts[piece].pick(e.rng); id != 0 {
-			tile.Items[i].ID = id
-		} else if id := table.parts[tableAlone].pick(e.rng); id != 0 {
-			tile.Items[i].ID = id
-		}
-	}
+		return info.table, info.tableAlign
+	},
+	piece:    tablePiece,
+	fallback: tableAlone,
 }
 
-func (e *Editor) drawCarpet(tile *otmap.Tile, carpet *CarpetBrush) {
-	e.removeCarpets(tile)
-	id := carpet.parts[edgeCenter].pick(e.rng)
-	if id == 0 {
-		for _, part := range carpet.parts {
-			if id = part.pick(e.rng); id != 0 {
-				break
-			}
-		}
-	}
-	if id != 0 {
-		e.addItem(tile, otmap.Item{ID: id})
-	}
+// joinedBrushOf returns the brush of the kind the item id belongs to (nil
+// for other items) and the piece it is.
+func (e *Editor) joinedBrushOf(kind *joinedKind, id uint16) (joinedBrush, int) {
+	return kind.brushOf(e.Brushes.info[id])
 }
 
-func (e *Editor) removeCarpets(tile *otmap.Tile) {
-	tile.Items = slices.DeleteFunc(tile.Items, func(item otmap.Item) bool {
-		info := e.Brushes.info[item.ID]
-		return info != nil && info.carpet != nil
+// hasJoined reports whether the tile holds an item of the kind.
+func (e *Editor) hasJoined(tile *otmap.Tile, kind *joinedKind) bool {
+	return tileHas(tile, func(id uint16) bool {
+		brush, _ := e.joinedBrushOf(kind, id)
+		return brush != nil
 	})
 }
 
-func (e *Editor) drawTable(tile *otmap.Tile, table *TableBrush) {
-	e.removeTables(tile)
-	id := table.parts[tableAlone].pick(e.rng)
+// fitCarpets reshapes the carpets of the tile at pos.
+func (e *Editor) fitCarpets(tx *Tx, pos otmap.Position) { e.fitJoined(tx, pos, &carpetKind) }
+
+// fitTables reshapes the tables of the tile at pos.
+func (e *Editor) fitTables(tx *Tx, pos otmap.Position) { e.fitJoined(tx, pos, &tableKind) }
+
+// fitJoined reshapes the carpets or tables of the tile at pos.
+func (e *Editor) fitJoined(tx *Tx, pos otmap.Position, kind *joinedKind) {
+	current := tx.Get(pos)
+	if current == nil || !e.hasJoined(current, kind) {
+		return
+	}
+	x, y, z := int(pos.X), int(pos.Y), int(pos.Z)
+	var changes []pieceChange
+	for i, item := range current.Items {
+		brush, currentPiece := e.joinedBrushOf(kind, item.ID)
+		if brush == nil {
+			continue
+		}
+		mask := e.neighborMask(x, y, z, neighborOffsets8[:], func(neighbor *otmap.Tile) bool {
+			return tileHas(neighbor, func(id uint16) bool {
+				neighborBrush, _ := e.joinedBrushOf(kind, id)
+				return neighborBrush == brush
+			})
+		})
+		piece := kind.piece(mask)
+		if piece == currentPiece {
+			continue
+		}
+		pieces := brush.pieces()
+		if id := pieces[piece].pick(e.rng); id != 0 {
+			changes = appendPieceChange(changes, current.Items, i, id)
+		} else if id := pieces[kind.fallback].pick(e.rng); id != 0 {
+			changes = appendPieceChange(changes, current.Items, i, id)
+		}
+	}
+	applyPieceChanges(tx, pos, changes)
+}
+
+// drawJoined replaces the carpets or tables of the tile by a piece of the
+// brush; fitJoined shapes it afterwards.
+func (e *Editor) drawJoined(tile *otmap.Tile, kind *joinedKind, brush joinedBrush) {
+	e.removeJoined(tile, kind)
+	pieces := brush.pieces()
+	id := pieces[kind.fallback].pick(e.rng)
 	if id == 0 {
-		for _, part := range table.parts {
+		for _, part := range pieces {
 			if id = part.pick(e.rng); id != 0 {
 				break
 			}
@@ -494,9 +517,10 @@ func (e *Editor) drawTable(tile *otmap.Tile, table *TableBrush) {
 	}
 }
 
-func (e *Editor) removeTables(tile *otmap.Tile) {
+// removeJoined removes the carpets or tables of the tile.
+func (e *Editor) removeJoined(tile *otmap.Tile, kind *joinedKind) {
 	tile.Items = slices.DeleteFunc(tile.Items, func(item otmap.Item) bool {
-		info := e.Brushes.info[item.ID]
-		return info != nil && info.table != nil
+		brush, _ := e.joinedBrushOf(kind, item.ID)
+		return brush != nil
 	})
 }

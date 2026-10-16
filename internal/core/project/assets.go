@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/nekiro/ots-creator/internal/formats/assets"
 	"github.com/nekiro/ots-creator/internal/core/client"
+	"github.com/nekiro/ots-creator/internal/formats/assets"
 	"github.com/nekiro/ots-creator/internal/formats/dat"
 )
 

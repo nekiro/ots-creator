@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/nekiro/ots-creator/internal/formats/spr"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/spr"
 )
 
 // TransferResult reports a Transfer.
@@ -85,7 +85,7 @@ func transfer(dst, src *Project, category thing.Category, ids []uint32, appendNe
 		label += " from " + snap.name
 	}
 	edit := dst.record(label)
-	res := TransferResult{IDs: make([]uint32, 0, len(things)), Before: map[uint32]*thing.Thing{}}
+	result := TransferResult{IDs: make([]uint32, 0, len(things)), Before: map[uint32]*thing.Thing{}}
 	mapped := map[uint32]uint32{}
 	added := map[string]uint32{}
 	for i, object := range things {
@@ -96,7 +96,7 @@ func transfer(dst, src *Project, category thing.Category, ids []uint32, appendNe
 			for i, spriteID := range group.Sprites {
 				newID, ok := mapped[spriteID]
 				if !ok {
-					if newID, err = dst.importSprite(edit, spriteID, snap.sprites[spriteID], snap.transparent, added, &res.Sprites); err != nil {
+					if newID, err = dst.importSprite(edit, spriteID, snap.sprites[spriteID], snap.transparent, added, &result.Sprites); err != nil {
 						return TransferResult{}, err
 					}
 					mapped[spriteID] = newID
@@ -109,8 +109,8 @@ func transfer(dst, src *Project, category thing.Category, ids []uint32, appendNe
 			object.ID = dst.things.MaxID(category) + 1
 		} else {
 			current = dst.things.Get(category, object.ID)
-			if _, ok := res.Before[object.ID]; !ok {
-				res.Before[object.ID] = current
+			if _, ok := result.Before[object.ID]; !ok {
+				result.Before[object.ID] = current
 			}
 			for id := dst.things.MaxID(category) + 1; id < object.ID; id++ {
 				edit.setThing(category, id, thing.New(id, category))
@@ -124,10 +124,10 @@ func transfer(dst, src *Project, category thing.Category, ids []uint32, appendNe
 			return TransferResult{}, err
 		}
 		edit.setThing(category, object.ID, object)
-		res.IDs = append(res.IDs, object.ID)
+		result.IDs = append(result.IDs, object.ID)
 	}
 	edit.commit()
-	return res, nil
+	return result, nil
 }
 
 // name is a short name of the client for labels.

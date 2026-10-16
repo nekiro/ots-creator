@@ -3,52 +3,52 @@ import { decodeGeo, decodeGeoSignature, encodeGeoSignature, geoBits, GEO, LIGHT_
 
 describe("decodeGeo", () => {
   it("decodes chunks with their parts", () => {
-    const q = 24;
-    const an = q + QUAD_BYTES;
-    const co = an + 12;
-    const sp = co + 16;
-    const li = sp + 4;
-    const sh = li + LIGHT_BYTES;
-    const buf = new ArrayBuffer(sh + 4 + 128 + 28);
-    const v = new DataView(buf);
-    v.setUint32(0, 1234, true);
-    v.setUint32(4, 1, true); // quads
-    v.setUint32(8, 1, true); // animated
-    v.setUint32(12, 1, true); // composed
-    v.setUint32(16, 1, true); // sprites
-    v.setUint32(20, 1, true); // lights
-    v.setInt16(q, -8, true);
-    v.setUint32(q + 4, 77, true);
-    v.setUint32(an, 0, true); // anim: quad 0
-    v.setUint32(an + 4, 500, true);
-    v.setUint32(an + 8, 3, true);
-    v.setUint32(co, 0, true); // comp: quad 0
-    v.setUint32(co + 4, 9, true);
-    v.setUint32(co + 8, 10, true);
-    v.setUint32(co + 12, 0x04030201, true);
-    v.setUint32(sp, 77, true); // sprite list
-    v.setInt16(li, -16, true); // light at (-16, 48), level 5, color 215
-    v.setInt16(li + 2, 48, true);
-    v.setUint8(li + 4, 5);
-    v.setUint8(li + 5, 215);
-    v.setUint32(sh, 128, true); // shade bits: tile (1, 0)
-    v.setUint8(sh + 4, 2);
-    v.setUint32(sh + 4 + 128, 99, true); // second, empty chunk
-    const [a, b] = decodeGeo(buf, "s");
-    expect(a.key).toBe(1234);
-    expect(a.n).toBe(1);
-    expect(new DataView(a.quads.buffer, a.quads.byteOffset).getInt16(0, true)).toBe(-8);
-    expect([...a.anim]).toEqual([0, 500, 3]);
-    expect([...a.comp]).toEqual([0, 9, 10, 0x04030201]);
-    expect([...a.sprites]).toEqual([77]);
-    expect(a.lightCount).toBe(1);
-    expect([a.lights.getInt16(0, true), a.lights.getInt16(2, true), a.lights.getUint8(4), a.lights.getUint8(5)]).toEqual([-16, 48, 5, 215]);
-    expect(b.key).toBe(99);
-    expect(b.n).toBe(0);
-    expect(a.shades?.length).toBe(128);
-    expect(a.shades?.[0]).toBe(2);
-    expect(b.lightCount).toBe(0);
-    expect(b.shades).toBeNull();
+    const quadsAt = 24;
+    const animatedAt = quadsAt + QUAD_BYTES;
+    const composedAt = animatedAt + 12;
+    const spritesAt = composedAt + 16;
+    const lightsAt = spritesAt + 4;
+    const shadesAt = lightsAt + LIGHT_BYTES;
+    const buffer = new ArrayBuffer(shadesAt + 4 + 128 + 28);
+    const view = new DataView(buffer);
+    view.setUint32(0, 1234, true);
+    view.setUint32(4, 1, true); // quads
+    view.setUint32(8, 1, true); // animated
+    view.setUint32(12, 1, true); // composed
+    view.setUint32(16, 1, true); // sprites
+    view.setUint32(20, 1, true); // lights
+    view.setInt16(quadsAt, -8, true);
+    view.setUint32(quadsAt + 4, 77, true);
+    view.setUint32(animatedAt, 0, true); // animated: quad 0
+    view.setUint32(animatedAt + 4, 500, true);
+    view.setUint32(animatedAt + 8, 3, true);
+    view.setUint32(composedAt, 0, true); // composed: quad 0
+    view.setUint32(composedAt + 4, 9, true);
+    view.setUint32(composedAt + 8, 10, true);
+    view.setUint32(composedAt + 12, 0x04030201, true);
+    view.setUint32(spritesAt, 77, true); // sprite list
+    view.setInt16(lightsAt, -16, true); // light at (-16, 48), level 5, color 215
+    view.setInt16(lightsAt + 2, 48, true);
+    view.setUint8(lightsAt + 4, 5);
+    view.setUint8(lightsAt + 5, 215);
+    view.setUint32(shadesAt, 128, true); // shade bits: tile (1, 0)
+    view.setUint8(shadesAt + 4, 2);
+    view.setUint32(shadesAt + 4 + 128, 99, true); // second, empty chunk
+    const [first, second] = decodeGeo(buffer, "s");
+    expect(first.key).toBe(1234);
+    expect(first.quadCount).toBe(1);
+    expect(new DataView(first.quads.buffer, first.quads.byteOffset).getInt16(0, true)).toBe(-8);
+    expect([...first.animated]).toEqual([0, 500, 3]);
+    expect([...first.composed]).toEqual([0, 9, 10, 0x04030201]);
+    expect([...first.sprites]).toEqual([77]);
+    expect(first.lightCount).toBe(1);
+    expect([first.lights.getInt16(0, true), first.lights.getInt16(2, true), first.lights.getUint8(4), first.lights.getUint8(5)]).toEqual([-16, 48, 5, 215]);
+    expect(second.key).toBe(99);
+    expect(second.quadCount).toBe(0);
+    expect(first.shades?.length).toBe(128);
+    expect(first.shades?.[0]).toBe(2);
+    expect(second.lightCount).toBe(0);
+    expect(second.shades).toBeNull();
   });
 
   it("packs view options", () => {

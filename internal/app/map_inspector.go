@@ -3,8 +3,8 @@ package app
 import (
 	"fmt"
 
-	"github.com/nekiro/ots-creator/internal/mapping/materials"
 	"github.com/nekiro/ots-creator/internal/core/otitems"
+	"github.com/nekiro/ots-creator/internal/mapping/materials"
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
@@ -76,32 +76,32 @@ func (data *mapData) tileItem(item otmap.Item) TileItem {
 }
 
 // Tile returns the inspector data of a tile.
-func (ms *MapService) Tile(id int, p otmap.Position) (info TileInfo, err error) {
-	err = ms.withMap(id, func(m *openMap, data *mapData) error {
-		info = data.tileInfo(m.editor.Map, p)
+func (ms *MapService) Tile(id int, pos otmap.Position) (info TileInfo, err error) {
+	err = ms.withMap(id, func(opened *openMap, data *mapData) error {
+		info = data.tileInfo(opened.editor.Map, pos)
 		return nil
 	})
 	return info, err
 }
 
-func (data *mapData) tileInfo(m *otmap.Map, p otmap.Position) TileInfo {
-	info := TileInfo{Pos: p}
-	for _, house := range m.Houses {
-		if house.Exit == p {
+func (data *mapData) tileInfo(gameMap *otmap.Map, pos otmap.Position) TileInfo {
+	info := TileInfo{Pos: pos}
+	for _, house := range gameMap.Houses {
+		if house.Exit == pos {
 			info.HouseExit = house.Name
 		}
 	}
-	for _, waypoint := range m.Waypoints {
-		if waypoint.Pos == p {
+	for _, waypoint := range gameMap.Waypoints {
+		if waypoint.Pos == pos {
 			info.Waypoints = append(info.Waypoints, waypoint.Name)
 		}
 	}
-	for _, town := range m.Towns {
-		if town.Temple == p {
+	for _, town := range gameMap.Towns {
+		if town.Temple == pos {
 			info.Temple = town.Name
 		}
 	}
-	tile := m.Tile(p)
+	tile := gameMap.Tile(pos)
 	if tile == nil {
 		return info
 	}
@@ -114,7 +114,7 @@ func (data *mapData) tileInfo(m *otmap.Map, p otmap.Position) TileInfo {
 		info.Items = append(info.Items, data.tileItem(item))
 	}
 	info.Flags, info.HouseID, info.Zones = tile.Flags, tile.HouseID, tile.Zones()
-	if house := m.Houses[tile.HouseID]; house != nil {
+	if house := gameMap.Houses[tile.HouseID]; house != nil {
 		info.HouseName = house.Name
 	}
 	for _, creature := range tile.Creatures() {

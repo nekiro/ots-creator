@@ -8,7 +8,7 @@
   const release = $derived(updates.info?.release ?? null);
   const busy = $derived(updates.stage !== "idle");
   const percent = $derived(updates.progress && updates.progress.total > 0 ? Math.min(100, (updates.progress.written / updates.progress.total) * 100) : 0);
-  const mb = (n: number) => (n / 1048576).toFixed(1);
+  const megabytes = (bytes: number) => (bytes / 1048576).toFixed(1);
   const STAGES = { idle: "", downloading: "Downloading…", verifying: "Verifying checksum…", installing: "Installing…", restarting: "Restarting…" };
 
   function close() {
@@ -27,7 +27,7 @@
         <ProgressBar
           title={STAGES[updates.stage]}
           percent={updates.stage === "downloading" ? percent : 100}
-          label={updates.stage === "downloading" && updates.progress ? `${mb(updates.progress.written)} / ${mb(updates.progress.total)} MB` : STAGES[updates.stage]}
+          label={updates.stage === "downloading" && updates.progress ? `${megabytes(updates.progress.written)} / ${megabytes(updates.progress.total)} MB` : STAGES[updates.stage]}
         />
         <p class="t-label">OTS Creator restarts into the new version when the update is installed.</p>
       {/if}

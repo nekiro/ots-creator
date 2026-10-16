@@ -2,6 +2,7 @@
 // Each topic lives in lib/commands/; `commands` gathers them.
 import { errorMessage } from "./api";
 import { app, toast } from "./state/app.svelte";
+import { isTyping } from "./ui/typing";
 import { clipboardCommands } from "./commands/objectClipboard";
 import { dropCommands } from "./commands/drop";
 import { objectCommands } from "./commands/objects";
@@ -24,8 +25,7 @@ export const commands = {
 
 /** Global keyboard shortcuts. Inputs keep their own editing keys. */
 export function handleShortcut(event: KeyboardEvent): void {
-  const target = event.target as HTMLElement;
-  const typing = target.closest("input, textarea, select") !== null;
+  const typing = isTyping(event);
   const mod = event.ctrlKey || event.metaKey;
   const key = event.key.toLowerCase();
   const run = (action: () => unknown) => {

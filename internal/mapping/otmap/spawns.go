@@ -1,7 +1,6 @@
 package otmap
 
 import (
-	"cmp"
 	"fmt"
 	"slices"
 	"strconv"
@@ -11,7 +10,7 @@ import (
 
 // ReadSpawns applies a spawn file. npcFile marks a separate NPC spawn file
 // (its areas become NPC spawns); a TFS file holds monsters and NPCs.
-func ReadSpawns(m *Map, data []byte, npcFile bool) ([]string, error) {
+func ReadSpawns(gameMap *Map, data []byte, npcFile bool) ([]string, error) {
 	doc, err := xmltree.Parse(data)
 	if err != nil {
 		return nil, err
@@ -31,7 +30,7 @@ func ReadSpawns(m *Map, data []byte, npcFile bool) ([]string, error) {
 			radius = 1
 		}
 		center := Position{uint16(centerX), uint16(centerY), uint8(centerZ)}
-		tile := m.Tile(center).Clone()
+		tile := gameMap.Tile(center).Clone()
 		if tile == nil {
 			tile = &Tile{}
 		}
@@ -48,7 +47,7 @@ func ReadSpawns(m *Map, data []byte, npcFile bool) ([]string, error) {
 			}
 			tile.EnsureExt().Spawn = &Spawn{Radius: int32(radius)}
 		}
-		m.SetTile(center, tile)
+		gameMap.SetTile(center, tile)
 		for _, creatureNode := range spawnNode.Children {
 			if creatureNode.Name != "monster" && creatureNode.Name != "npc" {
 				continue
@@ -71,12 +70,12 @@ func ReadSpawns(m *Map, data []byte, npcFile bool) ([]string, error) {
 			if creatureNode.Has("direction") {
 				creature.Direction = uint8(min(max(creatureNode.Int("direction"), 0), 3))
 			}
-			creatureTile := m.Tile(pos).Clone()
+			creatureTile := gameMap.Tile(pos).Clone()
 			if creatureTile == nil {
 				creatureTile = &Tile{}
 			}
 			creatureTile.EnsureExt().Creatures = append(creatureTile.EnsureExt().Creatures, creature)
-			m.SetTile(pos, creatureTile)
+			gameMap.SetTile(pos, creatureTile)
 		}
 	}
 	return warnings, nil
@@ -87,10 +86,10 @@ type spawnArea struct {
 	radius int32
 }
 
-func spawnAreas(m *Map, npc bool) []spawnArea {
+func spawnAreas(gameMap *Map, npc bool) []spawnArea {
 	var out []spawnArea
-	for _, chunk := range m.chunks {
-		chunk.Each(func(pos Position, tile *Tile) {
+	for _, chunk := range gameMap.chunks {
+		chunk.eachStored(func(pos Position, tile *Tile) {
 			spawn := tile.Spawn()
 			if npc {
 				spawn = tile.SpawnNPC()
@@ -101,7 +100,7 @@ func spawnAreas(m *Map, npc bool) []spawnArea {
 		})
 	}
 	slices.SortFunc(out, func(left, right spawnArea) int {
-		return cmp.Or(cmp.Compare(left.pos.Z, right.pos.Z), cmp.Compare(left.pos.Y, right.pos.Y), cmp.Compare(left.pos.X, right.pos.X))
+		return ComparePositions(left.pos, right.pos)
 	})
 	return out
 }
@@ -115,9 +114,9 @@ type creatureRef struct {
 // WriteSpawns returns the spawn files. Maps with single spawns get one file
 // (npcs is nil); maps with separate spawns get a monster file and an NPC
 // file. unsaved counts creatures outside every matching spawn area.
-func WriteSpawns(m *Map) (monsters, npcs []byte, unsaved int) {
+func WriteSpawns(gameMap *Map) (monsters, npcs []byte, unsaved int) {
 	saved := map[creatureRef]bool{}
-	separate := m.SpawnFormat == SpawnsSeparate
+	separate := gameMap.SpawnFormat == SpawnsSeparate
 	write := func(root, areaTag, kind string, areas []spawnArea, want func(Creature) bool) []byte {
 		w := newXMLWriter()
 		w.elem(root, nil, false)
@@ -130,7 +129,7 @@ func WriteSpawns(m *Map) (monsters, npcs []byte, unsaved int) {
 					if !ok {
 						continue
 					}
-					tile := m.Tile(pos)
+					tile := gameMap.stored(pos)
 					if tile == nil {
 						continue
 					}
@@ -164,14 +163,14 @@ func WriteSpawns(m *Map) (monsters, npcs []byte, unsaved int) {
 		return w.buf.Bytes()
 	}
 	if separate {
-		monsters = write("monsters", "monster", "monster", spawnAreas(m, false), func(creature Creature) bool { return !creature.NPC })
-		npcs = write("npcs", "npc", "npc", spawnAreas(m, true), func(creature Creature) bool { return creature.NPC })
+		monsters = write("monsters", "monster", "monster", spawnAreas(gameMap, false), func(creature Creature) bool { return !creature.NPC })
+		npcs = write("npcs", "npc", "npc", spawnAreas(gameMap, true), func(creature Creature) bool { return creature.NPC })
 	} else {
-		areas := append(spawnAreas(m, false), spawnAreas(m, true)...)
+		areas := append(spawnAreas(gameMap, false), spawnAreas(gameMap, true)...)
 		monsters = write("spawns", "spawn", "", areas, func(Creature) bool { return true })
 	}
-	for _, chunk := range m.chunks {
-		chunk.Each(func(pos Position, tile *Tile) {
+	for _, chunk := range gameMap.chunks {
+		chunk.eachStored(func(pos Position, tile *Tile) {
 			for i := range tile.Creatures() {
 				if !saved[creatureRef{pos, i}] {
 					unsaved++

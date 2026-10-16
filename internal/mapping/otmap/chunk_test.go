@@ -77,3 +77,35 @@ func TestForgetAuxFileNames(t *testing.T) {
 		t.Fatalf("names kept: %+v", m)
 	}
 }
+
+func TestPeekAndEachStored(t *testing.T) {
+	gameMap := New(100, 100)
+	plain := Position{1, 1, 7}
+	house := Position{40, 1, 7}
+	gameMap.SetTile(plain, &Tile{Ground: Item{ID: 100}, Items: []Item{{ID: 200}}})
+	gameMap.SetTile(house, &Tile{Ground: Item{ID: 101}, HouseID: 5})
+	var scratch Tile
+	var buf [4]Item
+	if tile := gameMap.Peek(plain, &scratch, buf[:]); tile != &scratch || tile.Ground.ID != 100 || tile.Items[0].ID != 200 {
+		t.Fatalf("peek packed %+v", tile)
+	}
+	if tile := gameMap.PeekAt(40, 1, 7, &scratch, buf[:]); tile == nil || tile.HouseID != 5 || tile == &scratch {
+		t.Fatalf("peek stored %+v", tile)
+	}
+	if gameMap.PeekAt(-1, 1, 7, &scratch, buf[:]) != nil || gameMap.Peek(Position{2, 2, 7}, &scratch, buf[:]) != nil {
+		t.Fatal("peek of no tile")
+	}
+	var visited []Position
+	gameMap.EachStored(func(pos Position, tile *Tile) {
+		visited = append(visited, pos)
+		if tile.HouseID != 5 {
+			t.Fatalf("stored tile %+v", tile)
+		}
+	})
+	if len(visited) != 1 || visited[0] != house {
+		t.Fatalf("each stored visited %v", visited)
+	}
+	if gameMap.stored(plain) != nil || gameMap.stored(house) == nil {
+		t.Fatal("stored lookup")
+	}
+}

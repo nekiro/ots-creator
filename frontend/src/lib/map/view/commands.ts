@@ -35,6 +35,20 @@ async function afterOpen(id: number, center?: Position): Promise<void> {
   }
 }
 
+/** Find and replace in the selection when there is one. */
+export function selectionScope(): { inSelection: boolean } {
+  return { inSelection: !!map.active?.selection };
+}
+
+/** Shows the backend's map:progress events in the loader (map.loading) until the returned function is called. */
+function trackProgress(name: string, title?: string): () => void {
+  map.loading = { name, step: "Starting", percent: 0, title };
+  return Events.On("map:progress", (event: { data: { label: string; done: number; total: number } }) => {
+    const progress = event.data;
+    if (map.loading) map.loading = { name, step: progress.label, percent: progress.total > 0 ? (progress.done / progress.total) * 100 : 0, title };
+  });
+}
+
 /** Centers the view of a map on a position. */
 export function goTo(position: Position, id = map.activeId): void {
   if (id === null) return;
@@ -46,8 +60,8 @@ export const mapCommands = {
   /** Walks the map as a player, from a tile (default: the one under the mouse, or the middle of the view). */
   play(position?: Position) {
     if (map.activeId === null || !map.items) return;
-    const cam = map.cam;
-    map.play = position ?? map.hover ?? { ...worldToTile(cam.x, cam.y, cam.floor, spriteSize()), z: cam.floor };
+    const camera = map.cam;
+    map.play = position ?? map.hover ?? { ...worldToTile(camera.x, camera.y, camera.floor, spriteSize()), z: camera.floor };
   },
 
   /** Back to editing, the view on where the player stands. */
@@ -91,15 +105,11 @@ export const mapCommands = {
       path = paths[0];
     }
     const name = path.split(/[\\/]/).pop() ?? path;
-    map.loading = { name, step: "Starting", percent: 0 };
-    const off = Events.On("map:progress", (ev: { data: { label: string; done: number; total: number } }) => {
-      const progress = ev.data;
-      if (map.loading) map.loading = { name, step: progress.label, percent: progress.total > 0 ? (progress.done / progress.total) * 100 : 0 };
-    });
+    const stopProgress = trackProgress(name);
     const started = performance.now();
     try {
       const opened = await MapService.OpenMap(path);
-      off();
+      stopProgress();
       map.loading = { name, step: "Preparing the view", percent: 98 };
       await loadMapData(!map.items);
       if (!map.maps.some((open) => open.id === opened.info.id)) map.maps = [...map.maps, opened.info];
@@ -107,7 +117,7 @@ export const mapCommands = {
       // The loader stays until the first view is drawn, not on a black map.
       map.loading = { name, step: "Drawing the map", percent: 99 };
       await whenRendered(opened.info.id);
-      const warnings = (opened.warnings ?? []).filter((x): x is string => !!x);
+      const warnings = (opened.warnings ?? []).filter((warning): warning is string => !!warning);
       map.loadWarnings = { ...map.loadWarnings, [opened.info.id]: warnings };
       // Whole open: reading the file, the item data and the first view.
       const took = `${((performance.now() - started) / 1000).toFixed(1)} s`;
@@ -119,7 +129,7 @@ export const mapCommands = {
     } catch (err) {
       toast(errorMessage(err), "error");
     } finally {
-      off();
+      stopProgress();
       map.loading = null;
     }
   },
@@ -139,14 +149,10 @@ export const mapCommands = {
     }
     const name = path.split(/[\\/]/).pop() ?? path;
     const title = "Saving map";
-    map.loading = { name, step: "Starting", percent: 0, title };
-    const off = Events.On("map:progress", (ev: { data: { label: string; done: number; total: number } }) => {
-      const progress = ev.data;
-      if (map.loading) map.loading = { name, step: progress.label, percent: progress.total > 0 ? (progress.done / progress.total) * 100 : 0, title };
-    });
+    const stopProgress = trackProgress(name, title);
     try {
       const change = await MapService.SaveMap(active.id, path);
-      off();
+      stopProgress();
       map.loading = { name, step: "Reloading the item data", percent: 100, title };
       applyChange(active.id, change);
       await loadMapData();
@@ -156,7 +162,7 @@ export const mapCommands = {
       toast(errorMessage(err), "error");
       return false;
     } finally {
-      off();
+      stopProgress();
       map.loading = null;
     }
   },
@@ -241,14 +247,14 @@ export const mapCommands = {
   zoom(step: number, anchor?: { x: number; y: number; w: number; h: number }) {
     const id = map.activeId;
     if (id === null) return;
-    const cam = map.cam;
-    const next = stepZoom(cam.zoom, step);
+    const camera = map.cam;
+    const next = stepZoom(camera.zoom, step);
     if (anchor) {
       // Keep the point under the cursor in place.
-      const dpr = window.devicePixelRatio || 1;
-      const offsetX = (anchor.x - anchor.w / 2) / dpr;
-      const offsetY = (anchor.y - anchor.h / 2) / dpr;
-      setCam(id, { zoom: next, ...zoomAround(cam.x, cam.y, cam.zoom, next, offsetX, offsetY) });
+      const pixelRatio = window.devicePixelRatio || 1;
+      const offsetX = (anchor.x - anchor.w / 2) / pixelRatio;
+      const offsetY = (anchor.y - anchor.h / 2) / pixelRatio;
+      setCam(id, { zoom: next, ...zoomAround(camera.x, camera.y, camera.zoom, next, offsetX, offsetY) });
     } else setCam(id, { zoom: next });
   },
   zoomReset: () => map.activeId !== null && setCam(map.activeId, { zoom: 1 }),

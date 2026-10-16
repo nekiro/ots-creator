@@ -19,8 +19,8 @@ func (ms *MapService) Redo(id int) (MapChange, error) {
 
 // History lists the undo and redo steps.
 func (ms *MapService) History(id int) (steps map[string][]mapedit.ActionInfo, err error) {
-	err = ms.withMap(id, func(m *openMap, _ *mapData) error {
-		undo, redo := m.editor.History()
+	err = ms.withMap(id, func(opened *openMap, _ *mapData) error {
+		undo, redo := opened.editor.History()
 		steps = map[string][]mapedit.ActionInfo{"undo": undo, "redo": redo}
 		return nil
 	})
@@ -41,8 +41,8 @@ func (ms *MapService) Draw(id int, request mapedit.DrawRequest) (MapChange, erro
 
 // DoodadPreview generates the next placement of a doodad brush.
 func (ms *MapService) DoodadPreview(id int, name string, variation, size int, shape string, thickness float64) (preview *mapedit.DoodadBuffer, err error) {
-	err = ms.withMap(id, func(m *openMap, _ *mapData) error {
-		preview = m.editor.GenerateDoodad(name, variation, size, shape, thickness)
+	err = ms.withMap(id, func(opened *openMap, _ *mapData) error {
+		preview = opened.editor.GenerateDoodad(name, variation, size, shape, thickness)
 		return nil
 	})
 	return preview, err
@@ -59,8 +59,8 @@ func (ms *MapService) RemoveItem(id int, ref mapedit.ItemRef) (MapChange, error)
 }
 
 // AddItem puts an item on a tile.
-func (ms *MapService) AddItem(id int, p otmap.Position, item uint16) (MapChange, error) {
-	return ms.editMap(id, func(editor *mapedit.Editor) error { return editor.AddItem(p, item) })
+func (ms *MapService) AddItem(id int, pos otmap.Position, item uint16) (MapChange, error) {
+	return ms.editMap(id, func(editor *mapedit.Editor) error { return editor.AddItem(pos, item) })
 }
 
 // AddToContainer puts an item into a container.
@@ -69,8 +69,8 @@ func (ms *MapService) AddToContainer(id int, ref mapedit.ItemRef, item uint16) (
 }
 
 // MoveItem reorders an item of a tile.
-func (ms *MapService) MoveItem(id int, p otmap.Position, from, to int) (MapChange, error) {
-	return ms.editMap(id, func(editor *mapedit.Editor) error { return editor.MoveItem(p, from, to) })
+func (ms *MapService) MoveItem(id int, pos otmap.Position, from, to int) (MapChange, error) {
+	return ms.editMap(id, func(editor *mapedit.Editor) error { return editor.MoveItem(pos, from, to) })
 }
 
 // RotateItem rotates an item.
@@ -79,23 +79,23 @@ func (ms *MapService) RotateItem(id int, ref mapedit.ItemRef) (MapChange, error)
 }
 
 // SwitchDoor opens or closes a door.
-func (ms *MapService) SwitchDoor(id int, p otmap.Position, index int) (MapChange, error) {
-	return ms.editMap(id, func(editor *mapedit.Editor) error { return editor.SwitchDoor(p, index) })
+func (ms *MapService) SwitchDoor(id int, pos otmap.Position, index int) (MapChange, error) {
+	return ms.editMap(id, func(editor *mapedit.Editor) error { return editor.SwitchDoor(pos, index) })
 }
 
 // UpdateTile changes tile flags, house or zones.
-func (ms *MapService) UpdateTile(id int, p otmap.Position, patch mapedit.TilePatch) (MapChange, error) {
-	return ms.editMap(id, func(editor *mapedit.Editor) error { editor.UpdateTile(p, patch); return nil })
+func (ms *MapService) UpdateTile(id int, pos otmap.Position, patch mapedit.TilePatch) (MapChange, error) {
+	return ms.editMap(id, func(editor *mapedit.Editor) error { editor.UpdateTile(pos, patch); return nil })
 }
 
 // UpdateCreature changes or removes a creature.
-func (ms *MapService) UpdateCreature(id int, p otmap.Position, index int, patch mapedit.CreaturePatch) (MapChange, error) {
-	return ms.editMap(id, func(editor *mapedit.Editor) error { return editor.UpdateCreature(p, index, patch) })
+func (ms *MapService) UpdateCreature(id int, pos otmap.Position, index int, patch mapedit.CreaturePatch) (MapChange, error) {
+	return ms.editMap(id, func(editor *mapedit.Editor) error { return editor.UpdateCreature(pos, index, patch) })
 }
 
 // UpdateSpawn changes the radius of a spawn (0 removes it).
-func (ms *MapService) UpdateSpawn(id int, p otmap.Position, npc bool, radius int32) (MapChange, error) {
-	return ms.editMap(id, func(editor *mapedit.Editor) error { return editor.UpdateSpawn(p, npc, radius) })
+func (ms *MapService) UpdateSpawn(id int, pos otmap.Position, npc bool, radius int32) (MapChange, error) {
+	return ms.editMap(id, func(editor *mapedit.Editor) error { return editor.UpdateSpawn(pos, npc, radius) })
 }
 
 // SetProperties changes the map header.
@@ -118,8 +118,8 @@ func (ms *MapService) RemoveHouse(id int, house uint32) (MapChange, error) {
 
 // HouseTiles returns the tiles of a house.
 func (ms *MapService) HouseTiles(id int, house uint32) (tiles []otmap.Position, err error) {
-	err = ms.withMap(id, func(m *openMap, _ *mapData) error {
-		tiles = m.editor.HouseTiles(house)
+	err = ms.withMap(id, func(opened *openMap, _ *mapData) error {
+		tiles = opened.editor.HouseTiles(house)
 		return nil
 	})
 	return tiles, err

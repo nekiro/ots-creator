@@ -85,20 +85,20 @@ func (c *Chunk) get(i int) *Tile {
 // unpack fills tile from a packed tile. Items go into buf when it has room
 // (then tile is only valid until buf is reused), else into a new slice.
 func (c *Chunk) unpack(stored packedTile, tile *Tile, buf []Item) *Tile {
-	src := c.items[stored.offset : stored.offset+uint32(stored.count)]
+	packedItems := c.items[stored.offset : stored.offset+uint32(stored.count)]
 	*tile = Tile{}
 	if stored.ground {
-		tile.Ground = Item{ID: src[0].id, Subtype: src[0].subtype}
-		src = src[1:]
+		tile.Ground = Item{ID: packedItems[0].id, Subtype: packedItems[0].subtype}
+		packedItems = packedItems[1:]
 	}
-	if len(src) > 0 {
+	if len(packedItems) > 0 {
 		var items []Item
-		if cap(buf) >= len(src) {
-			items = buf[:len(src)]
+		if cap(buf) >= len(packedItems) {
+			items = buf[:len(packedItems)]
 		} else {
-			items = make([]Item, len(src))
+			items = make([]Item, len(packedItems))
 		}
-		for i, item := range src {
+		for i, item := range packedItems {
 			items[i] = Item{ID: item.id, Subtype: item.subtype}
 		}
 		tile.Items = items
@@ -198,6 +198,15 @@ func (c *Chunk) eachPtr(fn func(tile *Tile)) {
 	for _, tile := range c.ptrs {
 		if tile != nil {
 			fn(tile)
+		}
+	}
+}
+
+// eachStored calls fn for every tile stored as *Tile, with its position.
+func (c *Chunk) eachStored(fn func(pos Position, tile *Tile)) {
+	for i := range c.cells {
+		if cell := c.cells[i]; cell&cellPtr != 0 {
+			fn(Position{c.X<<ChunkBits | uint16(i&(ChunkSize-1)), c.Y<<ChunkBits | uint16(i>>ChunkBits), c.Z}, c.ptrs[cell&^cellPtr])
 		}
 	}
 }

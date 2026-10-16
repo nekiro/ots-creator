@@ -4,6 +4,7 @@
 import { ItemFlags, TileFlags } from "../data/chunks";
 import { ALPHA, COLORS, LABEL_COLORS, LIMITS, ZOOM } from "../constants";
 import { labelText, wrapText } from "../editor/itemText";
+import { wholePixelRatio } from "./labels";
 import type { QuadBatch } from "./quadBatch";
 import type { FrameResult, Scene } from "./scene";
 import { type Camera } from "../view/view";
@@ -54,11 +55,6 @@ function isHovered(scene: Scene, x: number, y: number, z: number): boolean {
   return !!scene.hover && scene.hover.x === x && scene.hover.y === y && scene.hover.z === z;
 }
 
-/** Device pixels per CSS pixel, for label sizes. */
-function pixelRatio(): number {
-  return Math.max(1, Math.round(globalThis.devicePixelRatio || 1));
-}
-
 function drawGrid({ scene, camera, batch, z }: Overlay): void {
   const range = camera.tiles(z, 0, 0);
   for (let x = range.x0; x <= range.x1; x++) batch.rect(camera.tileX(x, z), 0, 1, scene.height, COLORS.grid);
@@ -101,8 +97,8 @@ function drawMarkers({ scene, result, camera, batch, z, tilePx, lineWidth }: Ove
     if (marker.z !== z) continue;
     const x = camera.tileX(marker.x, z);
     const y = camera.tileY(marker.y, z);
-    const [r, g, b] = marker.color;
-    batch.stroke(x + lineWidth, y + lineWidth, tilePx - 2 * lineWidth, tilePx - 2 * lineWidth, [r, g, b, ALPHA.marker], Math.max(2, lineWidth * 2));
+    const [red, green, blue] = marker.color;
+    batch.stroke(x + lineWidth, y + lineWidth, tilePx - 2 * lineWidth, tilePx - 2 * lineWidth, [red, green, blue, ALPHA.marker], Math.max(2, lineWidth * 2));
     if (tilePx >= ZOOM.markerNames && scene.opts.labels) {
       // The whole name under the mouse, the short one elsewhere.
       const hovered = isHovered(scene, marker.x, marker.y, z);
@@ -111,7 +107,7 @@ function drawMarkers({ scene, result, camera, batch, z, tilePx, lineWidth }: Ove
         y: y - 2,
         text: hovered ? (marker.full ?? marker.label) : marker.label,
         top: hovered,
-        color: `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`,
+        color: `rgb(${Math.round(red * 255)},${Math.round(green * 255)},${Math.round(blue * 255)})`,
       });
     }
   }
@@ -150,7 +146,7 @@ function labelItemTexts(overlay: Overlay): void {
     if (isHovered(scene, x, y, z)) {
       // Line by line, over the other labels.
       const lines = wrapText(text);
-      const lineHeight = 11 * pixelRatio();
+      const lineHeight = 11 * wholePixelRatio(globalThis.devicePixelRatio);
       lines.forEach((line, i) => result.labels.push({ x: centerX, y: centerY + (i - (lines.length - 1) / 2) * lineHeight, text: line, color: LABEL_COLORS.itemText, small: true, top: true }));
       return;
     }
@@ -162,7 +158,7 @@ function labelItemTexts(overlay: Overlay): void {
 /** The position of the tile under the mouse, in a dark tag above it (below it at the top edge). */
 function labelHoverPosition({ scene, result, camera, batch, z, tilePx }: Overlay): void {
   const hover = scene.hover!;
-  const ratio = pixelRatio();
+  const ratio = wholePixelRatio(globalThis.devicePixelRatio);
   const text = `${hover.x}, ${hover.y}, ${hover.z}`;
   const tagWidth = (text.length * 5 + 8) * ratio;
   const tagHeight = 13 * ratio;
@@ -183,7 +179,7 @@ function labelItemTooltips(overlay: Overlay): void {
     const tile = scene.chunks.peekTile(x, y, z);
     if (!tile) return;
     for (let i = 0; i < tile.ids.length; i++) {
-      const itemFlags = tile.iflags[i];
+      const itemFlags = tile.itemFlags[i];
       if (!(itemFlags & (ItemFlags.ids | ItemFlags.text | ItemFlags.teleport | ItemFlags.doorId))) continue;
       const tags: string[] = [];
       if (itemFlags & ItemFlags.ids) tags.push("id");

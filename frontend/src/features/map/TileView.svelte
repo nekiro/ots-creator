@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ask } from "../../lib/confirm.svelte";
-  import { MapService, TILE_FLAGS, fmtPos, type Attr, type ItemRef, type TileItem, type Position, type ItemPatch } from "../../lib/map/data/api";
+  import { MapService, TILE_FLAGS, fmtPos, parsePos, type Attr, type ItemRef, type TileItem, type Position, type ItemPatch } from "../../lib/map/data/api";
   import { goTo, mapCommands } from "../../lib/map/view/commands";
   import { edit, map, selectBrush, useCreature } from "../../lib/map/state.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
@@ -12,7 +12,7 @@
   const tile = $derived(map.tile);
   const inspected = $derived(map.inspect);
   /** Selected entry: -1 ground, n items index; path into containers. */
-  let sel = $state<{ index: number; path: number[] } | null>(null);
+  let selection = $state<{ index: number; path: number[] } | null>(null);
   let addId = $state("");
 
   // A different tile resets the item selection.
@@ -21,27 +21,27 @@
     const key = fmtPos(map.inspect);
     if (key !== lastPos) {
       lastPos = key;
-      sel = null;
+      selection = null;
     }
   });
 
   /** Items top first, with their index in the tile (-1 ground). */
   const stack = $derived.by(() => {
-    if (!tile) return [] as { it: TileItem; index: number }[];
-    const out = (tile.items ?? []).map((it, index) => ({ it, index })).reverse();
-    if (tile.ground) out.push({ it: tile.ground, index: -1 });
+    if (!tile) return [] as { item: TileItem; index: number }[];
+    const out = (tile.items ?? []).map((item, index) => ({ item, index })).reverse();
+    if (tile.ground) out.push({ item: tile.ground, index: -1 });
     return out;
   });
 
   function itemAt(index: number, path: number[]): TileItem | null {
     if (!tile) return null;
     let item: TileItem | null | undefined = index < 0 ? tile.ground : tile.items?.[index];
-    for (const i of path) item = item?.contents?.[i];
+    for (const contentIndex of path) item = item?.contents?.[contentIndex];
     return item ?? null;
   }
 
-  const current = $derived(sel ? itemAt(sel.index, sel.path) : null);
-  const ref = $derived<ItemRef | null>(sel && inspected ? { pos: inspected, index: sel.index, path: sel.path } : null);
+  const current = $derived(selection ? itemAt(selection.index, selection.path) : null);
+  const ref = $derived<ItemRef | null>(selection && inspected ? { pos: inspected, index: selection.index, path: selection.path } : null);
 
   function patch(changes: ItemPatch) {
     const itemRef = ref;
@@ -49,28 +49,28 @@
   }
 
   function pick(index: number) {
-    sel = { index, path: [] };
+    selection = { index, path: [] };
     if (inspected) void edit((id) => MapService.SelectItem(id, inspected, index, false));
   }
 
-  async function removeSel() {
+  async function removeSelected() {
     const itemRef = ref;
     if (!itemRef) return;
     await edit((id) => MapService.RemoveItem(id, itemRef));
-    sel = null;
+    selection = null;
   }
 
   async function removeAt(index: number) {
     if (!inspected) return;
     const pos = inspected;
     await edit((id) => MapService.RemoveItem(id, { pos, index, path: [] }));
-    if (sel && !sel.path.length && (sel.index === index || (index >= 0 && sel.index > index))) sel = sel.index === index ? null : { index: sel.index - 1, path: [] };
+    if (selection && !selection.path.length && (selection.index === index || (index >= 0 && selection.index > index))) selection = selection.index === index ? null : { index: selection.index - 1, path: [] };
   }
 
   async function move(index: number, to: number) {
     if (!inspected || !tile || to < 0 || to >= (tile.items?.length ?? 0)) return;
     await edit((id) => MapService.MoveItem(id, inspected, index, to));
-    if (sel?.index === index) sel = { index: to, path: [] };
+    if (selection?.index === index) selection = { index: to, path: [] };
   }
 
   // Dragging a row changes the stack order. Rows are top first, so "above
@@ -86,11 +86,11 @@
   }
   function drop() {
     const from = dragFrom;
-    const at = dropAt;
+    const dropTarget = dropAt;
     dragFrom = dropAt = null;
-    if (from === null || !at) return;
-    const target = at.index;
-    let to = at.above ? (from < target ? target : target + 1) : from < target ? target - 1 : target;
+    if (from === null || !dropTarget) return;
+    const target = dropTarget.index;
+    let to = dropTarget.above ? (from < target ? target : target + 1) : from < target ? target - 1 : target;
     to = clamp(to, 0, (tile?.items?.length ?? 1) - 1);
     if (to !== from) void move(from, to);
   }
@@ -156,17 +156,17 @@
         <div class="badges">
           {#if tile.temple}<button class="badge gold" title="Show the town" onclick={() => focusTown(tile.temple)}>{tile.temple} temple</button>{/if}
           {#if tile.houseExit}<button class="badge blue" title="Show the house" onclick={() => focusHouse(tile.houseExit)}>{tile.houseExit} exit</button>{/if}
-          {#each tile.waypoints ?? [] as w}<button class="badge green" title="Show the waypoint" onclick={() => mapCommands.focus({ kind: "waypoint", name: w })}>waypoint {w}</button>{/each}
+          {#each tile.waypoints ?? [] as waypoint}<button class="badge green" title="Show the waypoint" onclick={() => mapCommands.focus({ kind: "waypoint", name: waypoint })}>waypoint {waypoint}</button>{/each}
         </div>
       {/if}
       <div class="t-label sect">Items (top first)</div>
       <div class="stack t-panel">
-        {#each stack as { it, index } (index)}
+        {#each stack as { item, index } (index)}
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="it"
-            class:on={sel?.index === index && !sel.path.length}
-            class:selected={it.selected}
+            class:on={selection?.index === index && !selection.path.length}
+            class:selected={item.selected}
             class:dragging={dragFrom === index}
             class:dropabove={dropAt?.index === index && dropAt.above}
             class:dropbelow={dropAt?.index === index && !dropAt.above}
@@ -181,16 +181,16 @@
             ondrop={(event) => (event.preventDefault(), drop())}
             ondragend={() => (dragFrom = dropAt = null)}
           >
-            <button class="pickbtn" title="{it.name} · server id {it.id}, client id {it.clientId}" onclick={() => pick(index)} ondblclick={() => selectBrush({ kind: "raw", item: it.id, look: it.id, label: it.name })}>
-              <span class="t-slot"><ItemIcon id={it.id} /></span>
+            <button class="pickbtn" title="{item.name} · server id {item.id}, client id {item.clientId}" onclick={() => pick(index)} ondblclick={() => selectBrush({ kind: "raw", item: item.id, look: item.id, label: item.name })}>
+              <span class="t-slot"><ItemIcon id={item.id} /></span>
               <span class="nm">
-                <span class="n">{it.name}</span>
+                <span class="n">{item.name}</span>
                 <span class="d">
-                  {it.id}{#if it.subtype}{` · ${it.kind === "fluid" ? "fluid" : "count"} ${it.subtype}`}{/if}{#if it.ext?.actionId}{` · aid ${it.ext.actionId}`}{/if}{#if it.ext?.uniqueId}{` · uid ${it.ext.uniqueId}`}{/if}{#if it.ext?.dest}{` · → ${fmtPos(it.ext.dest)}`}{/if}{#if it.contents?.length}{` · ${it.contents.length} inside`}{/if}{#if it.brush}{` · ${it.brush}`}{/if}
+                  {item.id}{#if item.subtype}{` · ${item.kind === "fluid" ? "fluid" : "count"} ${item.subtype}`}{/if}{#if item.ext?.actionId}{` · aid ${item.ext.actionId}`}{/if}{#if item.ext?.uniqueId}{` · uid ${item.ext.uniqueId}`}{/if}{#if item.ext?.dest}{` · → ${fmtPos(item.ext.dest)}`}{/if}{#if item.contents?.length}{` · ${item.contents.length} inside`}{/if}{#if item.brush}{` · ${item.brush}`}{/if}
                 </span>
               </span>
             </button>
-            <button class="t-icon-btn danger del" title="Remove {it.name}" onclick={() => removeAt(index)}><Icon name="trash" /></button>
+            <button class="t-icon-btn danger del" title="Remove {item.name}" onclick={() => removeAt(index)}><Icon name="trash" /></button>
           </div>
         {:else}
           <div class="t-label empty">Empty tile</div>
@@ -202,58 +202,58 @@
         <button class="t-icon-btn" title="Add item" disabled={!map.items?.has(Number(addId))} onclick={addItem}><Icon name="plus" /></button>
       </div>
 
-      {#if current && sel}
-        {@const it = current}
+      {#if current && selection}
+        {@const item = current}
         <div class="t-sep"></div>
         <div class="props">
           <div class="row head">
-            <span class="t-slot"><ItemIcon id={it.id} /></span>
-            <span class="grow title">{it.name}{#if sel.path.length}<span class="t-label"> (in container)</span>{/if}</span>
-            {#if it.rotateTo}<button class="t-icon-btn" title="Rotate" onclick={() => ref && edit((id) => MapService.RotateItem(id, ref!))}><Icon name="refresh" /></button>{/if}
-            {#if it.kind === "door" && !sel.path.length}<button class="t-icon-btn" title="Open or close" onclick={() => inspected && sel && edit((id) => MapService.SwitchDoor(id, inspected!, sel!.index))}><Icon name="replace" /></button>{/if}
-            <button class="t-icon-btn" title="Use as brush" onclick={() => selectBrush({ kind: "raw", item: it.id, look: it.id, label: it.name })}><Icon name="pencil" /></button>
-            <button class="t-icon-btn danger" title="Remove (Del)" onclick={removeSel}><Icon name="trash" /></button>
+            <span class="t-slot"><ItemIcon id={item.id} /></span>
+            <span class="grow title">{item.name}{#if selection.path.length}<span class="t-label"> (in container)</span>{/if}</span>
+            {#if item.rotateTo}<button class="t-icon-btn" title="Rotate" onclick={() => ref && edit((id) => MapService.RotateItem(id, ref!))}><Icon name="refresh" /></button>{/if}
+            {#if item.kind === "door" && !selection.path.length}<button class="t-icon-btn" title="Open or close" onclick={() => inspected && selection && edit((id) => MapService.SwitchDoor(id, inspected!, selection!.index))}><Icon name="replace" /></button>{/if}
+            <button class="t-icon-btn" title="Use as brush" onclick={() => selectBrush({ kind: "raw", item: item.id, look: item.id, label: item.name })}><Icon name="pencil" /></button>
+            <button class="t-icon-btn danger" title="Remove (Del)" onclick={removeSelected}><Icon name="trash" /></button>
           </div>
           <div class="grid2">
-            <label>Action id<input class="t-input" value={it.ext?.actionId || ""} placeholder="0" onchange={(event) => patch({ actionId: parseCount(event.currentTarget.value) })} /></label>
-            <label>Unique id<input class="t-input" value={it.ext?.uniqueId || ""} placeholder="0" onchange={(event) => patch({ uniqueId: parseCount(event.currentTarget.value) })} /></label>
-            {#if it.kind === "stackable"}
-              <label>Count<input class="t-input" value={it.subtype} onchange={(event) => patch({ subtype: Math.max(1, Math.min(map.settings?.countU16 ? 65535 : 255, parseCount(event.currentTarget.value))) })} /></label>
-            {:else if it.kind === "charges" || it.kind === "rune"}
-              <label>Charges<input class="t-input" value={it.subtype} onchange={(event) => patch({ subtype: parseCount(event.currentTarget.value) })} /></label>
-            {:else if it.kind === "fluid"}
-              <label class="wide">Fluid<Select grow value={it.subtype} options={FLUID_OPTIONS} onchange={(value) => patch({ subtype: value })} /></label>
+            <label>Action id<input class="t-input" value={item.ext?.actionId || ""} placeholder="0" onchange={(event) => patch({ actionId: parseCount(event.currentTarget.value) })} /></label>
+            <label>Unique id<input class="t-input" value={item.ext?.uniqueId || ""} placeholder="0" onchange={(event) => patch({ uniqueId: parseCount(event.currentTarget.value) })} /></label>
+            {#if item.kind === "stackable"}
+              <label>Count<input class="t-input" value={item.subtype} onchange={(event) => patch({ subtype: Math.max(1, Math.min(map.settings?.countU16 ? 65535 : 255, parseCount(event.currentTarget.value))) })} /></label>
+            {:else if item.kind === "charges" || item.kind === "rune"}
+              <label>Charges<input class="t-input" value={item.subtype} onchange={(event) => patch({ subtype: parseCount(event.currentTarget.value) })} /></label>
+            {:else if item.kind === "fluid"}
+              <label class="wide">Fluid<Select grow value={item.subtype} options={FLUID_OPTIONS} onchange={(value) => patch({ subtype: value })} /></label>
             {/if}
-            {#if it.kind === "door"}
-              <label>Door id<input class="t-input" value={it.ext?.doorId || ""} placeholder="0" onchange={(event) => patch({ doorId: Math.min(255, parseCount(event.currentTarget.value)) })} /></label>
+            {#if item.kind === "door"}
+              <label>Door id<input class="t-input" value={item.ext?.doorId || ""} placeholder="0" onchange={(event) => patch({ doorId: Math.min(255, parseCount(event.currentTarget.value)) })} /></label>
             {/if}
-            {#if it.kind === "depot"}
-              <label>Depot id<input class="t-input" value={it.ext?.depotId || ""} placeholder="0" onchange={(event) => patch({ depotId: parseCount(event.currentTarget.value) })} /></label>
+            {#if item.kind === "depot"}
+              <label>Depot id<input class="t-input" value={item.ext?.depotId || ""} placeholder="0" onchange={(event) => patch({ depotId: parseCount(event.currentTarget.value) })} /></label>
             {/if}
           </div>
-          {#if it.kind === "teleport" || it.ext?.dest}
+          {#if item.kind === "teleport" || item.ext?.dest}
             <div class="row dest">
               <span class="t-label">Destination</span>
-              <input class="t-input grow" value={it.ext?.dest ? fmtPos(it.ext.dest) : ""} placeholder="x, y, z" onchange={(event) => {
-                const m = event.currentTarget.value.match(/(\d+)\D+(\d+)\D+(\d+)/);
-                if (m) patch({ dest: { x: +m[1], y: +m[2], z: +m[3] } });
+              <input class="t-input grow" value={item.ext?.dest ? fmtPos(item.ext.dest) : ""} placeholder="x, y, z" onchange={(event) => {
+                const dest = parsePos(event.currentTarget.value);
+                if (dest) patch({ dest });
               }} />
               <button class="t-icon-btn" title="Pick on the map" onclick={pickDest}><Icon name="picker" /></button>
-              {#if it.ext?.dest}<button class="t-icon-btn" title="Go to destination" onclick={() => it.ext?.dest && goTo(it.ext.dest)}><Icon name="arrowE" /></button>{/if}
+              {#if item.ext?.dest}<button class="t-icon-btn" title="Go to destination" onclick={() => item.ext?.dest && goTo(item.ext.dest)}><Icon name="arrowE" /></button>{/if}
             </div>
           {/if}
-          {#if it.kind === "writeable" || it.ext?.text || map.items?.is(it.id, "readable")}
-            <label class="col">Text<textarea class="t-input text" value={it.ext?.text ?? ""} onchange={(event) => patch({ text: event.currentTarget.value })}></textarea></label>
+          {#if item.kind === "writeable" || item.ext?.text || map.items?.is(item.id, "readable")}
+            <label class="col">Text<textarea class="t-input text" value={item.ext?.text ?? ""} onchange={(event) => patch({ text: event.currentTarget.value })}></textarea></label>
           {/if}
-          <label class="col">Description<input class="t-input" value={it.ext?.description ?? ""} onchange={(event) => patch({ description: event.currentTarget.value })} /></label>
-          {#if it.kind === "container" || it.kind === "depot" || it.contents?.length}
+          <label class="col">Description<input class="t-input" value={item.ext?.description ?? ""} onchange={(event) => patch({ description: event.currentTarget.value })} /></label>
+          {#if item.kind === "container" || item.kind === "depot" || item.contents?.length}
             <div class="t-label sect">Contents</div>
             <div class="contents t-panel">
-              {#each it.contents ?? [] as c, ci}
+              {#each item.contents ?? [] as content, contentIndex}
                 <div class="it">
-                  <button class="pickbtn" onclick={() => (sel = { index: sel!.index, path: [...sel!.path, ci] })}>
-                    <span class="t-slot"><ItemIcon id={c.id} /></span>
-                    <span class="nm"><span class="n">{c.name}</span><span class="d">{c.id}{c.subtype ? ` · ${c.subtype}` : ""}{c.contents?.length ? ` · ${c.contents.length} inside` : ""}</span></span>
+                  <button class="pickbtn" onclick={() => (selection = { index: selection!.index, path: [...selection!.path, contentIndex] })}>
+                    <span class="t-slot"><ItemIcon id={content.id} /></span>
+                    <span class="nm"><span class="n">{content.name}</span><span class="d">{content.id}{content.subtype ? ` · ${content.subtype}` : ""}{content.contents?.length ? ` · ${content.contents.length} inside` : ""}</span></span>
                   </button>
                 </div>
               {:else}
@@ -265,28 +265,28 @@
               <button class="t-icon-btn" title="Put into the container" disabled={!map.items?.has(Number(contentId))} onclick={addContent}><Icon name="plus" /></button>
             </div>
           {/if}
-          {#if sel.path.length}
-            <button class="t-btn back" onclick={() => (sel = { index: sel!.index, path: sel!.path.slice(0, -1) })}>Back to the container</button>
+          {#if selection.path.length}
+            <button class="t-btn back" onclick={() => (selection = { index: selection!.index, path: selection!.path.slice(0, -1) })}>Back to the container</button>
           {/if}
           <details class="attrs">
-            <summary class="t-label">Custom attributes ({attrsOf(it).length})</summary>
-            {#each attrsOf(it) as a, ai}
+            <summary class="t-label">Custom attributes ({attrsOf(item).length})</summary>
+            {#each attrsOf(item) as attribute, attributeIndex}
               <div class="row attr">
-                <input class="t-input key" value={a.key} onchange={(event) => setAttrs(attrsOf(it).map((x, k) => (k === ai ? { ...x, key: event.currentTarget.value } : x)))} />
-                <Select value={a.type} width={80} options={ATTR_TYPE_OPTIONS} onchange={(value) => setAttrs(attrsOf(it).map((x, k) => (k === ai ? { ...x, type: value } : x)))} />
-                <input class="t-input grow" value={a.type === 1 ? (a.str ?? "") : a.type === 4 ? String(!!a.value) : a.type === 2 ? String(a.int ?? 0) : String(a.num ?? 0)} onchange={(event) => {
-                  const v = event.currentTarget.value;
-                  const next = { ...a };
-                  if (a.type === 1) next.str = v;
-                  else if (a.type === 4) next.value = v === "true" || v === "1";
-                  else if (a.type === 2) next.int = Math.trunc(Number(v)) || 0;
-                  else next.num = Number(v) || 0;
-                  setAttrs(attrsOf(it).map((x, k) => (k === ai ? next : x)));
+                <input class="t-input key" value={attribute.key} onchange={(event) => setAttrs(attrsOf(item).map((other, otherIndex) => (otherIndex === attributeIndex ? { ...other, key: event.currentTarget.value } : other)))} />
+                <Select value={attribute.type} width={80} options={ATTR_TYPE_OPTIONS} onchange={(value) => setAttrs(attrsOf(item).map((other, otherIndex) => (otherIndex === attributeIndex ? { ...other, type: value } : other)))} />
+                <input class="t-input grow" value={attribute.type === 1 ? (attribute.str ?? "") : attribute.type === 4 ? String(!!attribute.value) : attribute.type === 2 ? String(attribute.int ?? 0) : String(attribute.num ?? 0)} onchange={(event) => {
+                  const text = event.currentTarget.value;
+                  const next = { ...attribute };
+                  if (attribute.type === 1) next.str = text;
+                  else if (attribute.type === 4) next.value = text === "true" || text === "1";
+                  else if (attribute.type === 2) next.int = Math.trunc(Number(text)) || 0;
+                  else next.num = Number(text) || 0;
+                  setAttrs(attrsOf(item).map((other, otherIndex) => (otherIndex === attributeIndex ? next : other)));
                 }} />
-                <button class="t-icon-btn danger" title="Remove" onclick={() => setAttrs(attrsOf(it).filter((_, k) => k !== ai))}><Icon name="close" /></button>
+                <button class="t-icon-btn danger" title="Remove" onclick={() => setAttrs(attrsOf(item).filter((_, otherIndex) => otherIndex !== attributeIndex))}><Icon name="close" /></button>
               </div>
             {/each}
-            <button class="t-btn" onclick={() => setAttrs([...attrsOf(it), { key: "key", type: 1, str: "" }])}>Add attribute</button>
+            <button class="t-btn" onclick={() => setAttrs([...attrsOf(item), { key: "key", type: 1, str: "" }])}>Add attribute</button>
           </details>
         </div>
       {/if}
@@ -294,28 +294,28 @@
       {#if tile.creatures?.length}
         <div class="t-sep"></div>
         <div class="t-label sect">Creatures</div>
-        {#each tile.creatures as c, ci}
+        {#each tile.creatures as creature, creatureIndex}
           <div class="creature">
-            <span class="t-slot"><ItemIcon outfit={c.outfit.lookItem ? 0 : c.outfit.lookType} id={c.outfit.lookItem} /></span>
+            <span class="t-slot"><ItemIcon outfit={creature.outfit.lookItem ? 0 : creature.outfit.lookType} id={creature.outfit.lookItem} /></span>
             <div class="col grow">
-              <span class:unknown={c.unknown} title={c.unknown ? "Not in the creature list" : ""}>{c.name}{c.npc ? " (NPC)" : ""}</span>
+              <span class:unknown={creature.unknown} title={creature.unknown ? "Not in the creature list" : ""}>{creature.name}{creature.npc ? " (NPC)" : ""}</span>
               <div class="row">
-                <input class="t-input sp" title="Spawn time (seconds)" value={c.spawnTime} onchange={(event) => inspected && edit((id) => MapService.UpdateCreature(id, inspected!, ci, { spawnTime: Math.max(1, Math.trunc(+event.currentTarget.value) || 60), remove: false }))} />
+                <input class="t-input sp" title="Spawn time (seconds)" value={creature.spawnTime} onchange={(event) => inspected && edit((id) => MapService.UpdateCreature(id, inspected!, creatureIndex, { spawnTime: Math.max(1, Math.trunc(+event.currentTarget.value) || 60), remove: false }))} />
                 <span class="t-label">s</span>
-                <Select value={c.direction} width={70} options={DIRECTION_OPTIONS} onchange={(value) => inspected && edit((id) => MapService.UpdateCreature(id, inspected!, ci, { direction: value, remove: false }))} />
+                <Select value={creature.direction} width={70} options={DIRECTION_OPTIONS} onchange={(value) => inspected && edit((id) => MapService.UpdateCreature(id, inspected!, creatureIndex, { direction: value, remove: false }))} />
               </div>
             </div>
-            <button class="t-icon-btn" title="Use as brush" onclick={() => useCreature(c)}><Icon name="pencil" /></button>
-            <button class="t-icon-btn danger" title="Remove" onclick={() => inspected && edit((id) => MapService.UpdateCreature(id, inspected!, ci, { remove: true }))}><Icon name="trash" /></button>
+            <button class="t-icon-btn" title="Use as brush" onclick={() => useCreature(creature)}><Icon name="pencil" /></button>
+            <button class="t-icon-btn danger" title="Remove" onclick={() => inspected && edit((id) => MapService.UpdateCreature(id, inspected!, creatureIndex, { remove: true }))}><Icon name="trash" /></button>
           </div>
         {/each}
       {/if}
-      {#each [{ s: tile.spawn, npc: false, label: "Spawn" }, { s: tile.spawnNpc, npc: true, label: "NPC spawn" }] as sp}
-        {#if sp.s}
+      {#each [{ spawn: tile.spawn, npc: false, label: "Spawn" }, { spawn: tile.spawnNpc, npc: true, label: "NPC spawn" }] as { spawn, npc, label }}
+        {#if spawn}
           <div class="row spawn">
-            <span class="t-label">{sp.label} radius</span>
-            <input class="t-input sp" value={sp.s.radius} onchange={(event) => inspected && edit((id) => MapService.UpdateSpawn(id, inspected!, sp.npc, Math.max(1, Math.trunc(+event.currentTarget.value) || 1)))} />
-            <button class="t-icon-btn danger" title="Remove spawn" onclick={() => inspected && edit((id) => MapService.UpdateSpawn(id, inspected!, sp.npc, 0))}><Icon name="trash" /></button>
+            <span class="t-label">{label} radius</span>
+            <input class="t-input sp" value={spawn.radius} onchange={(event) => inspected && edit((id) => MapService.UpdateSpawn(id, inspected!, npc, Math.max(1, Math.trunc(+event.currentTarget.value) || 1)))} />
+            <button class="t-icon-btn danger" title="Remove spawn" onclick={() => inspected && edit((id) => MapService.UpdateSpawn(id, inspected!, npc, 0))}><Icon name="trash" /></button>
           </div>
         {/if}
       {/each}
@@ -332,7 +332,7 @@
         {#if tile.houseId}<button class="t-icon-btn" title="Show the house" onclick={() => mapCommands.focus({ kind: "house", id: tile.houseId })}><Icon name="arrowE" /></button>{/if}
       </div>
       {#if tile.zones?.length}
-        <div class="t-label zones">Zones: {tile.zones.map((z) => map.active?.zones?.find((x) => x.id === z)?.name ?? z).join(", ")}</div>
+        <div class="t-label zones">Zones: {tile.zones.map((zoneId) => map.active?.zones?.find((zone) => zone.id === zoneId)?.name ?? zoneId).join(", ")}</div>
       {/if}
       <div class="row foot">
         <button class="t-btn" onclick={() => inspected && goTo(inspected)}>Center</button>

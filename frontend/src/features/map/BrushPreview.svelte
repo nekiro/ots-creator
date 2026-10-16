@@ -87,10 +87,10 @@
     let loading = images.get(src);
     if (!loading) {
       loading = new Promise((done) => {
-        const img = new Image();
-        img.onload = () => done(img);
-        img.onerror = () => done(null);
-        img.src = src;
+        const image = new Image();
+        image.onload = () => done(image);
+        image.onerror = () => done(null);
+        image.src = src;
       });
       images.set(src, loading);
     }
@@ -115,7 +115,7 @@
         return { tile: tile!, src: clientId ? res.textureAt(Category.CategoryItem, clientId, tile!.x, tile!.y, 7, versions.thing(Category.CategoryItem, clientId)) : "" };
       }),
     );
-    void Promise.all(draws.map((draw) => (draw.src ? load(draw.src) : Promise.resolve(null)))).then((imgs) => {
+    void Promise.all(draws.map((draw) => (draw.src ? load(draw.src) : Promise.resolve(null)))).then((loadedImages) => {
       if (stale) return;
       const ctx = target.getContext("2d");
       if (!ctx) return;
@@ -123,10 +123,10 @@
       target.height = shown.h * TILE_PIXELS;
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, target.width, target.height);
-      imgs.forEach((img, i) => {
-        if (!img) return;
+      loadedImages.forEach((image, i) => {
+        if (!image) return;
         const { tile } = draws[i];
-        ctx.drawImage(img, (tile.x + 1) * TILE_PIXELS - img.width, (tile.y + 1) * TILE_PIXELS - img.height);
+        ctx.drawImage(image, (tile.x + 1) * TILE_PIXELS - image.width, (tile.y + 1) * TILE_PIXELS - image.height);
       });
     });
     return () => (stale = true);

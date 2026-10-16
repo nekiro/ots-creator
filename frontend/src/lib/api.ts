@@ -85,37 +85,32 @@ export function minId(category: Category): number {
 }
 
 export const res = {
-  thumb: (c: Category, id: number, ver: string | number) => `/res/thumb/${CATEGORY_NAMES[c]}/${id}?v=${ver}`,
+  thumb: (category: Category, id: number, version: string | number) => `/res/thumb/${CATEGORY_NAMES[category]}/${id}?v=${version}`,
   /** Thumbnail of the second client of a comparison. */
-  otherThumb: (c: Category, id: number, ver: string | number) => `/res/b/thumb/${CATEGORY_NAMES[c]}/${id}?v=${ver}`,
+  otherThumb: (category: Category, id: number, version: string | number) => `/res/b/thumb/${CATEGORY_NAMES[category]}/${id}?v=${version}`,
   /** Full (uncropped) texture of a thing as the client draws it at map position x, y, z. */
-  textureAt: (c: Category, id: number, x: number, y: number, z: number, ver: string | number) => `/res/texture/${CATEGORY_NAMES[c]}/${id}?x=${x}&y=${y}&z=${z}&wrap=1&v=${ver}`,
-  spritePng:(id: number, ver: string | number) => `/res/spritepng/${id}?v=${ver}`,
-  sheet: (c: Category, id: number, group: number, transparent: boolean, ver: string | number) =>
-    `/res/sheet/${CATEGORY_NAMES[c]}/${id}?g=${group}&bg=${transparent ? "transparent" : "magenta"}&v=${ver}`,
-  sprites: (ids: number[], rev: number) => `/res/sprites?ids=${ids.join(",")}&r=${rev}`,
+  textureAt: (category: Category, id: number, x: number, y: number, z: number, version: string | number) => `/res/texture/${CATEGORY_NAMES[category]}/${id}?x=${x}&y=${y}&z=${z}&wrap=1&v=${version}`,
+  spritePng: (id: number, version: string | number) => `/res/spritepng/${id}?v=${version}`,
+  sheet: (category: Category, id: number, group: number, transparent: boolean, version: string | number) =>
+    `/res/sheet/${CATEGORY_NAMES[category]}/${id}?g=${group}&bg=${transparent ? "transparent" : "magenta"}&v=${version}`,
+  sprites: (ids: number[], revision: number) => `/res/sprites?ids=${ids.join(",")}&r=${revision}`,
   /** Raw sprites of the second client of a comparison. */
-  otherSprites: (ids: number[], rev: number) => `/res/b/sprites?ids=${ids.join(",")}&r=${rev}`,
+  otherSprites: (ids: number[], revision: number) => `/res/b/sprites?ids=${ids.join(",")}&r=${revision}`,
 };
 
 /** Decodes a Go []byte (base64 in JSON) into bytes. */
-export function decodeBytes(b64: string | null | undefined): Uint8ClampedArray {
-  const bin = atob(b64 ?? "");
-  const out = new Uint8ClampedArray(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+export function decodeBytes(base64: string | null | undefined): Uint8ClampedArray {
+  const binary = atob(base64 ?? "");
+  const out = new Uint8ClampedArray(binary.length);
+  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
   return out;
 }
 
 /** Encodes bytes as base64 for a Go []byte parameter. */
 export function encodeBytes(bytes: Uint8Array | Uint8ClampedArray): string {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(bin);
-}
-
-/** Formats a byte count as KB or MB. */
-export function formatSize(bytes: number): string {
-  return bytes < 1048576 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1048576).toFixed(1)} MB`;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
 }
 
 /** Normalizes Go errors (strings or Error objects) into a message. */

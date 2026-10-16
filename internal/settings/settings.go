@@ -188,13 +188,7 @@ func (st *Store) AddRecent(recent Recent) error {
 	if recent.OpenedAt.IsZero() {
 		recent.OpenedAt = time.Now()
 	}
-	list := []Recent{recent}
-	for _, entry := range st.settings.Recent {
-		if !fsutil.SamePath(entry.DatPath, recent.DatPath) {
-			list = append(list, entry)
-		}
-	}
-	st.settings.Recent = list
+	st.settings.Recent = fsutil.AppendOtherPaths([]Recent{recent}, st.settings.Recent, recent.DatPath, recentDatPath)
 	st.settings.normalize()
 	return st.saveLocked()
 }
@@ -249,14 +243,14 @@ func (st *Store) RemoveRecent(datPath string) error {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	list := []Recent{}
-	for _, entry := range st.settings.Recent {
-		if datPath != "" && !fsutil.SamePath(entry.DatPath, datPath) {
-			list = append(list, entry)
-		}
+	if datPath != "" {
+		list = fsutil.AppendOtherPaths(list, st.settings.Recent, datPath, recentDatPath)
 	}
 	st.settings.Recent = list
 	return st.saveLocked()
 }
+
+func recentDatPath(recent Recent) string { return recent.DatPath }
 
 // ItemsOTB returns the items.otb kept in sync with a client, or "".
 func (st *Store) ItemsOTB(clientPath string) string {
@@ -284,15 +278,5 @@ func (st *Store) SetItemsOTB(clientPath, otbPath string) error {
 }
 
 func (st *Store) saveLocked() error {
-	if st.path == "" {
-		return nil
-	}
-	data, err := json.MarshalIndent(st.settings, "", "  ")
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(st.path), fsutil.DirMode); err != nil {
-		return err
-	}
-	return fsutil.WriteAtomic(st.path, data)
+	return fsutil.WriteJSON(st.path, st.settings, "  ")
 }

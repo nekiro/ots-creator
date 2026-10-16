@@ -10,6 +10,7 @@
   import ItemIcon from "../ItemIcon.svelte";
   import ItemPicker from "../ItemPicker.svelte";
   import TagPicker from "../../../lib/ui/TagPicker.svelte";
+  import { isTyping } from "../../../lib/ui/typing";
   import BrushPreview from "../BrushPreview.svelte";
   import { frameOf, previewOf, type Frame } from "../../../lib/map/editor/brushpreview";
   import { MAIN_WALLS, MORE_WALLS, chances, collectionsContaining, ensureBrushShape, missingForSave, normalizeBrushForSave, stampOf } from "../../../lib/map/editor/brushEdit";
@@ -117,7 +118,7 @@
   }
   function onkeydown(event: KeyboardEvent) {
     if (!stamp || !picked.length || (event.key !== "Delete" && event.key !== "Backspace")) return;
-    if ((event.target as HTMLElement).closest("input, textarea, select, [contenteditable]")) return;
+    if (isTyping(event)) return;
     event.preventDefault();
     clearPicked();
   }

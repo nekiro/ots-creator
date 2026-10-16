@@ -453,6 +453,21 @@ input[type="number"].t-input::-webkit-outer-spin-button {
     transform: rotate(360deg);
   }
 }
+/* Small spinning ring next to a "Loading…" text */
+.t-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(232, 196, 106, 0.25);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: t-spin 0.7s linear infinite;
+}
+@keyframes t-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 .t-label {
   color: var(--text-dim);

@@ -2,10 +2,11 @@ package app
 
 import (
 	"errors"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/nekiro/ots-creator/internal/workpool"
 )
 
 // EventProgress carries a Progress while a long operation runs.
@@ -48,10 +49,7 @@ func (s *Session) parallel(label string, n int, fn func(i int) error) error {
 	s.canceled.Store(false)
 	s.exporting.Add(1)
 	defer s.exporting.Add(-1)
-	var next, done atomic.Int64
-	var failed atomic.Bool
-	var firstErr error
-	var errOnce sync.Once
+	var done atomic.Int64
 	stop, stopped := make(chan struct{}), make(chan struct{})
 	ticker := time.NewTicker(progressEvery)
 	defer ticker.Stop()
@@ -66,33 +64,18 @@ func (s *Session) parallel(label string, n int, fn func(i int) error) error {
 			}
 		}
 	}()
-	var wg sync.WaitGroup
-	for range min(n, runtime.GOMAXPROCS(0)) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for !failed.Load() {
-				if s.canceled.Load() {
-					errOnce.Do(func() { firstErr = ErrCanceled })
-					failed.Store(true)
-					return
-				}
-				i := int(next.Add(1) - 1)
-				if i >= n {
-					return
-				}
-				if err := fn(i); err != nil {
-					errOnce.Do(func() { firstErr = err })
-					failed.Store(true)
-					return
-				}
-				done.Add(1)
-			}
-		}()
-	}
-	wg.Wait()
+	err := workpool.Run(n, func(i int) error {
+		if s.canceled.Load() {
+			return ErrCanceled
+		}
+		if err := fn(i); err != nil {
+			return err
+		}
+		done.Add(1)
+		return nil
+	})
 	close(stop)
 	<-stopped // events are never sent concurrently
 	s.notify(EventProgress, Progress{Label: label, Done: n, Total: n})
-	return firstErr
+	return err
 }

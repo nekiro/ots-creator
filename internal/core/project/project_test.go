@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/nekiro/ots-creator/internal/core/client"
-	"github.com/nekiro/ots-creator/internal/formats/obd"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/obd"
 )
 
 func v1098() client.Version {

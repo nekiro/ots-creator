@@ -128,10 +128,7 @@ func (im *importer) ground(brush *Brush, node *xmltree.Node) {
 		case "optional":
 			rule := &BorderRule{Align: "outer"}
 			if child.Has("ground_equivalent") {
-				inline := borderNode(child)
-				inline.ID = 0
-				inline.GroundEquivalent = child.U16("ground_equivalent")
-				rule.Inline = inline
+				rule.Inline = inlineBorder(child)
 			} else {
 				rule.Border = uint32(child.Int("id"))
 			}
@@ -148,10 +145,7 @@ func (im *importer) ground(brush *Brush, node *xmltree.Node) {
 			if child.Has("id") {
 				rule.Border = uint32(child.Int("id"))
 			} else if child.Has("ground_equivalent") {
-				inline := borderNode(child)
-				inline.ID = 0
-				inline.GroundEquivalent = child.U16("ground_equivalent")
-				rule.Inline = inline
+				rule.Inline = inlineBorder(child)
 			}
 			for _, specificNode := range child.Children {
 				if specificNode.Name == "specific" {
@@ -360,9 +354,13 @@ func alternative(node *xmltree.Node) Alternative {
 	return result
 }
 
-var tableAligns = map[string]string{
-	"north": "north", "south": "south", "east": "east", "west": "west",
-	"horizontal": "horizontal", "vertical": "vertical", "alone": "alone",
+// inlineBorder reads a border defined inside a ground brush: it has no id
+// and is keyed by the ground item it stands for.
+func inlineBorder(node *xmltree.Node) *Border {
+	inline := borderNode(node)
+	inline.ID = 0
+	inline.GroundEquivalent = node.U16("ground_equivalent")
+	return inline
 }
 
 func (im *importer) parts(brush *Brush, node *xmltree.Node) {
@@ -382,7 +380,7 @@ func (im *importer) parts(brush *Brush, node *xmltree.Node) {
 				im.warn("carpet %q: unknown alignment %q", brush.Name, align)
 				continue
 			}
-		} else if tableAligns[align] == "" {
+		} else if !slices.Contains(TableAlignments, align) {
 			im.warn("table %q: unknown alignment %q", brush.Name, align)
 			continue
 		}

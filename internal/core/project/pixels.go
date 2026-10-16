@@ -6,8 +6,8 @@ import (
 	"image"
 
 	"github.com/nekiro/ots-creator/internal/core/imaging"
-	"github.com/nekiro/ots-creator/internal/formats/spr"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/spr"
 )
 
 // ErrShiftCut is returned by ShiftPixels when visible pixels would be moved

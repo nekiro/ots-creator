@@ -102,11 +102,7 @@ func (m *Materials) AddRawItems(tilesetName string, items []uint16) {
 		tileset = &Tileset{Name: tilesetName}
 		m.Tilesets = append(m.Tilesets, tileset)
 	}
-	for _, id := range items {
-		if !slices.Contains(tileset.Raw, id) {
-			tileset.Raw = append(tileset.Raw, id)
-		}
-	}
+	tileset.Raw = appendMissingIDs(tileset.Raw, items)
 }
 
 // SaveCreature adds or replaces a creature type.

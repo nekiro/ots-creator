@@ -24,16 +24,16 @@
   let jump = $state("");
   let filter = $state("");
   // Ids matching the filter of the All tab; refreshed after every change.
-  let found = $state<number[] | null>(null);
+  let found = $state.raw<number[] | null>(null);
   $effect(() => {
-    const f = filter;
+    const searched = filter;
     void app.rev;
-    if (!f || mode !== "all" || !app.open) {
+    if (!searched || mode !== "all" || !app.open) {
       found = null;
       return;
     }
     let stale = false;
-    SpriteService.Find(f).then(
+    SpriteService.Find(searched).then(
       (ids) => !stale && (found = ids ?? []),
       (err) => toast(errorMessage(err), "error"),
     );
@@ -74,11 +74,11 @@
 
   function onJump(event: KeyboardEvent) {
     if (event.key !== "Enter") return;
-    const n = parseInt(jump, 10);
-    if (Number.isFinite(n) && n >= 1 && n <= total) {
+    const id = parseInt(jump, 10);
+    if (Number.isFinite(id) && id >= 1 && id <= total) {
       mode = "all";
       filter = "";
-      app.selectedSprites = [n];
+      app.selectedSprites = [id];
     }
   }
 
@@ -127,12 +127,12 @@
           {@const src = res.spritePng(id, versions.sprite(id))}
           <button
             class="spr"
-            class:sel={app.selectedSprites.includes(id)}
+            class:sel={app.selectedSpriteSet.has(id)}
             draggable="true"
             ondragstart={(event) => ondragstart(event, id)}
             onclick={(event) => pick(id, event)}
             oncontextmenu={(event) => {
-              if (!app.selectedSprites.includes(id)) app.selectedSprites = [id];
+              if (!app.selectedSpriteSet.has(id)) app.selectedSprites = [id];
               openContextMenu(event, spriteMenu(true));
             }}
             title="Sprite #{id}: drag onto a preview tile (a multi-selection fills the following slots)"

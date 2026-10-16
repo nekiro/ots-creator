@@ -2,11 +2,11 @@
   // Edits flags of several selected objects at once. Every flag starts as
   // "keep"; clicking cycles keep → on → off.
   import { CATEGORY_NAMES, ThingService, type PropsPatch } from "../lib/api";
-  import { buildPatch, FLAG_GROUPS, flagVisible, type Field } from "../lib/flags";
+  import { buildPatch, FLAG_GROUPS, flagMatches, flagVisible, type Field } from "../lib/flags";
   import { app, run, toast } from "../lib/state/app.svelte";
   import MiniWindow from "../lib/ui/MiniWindow.svelte";
-  import NumberField from "../lib/ui/NumberField.svelte";
-  import Select from "../lib/ui/Select.svelte";
+  import { plural } from "../lib/util/format";
+  import FlagFields from "./FlagFields.svelte";
 
   let states = $state<Record<string, boolean | undefined>>({});
   let values = $state<Record<string, number | string>>({});
@@ -23,79 +23,55 @@
   });
 
   function cycle(key: string) {
-    const cur = states[key];
-    states[key] = cur === undefined ? true : cur ? false : undefined;
+    const current = states[key];
+    states[key] = current === undefined ? true : current ? false : undefined;
   }
 
-  function matches(label: string, key: string) {
-    const q = filter.trim().toLowerCase();
-    return !q || label.toLowerCase().includes(q) || key.toLowerCase().includes(q);
+  function options(field: Field) {
+    return (field.options ?? []).map(([value, label]) => ({ value, label }));
   }
 
-  function options(fd: Field) {
-    return (fd.options ?? []).map(([value, label]) => ({ value, label }));
+  // Fields start at 0 (or empty text) until they are set.
+  function fieldValue(field: Field) {
+    if (field.kind === "text") return values[field.key] ?? "";
+    if (field.kind === "select") return values[field.key] ?? 0;
+    return Number(values[field.key] ?? 0);
   }
 
   async function apply() {
     const patch = buildPatch(states, values) as PropsPatch;
     const ids = [...app.selection];
-    const n = await run("Applying", () => ThingService.Patch(app.category, ids, patch));
-    if (n === undefined) return;
-    toast(`Updated ${n} of ${ids.length} ${CATEGORY_NAMES[app.category]}(s).`, "success");
+    const updated = await run("Applying", () => ThingService.Patch(app.category, ids, patch));
+    if (updated === undefined) return;
+    toast(`Updated ${updated} of ${ids.length} ${CATEGORY_NAMES[app.category]}(s).`, "success");
     states = {};
   }
 </script>
 
 <MiniWindow title="Edit {count} {CATEGORY_NAMES[app.category]}s" class="props">
   {#snippet actions()}
-    {#if changes}<span class="dirty">{changes} change{changes > 1 ? "s" : ""}</span>{/if}
+    {#if changes}<span class="dirty">{plural(changes, "change")}</span>{/if}
   {/snippet}
   <div class="scroll">
     <p class="t-label hint">Click a flag to set it on, again to set it off, a third time to keep each object's value.</p>
     <input class="t-input filter" placeholder="Filter flags…" bind:value={filter} />
-    {#each FLAG_GROUPS as grp}
-      {@const flags = grp.flags.filter((f) => f.key !== "hasBones" && flagVisible(f.key, app.category, false) && matches(f.label, f.key))}
+    {#each FLAG_GROUPS as flagGroup}
+      {@const flags = flagGroup.flags.filter((flag) => flag.key !== "hasBones" && flagVisible(flag.key, app.category, false) && flagMatches(filter, flag.label, flag.key))}
       {#if flags.length}
         <div class="group">
-          <div class="ghead">{grp.title}</div>
-          {#each flags as f}
-            {@const st = states[f.key]}
-            {@const supported = app.supported.has(f.key)}
+          <div class="ghead">{flagGroup.title}</div>
+          {#each flags as flag}
+            {@const setTo = states[flag.key]}
+            {@const supported = app.supported.has(flag.key)}
             <div class="flag" class:unsupported={!supported}>
-              <button class="row tri" onclick={() => cycle(f.key)} title={supported ? (f.hint ?? "") : `Not stored by ${app.project?.info.formatLabel} clients`}>
-                <span class="t-check box" class:on={st === true} class:keep={st === undefined}></span>
-                <span class:set={st !== undefined}>{f.label}</span>
+              <button class="row tri" onclick={() => cycle(flag.key)} title={supported ? (flag.hint ?? "") : `Not stored by ${app.project?.info.formatLabel} clients`}>
+                <span class="t-check box" class:on={setTo === true} class:keep={setTo === undefined}></span>
+                <span class:set={setTo !== undefined}>{flag.label}</span>
                 <span class="grow"></span>
-                {#if st === true}<span class="tag on">set on</span>{:else if st === false}<span class="tag off">set off</span>{/if}
+                {#if setTo === true}<span class="tag on">set on</span>{:else if setTo === false}<span class="tag off">set off</span>{/if}
               </button>
-              {#if st && f.fields}
-                <div class="fields">
-                  {#each f.fields as fd}
-                    <label class="row">
-                      <span class="t-label">{fd.label}</span>
-                      {#if fd.kind === "mask"}
-                        <span class="mask">
-                          {#each fd.options ?? [] as [bit, name]}
-                            <label class="row"
-                              ><input
-                                class="t-check"
-                                type="checkbox"
-                                checked={(Number(values[fd.key] ?? 0) & bit) !== 0}
-                                onchange={(event) => (values[fd.key] = event.currentTarget.checked ? Number(values[fd.key] ?? 0) | bit : Number(values[fd.key] ?? 0) & ~bit)}
-                              />{name}</label
-                            >
-                          {/each}
-                        </span>
-                      {:else if fd.kind === "select"}
-                        <Select grow value={values[fd.key] ?? 0} options={options(fd)} onchange={(value) => (values[fd.key] = value)} />
-                      {:else if fd.kind === "text"}
-                        <input class="t-input grow" value={values[fd.key] ?? ""} onchange={(event) => (values[fd.key] = event.currentTarget.value)} />
-                      {:else}
-                        <NumberField value={Number(values[fd.key] ?? 0)} min={fd.kind === "i16" ? -32768 : 0} max={fd.kind === "i16" ? 32767 : 65535} onchange={(value) => (values[fd.key] = value)} />
-                      {/if}
-                    </label>
-                  {/each}
-                </div>
+              {#if setTo && flag.fields}
+                <FlagFields fields={flag.fields} value={fieldValue} onset={(field, value) => (values[field.key] = value)} {options} />
               {/if}
             </div>
           {/each}
@@ -170,24 +146,10 @@
   .tag.off {
     color: #ff9c9c;
   }
-  .fields {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    margin: 3px 0 4px 18px;
-    padding-left: 6px;
-    border-left: 1px solid #4a4a4a;
-  }
-  .fields .t-label {
-    min-width: 54px;
-  }
+
   .apply {
     justify-content: flex-end;
     padding: 0 4px 2px;
   }
-  .mask {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2px 8px;
-  }
+
 </style>

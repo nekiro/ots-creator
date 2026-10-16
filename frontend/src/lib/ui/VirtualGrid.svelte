@@ -23,7 +23,7 @@
     onkeydown?: (event: KeyboardEvent, columns: number) => void;
   } = $props();
 
-  let el: HTMLDivElement;
+  let scroller: HTMLDivElement;
   let width = $state(0);
   let height = $state(0);
   let scrollTop = $state(0);
@@ -32,14 +32,14 @@
   // Spread the columns over the full width so no empty strip is left on the right.
   const step = $derived(columns > 1 ? Math.max(cellWidth + gap, (width - cellWidth) / (columns - 1)) : 0);
   const rows = $derived(Math.ceil(count / columns));
-  const rowH = $derived(cellHeight + gap);
-  const first = $derived(Math.max(0, Math.floor(scrollTop / rowH) - overscan));
-  const last = $derived(Math.min(rows - 1, Math.ceil((scrollTop + height) / rowH) + overscan));
+  const rowHeight = $derived(cellHeight + gap);
+  const first = $derived(Math.max(0, Math.floor(scrollTop / rowHeight) - overscan));
+  const last = $derived(Math.min(rows - 1, Math.ceil((scrollTop + height) / rowHeight) + overscan));
   const visible = $derived.by(() => {
     const out: number[] = [];
-    for (let r = first; r <= last; r++) {
-      for (let c = 0; c < columns; c++) {
-        const i = r * columns + c;
+    for (let row = first; row <= last; row++) {
+      for (let column = 0; column < columns; column++) {
+        const i = row * columns + column;
         if (i < count) out.push(i);
       }
     }
@@ -47,11 +47,11 @@
   });
 
   $effect(() => {
-    if (scrollTo == null || !el) return;
+    if (scrollTo == null || !scroller) return;
     const row = Math.floor(scrollTo / columns);
-    const top = row * rowH;
-    if (top < el.scrollTop) el.scrollTop = top;
-    else if (top + rowH > el.scrollTop + el.clientHeight) el.scrollTop = top + rowH - el.clientHeight;
+    const top = row * rowHeight;
+    if (top < scroller.scrollTop) scroller.scrollTop = top;
+    else if (top + rowHeight > scroller.scrollTop + scroller.clientHeight) scroller.scrollTop = top + rowHeight - scroller.clientHeight;
   });
 </script>
 
@@ -59,16 +59,16 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="vgrid"
-  bind:this={el}
+  bind:this={scroller}
   bind:clientWidth={width}
   bind:clientHeight={height}
-  onscroll={() => (scrollTop = el.scrollTop)}
+  onscroll={() => (scrollTop = scroller.scrollTop)}
   tabindex="0"
   onkeydown={(event) => onkeydown?.(event, columns)}
 >
-  <div class="spacer" style="height:{rows * rowH}px">
+  <div class="spacer" style="height:{rows * rowHeight}px">
     {#each visible as i (i)}
-      <div class="cell" style="transform:translate({Math.round((i % columns) * step)}px,{Math.floor(i / columns) * rowH}px);width:{cellWidth}px;height:{cellHeight}px">
+      <div class="cell" style="transform:translate({Math.round((i % columns) * step)}px,{Math.floor(i / columns) * rowHeight}px);width:{cellWidth}px;height:{cellHeight}px">
         {@render cell(i)}
       </div>
     {/each}

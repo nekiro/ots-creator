@@ -178,7 +178,7 @@ func (p *Project) ConvertFrameGroups(toGroups bool) ConvertResult {
 		label = "Merge outfit frame groups"
 	}
 	edit := p.record(label)
-	var res ConvertResult
+	var result ConvertResult
 	for _, current := range p.things.Things[thing.CategoryOutfit] {
 		if current == nil {
 			continue
@@ -188,17 +188,17 @@ func (p *Project) ConvertFrameGroups(toGroups bool) ConvertResult {
 			object = splitGroups(current)
 		} else if !toGroups && len(current.FrameGroups) > 1 {
 			if object = mergeGroups(current); object == nil {
-				res.Skipped++
+				result.Skipped++
 				continue
 			}
 		}
 		if object != nil {
 			edit.setThing(thing.CategoryOutfit, object.ID, object)
-			res.Converted++
+			result.Converted++
 		}
 	}
 	edit.commit()
-	return res
+	return result
 }
 
 // frameBlock returns the sprites of frames [from, to) of group.

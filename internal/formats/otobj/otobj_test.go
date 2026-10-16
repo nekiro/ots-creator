@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nekiro/ots-creator/internal/formats/obd"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/obd"
 )
 
 // sprite returns a 32x32 sprite with one pixel of color c at (i%32, i/32);

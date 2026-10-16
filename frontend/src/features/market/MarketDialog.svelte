@@ -12,6 +12,7 @@
   import { filterEntries, licenseLabel, sectionCounts, sectionOf, topTags, type MarketEntry, type MarketSort } from "../../lib/market";
   import { decodeObjectFile, type DecodedObject } from "../../lib/objectFile";
   import { nextIndex } from "../../lib/ui/listNav";
+  import { isTyping } from "../../lib/ui/typing";
   import { app, run, select, setCategory, toast } from "../../lib/state/app.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
@@ -121,33 +122,33 @@
   const sizeMismatch = $derived(!!selected && !!size && !!selected.spriteSize && selected.spriteSize !== size);
 
   async function importEntry() {
-    const e = selected;
-    if (!e || !app.open) return;
-    const r = await run(`Importing ${e.name}`, () => MarketService.Import(e.id));
-    if (!r) return;
-    if (r.kind === "sprites") {
-      toast(`Added ${r.sprites?.length ?? 0} sprite(s) from ${e.name}.`, "success");
-      if (r.sprites?.length) app.selectedSprites = [r.sprites[0]];
+    const entry = selected;
+    if (!entry || !app.open) return;
+    const imported = await run(`Importing ${entry.name}`, () => MarketService.Import(entry.id));
+    if (!imported) return;
+    if (imported.kind === "sprites") {
+      toast(`Added ${imported.sprites?.length ?? 0} sprite(s) from ${entry.name}.`, "success");
+      if (imported.sprites?.length) app.selectedSprites = [imported.sprites[0]];
       return;
     }
-    toast(`Imported ${e.name} as ${SECTION_NAMES[e.category ?? ""]?.toLowerCase()} #${r.id}.`, "success");
-    if (r.category !== app.category) await setCategory(r.category);
-    await select(r.id);
+    toast(`Imported ${entry.name} as ${SECTION_NAMES[entry.category ?? ""]?.toLowerCase()} #${imported.id}.`, "success");
+    if (imported.category !== app.category) await setCategory(imported.category);
+    await select(imported.id);
   }
 
   async function deleteEntry() {
-    const e = selected;
-    if (!e) return;
-    const own = (index?.mine ?? []).includes(e.id);
+    const entry = selected;
+    if (!entry) return;
+    const own = (index?.mine ?? []).includes(entry.id);
     const ok = await ask({
       title: "Delete from market",
-      message: own ? `Delete ${e.name} from the market? Everyone loses access to it.` : `Delete ${e.name} by ${e.author} as admin?`,
+      message: own ? `Delete ${entry.name} from the market? Everyone loses access to it.` : `Delete ${entry.name} by ${entry.author} as admin?`,
       ok: "Delete",
     });
     if (!ok) return;
-    const done = await run(`Deleting ${e.name}`, () => MarketService.Delete(e.id).then(() => true));
+    const done = await run(`Deleting ${entry.name}`, () => MarketService.Delete(entry.id).then(() => true));
     if (!done) return;
-    toast(`${e.name} was deleted from the market.`, "success");
+    toast(`${entry.name} was deleted from the market.`, "success");
     selectedId = "";
     await load(false);
   }
@@ -155,7 +156,7 @@
   function onkeydown(event: KeyboardEvent) {
     const current = filtered.findIndex((entry) => entry.id === selectedId);
     const next = nextIndex(event.key, current, filtered.length);
-    if (next === null || !filtered.length || (event.target as HTMLElement).closest("input")) return;
+    if (next === null || !filtered.length || isTyping(event)) return;
     event.preventDefault();
     selectedId = filtered[next].id;
   }
@@ -185,12 +186,12 @@
       <button class="t-icon-btn" title="Reload the market" disabled={loading} onclick={() => load(true)}><Icon name="refresh" /></button>
     </div>
 
-    <TagPicker value={tags} options={tagOptions} placeholder="Filter by tags…" onchange={(t) => (tags = t)} />
+    <TagPicker value={tags} options={tagOptions} placeholder="Filter by tags…" onchange={(picked) => (tags = picked)} />
 
     <div class="body">
       <div class="list t-panel">
         {#if loading && !index}
-          <div class="msg"><span class="spinner"></span>Loading the market…</div>
+          <div class="msg"><span class="t-spinner"></span>Loading the market…</div>
         {:else if error}
           <div class="msg col">
             <span class="err">{error}</span>
@@ -200,11 +201,11 @@
           <div class="msg t-label">{entries.length ? "Nothing matches the filters." : "Nothing here yet. Be the first to publish something!"}</div>
         {:else}
           <div class="grid">
-            {#each filtered.slice(0, shown) as e (e.id)}
-              <button class="card" class:on={e.id === selectedId} title={e.name} onclick={() => (selectedId = e.id)} ondblclick={importEntry}>
-                <span class="thumb checker"><img class="pixel" src={url(e.preview)} alt="" loading="lazy" /></span>
-                <span class="cname">{e.name}</span>
-                <span class="cmeta">{SECTION_NAMES[sectionOf(e)]}</span>
+            {#each filtered.slice(0, shown) as entry (entry.id)}
+              <button class="card" class:on={entry.id === selectedId} title={entry.name} onclick={() => (selectedId = entry.id)} ondblclick={importEntry}>
+                <span class="thumb checker"><img class="pixel" src={url(entry.preview)} alt="" loading="lazy" /></span>
+                <span class="cname">{entry.name}</span>
+                <span class="cmeta">{SECTION_NAMES[sectionOf(entry)]}</span>
               </button>
             {/each}
           </div>
@@ -225,7 +226,7 @@
               <span class="err">{previewError}</span>
             {:else}
               <img class="pixel big" src={url(selected.preview)} alt={selected.name} />
-              {#if previewLoading}<span class="spinner corner"></span>{/if}
+              {#if previewLoading}<span class="t-spinner corner"></span>{/if}
             {/if}
           </div>
           {#if loaded && (loaded.thing.frameGroups.length > 1 || isOutfit)}
@@ -251,7 +252,7 @@
           {#if selected.description}<p class="desc" title={selected.description}>{selected.description}</p>{/if}
           {#if selected.tags?.length}
             <div class="dtags">
-              {#each selected.tags as t}<button class="tag" class:on={tags.includes(t)} onclick={() => toggleTag(t)}>{t}</button>{/each}
+              {#each selected.tags as tag}<button class="tag" class:on={tags.includes(tag)} onclick={() => toggleTag(tag)}>{tag}</button>{/each}
             </div>
           {/if}
           <div class="info">
@@ -566,19 +567,5 @@
   .err {
     color: #ff9c9c;
     margin: 0;
-  }
-  .spinner {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    border: 2px solid rgba(232, 196, 106, 0.25);
-    border-top-color: var(--gold);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
   }
 </style>

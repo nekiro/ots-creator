@@ -1,5 +1,5 @@
 // Checks and dialog filters shared by the commands.
-import { formatSize } from "../api";
+import { formatSize } from "../util/format";
 import { ask } from "../confirm.svelte";
 import { prefs } from "../state/prefs.svelte";
 import { app, toast } from "../state/app.svelte";
@@ -9,6 +9,8 @@ export const OBJECT_FILTERS = [
   { name: "OTS Creator objects (*.otobj)", pattern: "*.otobj" },
   { name: "Object Builder Data (*.obd)", pattern: "*.obd" },
 ];
+
+export const OTB_FILTERS = [{ name: "Server items (items.otb)", pattern: "*.otb" }];
 
 export const IMAGE_FILTERS = [{ name: "Images (*.png, *.bmp, *.gif, *.jpg)", pattern: "*.png;*.bmp;*.gif;*.jpg;*.jpeg" }];
 

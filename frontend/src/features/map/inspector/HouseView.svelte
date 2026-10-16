@@ -7,42 +7,42 @@
   import Select from "../../../lib/ui/Select.svelte";
   import PosField from "./PosField.svelte";
 
-  let { house: h }: { house: HouseInfo } = $props();
-  const townOptions = $derived([{ value: 0, label: "None" }, ...(map.active ? towns() : []).map((t) => ({ value: t.id, label: t.name }))]);
-  const painting = $derived(isBrushActive({ kind: "house", house: h.id, label: "" }));
+  let { house }: { house: HouseInfo } = $props();
+  const townOptions = $derived([{ value: 0, label: "None" }, ...(map.active ? towns() : []).map((town) => ({ value: town.id, label: town.name }))]);
+  const painting = $derived(isBrushActive({ kind: "house", house: house.id, label: "" }));
 </script>
 
 <div class="m-form">
-  <div class="m-field"><span class="m-lbl">Name</span><input class="t-input" value={h.name} onchange={(event) => saveHouse({ ...h, name: event.currentTarget.value.trim() || h.name })} /></div>
+  <div class="m-field"><span class="m-lbl">Name</span><input class="t-input" value={house.name} onchange={(event) => saveHouse({ ...house, name: event.currentTarget.value.trim() || house.name })} /></div>
   <div class="m-field">
     <span class="m-lbl">Town</span>
-    <Select grow value={h.townId} options={townOptions} onchange={(value) => saveHouse({ ...h, townId: value })} />
-    {#if h.townId}<button class="t-btn sm" onclick={() => mapCommands.focus({ kind: "town", id: h.townId })}>Open</button>{/if}
+    <Select grow value={house.townId} options={townOptions} onchange={(value) => saveHouse({ ...house, townId: value })} />
+    {#if house.townId}<button class="t-btn sm" onclick={() => mapCommands.focus({ kind: "town", id: house.townId })}>Open</button>{/if}
   </div>
   <div class="m-field">
     <span class="m-lbl">Rent</span>
-    <NumberField value={h.rent} min={0} max={100000000} width={90} onchange={(value) => saveHouse({ ...h, rent: value })} />
-    <label class="row"><input class="t-check" type="checkbox" checked={h.guildhall} onchange={(event) => saveHouse({ ...h, guildhall: event.currentTarget.checked })} />Guildhall</label>
+    <NumberField value={house.rent} min={0} max={100000000} width={90} onchange={(value) => saveHouse({ ...house, rent: value })} />
+    <label class="row"><input class="t-check" type="checkbox" checked={house.guildhall} onchange={(event) => saveHouse({ ...house, guildhall: event.currentTarget.checked })} />Guildhall</label>
   </div>
-  <div class="m-field"><span class="m-lbl">Entrance</span><PosField value={h.exit} pickLabel="Click the tile in front of the door of {h.name}" onchange={(p) => saveHouse({ ...h, exit: p })} /></div>
-  <div class="m-field"><span class="m-lbl">Size</span><span>{h.size ? `${h.size} tiles` : "No tiles yet"}</span><span class="t-label">#{h.id}</span></div>
+  <div class="m-field"><span class="m-lbl">Entrance</span><PosField value={house.exit} pickLabel="Click the tile in front of the door of {house.name}" onchange={(position) => saveHouse({ ...house, exit: position })} /></div>
+  <div class="m-field"><span class="m-lbl">Size</span><span>{house.size ? `${house.size} tiles` : "No tiles yet"}</span><span class="t-label">#{house.id}</span></div>
 
   <div class="paint" class:on={painting}>
     {#if painting}
-      <span>Painting the tiles of {h.name}. <kbd>Ctrl</kbd> removes tiles, <kbd>Esc</kbd> stops.</span>
+      <span>Painting the tiles of {house.name}. <kbd>Ctrl</kbd> removes tiles, <kbd>Esc</kbd> stops.</span>
       <button class="t-btn sm" onclick={() => (map.tool = "select")}>Done</button>
     {:else}
       <span>Paint the floor of the house on the map.</span>
-      <button class="t-btn sm primary" onclick={() => paintHouse(h)}>Paint tiles</button>
+      <button class="t-btn sm primary" onclick={() => paintHouse(house)}>Paint tiles</button>
     {/if}
   </div>
 
   <div class="acts">
-    <button class="t-btn" onclick={() => goHouse(h)}>Go to</button>
-    <button class="t-btn" disabled={!h.size} onclick={() => selectHouseTiles(h)}>Select tiles</button>
-    <button class="t-btn" title="Click the tile in front of the door" onclick={() => selectBrush({ kind: "houseExit", house: h.id, label: `${h.name} entrance` })}>Place entrance</button>
+    <button class="t-btn" onclick={() => goHouse(house)}>Go to</button>
+    <button class="t-btn" disabled={!house.size} onclick={() => selectHouseTiles(house)}>Select tiles</button>
+    <button class="t-btn" title="Click the tile in front of the door" onclick={() => selectBrush({ kind: "houseExit", house: house.id, label: `${house.name} entrance` })}>Place entrance</button>
     <span class="grow"></span>
-    <button class="t-btn danger" onclick={() => removeHouse(h)}>Remove</button>
+    <button class="t-btn danger" onclick={() => removeHouse(house)}>Remove</button>
   </div>
 </div>
 

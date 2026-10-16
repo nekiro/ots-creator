@@ -21,8 +21,8 @@ export function thumbOffset(value: number, track: number, min: number, max: numb
 /** Value for a pointer at x (track coordinates), centred on the thumb. */
 export function valueAt(x: number, track: number, min: number, max: number): number {
   if (max <= min) return min;
-  const w = thumbWidth(track, min, max);
-  const free = track - w;
+  const thumb = thumbWidth(track, min, max);
+  const free = track - thumb;
   if (free <= 0) return min;
-  return clamp(Math.round(min + ((x - w / 2) / free) * (max - min)), min, max);
+  return clamp(Math.round(min + ((x - thumb / 2) / free) * (max - min)), min, max);
 }

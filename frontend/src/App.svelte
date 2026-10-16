@@ -90,8 +90,8 @@
       if (prefs.settings.reopenLast && last && !app.open) await commands.openRecent(last);
     })();
     const offClose = Events.On("app:close-requested", () => void commands.quit());
-    const offDrop = Events.On("app:files-dropped", (e: { data: FilesDropped | null }) =>
-      void commands.drop(e.data?.paths ?? [], e.data?.target ?? "", group),
+    const offDrop = Events.On("app:files-dropped", (event: { data: FilesDropped | null }) =>
+      void commands.drop(event.data?.paths ?? [], event.data?.target ?? "", group),
     );
     return () => {
       offClose();
@@ -144,13 +144,13 @@
             <div class="recent">
               <div class="t-label rtitle">Recent clients</div>
               <div class="t-panel rlist">
-                {#each recent as r (r.datPath)}
+                {#each recent as recentClient (recentClient.datPath)}
                   <div class="ritem">
-                    <button class="ropen" title={r.datPath} onclick={() => commands.openRecent(r)}>
-                      <span class="rver">{r.version.name}</span>
-                      <span class="rdir">{shortPath(recentDir(r), 44)}</span>
+                    <button class="ropen" title={recentClient.datPath} onclick={() => commands.openRecent(recentClient)}>
+                      <span class="rver">{recentClient.version.name}</span>
+                      <span class="rdir">{shortPath(recentDir(recentClient), 44)}</span>
                     </button>
-                    <button class="rdel" title="Remove from list" aria-label="Remove from list" onclick={() => removeRecent(r)}>×</button>
+                    <button class="rdel" title="Remove from list" aria-label="Remove from list" onclick={() => removeRecent(recentClient)}>×</button>
                   </div>
                 {/each}
               </div>

@@ -4,6 +4,7 @@
 // a ground hides the light of the floors under it. The map is multiplied by
 // it, stretched with linear filtering, so light fades from tile to tile.
 import { CHUNK, splitKey } from "../data/chunks";
+import { CLIENT_COLOR_RGB, clientColorOffset } from "../data/items";
 import { GEO_BLOCK, LIGHT_BYTES, type GeoChunk } from "./geo";
 
 /** Ambient light at or above this intensity is full daylight: nothing is darkened (client: LightView::isDark). */
@@ -17,8 +18,8 @@ const MIN_LIGHT = 0.01;
 
 /** The rgb of an 8-bit client color (a 6x6x6 cube) times brightness; colors 0 and from 216 are black (client: Color::from8bit). */
 export function lightColor(color: number, brightness = 1): [number, number, number] {
-  if (color <= 0 || color >= 216) return [0, 0, 0];
-  return [Math.trunc((Math.trunc(color / 36) % 6) * 51 * brightness), Math.trunc((Math.trunc(color / 6) % 6) * 51 * brightness), Math.trunc((color % 6) * 51 * brightness)];
+  const offset = clientColorOffset(color);
+  return [Math.trunc(CLIENT_COLOR_RGB[offset] * brightness), Math.trunc(CLIENT_COLOR_RGB[offset + 1] * brightness), Math.trunc(CLIENT_COLOR_RGB[offset + 2] * brightness)];
 }
 
 /** Intensity of the ambient light at an ambient level (0 to 100 %, client: minimum ambient light). */
@@ -98,7 +99,10 @@ export function buildLightMap(pixels: Uint8Array, grid: LightGrid, floors: Light
       for (let index = 0; index < chunk.lightCount; index++) {
         const offset = index * LIGHT_BYTES;
         const intensity = chunk.lights.getUint8(offset + 4);
-        const [red, green, blue] = lightColor(chunk.lights.getUint8(offset + 5));
+        const colorOffset = clientColorOffset(chunk.lights.getUint8(offset + 5));
+        const red = CLIENT_COLOR_RGB[colorOffset];
+        const green = CLIENT_COLOR_RGB[colorOffset + 1];
+        const blue = CLIENT_COLOR_RGB[colorOffset + 2];
         if (!intensity || !(red | green | blue)) continue;
         // The light in grid tiles; tile centers are at x + 0.5.
         const lightX = originX + chunk.lights.getInt16(offset, true) / spriteSize;

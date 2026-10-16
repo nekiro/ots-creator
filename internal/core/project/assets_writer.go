@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/nekiro/ots-creator/internal/core/imaging"
 	"github.com/nekiro/ots-creator/internal/formats/assets"
 )
 
@@ -56,9 +57,7 @@ func (w *assetWriter) resolve(pieces []uint32, tilesWide, tilesHigh int) (uint32
 			return 0, err
 		}
 		x, y := (tilesWide-1-pieceIndex%tilesWide)*tileSize, (tilesHigh-1-pieceIndex/tilesWide)*tileSize
-		for row := range tileSize {
-			copy(pixels[((y+row)*rowWidth+x)*4:((y+row)*rowWidth+x+tileSize)*4], piece[row*tileSize*4:(row+1)*tileSize*4])
-		}
+		imaging.CopyRect(pixels, rowWidth, x, y, piece, tileSize, 0, 0, tileSize, tileSize)
 	}
 	return w.add(spriteType, pixels).id, nil
 }
@@ -119,10 +118,7 @@ func (w *assetWriter) repack(base *assets.Catalog) ([]assets.Sheet, error) {
 				}
 				x, y, spriteWidth, spriteHeight := assets.SpriteRect(sheet.SpriteType, int(id-sheet.First))
 				pixels := make([]byte, spriteWidth*spriteHeight*4)
-				for row := range spriteHeight {
-					offset := ((y+row)*assets.SheetSize + x) * 4
-					copy(pixels[row*spriteWidth*4:(row+1)*spriteWidth*4], sheetPixels[offset:offset+spriteWidth*4])
-				}
+				imaging.CopyRect(pixels, spriteWidth, 0, 0, sheetPixels, assets.SheetSize, x, y, spriteWidth, spriteHeight)
 				w.repacked[id] = w.add(sheet.SpriteType, pixels)
 			}
 		}
@@ -253,10 +249,7 @@ func encodeSheet(sprites []*newSprite) ([]byte, assets.Sheet, error) {
 	spriteType := sprites[0].spriteType
 	for i, sprite := range sprites {
 		x, y, spriteWidth, spriteHeight := assets.SpriteRect(spriteType, i)
-		for row := range spriteHeight {
-			offset := ((y+row)*assets.SheetSize + x) * 4
-			copy(pixels[offset:offset+spriteWidth*4], sprite.pixels[row*spriteWidth*4:(row+1)*spriteWidth*4])
-		}
+		imaging.CopyRect(pixels, assets.SheetSize, x, y, sprite.pixels, spriteWidth, 0, 0, spriteWidth, spriteHeight)
 	}
 	data, err := assets.EncodeSheet(pixels)
 	if err != nil {

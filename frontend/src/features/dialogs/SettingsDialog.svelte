@@ -5,21 +5,21 @@
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Select from "../../lib/ui/Select.svelte";
 
-  const s = $derived(prefs.settings);
-  const recent = $derived(s.recent?.length ?? 0);
+  const settings = $derived(prefs.settings);
+  const recent = $derived(settings.recent?.length ?? 0);
 </script>
 
 <Dialog title="Settings" width={420} onclose={() => (app.dialog = null)}>
   <div class="col">
     <h4>Startup</h4>
-    <label class="row"><input class="t-check" type="checkbox" checked={s.checkUpdates} onchange={(event) => savePrefs({ checkUpdates: event.currentTarget.checked })} />Check for updates on startup</label>
-    <label class="row"><input class="t-check" type="checkbox" checked={s.reopenLast} onchange={(event) => savePrefs({ reopenLast: event.currentTarget.checked })} />Reopen the last client on startup</label>
+    <label class="row"><input class="t-check" type="checkbox" checked={settings.checkUpdates} onchange={(event) => savePrefs({ checkUpdates: event.currentTarget.checked })} />Check for updates on startup</label>
+    <label class="row"><input class="t-check" type="checkbox" checked={settings.reopenLast} onchange={(event) => savePrefs({ reopenLast: event.currentTarget.checked })} />Reopen the last client on startup</label>
 
     <h4>Layout</h4>
     <div class="row">
       <NumberField
         label="Objects per row"
-        value={s.listColumns}
+        value={settings.listColumns}
         min={LIST_COLUMNS.min}
         max={LIST_COLUMNS.max}
         width={40}
@@ -31,13 +31,13 @@
     <h4>Export</h4>
     <label class="row">
       <span class="t-label lbl">Image format</span>
-      <Select grow value={s.exportFormat} options={IMAGE_FORMATS} onchange={(value) => savePrefs({ exportFormat: value })} />
+      <Select grow value={settings.exportFormat} options={IMAGE_FORMATS} onchange={(value) => savePrefs({ exportFormat: value })} />
     </label>
     <label class="row" title="OTOBJ is readable and editable (JSON and PNG); OBD opens in ObjectBuilder">
       <span class="t-label lbl">Object files</span>
       <Select
         grow
-        value={s.objectFormat}
+        value={settings.objectFormat}
         options={[
           { value: "otobj", label: "OTOBJ (.otobj)" },
           { value: "obd", label: "ObjectBuilder (.obd)" },
@@ -49,7 +49,7 @@
       <span class="t-label lbl">Sheet background</span>
       <Select
         grow
-        value={s.sheetBackground}
+        value={settings.sheetBackground}
         options={[
           { value: "magenta", label: "Magenta (ObjectBuilder)" },
           { value: "transparent", label: "Transparent" },
@@ -67,7 +67,7 @@
         type="password"
         autocomplete="off"
         placeholder="Only for market moderators"
-        value={s.marketAdminToken}
+        value={settings.marketAdminToken}
         onchange={(event) => savePrefs({ marketAdminToken: event.currentTarget.value.trim() })}
       />
     </label>

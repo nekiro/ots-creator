@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nekiro/ots-creator/internal/formats/assets"
 	"github.com/nekiro/ots-creator/internal/core/client"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/assets"
 )
 
 // buildAssets converts a small dat project into an asset folder: one 1x1

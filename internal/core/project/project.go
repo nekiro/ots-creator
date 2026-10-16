@@ -13,11 +13,11 @@ import (
 
 	"github.com/nekiro/ots-creator/internal/fsutil"
 
-	"github.com/nekiro/ots-creator/internal/formats/assets"
 	"github.com/nekiro/ots-creator/internal/core/client"
+	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/assets"
 	"github.com/nekiro/ots-creator/internal/formats/dat"
 	"github.com/nekiro/ots-creator/internal/formats/spr"
-	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
 // ErrUnknownVersion is returned by Open when signatures match no known

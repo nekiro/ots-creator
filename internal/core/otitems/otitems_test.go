@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/nekiro/ots-creator/internal/core/thing"
 	"github.com/nekiro/ots-creator/internal/formats/itemsotb"
 	"github.com/nekiro/ots-creator/internal/formats/otbnode"
-	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
 // writeOTB builds a minimal items.otb with the given items.

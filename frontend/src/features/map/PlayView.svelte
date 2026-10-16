@@ -23,6 +23,7 @@
   import { Category } from "../../lib/api";
   import NumberField from "../../lib/ui/NumberField.svelte";
   import Slider from "../../lib/ui/Slider.svelte";
+  import { isTyping } from "../../lib/ui/typing";
   import ColorPicker from "../ColorPicker.svelte";
   import ItemIcon from "./ItemIcon.svelte";
 
@@ -122,7 +123,7 @@
     if (look === undefined) return;
     prefetched.add(lookType);
     if (!look) return;
-    void spriteCache.load([...look.s, ...(look.mv?.s ?? [])]).then(requestDraw);
+    void spriteCache.load([...look.sprites, ...(look.moving?.sprites ?? [])]).then(requestDraw);
   }
 
   /** Walk phases of the feet of the outfit, or of the mount when mounted (Creature::getFootAnimPhases). */
@@ -130,8 +131,8 @@
     const lookType = mountLook() || playerSettings.lookType;
     const look = looks.outfits.get(lookType);
     if (!look) return 0;
-    if (look.mv) return look.mv.f;
-    return look.f > 2 ? look.f - 1 : look.f;
+    if (look.moving) return look.moving.frames;
+    return look.frames > 2 ? look.frames - 1 : look.frames;
   }
 
   function draw() {
@@ -223,13 +224,8 @@
     Numpad7: Direction.northWest,
   };
 
-  function typing(event: KeyboardEvent): boolean {
-    const target = event.target as HTMLElement | null;
-    return !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
-  }
-
   function onkeydown(event: KeyboardEvent) {
-    if (typing(event)) return;
+    if (isTyping(event)) return;
     if (event.key === "Escape") {
       event.preventDefault();
       if (settingsOpen) settingsOpen = false;

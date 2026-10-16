@@ -10,25 +10,25 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/nekiro/ots-creator/internal/core/thing"
 	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
-	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
 func TestGeoChunk(t *testing.T) {
 	ms, s := mapTestService(t)
-	p, _ := s.Project()
+	proj, _ := s.Project()
 	px := make([]byte, 32*32*4)
 	for i := 0; i < len(px); i += 4 {
 		px[i], px[i+3] = 200, 255
 	}
-	ids, err := p.AddSprites([][]byte{px})
+	ids, err := proj.AddSprites([][]byte{px})
 	if err != nil {
 		t.Fatal(err)
 	}
-	g, _ := p.Thing(thing.CategoryItem, 100)
+	g, _ := proj.Thing(thing.CategoryItem, 100)
 	g.FrameGroups[0].Sprites[0] = ids[0]
-	if err := p.UpdateThing(g); err != nil {
+	if err := proj.UpdateThing(g); err != nil {
 		t.Fatal(err)
 	}
 	info, err := ms.NewMap(NewMapOptions{Width: 256, Height: 256})

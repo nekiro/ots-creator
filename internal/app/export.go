@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
-	"github.com/nekiro/ots-creator/internal/fsutil"
 	"github.com/nekiro/ots-creator/internal/core/imaging"
 	"github.com/nekiro/ots-creator/internal/core/project"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/fsutil"
 )
 
 // maxSheetSprites is the most sprites ExportAllSheets puts in one sheet.
@@ -30,7 +30,7 @@ type ExportSummary struct {
 // (ObjectOTOBJ or ObjectOBD). With skipEmpty objects without visible
 // sprites are left out.
 func (ts *ThingService) ExportAll(dir string, skipEmpty bool, format string) (ExportSummary, error) {
-	p, err := ts.session.Project()
+	proj, err := ts.session.Project()
 	if err != nil {
 		return ExportSummary{}, err
 	}
@@ -45,11 +45,11 @@ func (ts *ThingService) ExportAll(dir string, skipEmpty bool, format string) (Ex
 	var jobs []job
 	total := 0
 	for _, category := range thing.Categories {
-		ids, err := p.FindThings(category, project.Filter{Content: content})
+		ids, err := proj.FindThings(category, project.Filter{Content: content})
 		if err != nil {
 			return ExportSummary{}, err
 		}
-		all, _ := p.FindThings(category, project.Filter{})
+		all, _ := proj.FindThings(category, project.Filter{})
 		total += len(all)
 		if len(ids) == 0 {
 			continue
@@ -63,7 +63,7 @@ func (ts *ThingService) ExportAll(dir string, skipEmpty bool, format string) (Ex
 	}
 	err = ts.session.parallel("Exporting objects", len(jobs), func(i int) error {
 		next := jobs[i]
-		_, err := exportObject(p, next.category, next.id, filepath.Join(dir, categoryFolder(next.category)), format)
+		_, err := exportObject(proj, next.category, next.id, filepath.Join(dir, categoryFolder(next.category)), format)
 		return err
 	})
 	return ExportSummary{Files: len(jobs), Skipped: total - len(jobs)}, err
@@ -75,30 +75,23 @@ func categoryFolder(category thing.Category) string { return category.String() +
 // With skipEmpty fully transparent sprites are left out.
 func (ss *SpriteService) ExportAll(dir, format string, skipEmpty bool) (ExportSummary, error) {
 	format = imaging.FormatOf("x." + format)
-	p, err := ss.session.Project()
+	proj, err := ss.session.Project()
 	if err != nil {
 		return ExportSummary{}, err
 	}
-	spriteCount := int(p.Info().Counts.Sprites)
-	size := p.SpriteSize()
+	spriteCount := int(proj.Info().Counts.Sprites)
+	size := proj.SpriteSize()
 	var skipped atomic.Int64
 	err = ss.session.parallel("Exporting sprites", spriteCount, func(i int) error {
 		id := uint32(i + 1)
 		if skipEmpty {
-			if empty, err := p.IsSpriteEmpty(id); err != nil || empty {
+			if empty, err := proj.IsSpriteEmpty(id); err != nil || empty {
 				skipped.Add(1)
 				return err
 			}
 		}
-		pixels, err := p.SpritePixels(id)
-		if err != nil {
-			return err
-		}
-		data, err := imaging.Encode(spriteImage(pixels, size), format, imaging.Magenta)
-		if err != nil {
-			return err
-		}
-		return os.WriteFile(filepath.Join(dir, fmt.Sprintf("%d.%s", id, format)), data, fsutil.FileMode)
+		_, err := writeSpriteFile(proj, id, size, dir, format)
+		return err
 	})
 	return ExportSummary{Files: spriteCount - int(skipped.Load()), Skipped: int(skipped.Load())}, err
 }
@@ -113,12 +106,12 @@ func (ss *SpriteService) ExportAllSheets(dir, format string, columns, rows int, 
 	if columns < 1 || rows < 1 || columns*rows > maxSheetSprites {
 		return ExportSummary{}, fmt.Errorf("a sheet holds 1 to %d sprites, not %d x %d", maxSheetSprites, columns, rows)
 	}
-	p, err := ss.session.Project()
+	proj, err := ss.session.Project()
 	if err != nil {
 		return ExportSummary{}, err
 	}
-	spriteCount := int(p.Info().Counts.Sprites)
-	size := p.SpriteSize()
+	spriteCount := int(proj.Info().Counts.Sprites)
+	size := proj.SpriteSize()
 	perSheet := columns * rows
 	sheets := (spriteCount + perSheet - 1) / perSheet
 	background := imaging.Magenta
@@ -133,7 +126,7 @@ func (ss *SpriteService) ExportAllSheets(dir, format string, columns, rows int, 
 		img := image.NewNRGBA(image.Rect(0, 0, columns*size, usedRows*size))
 		draw.Draw(img, img.Rect, &image.Uniform{C: background}, image.Point{}, draw.Src)
 		for id := first; id <= last; id++ {
-			pixels, err := p.SpritePixels(uint32(id))
+			pixels, err := proj.SpritePixels(uint32(id))
 			if err != nil {
 				return err
 			}

@@ -31,7 +31,7 @@
     placeholder?: string;
   } = $props();
 
-  const ITEM_H = 20;
+  const ITEM_HEIGHT = 20;
   const MAX_ITEMS = 10;
 
   let query = $state("");
@@ -45,24 +45,24 @@
   const full = $derived(max > 0 && value.length >= max);
   const matches = $derived.by(() => {
     if (!plain) return matchTags(options, query, value);
-    const q = query.trim().toLowerCase();
-    const free = options.filter((o) => !value.includes(o.tag));
-    return q ? free.filter((o) => o.tag.toLowerCase().includes(q)) : free;
+    const search = query.trim().toLowerCase();
+    const free = options.filter((option) => !value.includes(option.tag));
+    return search ? free.filter((option) => option.tag.toLowerCase().includes(search)) : free;
   });
   // A typed tag that is not offered can be added as is.
   const custom = $derived.by(() => {
     if (!allowCustom) return "";
-    const t = plain ? query.trim() : (parseTags(query)[0] ?? "");
-    const same = (x: string) => (plain ? x.toLowerCase() === t.toLowerCase() : x === t);
-    return t && !value.some(same) && !matches.some((m) => same(m.tag)) ? t : "";
+    const typed = plain ? query.trim() : (parseTags(query)[0] ?? "");
+    const same = (candidate: string) => (plain ? candidate.toLowerCase() === typed.toLowerCase() : candidate === typed);
+    return typed && !value.some(same) && !matches.some((match) => same(match.tag)) ? typed : "";
   });
   type Row = { tag: string; count?: number; header?: string; custom?: boolean };
   const rows = $derived.by((): Row[] => {
     const out: Row[] = [];
     let group: string | undefined;
-    for (const m of matches) {
-      out.push({ tag: m.tag, count: m.count, header: m.group && m.group !== group ? m.group : undefined });
-      group = m.group;
+    for (const match of matches) {
+      out.push({ tag: match.tag, count: match.count, header: match.group && match.group !== group ? match.group : undefined });
+      group = match.group;
     }
     // Last, so Enter takes the best match; alone when nothing matches.
     if (custom) out.push({ tag: custom, custom: true, header: matches.length ? (plain ? "New" : "Your tag") : undefined });
@@ -70,11 +70,11 @@
   });
 
   function place() {
-    const b = field.getBoundingClientRect();
-    const r = { left: toCss(b.left), top: toCss(b.top), bottom: toCss(b.bottom), width: toCss(b.width) };
-    const h = MAX_ITEMS * ITEM_H + 4;
-    const up = r.bottom + h > toCss(window.innerHeight) - 4 && r.top - h > 4;
-    rect = { left: r.left, top: up ? r.top - h : r.bottom, width: r.width };
+    const bounds = field.getBoundingClientRect();
+    const fieldRect = { left: toCss(bounds.left), top: toCss(bounds.top), bottom: toCss(bounds.bottom), width: toCss(bounds.width) };
+    const popupHeight = MAX_ITEMS * ITEM_HEIGHT + 4;
+    const up = fieldRect.bottom + popupHeight > toCss(window.innerHeight) - 4 && fieldRect.top - popupHeight > 4;
+    rect = { left: fieldRect.left, top: up ? fieldRect.top - popupHeight : fieldRect.bottom, width: fieldRect.width };
   }
 
   async function show() {
@@ -96,7 +96,7 @@
   }
 
   function remove(tag: string) {
-    onchange(value.filter((t) => t !== tag));
+    onchange(value.filter((other) => other !== tag));
     input?.focus();
   }
 
@@ -135,8 +135,8 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 <div class="field t-input" class:on={open} bind:this={field} onclick={() => input.focus()}>
-  {#each value as t (t)}
-    <span class="chip">{t}<button type="button" class="x" title="Remove {t}" onclick={(event) => (event.stopPropagation(), remove(t))}>×</button></span>
+  {#each value as tag (tag)}
+    <span class="chip">{tag}<button type="button" class="x" title="Remove {tag}" onclick={(event) => (event.stopPropagation(), remove(tag))}>×</button></span>
   {/each}
   <input
     bind:this={input}
@@ -150,9 +150,9 @@
 </div>
 
 {#if open && rows.length}
-  <div bind:this={list} use:portal class="popup t-popup" role="listbox" style="left:{rect.left}px;top:{rect.top}px;width:{rect.width}px;max-height:{MAX_ITEMS * ITEM_H + 4}px">
-    {#each rows as r, i (r.custom ? "+" + r.tag : r.tag)}
-      {#if r.header}<div class="header">{r.header}</div>{/if}
+  <div bind:this={list} use:portal class="popup t-popup" role="listbox" style="left:{rect.left}px;top:{rect.top}px;width:{rect.width}px;max-height:{MAX_ITEMS * ITEM_HEIGHT + 4}px">
+    {#each rows as row, i (row.custom ? "+" + row.tag : row.tag)}
+      {#if row.header}<div class="header">{row.header}</div>{/if}
       <div
         class="item"
         class:active={i === active}
@@ -162,11 +162,11 @@
         data-i={i}
         onmouseenter={() => (active = i)}
         onmousedown={(event) => event.preventDefault()}
-        onclick={() => add(r.tag)}
+        onclick={() => add(row.tag)}
         onkeydown={() => {}}
       >
-        <span>{#if r.custom}<span class="dim">Add&nbsp;</span>{/if}{r.tag}</span>
-        {#if r.count !== undefined}<span class="count">{r.count}</span>{/if}
+        <span>{#if row.custom}<span class="dim">Add&nbsp;</span>{/if}{row.tag}</span>
+        {#if row.count !== undefined}<span class="count">{row.count}</span>{/if}
       </div>
     {/each}
   </div>

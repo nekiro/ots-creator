@@ -103,14 +103,14 @@ func firstDuplicate(items []otmap.Item) (otmap.Item, bool) {
 // matchFindItem reports whether an item matches the query and returns
 // the matched attribute. lowerName is the trimmed lower-case query name.
 func (e *Editor) matchFindItem(query FindQuery, lowerName string, item *otmap.Item) (bool, string) {
-	typ := e.itemType(item.ID)
+	itemType := e.itemType(item.ID)
 	switch {
 	case len(query.IDs) > 0:
 		if !slices.Contains(query.IDs, item.ID) {
 			return false, ""
 		}
 	case lowerName != "":
-		if typ == nil || !strings.Contains(strings.ToLower(typ.Name), lowerName) {
+		if itemType == nil || !strings.Contains(strings.ToLower(itemType.Name), lowerName) {
 			return false, ""
 		}
 	}
@@ -120,7 +120,7 @@ func (e *Editor) matchFindItem(query FindQuery, lowerName string, item *otmap.It
 	if query.UniqueID != 0 && item.UniqueID() != query.UniqueID {
 		return false, ""
 	}
-	ok, detail := findKindDetail(query.Kind, typ, item)
+	ok, detail := findKindDetail(query.Kind, itemType, item)
 	if !ok {
 		return false, ""
 	}
@@ -132,7 +132,7 @@ func (e *Editor) matchFindItem(query FindQuery, lowerName string, item *otmap.It
 
 // findKindDetail checks an item against a FindQuery kind and returns the
 // detail text for that kind (empty when there is nothing to show).
-func findKindDetail(kind string, typ *otitems.Type, item *otmap.Item) (bool, string) {
+func findKindDetail(kind string, itemType *otitems.Type, item *otmap.Item) (bool, string) {
 	switch kind {
 	case "unique":
 		if item.UniqueID() == 0 {
@@ -145,7 +145,7 @@ func findKindDetail(kind string, typ *otitems.Type, item *otmap.Item) (bool, str
 		}
 		return true, "aid " + strconv.Itoa(int(item.ActionID()))
 	case "container":
-		if typ == nil || !typ.IsContainer() {
+		if itemType == nil || !itemType.IsContainer() {
 			return false, ""
 		}
 		contentCount := 0
@@ -154,7 +154,7 @@ func findKindDetail(kind string, typ *otitems.Type, item *otmap.Item) (bool, str
 		}
 		return true, strconv.Itoa(contentCount) + " items"
 	case "writeable":
-		if typ == nil || !(typ.Flags.Has(otitems.FlagWritable) || typ.Flags.Has(otitems.FlagReadable)) {
+		if itemType == nil || !(itemType.Flags.Has(otitems.FlagWritable) || itemType.Flags.Has(otitems.FlagReadable)) {
 			return false, ""
 		}
 		if item.Ext != nil && item.Ext.Text != "" {
@@ -167,7 +167,7 @@ func findKindDetail(kind string, typ *otitems.Type, item *otmap.Item) (bool, str
 		dest := item.Ext.Dest
 		return true, fmt.Sprintf("to %d, %d, %d", dest.X, dest.Y, dest.Z)
 	case "door":
-		if typ == nil || !typ.IsDoor() {
+		if itemType == nil || !itemType.IsDoor() {
 			return false, ""
 		}
 		if item.Ext != nil && item.Ext.DoorID != 0 {
@@ -185,8 +185,8 @@ func truncate(text string, maxLen int) string {
 }
 
 func (e *Editor) name(id uint16) string {
-	if typ := e.itemType(id); typ != nil {
-		return typ.DisplayName()
+	if itemType := e.itemType(id); itemType != nil {
+		return itemType.DisplayName()
 	}
 	return "unknown item " + strconv.Itoa(int(id))
 }
@@ -240,7 +240,8 @@ func (e *Editor) rewriteItems(label string, inSelection bool, fn func(items []ot
 		if editTile.Ground.ID == 0 {
 			editTile.Ground = otmap.Item{}
 		}
-		editTile.Items = slices.DeleteFunc(slices.Clone(rewritten[1:]), func(item otmap.Item) bool { return item.ID == 0 })
+		// rewritten is a new list (items is built above), so it is reused.
+		editTile.Items = slices.DeleteFunc(rewritten[1:], func(item otmap.Item) bool { return item.ID == 0 })
 	})
 	tx.Commit()
 	return count
@@ -302,8 +303,8 @@ func (e *Editor) removeItemsWhere(label string, inSelection bool, shouldRemove f
 // RemoveCorpses removes corpse items.
 func (e *Editor) RemoveCorpses(inSelection bool) int {
 	return e.removeItemsWhere("Remove corpses", inSelection, func(item otmap.Item) bool {
-		typ := e.itemType(item.ID)
-		return typ != nil && typ.Flags.Has(otitems.FlagCorpse) && !item.Complex()
+		itemType := e.itemType(item.ID)
+		return itemType != nil && itemType.Flags.Has(otitems.FlagCorpse) && !item.Complex()
 	})
 }
 
@@ -353,7 +354,7 @@ func (e *Editor) RemoveEmptySpawns() int {
 		npc bool
 	}
 	var empty []spawnRef
-	e.Map.Each(func(pos otmap.Position, tile *otmap.Tile) {
+	e.Map.EachStored(func(pos otmap.Position, tile *otmap.Tile) {
 		for _, npc := range []bool{false, true} {
 			spawn := tile.Spawn()
 			if npc {
@@ -395,7 +396,7 @@ func (e *Editor) RemoveEmptySpawns() int {
 func (e *Editor) ClearInvalidHouses() int {
 	tx := e.Begin("Clear invalid houses", 0)
 	cleared := 0
-	e.Map.Each(func(pos otmap.Position, tile *otmap.Tile) {
+	e.Map.EachStored(func(pos otmap.Position, tile *otmap.Tile) {
 		if tile.HouseID != 0 && e.Map.Houses[tile.HouseID] == nil {
 			editTile := tx.Edit(pos)
 			editTile.HouseID = 0
@@ -423,18 +424,30 @@ func (e *Editor) allTilePositions() []otmap.Position {
 
 // BorderizeMap redoes all borders and walls.
 func (e *Editor) BorderizeMap() int {
-	tx := e.Begin("Borderize map", 0)
-	for _, pos := range e.allTilePositions() {
-		e.reborder(tx, pos, true)
-		e.wallize(tx, pos)
-	}
-	return tx.Commit()
+	return e.borderizePositions("Borderize map", e.allTilePositions())
 }
 
 // RandomizeMap rerolls all grounds.
 func (e *Editor) RandomizeMap() int {
-	tx := e.Begin("Randomize map", 0)
-	for _, pos := range e.allTilePositions() {
+	return e.randomizePositions("Randomize map", e.allTilePositions())
+}
+
+// borderizePositions redoes borders and walls of the tiles at positions as
+// one undo step.
+func (e *Editor) borderizePositions(label string, positions []otmap.Position) int {
+	tx := e.Begin(label, 0)
+	for _, pos := range positions {
+		e.reborder(tx, pos, true)
+		e.fitWalls(tx, pos)
+	}
+	return tx.Commit()
+}
+
+// randomizePositions rerolls the grounds of the tiles at positions as one
+// undo step.
+func (e *Editor) randomizePositions(label string, positions []otmap.Position) int {
+	tx := e.Begin(label, 0)
+	for _, pos := range positions {
 		e.randomize(tx, pos)
 	}
 	return tx.Commit()
@@ -528,7 +541,7 @@ func (e *Editor) countItemStats(stats *Statistics, items []otmap.Item, nested bo
 		if item.Ext != nil && item.Ext.Dest != nil {
 			stats.Teleports++
 		}
-		if typ := e.itemType(item.ID); typ != nil && typ.IsContainer() {
+		if itemType := e.itemType(item.ID); itemType != nil && itemType.IsContainer() {
 			stats.Containers++
 		}
 		if item.Ext != nil {
@@ -690,7 +703,7 @@ func (e *Editor) AddToContainer(ref ItemRef, id uint16) error {
 	if err != nil {
 		return err
 	}
-	if typ := e.itemType(container.ID); typ == nil || !typ.IsContainer() {
+	if itemType := e.itemType(container.ID); itemType == nil || !itemType.IsContainer() {
 		return errors.New("the item is not a container")
 	}
 	ext := container.Ensure()
@@ -736,11 +749,11 @@ func (e *Editor) RotateItem(ref ItemRef) error {
 	if err != nil {
 		return err
 	}
-	typ := e.itemType(item.ID)
-	if typ == nil || typ.RotateTo == 0 {
+	itemType := e.itemType(item.ID)
+	if itemType == nil || itemType.RotateTo == 0 {
 		return errors.New("the item cannot be rotated")
 	}
-	item.ID = typ.RotateTo
+	item.ID = itemType.RotateTo
 	return nil
 }
 

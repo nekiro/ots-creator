@@ -11,10 +11,10 @@ import (
 
 	"github.com/ulikunitz/xz/lzma"
 
-	"github.com/nekiro/ots-creator/internal/formats/binio"
 	"github.com/nekiro/ots-creator/internal/core/client"
-	"github.com/nekiro/ots-creator/internal/formats/dat"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/binio"
+	"github.com/nekiro/ots-creator/internal/formats/dat"
 )
 
 // Format versions as stored in the file.
@@ -93,18 +93,9 @@ func decodeV1(reader *binio.Reader) (*Data, error) {
 	if err := dat.ReadLayout(reader, group, true, false, category.DefaultDuration()); err != nil {
 		return nil, err
 	}
-	sprites := make([]Sprite, len(group.Sprites))
-	for i := range sprites {
-		group.Sprites[i] = reader.U32()
-		length := int(reader.U32())
-		if reader.Err() != nil {
-			return nil, reader.Err()
-		}
-		pixels, err := readARGB(reader, length, data)
-		if err != nil {
-			return nil, fmt.Errorf("sprite %d: %w", i, err)
-		}
-		sprites[i] = Sprite{ID: group.Sprites[i], Pixels: pixels}
+	sprites, err := readSprites(reader, group, data, true, "")
+	if err != nil {
+		return nil, err
 	}
 	object.FrameGroups = []*thing.FrameGroup{group}
 	data.Thing = object
@@ -136,27 +127,38 @@ func decodeV23(reader *binio.Reader, version int) (*Data, error) {
 		if err := dat.ReadLayout(reader, group, true, true, category.DefaultDuration()); err != nil {
 			return nil, err
 		}
-		sprites := make([]Sprite, len(group.Sprites))
-		for i := range sprites {
-			group.Sprites[i] = reader.U32()
-			length := data.SpriteSize * data.SpriteSize * 4
-			if version == Version3 {
-				length = int(reader.U32())
-			}
-			if reader.Err() != nil {
-				return nil, reader.Err()
-			}
-			pixels, err := readARGB(reader, length, data)
-			if err != nil {
-				return nil, fmt.Errorf("group %d sprite %d: %w", groupIndex, i, err)
-			}
-			sprites[i] = Sprite{ID: group.Sprites[i], Pixels: pixels}
+		sprites, err := readSprites(reader, group, data, version == Version3, fmt.Sprintf("group %d ", groupIndex))
+		if err != nil {
+			return nil, err
 		}
 		object.FrameGroups = append(object.FrameGroups, group)
 		data.Sprites = append(data.Sprites, sprites)
 	}
 	data.Thing = object
 	return data, reader.Err()
+}
+
+// readSprites reads the id and pixels of every sprite slot of group. With
+// withLength every sprite stores its pixel length, otherwise it has the
+// sprite size of data. errorPrefix names the group in errors.
+func readSprites(reader *binio.Reader, group *thing.FrameGroup, data *Data, withLength bool, errorPrefix string) ([]Sprite, error) {
+	sprites := make([]Sprite, len(group.Sprites))
+	for i := range sprites {
+		group.Sprites[i] = reader.U32()
+		length := data.SpriteSize * data.SpriteSize * 4
+		if withLength {
+			length = int(reader.U32())
+		}
+		if reader.Err() != nil {
+			return nil, reader.Err()
+		}
+		pixels, err := readARGB(reader, length, data)
+		if err != nil {
+			return nil, fmt.Errorf("%ssprite %d: %w", errorPrefix, i, err)
+		}
+		sprites[i] = Sprite{ID: group.Sprites[i], Pixels: pixels}
+	}
+	return sprites, nil
 }
 
 // readARGB reads n bytes of ARGB pixels and returns RGBA. The first sprite
@@ -185,7 +187,7 @@ func readARGB(reader *binio.Reader, length int, data *Data) ([]byte, error) {
 	return out, nil
 }
 
-// Encode serializes and compresses data with d.Version.
+// Encode serializes and compresses data with data.Version.
 func Encode(data *Data) ([]byte, error) {
 	raw, err := EncodeRaw(data)
 	if err != nil {
@@ -233,11 +235,7 @@ func EncodeRaw(data *Data) ([]byte, error) {
 	}
 	for groupIndex, group := range groups {
 		if data.Version == Version3 && object.Category == thing.CategoryOutfit {
-			groupType := uint8(groupIndex)
-			if len(groups) < 2 {
-				groupType = 1
-			}
-			writer.U8(groupType)
+			writer.U8(dat.GroupType(groupIndex, len(groups)))
 		}
 		if err := dat.WriteLayout(writer, group, true, data.Version != Version1); err != nil {
 			return nil, err

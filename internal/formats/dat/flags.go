@@ -3,8 +3,8 @@ package dat
 import (
 	"fmt"
 
-	"github.com/nekiro/ots-creator/internal/formats/binio"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/binio"
 )
 
 // attr is a version-independent flag identifier.

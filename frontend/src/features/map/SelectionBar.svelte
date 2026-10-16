@@ -5,15 +5,16 @@
   import { mapCommands } from "../../lib/map/view/commands";
   import { edit, map } from "../../lib/map/state.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
+  import { plural } from "../../lib/util/format";
 
-  const n = $derived(map.active?.selection ?? 0);
-  const a = $derived(map.active);
-  const size = $derived(a && n ? `${a.selMax.x - a.selMin.x + 1}×${a.selMax.y - a.selMin.y + 1}${a.selMin.z !== a.selMax.z ? ` · floors ${a.selMin.z}-${a.selMax.z}` : ""}` : "");
+  const selectedCount = $derived(map.active?.selection ?? 0);
+  const activeMap = $derived(map.active);
+  const size = $derived(activeMap && selectedCount ? `${activeMap.selMax.x - activeMap.selMin.x + 1}×${activeMap.selMax.y - activeMap.selMin.y + 1}${activeMap.selMin.z !== activeMap.selMax.z ? ` · floors ${activeMap.selMin.z}-${activeMap.selMax.z}` : ""}` : "");
 </script>
 
-{#if n && !map.pasting && !map.pick}
+{#if selectedCount && !map.pasting && !map.pick}
   <div class="bar" role="toolbar" aria-label="Selection">
-    <span class="count" title={size}>{n.toLocaleString()} tile{n === 1 ? "" : "s"}</span>
+    <span class="count" title={size}>{plural(selectedCount, "tile")}</span>
     <span class="sep"></span>
     <button title="Copy (Ctrl+C)" onclick={mapCommands.copy}><Icon name="copy" /></button>
     <button title="Cut (Ctrl+X)" onclick={mapCommands.cut}><Icon name="replace" /></button>

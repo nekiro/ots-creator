@@ -15,10 +15,10 @@ import (
 	"time"
 
 	"github.com/nekiro/ots-creator/internal/core/imaging"
-	"github.com/nekiro/ots-creator/internal/market"
-	"github.com/nekiro/ots-creator/internal/formats/obd"
-	"github.com/nekiro/ots-creator/internal/settings"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/obd"
+	"github.com/nekiro/ots-creator/internal/market"
+	"github.com/nekiro/ots-creator/internal/settings"
 )
 
 // Market endpoints. MarketFilesURL serves the public files (index.json and
@@ -71,16 +71,16 @@ func NewMarketService(session *Session, store *settings.Store) *MarketService {
 // newMarketService returns the service for a market at filesURL and apiURL
 // ("" for none).
 func newMarketService(session *Session, store *settings.Store, filesURL, apiURL string, client *http.Client) *MarketService {
-	m := &MarketService{session: session, settings: store}
+	service := &MarketService{session: session, settings: store}
 	if filesURL != "" {
-		m.src = market.NewSource(filesURL)
-		m.src.HTTP = client
+		service.src = market.NewSource(filesURL)
+		service.src.HTTP = client
 	}
 	if apiURL != "" {
-		m.api = market.NewAPI(apiURL)
-		m.api.HTTP = client
+		service.api = market.NewAPI(apiURL)
+		service.api.HTTP = client
 	}
-	return m
+	return service
 }
 
 var errNoMarket = errors.New("this build has no market configured")
@@ -210,7 +210,7 @@ type MarketImport struct {
 // sprite packs add their sprites. Files are checked like any other
 // untrusted file.
 func (m *MarketService) Import(id string) (*MarketImport, error) {
-	p, err := m.session.Project()
+	proj, err := m.session.Project()
 	if err != nil {
 		return nil, err
 	}
@@ -218,8 +218,8 @@ func (m *MarketService) Import(id string) (*MarketImport, error) {
 	if err != nil {
 		return nil, err
 	}
-	if entry.SpriteSize != p.SpriteSize() {
-		return nil, fmt.Errorf("%s uses %dpx sprites, client uses %dpx", entry.Name, entry.SpriteSize, p.SpriteSize())
+	if entry.SpriteSize != proj.SpriteSize() {
+		return nil, fmt.Errorf("%s uses %dpx sprites, client uses %dpx", entry.Name, entry.SpriteSize, proj.SpriteSize())
 	}
 	result := &MarketImport{Kind: entry.Kind, Sprites: []uint32{}}
 	switch entry.Kind {
@@ -229,7 +229,7 @@ func (m *MarketService) Import(id string) (*MarketImport, error) {
 			return nil, err
 		}
 		result.Category = object.Thing.Category
-		if result.ID, err = p.ImportOBD(object, 0); err != nil {
+		if result.ID, err = proj.ImportOBD(object, 0); err != nil {
 			return nil, err
 		}
 	case market.KindSprites:
@@ -237,7 +237,7 @@ func (m *MarketService) Import(id string) (*MarketImport, error) {
 		if err != nil {
 			return nil, err
 		}
-		if result.Sprites, err = p.AddSprites(sprites); err != nil {
+		if result.Sprites, err = proj.AddSprites(sprites); err != nil {
 			return nil, err
 		}
 	default:
@@ -271,11 +271,11 @@ func (req ShareRequest) meta(kind string, spriteSize int) market.Meta {
 
 // ShareObject publishes one object and returns the new entry id.
 func (m *MarketService) ShareObject(category thing.Category, id uint32, req ShareRequest) (string, error) {
-	p, err := m.session.Project()
+	proj, err := m.session.Project()
 	if err != nil {
 		return "", err
 	}
-	object, err := p.ExportOBD(category, id, obd.Version3)
+	object, err := proj.ExportOBD(category, id, obd.Version3)
 	if err != nil {
 		return "", err
 	}
@@ -309,19 +309,19 @@ func (m *MarketService) shareOBD(object *obd.Data, req ShareRequest) (string, er
 // ShareSprites publishes sprites as a pack and returns the new entry id.
 // Empty sprites are left out.
 func (m *MarketService) ShareSprites(ids []uint32, req ShareRequest) (string, error) {
-	p, err := m.session.Project()
+	proj, err := m.session.Project()
 	if err != nil {
 		return "", err
 	}
 	var sprites [][]byte
 	for _, id := range ids {
-		pixels, err := p.SpritePixels(id)
+		pixels, err := proj.SpritePixels(id)
 		if err != nil {
 			return "", err
 		}
 		sprites = append(sprites, pixels)
 	}
-	return m.sharePixels(sprites, p.SpriteSize(), req)
+	return m.sharePixels(sprites, proj.SpriteSize(), req)
 }
 
 // sharePixels publishes sprites as a pack; empty sprites are left out.
@@ -363,15 +363,13 @@ func (m *MarketService) ShareFile(path string, spriteSize int, req ShareRequest)
 	if !slices.Contains(shareSpriteSizes, spriteSize) {
 		return "", fmt.Errorf("sprite size %d is not 32 or 64", spriteSize)
 	}
-	img, err := imaging.Load(path)
+	img, err := loadSpriteImage(path)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", filepath.Base(path), err)
 	}
 	if img.Rect.Dx()%spriteSize != 0 || img.Rect.Dy()%spriteSize != 0 {
 		return "", fmt.Errorf("%s is %dx%d, not a grid of %d px sprites", filepath.Base(path), img.Rect.Dx(), img.Rect.Dy(), spriteSize)
 	}
-	imaging.RemoveMagenta(img)
-	imaging.Normalize(img)
 	return m.sharePixels(imaging.SliceTiles(img, spriteSize), spriteSize, req)
 }
 

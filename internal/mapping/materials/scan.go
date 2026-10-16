@@ -115,11 +115,11 @@ func xmlCreature(data []byte) *CreatureType {
 	return creature
 }
 
-func luaCreatures(src string) []*CreatureType {
+func luaCreatures(script string) []*CreatureType {
 	var out []*CreatureType
 	outfit := func() Outfit {
 		var result Outfit
-		match := reOutfit.FindStringSubmatch(src)
+		match := reOutfit.FindStringSubmatch(script)
 		if match == nil {
 			return result
 		}
@@ -146,18 +146,18 @@ func luaCreatures(src string) []*CreatureType {
 		}
 		return result
 	}
-	if match := reMonsterType.FindStringSubmatch(src); match != nil {
+	if match := reMonsterType.FindStringSubmatch(script); match != nil {
 		out = append(out, &CreatureType{Name: match[1], Outfit: outfit()})
 		return out
 	}
 	name := ""
 	for _, pattern := range []*regexp.Regexp{reNpcType, reNpcVar, reNpcConfig} {
-		if match := pattern.FindStringSubmatch(src); match != nil {
+		if match := pattern.FindStringSubmatch(script); match != nil {
 			name = match[1]
 			break
 		}
 	}
-	if name != "" && (strings.Contains(src, "createNpcType") || strings.Contains(src, "npcConfig")) {
+	if name != "" && (strings.Contains(script, "createNpcType") || strings.Contains(script, "npcConfig")) {
 		out = append(out, &CreatureType{Name: name, NPC: true, Outfit: outfit()})
 	}
 	return out

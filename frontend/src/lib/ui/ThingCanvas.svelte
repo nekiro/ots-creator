@@ -45,9 +45,9 @@
 
   const frameGroup = $derived(frameGroupAt(thing, group));
   const isOutfit = $derived(thing.category === Category.CategoryOutfit);
-  const dirX = (shown: typeof frameGroup) => (isOutfit && shown ? Math.min(direction, shown.patternX - 1) : 0);
-  const draw = (f: number) =>
-    compose(frameGroup!, frameGroup!.sprites, size, { pos: { layer: 0, x: dirX(frameGroup), y: 0, z: 0, frame: f }, colors: isOutfit && colorize ? DEFAULT_COLORS : null }, get);
+  const patternXOf = (shown: typeof frameGroup) => (isOutfit && shown ? Math.min(direction, shown.patternX - 1) : 0);
+  const draw = (frameIndex: number) =>
+    compose(frameGroup!, frameGroup!.sprites, size, { pos: { layer: 0, x: patternXOf(frameGroup), y: 0, z: 0, frame: frameIndex }, colors: isOutfit && colorize ? DEFAULT_COLORS : null }, get);
 
   // Fit mode crops to the visible pixels of all frames, so the animation
   // does not jump and small objects in big textures are not drawn tiny.
@@ -55,19 +55,19 @@
     void ready;
     if (!fit || !frameGroup) return null;
     let box: Box | null = null;
-    for (let f = 0; f < frameGroup.frames; f++) box = union(box, contentBox(draw(f)));
+    for (let frameIndex = 0; frameIndex < frameGroup.frames; frameIndex++) box = union(box, contentBox(draw(frameIndex)));
     return box;
   });
-  const w = $derived(crop ? crop.w : (frameGroup?.width ?? 1) * size);
-  const h = $derived(crop ? crop.h : (frameGroup?.height ?? 1) * size);
-  const scale = $derived(fit ? Math.min(1, fit / Math.max(w, h)) : zoom);
+  const width = $derived(crop ? crop.w : (frameGroup?.width ?? 1) * size);
+  const height = $derived(crop ? crop.h : (frameGroup?.height ?? 1) * size);
+  const scale = $derived(fit ? Math.min(1, fit / Math.max(width, height)) : zoom);
 
   $effect(() => {
     if (!frameGroup || frameGroup.frames < 2 || !playing) {
       frame = 0;
       return;
     }
-    const d = previewDurations(frameGroup, {
+    const durations = previewDurations(frameGroup, {
       outfit: isOutfit,
       groups: thing.frameGroups.length,
       animateAlways: !!thing.props.animateAlways,
@@ -75,28 +75,28 @@
     });
     let animator: Animator;
     try {
-      animator = new Animator(Number(frameGroup.mode), 0, clamp(frameGroup.startFrame, 0, frameGroup.frames - 1), d, performance.now());
+      animator = new Animator(Number(frameGroup.mode), 0, clamp(frameGroup.startFrame, 0, frameGroup.frames - 1), durations, performance.now());
     } catch {
       return;
     }
-    let raf = 0;
-    const tick = (t: number) => {
-      frame = animator.update(t);
-      raf = requestAnimationFrame(tick);
+    let animationFrame = 0;
+    const tick = (time: number) => {
+      frame = animator.update(time);
+      animationFrame = requestAnimationFrame(tick);
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    animationFrame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animationFrame);
   });
 
   $effect(() => {
     void ready;
     if (!canvas || !frameGroup) return;
-    const img = draw(frame);
-    const c = crop ?? { x: 0, y: 0, w: img.width, h: img.height };
-    canvas.width = c.w;
-    canvas.height = c.h;
-    canvas.getContext("2d")!.putImageData(img, -c.x, -c.y);
+    const image = draw(frame);
+    const area = crop ?? { x: 0, y: 0, w: image.width, h: image.height };
+    canvas.width = area.w;
+    canvas.height = area.h;
+    canvas.getContext("2d")!.putImageData(image, -area.x, -area.y);
   });
 </script>
 
-<canvas bind:this={canvas} class="pixel" style="width:{w * scale}px;height:{h * scale}px"></canvas>
+<canvas bind:this={canvas} class="pixel" style="width:{width * scale}px;height:{height * scale}px"></canvas>

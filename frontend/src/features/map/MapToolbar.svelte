@@ -6,14 +6,14 @@
   import Slider from "../../lib/ui/Slider.svelte";
   import ItemIcon from "./ItemIcon.svelte";
 
-  const b = $derived(map.brush);
-  const isDoodad = $derived(b?.kind === "doodad");
-  const isCreature = $derived(b?.kind === "creature");
-  const sized = $derived(!!b && !["door", "houseExit", "waypoint", "creature"].includes(b.kind));
+  const brush = $derived(map.brush);
+  const isDoodad = $derived(brush?.kind === "doodad");
+  const isCreature = $derived(brush?.kind === "creature");
+  const sized = $derived(!!brush && !["door", "houseExit", "waypoint", "creature"].includes(brush.kind));
   /** Brushes without an item show a color. */
   const SWATCHES: Record<string, string> = { house: "#5a6fd8", houseExit: "#5a6fd8", flag: "#4c4", zone: "#50c8ff", spawn: "#f66", spawnNpc: "#6af", waypoint: "#7c7", optionalBorder: "#a87", eraser: "#ddd" };
   const FLAG_COLORS: Record<number, string> = { 1: "#4c4", 4: "#cc4", 8: "#c44", 16: "#c4c" };
-  const swatch = $derived(b && !b.look && !b.item ? (b.kind === "flag" ? FLAG_COLORS[b.flag ?? 0] : SWATCHES[b.kind]) || "#888" : "");
+  const swatch = $derived(brush && !brush.look && !brush.item ? (brush.kind === "flag" ? FLAG_COLORS[brush.flag ?? 0] : SWATCHES[brush.kind]) || "#888" : "");
 
   // Walls switch between the wall itself and the doors and windows that go
   // into it.
@@ -28,9 +28,9 @@
   ];
   let lastWall = $state<BrushSel | null>(null);
   $effect(() => {
-    if (b?.kind === "wall") lastWall = b;
+    if (brush?.kind === "wall") lastWall = brush;
   });
-  const walling = $derived(!!b && (b.kind === "wall" || (b.kind === "door" && !!lastWall)));
+  const walling = $derived(!!brush && (brush.kind === "wall" || (brush.kind === "door" && !!lastWall)));
   let density = $state(Math.round(map.thickness * 100));
   $effect(() => {
     map.thickness = density / 100;
@@ -61,19 +61,19 @@
     <button class="t-icon-btn" class:on={map.tool === "select" && !map.pasting} title="Select and move (S) · drag a box, Ctrl+click adds, drag the selection to move it" onclick={() => ((map.tool = "select"), (map.pasting = false))}>
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2l9 6-4 1 2 5-2 1-2-5-3 3z" /></svg>
     </button>
-    <button class="t-icon-btn" class:on={map.tool === "brush" && b?.kind !== "eraser"} title="Draw with the brush (B) · Ctrl erases, Shift+drag paints a rectangle" disabled={!b} onclick={() => (map.tool = "brush")}><Icon name="pencil" /></button>
-    <button class="t-icon-btn" class:on={map.tool === "brush" && b?.kind === "eraser"} title="Eraser (E) · Ctrl also removes grounds" onclick={mapCommands.eraser}><Icon name="eraser" /></button>
-    <button class="t-icon-btn" class:on={map.fill} title="Fill with the ground brush (F)" disabled={b?.kind !== "ground"} onclick={() => (map.fill = !map.fill)}>
+    <button class="t-icon-btn" class:on={map.tool === "brush" && brush?.kind !== "eraser"} title="Draw with the brush (B) · Ctrl erases, Shift+drag paints a rectangle" disabled={!brush} onclick={() => (map.tool = "brush")}><Icon name="pencil" /></button>
+    <button class="t-icon-btn" class:on={map.tool === "brush" && brush?.kind === "eraser"} title="Eraser (E) · Ctrl also removes grounds" onclick={mapCommands.eraser}><Icon name="eraser" /></button>
+    <button class="t-icon-btn" class:on={map.fill} title="Fill with the ground brush (F)" disabled={brush?.kind !== "ground"} onclick={() => (map.fill = !map.fill)}>
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8l5-5 5 5-5 5z M13 10c0 2 1 3 1 4a1 1 0 0 1-2 0c0-1 1-2 1-4" /></svg>
     </button>
   </div>
   <span class="t-vsep"></span>
-  <div class="grp brush" title={b ? b.label : "No brush"}>
-    {#if b}
+  <div class="grp brush" title={brush ? brush.label : "No brush"}>
+    {#if brush}
       <span class="t-slot sm">
-        {#if swatch}<span class="sw" style="background:{swatch}"></span>{:else}<ItemIcon id={b.look ?? b.item ?? 0} size={26} outfit={isCreature ? creatureOutfit(b.creature) : 0} />{/if}
+        {#if swatch}<span class="sw" style="background:{swatch}"></span>{:else}<ItemIcon id={brush.look ?? brush.item ?? 0} size={26} outfit={isCreature ? creatureOutfit(brush.creature) : 0} />{/if}
       </span>
-      <span class="label">{b.label}</span>
+      <span class="label">{brush.label}</span>
     {:else}
       <span class="t-label label">Pick a brush</span>
     {/if}
@@ -97,9 +97,9 @@
     {@const wall = lastWall}
     <span class="t-vsep"></span>
     <div class="m-seg doors" title="Doors and windows go into an existing wall">
-      <button class:on={b?.kind === "wall"} title="The wall itself" onclick={() => selectBrush(wall)}>Wall</button>
+      <button class:on={brush?.kind === "wall"} title="The wall itself" onclick={() => selectBrush(wall)}>Wall</button>
       {#each DOORS as [type, label, title]}
-        <button class:on={b?.kind === "door" && b.doorType === type} {title} onclick={() => selectBrush({ kind: "door", doorType: type, look: wall.look, label: `${label} in ${wall.label}` })}>{label}</button>
+        <button class:on={brush?.kind === "door" && brush.doorType === type} {title} onclick={() => selectBrush({ kind: "door", doorType: type, look: wall.look, label: `${label} in ${wall.label}` })}>{label}</button>
       {/each}
     </div>
   {/if}
@@ -113,7 +113,7 @@
       <button class="t-btn sm" title="New random placement" onclick={() => map.reroll++}>Reroll</button>
     </div>
   {/if}
-  {#if isCreature || b?.kind === "spawn"}
+  {#if isCreature || brush?.kind === "spawn"}
     <span class="t-vsep"></span>
     <div class="grp">
       <span class="t-label">Spawn time</span>
@@ -125,14 +125,14 @@
   {/if}
   <span class="grow"></span>
   <div class="grp">
-    {#each LAYERS as l}
-      <button class="t-icon-btn" class:on={map.view[l.key]} title="{map.view[l.key] ? 'Hide' : 'Show'}: {l.title}" onclick={() => (map.view[l.key] = !map.view[l.key])}><Icon name={l.icon} /></button>
+    {#each LAYERS as layer}
+      <button class="t-icon-btn" class:on={map.view[layer.key]} title="{map.view[layer.key] ? 'Hide' : 'Show'}: {layer.title}" onclick={() => (map.view[layer.key] = !map.view[layer.key])}><Icon name={layer.icon} /></button>
     {/each}
   </div>
   <span class="t-vsep"></span>
   <div class="grp">
-    {#each QUICK as q}
-      <button class="t-icon-btn" class:on={map.view[q.key]} title={q.title} onclick={() => (map.view[q.key] = !map.view[q.key])}><Icon name={q.icon} /></button>
+    {#each QUICK as toggle}
+      <button class="t-icon-btn" class:on={map.view[toggle.key]} title={toggle.title} onclick={() => (map.view[toggle.key] = !map.view[toggle.key])}><Icon name={toggle.icon} /></button>
     {/each}
     {#if map.view.lights}
       <span class="t-label" title="Ambient light: how bright the map is away from lights">Ambient</span>

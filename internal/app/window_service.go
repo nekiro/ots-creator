@@ -21,18 +21,18 @@ type FilesDropped struct {
 type WindowService struct {
 	session *Session
 	// Maps reports unsaved maps.
-	Maps      *MapService
-	close     func()
+	Maps  *MapService
+	close func()
 	// OpenWindow opens another window of the app at a frontend URL (set by
 	// main).
 	OpenWindow func(url, title string, width, height int)
-	unapplied atomic.Bool
-	force     atomic.Bool
+	unapplied  atomic.Bool
+	force      atomic.Bool
 }
 
-// NewWindowService returns the guard. close closes the main window.
-func NewWindowService(s *Session, close func()) *WindowService {
-	return &WindowService{session: s, close: close}
+// NewWindowService returns the guard. closeWindow closes the main window.
+func NewWindowService(session *Session, closeWindow func()) *WindowService {
+	return &WindowService{session: session, close: closeWindow}
 }
 
 // SetUnapplied tells the backend whether the editor holds edits that were

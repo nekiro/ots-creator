@@ -13,17 +13,17 @@
   import ZoneView from "./inspector/ZoneView.svelte";
   import TileView from "./TileView.svelte";
 
-  const m = $derived(map.active);
-  const f = $derived(map.focus);
-  const town = $derived(f?.kind === "town" ? (m?.towns?.find((t) => t?.id === f.id) ?? null) : null);
-  const house = $derived(f?.kind === "house" ? (m?.houses?.find((h) => h?.id === f.id) ?? null) : null);
-  const waypoint = $derived(f?.kind === "waypoint" ? (m?.waypoints?.find((w) => w?.name === f.name) ?? null) : null);
-  const zone = $derived(f?.kind === "zone" ? (m?.zones?.find((z) => z.id === f.id) ?? null) : null);
+  const activeMap = $derived(map.active);
+  const focus = $derived(map.focus);
+  const town = $derived(focus?.kind === "town" ? (activeMap?.towns?.find((candidate) => candidate?.id === focus.id) ?? null) : null);
+  const house = $derived(focus?.kind === "house" ? (activeMap?.houses?.find((candidate) => candidate?.id === focus.id) ?? null) : null);
+  const waypoint = $derived(focus?.kind === "waypoint" ? (activeMap?.waypoints?.find((candidate) => candidate?.name === focus.name) ?? null) : null);
+  const zone = $derived(focus?.kind === "zone" ? (activeMap?.zones?.find((candidate) => candidate.id === focus.id) ?? null) : null);
   /** A waypoint named but not placed yet. */
-  const pendingWaypoint = $derived(f?.kind === "waypoint" && !waypoint ? { name: f.name, pos: { x: 0, y: 0, z: 0 } } : null);
+  const pendingWaypoint = $derived(focus?.kind === "waypoint" && !waypoint ? { name: focus.name, pos: { x: 0, y: 0, z: 0 } } : null);
 
   const view = $derived.by(() => {
-    if (f?.kind === "tile" && map.inspect) return "tile";
+    if (focus?.kind === "tile" && map.inspect) return "tile";
     if (town) return "town";
     if (house) return "house";
     if (waypoint || pendingWaypoint) return "waypoint";
@@ -52,7 +52,7 @@
     {/if}
   {/snippet}
   <div class="body">
-    {#if !m}
+    {#if !activeMap}
       <div class="m-empty">No map open.</div>
     {:else if view === "tile"}
       <TileView />
@@ -65,7 +65,7 @@
     {:else if view === "zone" && zone}
       <ZoneView {zone} />
     {:else}
-      <MapView info={m} />
+      <MapView info={activeMap} />
     {/if}
   </div>
 </MiniWindow>

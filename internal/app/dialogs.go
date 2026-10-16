@@ -14,9 +14,9 @@ type DialogService struct {
 	settings *settings.Store
 }
 
-// NewDialogService returns the service; st remembers the dialog folders.
-func NewDialogService(st *settings.Store) *DialogService {
-	return &DialogService{settings: st}
+// NewDialogService returns the service; store remembers the dialog folders.
+func NewDialogService(store *settings.Store) *DialogService {
+	return &DialogService{settings: store}
 }
 
 // FileFilter is one entry of a dialog filter list, e.g. {"Client files", "*.dat;*.spr;*.otfi"}.

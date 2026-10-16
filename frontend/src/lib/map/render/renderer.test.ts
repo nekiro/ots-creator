@@ -15,13 +15,13 @@ import type { PlayScene, Scene, ViewOptions } from "./scene";
 
 /** A small deterministic hash. */
 function mix(...values: number[]): number {
-  let h = 2166136261;
-  for (const v of values) {
-    h ^= v | 0;
-    h = Math.imul(h, 16777619);
-    h ^= h >>> 13;
+  let hash = 2166136261;
+  for (const value of values) {
+    hash ^= value | 0;
+    hash = Math.imul(hash, 16777619);
+    hash ^= hash >>> 13;
   }
-  return h >>> 0;
+  return hash >>> 0;
 }
 
 const SPRITE = 32;
@@ -33,30 +33,46 @@ function fakeSprites(complete = false): SpriteCache {
     size: SPRITE,
     get(id: number) {
       if (id % 11 === 0 && !complete) return undefined;
-      let e = cache.get(id);
-      if (!e) {
-        e = { pixels: new Uint8ClampedArray(SPRITE * SPRITE * 4).fill(id & 255) };
-        cache.set(id, e);
+      let entry = cache.get(id);
+      if (!entry) {
+        entry = { pixels: new Uint8ClampedArray(SPRITE * SPRITE * 4).fill(id & 255) };
+        cache.set(id, entry);
       }
-      return e;
+      return entry;
     },
     load: () => Promise.resolve(),
   } as unknown as SpriteCache;
 }
 
 function look(id: number, outfit: boolean): Look {
-  const f = id % 5 === 0 ? 3 : 1;
+  const frames = id % 5 === 0 ? 3 : 1;
   // Items ending in 4 have the 4x2 pattern of stackables.
-  const px = outfit || id % 10 === 4 ? 4 : 1 + (id % 3);
-  const py = outfit ? 2 + (id % 2) : id % 10 === 4 ? 2 : 1 + (id % 2);
-  const pz = outfit ? 2 : 1;
-  const l = outfit && id % 2 ? 2 : 1;
-  const w = 1 + (id % 2);
-  const h = 1 + ((id >> 1) % 2);
-  const s: number[] = [];
-  for (let i = 0; i < f * pz * py * px * l * h * w; i++) s.push(mix(id, i) % 7 === 0 ? 0 : 100 + (mix(id, i) % 400));
-  const cum = f > 1 ? [200, 400, 600] : null;
-  return { id, f, px, py, pz, l, w, h, s, ox: id % 4, oy: id % 3, el: id % 6 === 0 ? 8 : 0, fl: id % 9 === 0 ? 2 : 0, cum, total: cum ? 600 : 0 } as unknown as Look;
+  const patternX = outfit || id % 10 === 4 ? 4 : 1 + (id % 3);
+  const patternY = outfit ? 2 + (id % 2) : id % 10 === 4 ? 2 : 1 + (id % 2);
+  const patternZ = outfit ? 2 : 1;
+  const layers = outfit && id % 2 ? 2 : 1;
+  const width = 1 + (id % 2);
+  const height = 1 + ((id >> 1) % 2);
+  const sprites: number[] = [];
+  for (let i = 0; i < frames * patternZ * patternY * patternX * layers * height * width; i++) sprites.push(mix(id, i) % 7 === 0 ? 0 : 100 + (mix(id, i) % 400));
+  const frameEnds = frames > 1 ? [200, 400, 600] : null;
+  return {
+    id,
+    frames,
+    patternX,
+    patternY,
+    patternZ,
+    layers,
+    width,
+    height,
+    sprites,
+    offsetX: id % 4,
+    offsetY: id % 3,
+    elevation: id % 6 === 0 ? 8 : 0,
+    flags: id % 9 === 0 ? 2 : 0,
+    frameEnds,
+    loopDuration: frameEnds ? 600 : 0,
+  } as unknown as Look;
 }
 
 /** complete: every appearance is loaded. */
@@ -72,67 +88,67 @@ function fakeLooks(complete = false): Appearances {
 }
 
 function fakeItems(): ItemIndex {
-  const n = 600;
-  const flags = new Uint32Array(n);
-  const client = new Uint16Array(n);
-  const top = new Uint8Array(n);
-  for (let id = 0; id < n; id++) {
+  const itemCount = 600;
+  const flags = new Uint32Array(itemCount);
+  const client = new Uint16Array(itemCount);
+  const top = new Uint8Array(itemCount);
+  for (let id = 0; id < itemCount; id++) {
     // Items ending in 4 are stackable (and only those).
     flags[id] = id % 10 === 4 ? 8 : (mix(id) % 16) & ~8;
     client[id] = id;
     top[id] = id % 4;
   }
   return {
-    maxId: n - 1,
+    maxId: itemCount - 1,
     flags,
     client,
     top,
     bits: { meta: 1, splash: 2, fluidContainer: 4, stackable: 8, ground: 16 },
-    has: (id: number) => id > 0 && id < n && id % 13 !== 0,
+    has: (id: number) => id > 0 && id < itemCount && id % 13 !== 0,
     is: (id: number, flag: string) => flag === "ground" && id < 100,
   } as unknown as ItemIndex;
 }
 
-function geoChunk(key: number, sig: string): GeoChunk {
-  const n = 20 + (key % 30);
-  const quads = new Uint8Array(n * QUAD_BYTES);
-  const v = new DataView(quads.buffer);
+function geoChunk(key: number, signature: string): GeoChunk {
+  const quadCount = 20 + (key % 30);
+  const quads = new Uint8Array(quadCount * QUAD_BYTES);
+  const view = new DataView(quads.buffer);
   const sprites = new Set<number>();
-  for (let i = 0; i < n; i++) {
-    const sid = 100 + (mix(key, i) % 400);
-    v.setInt16(i * QUAD_BYTES, (i % 32) * SPRITE, true);
-    v.setInt16(i * QUAD_BYTES + 2, ((i >> 5) % 32) * SPRITE, true);
-    v.setUint32(i * QUAD_BYTES + 4, sid, true);
-    v.setUint32(i * QUAD_BYTES + 8, 0xffffffff, true);
-    sprites.add(sid);
+  for (let i = 0; i < quadCount; i++) {
+    const spriteId = 100 + (mix(key, i) % 400);
+    view.setInt16(i * QUAD_BYTES, (i % 32) * SPRITE, true);
+    view.setInt16(i * QUAD_BYTES + 2, ((i >> 5) % 32) * SPRITE, true);
+    view.setUint32(i * QUAD_BYTES + 4, spriteId, true);
+    view.setUint32(i * QUAD_BYTES + 8, 0xffffffff, true);
+    sprites.add(spriteId);
   }
-  const anim = key % 3 === 0 ? new Uint32Array([1, 5, 0, 2, 10, 1, 3, 17, 0]) : new Uint32Array(0);
-  const comp = key % 4 === 0 ? new Uint32Array([4, 120, 121, 0x01020304, 5, 130, 0, 0x05060708]) : new Uint32Array(0);
-  return { key, quads, n, anim, comp, sprites: Uint32Array.from(sprites), lights: new DataView(new ArrayBuffer(0)), lightCount: 0, shades: null, sig };
+  const animated = key % 3 === 0 ? new Uint32Array([1, 5, 0, 2, 10, 1, 3, 17, 0]) : new Uint32Array(0);
+  const composed = key % 4 === 0 ? new Uint32Array([4, 120, 121, 0x01020304, 5, 130, 0, 0x05060708]) : new Uint32Array(0);
+  return { key, quads, quadCount, animated, composed, sprites: Uint32Array.from(sprites), lights: new DataView(new ArrayBuffer(0)), lightCount: 0, shades: null, signature };
 }
 
 /** complete: every chunk is built (none still loading). */
 function fakeGeo(log: string[], complete = false): GeoStore {
   const chunks = new Map<string, GeoChunk | null | undefined>();
-  const get = (key: number, sig: string) => {
-    const k = `${key}|${sig}`;
-    if (!chunks.has(k)) {
-      const h = mix(key);
-      chunks.set(k, h % 7 === 0 && !complete ? undefined : h % 11 === 0 ? null : geoChunk(key, sig));
+  const get = (key: number, signature: string) => {
+    const storeKey = `${key}|${signature}`;
+    if (!chunks.has(storeKey)) {
+      const hash = mix(key);
+      chunks.set(storeKey, hash % 7 === 0 && !complete ? undefined : hash % 11 === 0 ? null : geoChunk(key, signature));
     }
-    return chunks.get(k);
+    return chunks.get(storeKey);
   };
-  let lastSig = "";
+  let lastSignature = "";
   return {
-    get(key: number, sig: string) {
+    get(key: number, signature: string) {
       // The order of requests decides what loads first.
-      log.push(`geo.get(${key}, ${sig})`);
-      lastSig = sig;
-      return get(key, sig);
+      log.push(`geo.get(${key}, ${signature})`);
+      lastSignature = signature;
+      return get(key, signature);
     },
     peek: (key: number) => {
       log.push(`geo.peek(${key})`);
-      return get(key, lastSig);
+      return get(key, lastSignature);
     },
     idle: () => true,
     drop: (key: number) => log.push(`geo.drop(${key})`),
@@ -164,28 +180,28 @@ function fakeChunks(log: string[]): ChunkStore {
       return undefined;
     },
     peekTile(x: number, y: number, z: number) {
-      const k = `${x},${y},${z}`;
-      if (!tiles.has(k)) {
-        const h = mix(x, y, z);
-        if (h % 5 !== 0) tiles.set(k, undefined);
+      const tileKey = `${x},${y},${z}`;
+      if (!tiles.has(tileKey)) {
+        const hash = mix(x, y, z);
+        if (hash % 5 !== 0) tiles.set(tileKey, undefined);
         else {
-          const count = 1 + (h % 4);
-          const ids = Uint16Array.from({ length: count }, (_, i) => 1 + (mix(h, i) % 520));
-          tiles.set(k, {
-            flags: (h % 3 === 0 ? 1 : 0) | (h % 7 === 0 ? 256 : 0) | (h % 9 === 0 ? 512 : 0),
+          const count = 1 + (hash % 4);
+          const ids = Uint16Array.from({ length: count }, (_, i) => 1 + (mix(hash, i) % 520));
+          tiles.set(tileKey, {
+            flags: (hash % 3 === 0 ? 1 : 0) | (hash % 7 === 0 ? 256 : 0) | (hash % 9 === 0 ? 512 : 0),
             house: 0,
             ids,
-            subs: Uint16Array.from({ length: count }, (_, i) => mix(h, i, 1) % 60),
-            iflags: Uint8Array.from({ length: count }, (_, i) => mix(h, i, 2) % 64),
-            creatures: h % 4 === 0 ? [creature(h % 1000)] : null,
-            spawn: h % 7 === 0 ? { radius: 1 + (h % 3), selected: h % 2 === 0 } : null,
-            spawnNpc: h % 9 === 0 ? { radius: 2, selected: false } : null,
+            subs: Uint16Array.from({ length: count }, (_, i) => mix(hash, i, 1) % 60),
+            itemFlags: Uint8Array.from({ length: count }, (_, i) => mix(hash, i, 2) % 64),
+            creatures: hash % 4 === 0 ? [creature(hash % 1000)] : null,
+            spawn: hash % 7 === 0 ? { radius: 1 + (hash % 3), selected: hash % 2 === 0 } : null,
+            spawnNpc: hash % 9 === 0 ? { radius: 2, selected: false } : null,
             zones: null,
-            text: h % 6 === 0 ? `A sign at ${x}, ${y} with a rather long text that wraps over a few lines` : null,
+            text: hash % 6 === 0 ? `A sign at ${x}, ${y} with a rather long text that wraps over a few lines` : null,
           });
         }
       }
-      return tiles.get(k);
+      return tiles.get(tileKey);
     },
   } as unknown as ChunkStore;
 }

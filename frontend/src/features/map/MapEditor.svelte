@@ -28,9 +28,9 @@
   // The client may have changed while the object editor was shown.
   let lastProject: unknown = null;
   $effect(() => {
-    const p = app.project?.open ? (app.project.info.datPath || app.project.info.version.name) : null;
-    if (p !== lastProject) {
-      lastProject = p;
+    const project = app.project?.open ? (app.project.info.datPath || app.project.info.version.name) : null;
+    if (project !== lastProject) {
+      lastProject = project;
       void loadMapData(true);
     }
   });
@@ -104,10 +104,10 @@
         {#if map.maps.length}
           <div class="head t-flat">
             <div class="t-tabs tabs" role="tablist">
-              {#each map.maps as m (m.id)}
-                <div class="t-tab tab" class:on={m.id === map.activeId} role="tab" aria-selected={m.id === map.activeId}>
-                  <button class="tabname" title={m.path || "Not saved yet"} onclick={() => (map.activeId = m.id)}>{m.name}{m.changed ? " ●" : ""}</button>
-                  <button class="x" title="Close map (Ctrl+W)" onclick={() => mapCommands.close(m.id)}>×</button>
+              {#each map.maps as openMap (openMap.id)}
+                <div class="t-tab tab" class:on={openMap.id === map.activeId} role="tab" aria-selected={openMap.id === map.activeId}>
+                  <button class="tabname" title={openMap.path || "Not saved yet"} onclick={() => (map.activeId = openMap.id)}>{openMap.name}{openMap.changed ? " ●" : ""}</button>
+                  <button class="x" title="Close map (Ctrl+W)" onclick={() => mapCommands.close(openMap.id)}>×</button>
                 </div>
               {/each}
               <button class="t-icon-btn add" title="New map (Ctrl+N)" onclick={mapCommands.newMap}><Icon name="plus" /></button>
@@ -132,10 +132,10 @@
               {#if map.recent.length}
                 <div class="t-label rtitle">Recent maps</div>
                 <div class="t-panel rlist">
-                  {#each map.recent as r (r.path)}
+                  {#each map.recent as recent (recent.path)}
                     <div class="ritem">
-                      <button class="ropen" title={r.path} onclick={() => mapCommands.open(r.path)}>{r.path}</button>
-                      <button class="rdel" title="Remove from list" onclick={() => MapService.RemoveRecent(r.path).then(() => loadMapData())}>×</button>
+                      <button class="ropen" title={recent.path} onclick={() => mapCommands.open(recent.path)}>{recent.path}</button>
+                      <button class="rdel" title="Remove from list" onclick={() => MapService.RemoveRecent(recent.path).then(() => loadMapData())}>×</button>
                     </div>
                   {/each}
                 </div>

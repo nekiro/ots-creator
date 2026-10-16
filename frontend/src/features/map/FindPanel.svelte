@@ -3,6 +3,7 @@
   // what was found. Stays open while you work on the map.
   import { errorMessage } from "../../lib/api";
   import { toast } from "../../lib/state/app.svelte";
+  import { plural } from "../../lib/util/format";
   import { MapService } from "../../lib/map/data/api";
   import { goTo, mapCommands } from "../../lib/map/view/commands";
   import { edit, map } from "../../lib/map/state.svelte";
@@ -38,16 +39,16 @@
 
   // Applies what the panel was opened with (Ctrl+F, "Find on the map"…).
   $effect(() => {
-    const p = map.findPreset;
-    if (!p) return;
+    const preset = map.findPreset;
+    if (!preset) return;
     map.findPreset = null;
-    if (p.ids?.length) {
-      ids = [...p.ids];
+    if (preset.ids?.length) {
+      ids = [...preset.ids];
       name = "";
     }
-    inSelection = !!p.inSelection && !!map.active?.selection;
-    if (p.replace) replaceOpen = true;
-    if (p.ids?.length && !p.replace) void find();
+    inSelection = !!preset.inSelection && !!map.active?.selection;
+    if (preset.replace) replaceOpen = true;
+    if (preset.ids?.length && !preset.replace) void find();
   });
 
   const results = $derived(map.results);
@@ -62,7 +63,7 @@
     if (map.activeId === null || !canFind) return;
     busy = true;
     try {
-      const r = await MapService.Find(map.activeId, {
+      const found = await MapService.Find(map.activeId, {
         ids,
         name: ids.length ? "" : name.trim(),
         kind,
@@ -72,8 +73,8 @@
         containers,
         limit: 5000,
       });
-      const title = ids.length ? (ids.length === 1 ? (map.items?.name(ids[0]) ?? "Found") : `${ids.length} items`) : name ? `“${name}”` : (KINDS.find((k) => k.value === kind)?.label ?? "Found");
-      map.results = { title, more: r.more, items: (r.results ?? []).filter((x) => !!x).map((x) => ({ pos: x.pos, label: `${x.name} (${x.id})`, detail: x.detail })) };
+      const title = ids.length ? (ids.length === 1 ? (map.items?.name(ids[0]) ?? "Found") : `${ids.length} items`) : name ? `“${name}”` : (KINDS.find((option) => option.value === kind)?.label ?? "Found");
+      map.results = { title, more: found.more, items: (found.results ?? []).filter((result) => !!result).map((result) => ({ pos: result.pos, label: `${result.name} (${result.id})`, detail: result.detail })) };
       current = -1;
     } catch (err) {
       toast(errorMessage(err), "error");
@@ -82,19 +83,19 @@
     }
   }
 
-  function show(i: number) {
-    const r = results?.items[i];
-    if (!r) return;
-    current = i;
-    goTo(r.pos);
-    mapCommands.inspect(r.pos);
+  function show(index: number) {
+    const result = results?.items[index];
+    if (!result) return;
+    current = index;
+    goTo(result.pos);
+    mapCommands.inspect(result.pos);
   }
 
   async function replace(remove: boolean) {
     if (!ids.length || (!remove && !target)) return;
-    const ch = await edit((id) => MapService.Replace(id, ids, ids.map(() => (remove ? 0 : target)), inSelection));
-    if (!ch) return;
-    toast(`${ch.count.toLocaleString()} item${ch.count === 1 ? "" : "s"} ${remove ? "removed" : "replaced"}. Ctrl+Z undoes it.`, "success");
+    const change = await edit((id) => MapService.Replace(id, ids, ids.map(() => (remove ? 0 : target)), inSelection));
+    if (!change) return;
+    toast(`${plural(change.count, "item")} ${remove ? "removed" : "replaced"}. Ctrl+Z undoes it.`, "success");
     map.results = null;
     if (!remove) ids = [target];
   }
@@ -116,7 +117,7 @@
       {#if ids.length}
         <div class="chips">
           {#each ids as id}
-            <span class="chip" title={String(id)}><ItemIcon {id} size={18} /><span class="cn">{map.items?.name(id)}</span><button class="x" title="Remove" onclick={() => (ids = ids.filter((x) => x !== id))}><Icon name="close" size={10} /></button></span>
+            <span class="chip" title={String(id)}><ItemIcon {id} size={18} /><span class="cn">{map.items?.name(id)}</span><button class="x" title="Remove" onclick={() => (ids = ids.filter((other) => other !== id))}><Icon name="close" size={10} /></button></span>
           {/each}
         </div>
       {:else}
@@ -149,15 +150,15 @@
         {#if results.items.length}
           <button class="t-icon-btn" title="Previous" onclick={() => show((current - 1 + results.items.length) % results.items.length)}><Icon name="arrowN" /></button>
           <button class="t-icon-btn" title="Next" onclick={() => show((current + 1) % results.items.length)}><Icon name="arrowS" /></button>
-          <button class="t-icon-btn" title="Select all found tiles" onclick={() => edit((id) => MapService.SelectTiles(id, results.items.map((r) => r.pos), false))}><Icon name="check" /></button>
+          <button class="t-icon-btn" title="Select all found tiles" onclick={() => edit((id) => MapService.SelectTiles(id, results.items.map((result) => result.pos), false))}><Icon name="check" /></button>
         {/if}
       </div>
       <div class="results t-panel">
-        {#each results.items as r, i (i)}
+        {#each results.items as result, i (i)}
           <button class="m-row res" class:on={i === current} onclick={() => show(i)}>
-            <span class="rp">{r.pos.x}, {r.pos.y}, {r.pos.z}</span>
-            <span class="m-name">{r.label}</span>
-            {#if r.detail}<span class="m-meta">{r.detail}</span>{/if}
+            <span class="rp">{result.pos.x}, {result.pos.y}, {result.pos.z}</span>
+            <span class="m-name">{result.label}</span>
+            {#if result.detail}<span class="m-meta">{result.detail}</span>{/if}
           </button>
         {:else}
           <div class="m-empty">Nothing found.</div>

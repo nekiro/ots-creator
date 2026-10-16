@@ -82,7 +82,7 @@ func NewSession(notify Notifier) *Session {
 	if notify == nil {
 		notify = func(string, any) {}
 	}
-	s := &Session{
+	session := &Session{
 		notify: notify,
 		main:   clientSlot{missing: ErrNoProject, event: EventProjectChanged},
 		other:  clientSlot{missing: ErrNoOther, event: EventOtherChanged},
@@ -91,8 +91,8 @@ func NewSession(notify Notifier) *Session {
 	// disk by the webview; starting from the launch time keeps URLs of one
 	// run from matching cached images of an earlier run. Milliseconds stay
 	// exact as JavaScript numbers.
-	s.rev.Store(uint64(time.Now().UnixMilli()))
-	return s
+	session.rev.Store(uint64(time.Now().UnixMilli()))
+	return session
 }
 
 // Cancel stops the running long operation (an export) after the files
@@ -109,12 +109,12 @@ func (s *Session) client(slot *clientSlot) (*project.Project, error) {
 }
 
 // setClient replaces the client of a slot (nil closes it).
-func (s *Session) setClient(slot *clientSlot, p *project.Project) {
+func (s *Session) setClient(slot *clientSlot, proj *project.Project) {
 	s.mu.Lock()
-	slot.project = p
+	slot.project = proj
 	s.mu.Unlock()
-	if p != nil {
-		p.TakeDelta() // a new client replaces everything anyway
+	if proj != nil {
+		proj.TakeDelta() // a new client replaces everything anyway
 	}
 	s.rev.Add(1)
 	state := s.state(slot)
@@ -124,12 +124,12 @@ func (s *Session) setClient(slot *clientSlot, p *project.Project) {
 
 func (s *Session) state(slot *clientSlot) State {
 	s.mu.RLock()
-	p := slot.project
+	proj := slot.project
 	s.mu.RUnlock()
 	state := State{Rev: s.rev.Load()}
-	if p != nil {
+	if proj != nil {
 		state.Open = true
-		state.Info = p.Info()
+		state.Info = proj.Info()
 	}
 	return state
 }
@@ -139,8 +139,8 @@ func (s *Session) changed(slot *clientSlot) {
 	s.rev.Add(1)
 	state := s.state(slot)
 	delta := project.Delta{All: true}
-	if p, err := s.client(slot); err == nil {
-		delta = p.TakeDelta()
+	if proj, err := s.client(slot); err == nil {
+		delta = proj.TakeDelta()
 	}
 	state.Delta = &delta
 	s.notify(slot.event, state)
@@ -150,7 +150,7 @@ func (s *Session) changed(slot *clientSlot) {
 func (s *Session) Project() (*project.Project, error) { return s.client(&s.main) }
 
 // Set replaces the open project (nil closes it).
-func (s *Session) Set(p *project.Project) { s.setClient(&s.main, p) }
+func (s *Session) Set(proj *project.Project) { s.setClient(&s.main, proj) }
 
 // State returns the current snapshot.
 func (s *Session) State() State { return s.state(&s.main) }
@@ -162,7 +162,7 @@ func (s *Session) Changed() { s.changed(&s.main) }
 func (s *Session) Other() (*project.Project, error) { return s.client(&s.other) }
 
 // SetOther replaces the second client (nil closes it).
-func (s *Session) SetOther(p *project.Project) { s.setClient(&s.other, p) }
+func (s *Session) SetOther(proj *project.Project) { s.setClient(&s.other, proj) }
 
 // OtherState returns the snapshot of the second client.
 func (s *Session) OtherState() State { return s.state(&s.other) }
@@ -173,11 +173,11 @@ func (s *Session) OtherChanged() { s.changed(&s.other) }
 
 // saved reports that the open client now lives at its dat/spr paths.
 func (s *Session) saved() {
-	p, err := s.Project()
+	proj, err := s.Project()
 	if err != nil || s.onSaved == nil {
 		return
 	}
-	if info := p.Info(); info.DatPath != "" {
+	if info := proj.Info(); info.DatPath != "" {
 		s.onSaved(info)
 	}
 }

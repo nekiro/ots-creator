@@ -91,7 +91,13 @@ func ReadCatalog(dir string) (*Catalog, error) {
 
 // Find returns the index of the sheet holding a sprite id.
 func (c *Catalog) Find(id uint32) (int, bool) {
-	i, _ := slices.BinarySearchFunc(c.Sheets, id, func(sheet Sheet, id uint32) int {
+	return findSheet(c.Sheets, id)
+}
+
+// findSheet returns the index of the sheet in sheets (sorted by id) that
+// holds sprite id.
+func findSheet(sheets []Sheet, id uint32) (int, bool) {
+	i, found := slices.BinarySearchFunc(sheets, id, func(sheet Sheet, id uint32) int {
 		switch {
 		case sheet.Last < id:
 			return -1
@@ -100,10 +106,10 @@ func (c *Catalog) Find(id uint32) (int, bool) {
 		}
 		return 0
 	})
-	if i < len(c.Sheets) && c.Sheets[i].First <= id && id <= c.Sheets[i].Last {
-		return i, true
+	if !found {
+		return 0, false
 	}
-	return 0, false
+	return i, true
 }
 
 // NextSpriteID returns the first unused sprite id after every sheet. Ids

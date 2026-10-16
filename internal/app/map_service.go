@@ -54,11 +54,11 @@ func (ms *MapService) get(id int) (*openMap, *mapData, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	m := ms.maps[id]
-	if m == nil {
+	opened := ms.maps[id]
+	if opened == nil {
 		return nil, nil, ErrNoMap
 	}
-	return m, data, nil
+	return opened, data, nil
 }
 
 // read read-locks the service and returns an open map and the item data
@@ -69,12 +69,12 @@ func (ms *MapService) read(id int) (*openMap, *mapData, func(), error) {
 		ms.mu.RLock()
 		project, err := ms.session.Project()
 		if err == nil && ms.data != nil && ms.data.project == project {
-			m := ms.maps[id]
-			if m == nil {
+			opened := ms.maps[id]
+			if opened == nil {
 				ms.mu.RUnlock()
 				return nil, nil, nil, ErrNoMap
 			}
-			return m, ms.data, ms.mu.RUnlock, nil
+			return opened, ms.data, ms.mu.RUnlock, nil
 		}
 		ms.mu.RUnlock()
 		ms.mu.Lock()
@@ -87,14 +87,14 @@ func (ms *MapService) read(id int) (*openMap, *mapData, func(), error) {
 }
 
 // withMap runs fn on an open map under the lock.
-func (ms *MapService) withMap(id int, fn func(m *openMap, data *mapData) error) error {
+func (ms *MapService) withMap(id int, fn func(opened *openMap, data *mapData) error) error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
-	m, data, err := ms.get(id)
+	opened, data, err := ms.get(id)
 	if err != nil {
 		return err
 	}
-	return fn(m, data)
+	return fn(opened, data)
 }
 
 // withData runs fn on the item data of the open client under the lock.
@@ -113,12 +113,12 @@ func (ms *MapService) withData(fn func(data *mapData) error) error {
 func (ms *MapService) edit(id int, fn func(editor *mapedit.Editor, data *mapData) (int, error)) (MapChange, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
-	m, data, err := ms.get(id)
+	opened, data, err := ms.get(id)
 	if err != nil {
 		return MapChange{}, err
 	}
-	count, err := fn(m.editor, data)
-	change := ms.change(m)
+	count, err := fn(opened.editor, data)
+	change := ms.change(opened)
 	change.Count = count
 	if len(change.Chunks) > 0 {
 		ms.session.notify(EventMapChanged, MapChanged{ID: id, Chunks: change.Chunks})

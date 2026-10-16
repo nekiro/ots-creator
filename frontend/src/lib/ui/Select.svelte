@@ -29,7 +29,7 @@
   }: {
     value: V;
     options: Option<V>[];
-    onchange: (v: V) => void;
+    onchange: (value: V) => void;
     disabled?: boolean;
     placeholder?: string;
     width?: number;
@@ -38,10 +38,10 @@
     title?: string;
   } = $props();
 
-  const ITEM_H = 20;
+  const ITEM_HEIGHT = 20;
   let open = $state(false);
   let active = $state(-1);
-  let btn: HTMLButtonElement;
+  let button: HTMLButtonElement;
   let list = $state<HTMLDivElement>();
   let rect = $state({ left: 0, top: 0, width: 0, up: false });
 
@@ -50,9 +50,9 @@
 
   async function show() {
     if (disabled || open) return;
-    const button = btn.getBoundingClientRect();
-    const box = { left: toCss(button.left), top: toCss(button.top), bottom: toCss(button.bottom), width: toCss(button.width) };
-    const popupHeight = Math.min(options.length, maxItems) * ITEM_H + 4;
+    const bounds = button.getBoundingClientRect();
+    const box = { left: toCss(bounds.left), top: toCss(bounds.top), bottom: toCss(bounds.bottom), width: toCss(bounds.width) };
+    const popupHeight = Math.min(options.length, maxItems) * ITEM_HEIGHT + 4;
     const up = box.bottom + popupHeight > toCss(window.innerHeight) - 4 && box.top - popupHeight > 4;
     rect = { left: box.left, top: up ? box.top - popupHeight : box.bottom, width: box.width, up };
     active = Math.max(selected, 0);
@@ -66,11 +66,11 @@
   // the window (dialog or panel) the box is in, or out of the screen.
   function fit() {
     if (!list) return;
-    const w = list.offsetWidth;
-    const host = btn.closest(".t-window, .t-mini, [role=dialog]")?.getBoundingClientRect();
+    const listWidth = list.offsetWidth;
+    const host = button.closest(".t-window, .t-mini, [role=dialog]")?.getBoundingClientRect();
     const right = Math.min(host ? toCss(host.right) : Infinity, toCss(window.innerWidth)) - 4;
     const left = Math.max(host ? toCss(host.left) : 0, 0) + 4;
-    if (rect.left + w > right) rect.left = Math.max(left, right - w);
+    if (rect.left + listWidth > right) rect.left = Math.max(left, right - listWidth);
   }
 
   const scrollToItem = (i: number) => reveal(list, list?.querySelector<HTMLElement>(`[data-i="${i}"]`));
@@ -83,7 +83,7 @@
     const option = options[i];
     if (!option || option.disabled) return;
     hide();
-    btn.focus();
+    button.focus();
     if (option.value !== value) onchange(option.value);
   }
 
@@ -138,13 +138,13 @@
 </script>
 
 <svelte:window
-  onmousedown={(event) => open && !list?.contains(event.target as Node) && !btn.contains(event.target as Node) && hide()}
+  onmousedown={(event) => open && !list?.contains(event.target as Node) && !button.contains(event.target as Node) && hide()}
   onresize={hide}
   onblur={hide}
 />
 
 <button
-  bind:this={btn}
+  bind:this={button}
   type="button"
   class="combo"
   class:on={open}
@@ -157,7 +157,7 @@
   onmousedown={(event) => {
     if (event.button !== 0) return;
     event.preventDefault();
-    btn.focus();
+    button.focus();
     open ? hide() : show();
   }}
   {onkeydown}
@@ -171,24 +171,24 @@
     use:portal
     class="popup t-popup"
     role="listbox"
-    style="left:{rect.left}px;top:{rect.top}px;min-width:{rect.width}px;max-height:{maxItems * ITEM_H + 4}px"
+    style="left:{rect.left}px;top:{rect.top}px;min-width:{rect.width}px;max-height:{maxItems * ITEM_HEIGHT + 4}px"
   >
-    {#each options as o, i}
+    {#each options as option, i}
       <div
         class="item"
         class:active={i === active}
         class:sel={i === selected}
-        class:disabled={o.disabled}
+        class:disabled={option.disabled}
         role="option"
         aria-selected={i === selected}
         tabindex="-1"
         data-i={i}
-        onmouseenter={() => !o.disabled && (active = i)}
+        onmouseenter={() => !option.disabled && (active = i)}
         onmousedown={(event) => event.preventDefault()}
         onclick={() => pick(i)}
         onkeydown={() => {}}
       >
-        {o.label}
+        {option.label}
       </div>
     {/each}
   </div>

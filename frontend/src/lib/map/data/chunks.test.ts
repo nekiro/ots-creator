@@ -79,7 +79,7 @@ describe("decodeChunks", () => {
     expect(tile.house).toBe(77);
     expect([...tile.ids]).toEqual([100, 200]);
     expect([...tile.subs]).toEqual([0, 5]);
-    expect([...tile.iflags]).toEqual([0, ItemFlags.text]);
+    expect([...tile.itemFlags]).toEqual([0, ItemFlags.text]);
     expect(tile.creatures).toEqual([{ npc: true, selected: true, dir: 2, lookType: 128, head: 1, body: 2, legs: 3, feet: 4, addons: 3, mount: 9, lookItem: 0, name: "Bob" }]);
     expect(tile.spawn).toEqual({ radius: 5, selected: true });
     expect(tile.spawnNpc).toEqual({ radius: 2, selected: false });

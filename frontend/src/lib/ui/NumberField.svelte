@@ -19,7 +19,7 @@
     width?: number;
     disabled?: boolean;
     title?: string;
-    onchange: (v: number) => void;
+    onchange: (next: number) => void;
   } = $props();
 
   let current = $state(0);
@@ -27,17 +27,17 @@
     current = value;
   });
 
-  function commit(v: number) {
-    if (!Number.isFinite(v)) v = min;
-    v = clamp(Math.trunc(v), min, max);
-    current = v;
-    if (v !== value) onchange(v);
+  function commit(next: number) {
+    if (!Number.isFinite(next)) next = min;
+    next = clamp(Math.trunc(next), min, max);
+    current = next;
+    if (next !== value) onchange(next);
   }
 
   let timer: ReturnType<typeof setTimeout> | undefined;
-  function hold(delta: number, e: PointerEvent) {
-    if (disabled || e.button !== 0) return;
-    e.preventDefault();
+  function hold(delta: number, event: PointerEvent) {
+    if (disabled || event.button !== 0) return;
+    event.preventDefault();
     const step = () => commit(current + delta);
     step();
     let wait = 350;

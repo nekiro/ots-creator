@@ -163,8 +163,8 @@ function brushPreview(hover: Position, brush: BrushSel, input: PreviewInput, { g
     else if (look) ghosts.push({ x: tile.x, y: tile.y, z: tile.z, ids: [look] });
   }
   if (tiles.length > 1) {
-    const xs = tiles.map((tile) => tile.x);
-    const ys = tiles.map((tile) => tile.y);
-    rects.push({ x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys), z: hover.z, stroke: PREVIEW_COLORS.brushBounds });
+    const tileXs = tiles.map((tile) => tile.x);
+    const tileYs = tiles.map((tile) => tile.y);
+    rects.push({ x0: Math.min(...tileXs), y0: Math.min(...tileYs), x1: Math.max(...tileXs), y1: Math.max(...tileYs), z: hover.z, stroke: PREVIEW_COLORS.brushBounds });
   }
 }

@@ -8,32 +8,32 @@ import (
 	"testing"
 
 	"github.com/nekiro/ots-creator/internal/core/client"
+	"github.com/nekiro/ots-creator/internal/core/project"
+	"github.com/nekiro/ots-creator/internal/core/thing"
 	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
 	"github.com/nekiro/ots-creator/internal/mapping/materials"
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
-	"github.com/nekiro/ots-creator/internal/core/project"
-	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
 func mapTestService(t testing.TB) (*MapService, *Session) {
 	t.Helper()
 	s := NewSession(nil)
 	v := client.FindByValue(1098)[0]
-	p := project.New(v, client.Features{})
+	proj := project.New(v, client.Features{})
 	// Item 100 is a ground, 101 a common item, 102 a border.
 	for i := 0; i < 2; i++ {
-		if _, err := p.AddThing(thing.CategoryItem); err != nil {
+		if _, err := proj.AddThing(thing.CategoryItem); err != nil {
 			t.Fatal(err)
 		}
 	}
-	g, _ := p.Thing(thing.CategoryItem, 100)
+	g, _ := proj.Thing(thing.CategoryItem, 100)
 	g.Props.Ground = true
 	g.Props.MiniMap = true
 	g.Props.MiniMapColor = 30
-	if err := p.UpdateThing(g); err != nil {
+	if err := proj.UpdateThing(g); err != nil {
 		t.Fatal(err)
 	}
-	s.Set(p)
+	s.Set(proj)
 	store := NewMapStore(filepath.Join(t.TempDir(), "mapeditor.json"))
 	return NewMapService(s, store), s
 }

@@ -3,8 +3,8 @@ package project
 import (
 	"fmt"
 
-	"github.com/nekiro/ots-creator/internal/formats/obd"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/obd"
 )
 
 // ImportOBD adds the sprites of an OBD file and appends its thing to the

@@ -8,8 +8,8 @@ import (
 
 	"github.com/nekiro/ots-creator/internal/fsutil"
 
-	"github.com/nekiro/ots-creator/internal/formats/itemsotb"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/itemsotb"
 )
 
 // An items.otb can be attached to a client. It is never edited directly:

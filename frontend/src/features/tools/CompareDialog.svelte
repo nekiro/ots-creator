@@ -6,7 +6,7 @@
   import { hasImprovedAnimations } from "../../lib/thing";
   import { CATEGORIES, CATEGORY_LABELS, CATEGORY_NAMES, CompareService, Format, normalizeThing, res, ThingService, type Category, type DiffEntry, type DiffResult } from "../../lib/api";
   import { mergeIds, mergeSummary, type MergeStep } from "../../lib/compare";
-  import { sliceBetween, toggleId } from "../../lib/util/selection";
+  import { clickSelection, sliceBetween } from "../../lib/util/selection";
   import { HoverAnim } from "../../lib/render/hoveranim.svelte";
   import { otherSpriteCache, spriteCache } from "../../lib/render/sprites";
   import { app, otherVersions, run, toast, versions } from "../../lib/state/app.svelte";
@@ -45,7 +45,8 @@
   // padding at the end of a category.
   let hideEmpty = $state(true);
   const visible = $derived((diff?.entries ?? []).filter((entry) => !(hideEmpty && entry.empty)));
-  let selected = $state<number[]>([]);
+  let selected = $state.raw<number[]>([]);
+  const selectedSet = $derived(new Set(selected));
   let anchor = $state<number | null>(null);
 
   const infoA = $derived(app.project?.info);
@@ -86,7 +87,7 @@
     for (const entry of visible) out[entry.status as Status]++;
     return out;
   });
-  const picked = $derived(entries.filter((entry) => selected.includes(entry.id)));
+  const picked = $derived(entries.filter((entry) => selectedSet.has(entry.id)));
   const fromA = $derived(picked.filter((entry) => entry.status !== "onlyB" && entry.status !== "copied"));
   const fromB = $derived(picked.filter((entry) => entry.status !== "onlyA" && entry.status !== "copied"));
   const pickedCopies = $derived(picked.filter((entry) => copied[entry.id]).map((entry) => entry.id));
@@ -112,7 +113,7 @@
   });
 
   // The last clicked object is previewed, from A or B.
-  const focused = $derived(entries.find((entry) => entry.id === anchor && selected.includes(entry.id)) ?? null);
+  const focused = $derived(entries.find((entry) => entry.id === anchor && selectedSet.has(entry.id)) ?? null);
   let side = $state<"A" | "B">("B");
   const hasA = $derived(!!focused && focused.status !== "onlyB");
   const hasB = $derived(!!focused && focused.status !== "onlyA");
@@ -160,22 +161,19 @@
   }
 
   function click(event: MouseEvent, id: number) {
-    if (event.shiftKey && anchor !== null) {
-      const from = entries.findIndex((entry) => entry.id === anchor);
-      const to = entries.findIndex((entry) => entry.id === id);
-      const range = sliceBetween(entries, from, to).map((entry) => entry.id);
-      selected = event.ctrlKey ? [...new Set([...selected, ...range])] : range;
-      return;
-    }
-    anchor = id;
-    if (event.ctrlKey || event.metaKey) selected = toggleId(selected, id);
-    else selected = [id];
+    const next = clickSelection(event, selected, anchor, id, (from) => {
+      const fromIndex = entries.findIndex((entry) => entry.id === from);
+      const toIndex = entries.findIndex((entry) => entry.id === id);
+      return sliceBetween(entries, fromIndex, toIndex).map((entry) => entry.id);
+    });
+    selected = next.selection;
+    anchor = next.anchor;
   }
 
   // Right click selects the row (unless it is selected) and offers the
   // actions for the selection.
   function oncontextmenu(event: MouseEvent, id: number) {
-    if (!selected.includes(id)) {
+    if (!selectedSet.has(id)) {
       selected = [id];
       anchor = id;
     }
@@ -349,15 +347,15 @@
 
     <div class="row">
       <div class="t-tabs">
-        {#each CATEGORIES as c}
-          <button class="t-tab" class:on={category === c} onclick={() => setCategory(c)}>{CATEGORY_LABELS[c]}</button>
+        {#each CATEGORIES as tabCategory}
+          <button class="t-tab" class:on={category === tabCategory} onclick={() => setCategory(tabCategory)}>{CATEGORY_LABELS[tabCategory]}</button>
         {/each}
       </div>
       <span class="grow"></span>
-      {#each Object.keys(STATUS_LABELS) as s}
-        {@const st = s as Status}
-        <label class="row filter {st}" title="Double click selects all {STATUS_LABELS[st].toLowerCase()}" ondblclick={() => selectStatus(st)}>
-          <input class="t-check" type="checkbox" bind:checked={shown[st]} />{STATUS_LABELS[st]} <span class="n">{counts[st]}</span>
+      {#each Object.keys(STATUS_LABELS) as statusKey}
+        {@const status = statusKey as Status}
+        <label class="row filter {status}" title="Double click selects all {STATUS_LABELS[status].toLowerCase()}" ondblclick={() => selectStatus(status)}>
+          <input class="t-check" type="checkbox" bind:checked={shown[status]} />{STATUS_LABELS[status]} <span class="n">{counts[status]}</span>
         </label>
       {/each}
       <label class="row filter" title="Hide objects that exist in one client only and have no sprites there">
@@ -371,7 +369,7 @@
           {#if error}
             <div class="msg err">{error}</div>
           {:else if !diff}
-            <div class="msg loading t-label"><span class="spinner"></span>Comparing clients…</div>
+            <div class="msg loading t-label"><span class="t-spinner"></span>Comparing clients…</div>
           {:else if diff && entries.length === 0}
             <div class="msg t-label">
               {diff.entries?.length ? "Nothing matches the filters." : `All ${diff.same.toLocaleString()} ${CATEGORY_LABELS[category].toLowerCase()} are the same.`}
@@ -379,38 +377,38 @@
           {:else if diff}
             <VirtualGrid count={entries.length} cellWidth={4000} cellHeight={38} gap={1} {scrollTo} {onkeydown}>
               {#snippet cell(i)}
-                {@const e = entries[i]}
-                <button class="entry" class:sel={selected.includes(e.id)} onclick={(event) => click(event, e.id)} oncontextmenu={(event) => oncontextmenu(event, e.id)} ondblclick={() => dblclick(e)} onmouseenter={() => enter(e)} onmouseleave={leave}>
-                  <span class="id">{e.id}</span>
+                {@const entry = entries[i]}
+                <button class="entry" class:sel={selectedSet.has(entry.id)} onclick={(event) => click(event, entry.id)} oncontextmenu={(event) => oncontextmenu(event, entry.id)} ondblclick={() => dblclick(entry)} onmouseenter={() => enter(entry)} onmouseleave={leave}>
+                  <span class="id">{entry.id}</span>
                   <span class="t-slot">
-                    {#if hoverA.current?.id === e.id}
-                      <ThingCanvas thing={hoverA.current.thing} get={(sid) => spriteCache.get(sid)?.pixels} size={spriteCache.size} ready={hoverA.ready} group={HoverAnim.group(hoverA.current.thing)} fit={32} colorize={false} improved={improvedA} />
-                    {:else if e.status !== "onlyB"}
-                      {@const src = res.thumb(category, e.id, versions.thing(category, e.id))}
+                    {#if hoverA.current?.id === entry.id}
+                      <ThingCanvas thing={hoverA.current.thing} get={(spriteId) => spriteCache.get(spriteId)?.pixels} size={spriteCache.size} ready={hoverA.ready} group={HoverAnim.group(hoverA.current.thing)} fit={32} colorize={false} improved={improvedA} />
+                    {:else if entry.status !== "onlyB"}
+                      {@const src = res.thumb(category, entry.id, versions.thing(category, entry.id))}
                       <img class="pixel" {src} alt="" loading="lazy" decoding="async" draggable="false" use:imgLoading={src} />
                     {/if}
                   </span>
                   <Icon name="arrowE" />
                   <span class="t-slot">
-                    {#if hoverB.current?.id === e.id}
-                      <ThingCanvas thing={hoverB.current.thing} get={(sid) => otherSpriteCache.get(sid)?.pixels} size={otherSpriteCache.size} ready={hoverB.ready} group={HoverAnim.group(hoverB.current.thing)} fit={32} colorize={false} improved={improvedB} />
-                    {:else if e.status !== "onlyA"}
-                      {@const src = res.otherThumb(category, e.id, otherVersions.thing(category, e.id))}
+                    {#if hoverB.current?.id === entry.id}
+                      <ThingCanvas thing={hoverB.current.thing} get={(spriteId) => otherSpriteCache.get(spriteId)?.pixels} size={otherSpriteCache.size} ready={hoverB.ready} group={HoverAnim.group(hoverB.current.thing)} fit={32} colorize={false} improved={improvedB} />
+                    {:else if entry.status !== "onlyA"}
+                      {@const src = res.otherThumb(category, entry.id, otherVersions.thing(category, entry.id))}
                       <img class="pixel" {src} alt="" loading="lazy" decoding="async" draggable="false" use:imgLoading={src} />
                     {/if}
                   </span>
-                  {#if queuedIds.has(e.id)}<span class="tag" title="Queued for A (double click removes it)">queued</span>{/if}
-                  <span class="state {e.status}">{e.status === "copied" ? "Copied" : STATUS_LABELS[e.status as Status]}</span>
-                  <span class="t-label changes" title={(e.changes ?? []).map((c) => CHANGE_LABELS[c] ?? c).join(", ")}>{(e.changes ?? []).map((c) => CHANGE_LABELS[c] ?? c).join(", ")}</span>
-                  {#if copied[e.id]}
+                  {#if queuedIds.has(entry.id)}<span class="tag" title="Queued for A (double click removes it)">queued</span>{/if}
+                  <span class="state {entry.status}">{entry.status === "copied" ? "Copied" : STATUS_LABELS[entry.status as Status]}</span>
+                  <span class="t-label changes" title={(entry.changes ?? []).map((change) => CHANGE_LABELS[change] ?? change).join(", ")}>{(entry.changes ?? []).map((change) => CHANGE_LABELS[change] ?? change).join(", ")}</span>
+                  {#if copied[entry.id]}
                     <!-- svelte-ignore a11y_click_events_have_key_events -->
-                    <span class="revert" role="button" tabindex="-1" title="Revert this copy" onclick={(event) => (event.stopPropagation(), revert([e.id]))}><Icon name="undo" /></span>
+                    <span class="revert" role="button" tabindex="-1" title="Revert this copy" onclick={(event) => (event.stopPropagation(), revert([entry.id]))}><Icon name="undo" /></span>
                   {/if}
                 </button>
               {/snippet}
             </VirtualGrid>
           {/if}
-          {#if loading && diff}<span class="spinner corner"></span>{/if}
+          {#if loading && diff}<span class="t-spinner corner"></span>{/if}
         </div>
 
       </div>
@@ -588,19 +586,6 @@
   }
   .err {
     color: #ff9c9c;
-  }
-  .spinner {
-    width: 12px;
-    height: 12px;
-    border: 2px solid rgba(232, 196, 106, 0.25);
-    border-top-color: var(--gold);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
   }
   .corner {
     position: absolute;

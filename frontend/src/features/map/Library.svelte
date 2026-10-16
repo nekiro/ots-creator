@@ -50,7 +50,7 @@
 
   function loadPrefs(): { view: View; collection: string } {
     const stored = (readJson(PREFS_KEY) ?? {}) as { view?: View; collection?: unknown };
-    return { view: VIEWS.some((x) => x.id === stored.view) ? stored.view! : "terrain", collection: typeof stored.collection === "string" ? stored.collection : "" };
+    return { view: VIEWS.some((view) => view.id === stored.view) ? stored.view! : "terrain", collection: typeof stored.collection === "string" ? stored.collection : "" };
   }
   $effect(() => saveJson(PREFS_KEY, { view, collection }));
 
@@ -207,11 +207,11 @@
   const ITEM_CELL = 36;
 </script>
 
-{#snippet brushRow(b: PaletteBrush)}
-  {@const sel = brushSel(b)}
-  <button class="m-row" class:on={isBrushActive(sel)} title="{b.name} · double-click to edit" onclick={() => selectBrush(sel)} ondblclick={() => editBrush(b)} oncontextmenu={(event) => brushMenu(event, b)}>
-    <span class="t-slot"><ItemIcon id={b.look} size={24} /></span>
-    <span class="m-name">{b.name}</span>
+{#snippet brushRow(brush: PaletteBrush)}
+  {@const choice = brushSel(brush)}
+  <button class="m-row" class:on={isBrushActive(choice)} title="{brush.name} · double-click to edit" onclick={() => selectBrush(choice)} ondblclick={() => editBrush(brush)} oncontextmenu={(event) => brushMenu(event, brush)}>
+    <span class="t-slot"><ItemIcon id={brush.look} size={24} /></span>
+    <span class="m-name">{brush.name}</span>
   </button>
 {/snippet}
 
@@ -220,11 +220,11 @@
   {#if list.length}
     <div class="m-sect">Groups<span class="grow"></span>{list.length}</div>
     <div class="stamps">
-      {#each list as b (b.name)}
-        {@const sel = brushSel(b)}
-        <button class="stamp" class:on={isBrushActive(sel)} title="{b.name} · {b.preview?.w}×{b.preview?.h} tiles · double-click to edit" onclick={() => selectBrush(sel)} ondblclick={() => editBrush(b)} oncontextmenu={(event) => brushMenu(event, b)}>
-          {#if b.preview}<BrushPreview preview={b.preview} />{/if}
-          <span class="m-name">{b.name}</span>
+      {#each list as brush (brush.name)}
+        {@const choice = brushSel(brush)}
+        <button class="stamp" class:on={isBrushActive(choice)} title="{brush.name} · {brush.preview?.w}×{brush.preview?.h} tiles · double-click to edit" onclick={() => selectBrush(choice)} ondblclick={() => editBrush(brush)} oncontextmenu={(event) => brushMenu(event, brush)}>
+          {#if brush.preview}<BrushPreview preview={brush.preview} />{/if}
+          <span class="m-name">{brush.name}</span>
         </button>
       {/each}
     </div>
@@ -232,18 +232,18 @@
 {/snippet}
 
 {#snippet itemCell(id: number)}
-  {@const sel = itemSel(id)}
-  <button class="m-cell" class:on={isBrushActive(sel)} title="{map.items?.name(id)} · {id}" onclick={() => selectBrush(sel)} oncontextmenu={(event) => itemMenu(event, id)}>
+  {@const choice = itemSel(id)}
+  <button class="m-cell" class:on={isBrushActive(choice)} title="{map.items?.name(id)} · {id}" onclick={() => selectBrush(choice)} oncontextmenu={(event) => itemMenu(event, id)}>
     <span class="t-slot"><ItemIcon {id} /></span>
   </button>
 {/snippet}
 
-{#snippet creatureRow(c: CreatureType)}
-  {@const sel = creatureSel(c)}
-  <button class="m-row" class:on={isBrushActive(sel)} onclick={() => selectBrush(sel)}>
-    <span class="t-slot"><ItemIcon outfit={c.outfit.lookItem ? 0 : c.outfit.lookType} id={c.outfit.lookItem} size={24} /></span>
-    <span class="m-name">{c.name}</span>
-    {#if c.npc}<span class="m-meta">NPC</span>{/if}
+{#snippet creatureRow(creature: CreatureType)}
+  {@const choice = creatureSel(creature)}
+  <button class="m-row" class:on={isBrushActive(choice)} onclick={() => selectBrush(choice)}>
+    <span class="t-slot"><ItemIcon outfit={creature.outfit.lookItem ? 0 : creature.outfit.lookType} id={creature.outfit.lookItem} size={24} /></span>
+    <span class="m-name">{creature.name}</span>
+    {#if creature.npc}<span class="m-meta">NPC</span>{/if}
   </button>
 {/snippet}
 
@@ -266,8 +266,8 @@
   <SearchField bind:value={query} placeholder="Search by name or id" />
 
   <div class="t-tabs views" role="tablist">
-    {#each VIEWS as v}
-      <button class="t-tab" role="tab" class:on={view === v.id} aria-selected={view === v.id} title={v.title} onclick={() => (view = v.id)}>{v.label}{#if search}<span class="count" class:none={!counts[v.id]}>{counts[v.id]}</span>{/if}</button>
+    {#each VIEWS as tab}
+      <button class="t-tab" role="tab" class:on={view === tab.id} aria-selected={view === tab.id} title={tab.title} onclick={() => (view = tab.id)}>{tab.label}{#if search}<span class="count" class:none={!counts[tab.id]}>{counts[tab.id]}</span>{/if}</button>
     {/each}
   </div>
 
@@ -281,35 +281,35 @@
 
   {#if view === "terrain"}
     <div class="m-body t-panel m-scroll">
-      {#each TERRAIN_GROUPS as g}
-        {@const list = terrain.filter((b) => g.kinds.includes(b.kind))}
+      {#each TERRAIN_GROUPS as group}
+        {@const list = terrain.filter((brush) => group.kinds.includes(brush.kind))}
         {#if list.length}
-          <div class="m-sect">{g.label}</div>
-          {#each list as b (b.name)}{@render brushRow(b)}{/each}
+          <div class="m-sect">{group.label}</div>
+          {#each list as brush (brush.name)}{@render brushRow(brush)}{/each}
         {/if}
       {/each}
       {#if !terrain.length}
         {#if search}{@render noMatch()}{:else if allBrushes.length}<div class="m-empty">No terrain in this collection.</div>{:else}{@render noBrushes()}{/if}
       {:else if !search}
-        {@const opt = { kind: "optionalBorder", label: "Optional border" }}
+        {@const optionalBorder = { kind: "optionalBorder", label: "Optional border" }}
         <div class="m-sect">Tools</div>
-        <button class="m-row" class:on={isBrushActive(opt)} title="Adds the optional border of a ground (like the gravel around mountains) where you paint" onclick={() => selectBrush(opt)}>
+        <button class="m-row" class:on={isBrushActive(optionalBorder)} title="Adds the optional border of a ground (like the gravel around mountains) where you paint" onclick={() => selectBrush(optionalBorder)}>
           <span class="m-swatch opt"></span><span class="m-name">Optional border</span>
         </button>
       {/if}
     </div>
   {:else if view === "decor"}
     <div class="m-body t-panel m-scroll">
-      {#each decor.filter((b) => !b.preview) as b (b.name)}{@render brushRow(b)}{/each}
-      {@render stampCards(decor.filter((b) => !!b.preview))}
+      {#each decor.filter((brush) => !brush.preview) as brush (brush.name)}{@render brushRow(brush)}{/each}
+      {@render stampCards(decor.filter((brush) => !!brush.preview))}
       {#if !decor.length}
         {#if search}{@render noMatch()}{:else if allBrushes.length}<div class="m-empty">No decoration in this collection.</div>{:else}{@render noBrushes()}{/if}
       {/if}
     </div>
   {:else if view === "items"}
     <div class="t-tabs kinds" role="tablist">
-      {#each ITEM_KINDS as k}
-        <button class="t-tab" role="tab" class:on={itemKind === k.id} aria-selected={itemKind === k.id} title={k.title} onclick={() => (itemKind = k.id)}>{k.label}</button>
+      {#each ITEM_KINDS as kindTab}
+        <button class="t-tab" role="tab" class:on={itemKind === kindTab.id} aria-selected={itemKind === kindTab.id} title={kindTab.title} onclick={() => (itemKind = kindTab.id)}>{kindTab.label}</button>
       {/each}
     </div>
     <div class="m-body t-panel grid-host">
@@ -343,7 +343,7 @@
       {/if}
       {#if shownCreatures.length}
         <div class="m-sect">{who === "npc" ? "NPCs" : who === "monster" ? "Monsters" : "Creatures"}<span class="grow"></span>{shownCreatures.length}</div>
-        {#each shownCreatures as c (c.name)}{@render creatureRow(c)}{/each}
+        {#each shownCreatures as creature (creature.name)}{@render creatureRow(creature)}{/each}
       {:else if search}
         {@render noMatch()}
       {:else}
@@ -357,9 +357,9 @@
 
   {#if map.recentBrushes.length}
     <div class="recent" title="Recently used: keys 1-9">
-      {#each map.recentBrushes.slice(0, 9) as b, i}
-        <button class="m-cell small" class:on={isBrushActive(b)} title="{i + 1}: {b.label}" onclick={() => selectBrush(b)}>
-          <span class="t-slot"><ItemIcon id={b.look ?? b.item ?? 0} outfit={b.kind === "creature" ? creatureOutfit(b.creature) : 0} /></span>
+      {#each map.recentBrushes.slice(0, 9) as brush, i}
+        <button class="m-cell small" class:on={isBrushActive(brush)} title="{i + 1}: {brush.label}" onclick={() => selectBrush(brush)}>
+          <span class="t-slot"><ItemIcon id={brush.look ?? brush.item ?? 0} outfit={brush.kind === "creature" ? creatureOutfit(brush.creature) : 0} /></span>
           <span class="key">{i + 1}</span>
         </button>
       {/each}

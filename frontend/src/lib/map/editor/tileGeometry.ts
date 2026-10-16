@@ -1,6 +1,6 @@
 // Tile shapes of brushes and strokes, and the tile under a screen point.
 import { pos, type Position } from "../data/api";
-import { worldToTile } from "../view/coords";
+import { worldToPosition } from "../view/coords";
 
 /** Tiles a brush of `size` (tiles from the center) covers around center; none below 0. */
 export function brushArea(center: Position, size: number, shape: string): Position[] {
@@ -17,7 +17,7 @@ export function brushArea(center: Position, size: number, shape: string): Positi
 
 /** The outline of a square brush (a wall brush draws only its border). */
 export function squareOutline(center: Position, size: number): Position[] {
-  return brushArea(center, size, "square").filter((p) => Math.abs(p.x - center.x) === size || Math.abs(p.y - center.y) === size);
+  return brushArea(center, size, "square").filter((position) => Math.abs(position.x - center.x) === size || Math.abs(position.y - center.y) === size);
 }
 
 /** Tiles on the line from one tile to another, without the first (strokes never skip tiles). */
@@ -29,17 +29,17 @@ export function bresenhamLine(from: Position, to: Position): Position[] {
   const dy = -Math.abs(to.y - from.y);
   const stepX = from.x < to.x ? 1 : -1;
   const stepY = from.y < to.y ? 1 : -1;
-  let err = dx + dy;
+  let error = dx + dy;
   for (;;) {
     if (x !== from.x || y !== from.y) out.push(pos(x, y, from.z));
     if (x === to.x && y === to.y) break;
-    const doubled = 2 * err;
+    const doubled = 2 * error;
     if (doubled >= dy) {
-      err += dy;
+      error += dy;
       x += stepX;
     }
     if (doubled <= dx) {
-      err += dx;
+      error += dx;
       y += stepY;
     }
   }
@@ -63,6 +63,5 @@ export interface ViewTransform {
 export function screenToTile(x: number, y: number, view: ViewTransform): Position {
   const worldX = (x - view.width / 2) / view.scale + view.camX;
   const worldY = (y - view.height / 2) / view.scale + view.camY;
-  const tile = worldToTile(worldX, worldY, view.floor, view.tileSize);
-  return pos(Math.max(0, tile.x), Math.max(0, tile.y), view.floor);
+  return worldToPosition(worldX, worldY, view.floor, view.tileSize);
 }

@@ -1,5 +1,7 @@
 <script lang="ts">
   import { DialogService, ProjectService, type OTBReport } from "../../lib/api";
+  import { OTB_FILTERS } from "../../lib/commands/shared";
+  import { plural } from "../../lib/util/format";
   import { app, run, toast } from "../../lib/state/app.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
 
@@ -14,23 +16,22 @@
       return;
     }
     ProjectService.ItemsOTBPreview().then(
-      (r) => (pending = r),
+      (report) => (pending = report),
       () => (pending = null),
     );
   });
 
   async function choose() {
-    const p = await DialogService.OpenFiles("itemsOtb", "items.otb", [{ name: "Server items (items.otb)", pattern: "*.otb" }], false);
-    if (!p?.length) return;
-    const st = await run("Loading items.otb", () => ProjectService.AttachItemsOTB(p[0]));
-    if (st?.info.itemsOtb) toast(`items.otb attached: ${st.info.itemsOtb.items.toLocaleString()} server items.`, "success");
+    const paths = await DialogService.OpenFiles("itemsOtb", "items.otb", OTB_FILTERS, false);
+    if (!paths?.length) return;
+    const attached = await run("Loading items.otb", () => ProjectService.AttachItemsOTB(paths[0]));
+    if (attached?.info.itemsOtb) toast(`items.otb attached: ${attached.info.itemsOtb.items.toLocaleString()} server items.`, "success");
   }
 
   async function detach() {
     await run("Detaching items.otb", () => ProjectService.DetachItemsOTB());
   }
 
-  const plural = (n: number, word: string) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`;
 </script>
 
 <Dialog title="Server Items (items.otb)" width={480} onclose={() => (app.dialog = null)}>

@@ -2,6 +2,7 @@
 // (SettingsService) in the user's config directory.
 import { Format, SettingsService, errorMessage, type Recent, type Settings } from "../api";
 import { toast } from "./app.svelte";
+import { dirname } from "../util/path";
 
 export const IMAGE_FORMATS = [
   { value: "png", label: "PNG" },
@@ -61,5 +62,5 @@ export function shortPath(path: string, max: number): string {
 /** Folder of a recent client, for display (an asset folder is its own path). */
 export function recentDir(recent: Recent): string {
   if (recent.format === Format.FormatAssets) return recent.datPath;
-  return recent.datPath.replace(/[\\/][^\\/]*$/, "");
+  return dirname(recent.datPath);
 }

@@ -6,6 +6,8 @@
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Select from "../../lib/ui/Select.svelte";
   import FeaturesEditor from "./FeaturesEditor.svelte";
+  import { basename, dirname } from "../../lib/util/path";
+  import { keyOfVersion, loadVersions } from "../../lib/versions";
 
   const info = app.project!.info;
   const fromAssets = info.format === Format.FormatAssets;
@@ -15,30 +17,29 @@
   let versionKey = $state("");
   let features = $state<Features>({ ...info.features });
   // An asset folder is the output itself; dat/spr go into a folder.
-  let dir = $state(fromAssets ? info.datPath : info.datPath ? info.datPath.replace(/[\\/][^\\/]*$/, "") : "");
-  let name = $state(!fromAssets && info.datPath ? info.datPath.replace(/^.*[\\/]/, "").replace(/\.dat$/i, "") : "Tibia");
+  let dir = $state(fromAssets ? info.datPath : info.datPath ? dirname(info.datPath) : "");
+  let name = $state(!fromAssets && info.datPath ? basename(info.datPath).replace(/\.dat$/i, "") : "Tibia");
   let writeOtfi = $state(true);
   let warnings = $state<string[]>([]);
 
-  const keyOf = (v: Version) => `${v.value}|${v.name}|${v.datSignature}|${v.sprSignature}`;
-  const version = $derived(versions.find((value) => keyOf(value) === versionKey) ?? null);
-  const sep = $derived(dir.includes("\\") ? "\\" : "/");
+  const version = $derived(versions.find((value) => keyOfVersion(value) === versionKey) ?? null);
+  const separator = $derived(dir.includes("\\") ? "\\" : "/");
 
   onMount(async () => {
-    versions = ((await ProjectService.Versions()) ?? []).slice().reverse();
+    versions = await loadVersions();
     // Assets have no dat signature; offer the newest dat version.
-    versionKey = fromAssets ? (versions[0] ? keyOf(versions[0]) : "") : keyOf(info.version);
+    versionKey = fromAssets ? (versions[0] ? keyOfVersion(versions[0]) : "") : keyOfVersion(info.version);
   });
 
   $effect(() => {
-    const v = toAssets ? info.version : version;
-    if (!v) return;
-    ProjectService.Warnings(format, v).then((w) => (warnings = w ?? []));
+    const target = toAssets ? info.version : version;
+    if (!target) return;
+    ProjectService.Warnings(format, target).then((found) => (warnings = found ?? []));
   });
 
   async function browse() {
-    const d = await DialogService.PickDirectory("compileOutput", "Output folder");
-    if (d) dir = d;
+    const picked = await DialogService.PickDirectory("compileOutput", "Output folder");
+    if (picked) dir = picked;
   }
 
   async function compileAssets() {
@@ -59,7 +60,7 @@
     if (!version || !dir || !name) return;
     if (app.dirty) await applyDraft();
     if (!(await offerOptimize())) return;
-    const base = dir + sep + name;
+    const base = dir + separator + name;
     app.dialog = null;
     const stats = await run("Compiling", () =>
       ProjectService.CompileAs({ format, datPath: base + ".dat", sprPath: base + ".spr", version, features, writeOtfi }),
@@ -103,7 +104,7 @@
       </label>
       <label class="row">
         <span class="t-label lbl">Version</span>
-        <Select grow value={versionKey} options={versions.map((value) => ({ value: keyOf(value), label: value.name }))} onchange={(value) => (versionKey = value)} />
+        <Select grow value={versionKey} options={versions.map((value) => ({ value: keyOfVersion(value), label: value.name }))} onchange={(value) => (versionKey = value)} />
       </label>
       {#if version}<FeaturesEditor bind:features version={version.value} sizeLocked />{/if}
       <label class="row"><input class="t-check" type="checkbox" bind:checked={writeOtfi} />Write OTClient feature file (.otfi)</label>
@@ -119,7 +120,7 @@
             : ""}:
         </div>
         <div class="list t-panel">
-          {#each warnings.slice(0, 200) as w}<div>{w}</div>{/each}
+          {#each warnings.slice(0, 200) as warning}<div>{warning}</div>{/each}
           {#if warnings.length > 200}<div>…</div>{/if}
         </div>
       </div>

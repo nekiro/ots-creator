@@ -5,10 +5,10 @@ import (
 	"math"
 	"slices"
 
-	"github.com/nekiro/ots-creator/internal/mapping/materials"
 	"github.com/nekiro/ots-creator/internal/core/otitems"
-	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/mapping/materials"
+	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
 // View flags the chunk geometry depends on (GeometryOptions.ViewFlags; see
@@ -173,7 +173,7 @@ type geometryBuilder struct {
 	// (see canShade), row by row, one bit each.
 	shades    []byte
 	hasShades bool
-	sprites       map[uint32]struct{}
+	sprites   map[uint32]struct{}
 	// chunks are the chunks of the key being built, row by row; scratch
 	// and scratchItems hold the packed tile being drawn.
 	chunks       []*otmap.Chunk
@@ -315,8 +315,8 @@ func (b *geometryBuilder) composedPiece(group *thing.FrameGroup, index int, spri
 	b.composedCount++
 }
 
-// item emits one item of the tile at p and returns its elevation.
-func (b *geometryBuilder) item(item otmap.Item, p tilePosition, anchorX, anchorY int, color tint, hook int) int {
+// item emits one item of the tile at position and returns its elevation.
+func (b *geometryBuilder) item(item otmap.Item, position tilePosition, anchorX, anchorY int, color tint, hook int) int {
 	spriteSize := b.scene.SpriteSize
 	itemType := b.scene.Items.Get(item.ID)
 	if itemType == nil {
@@ -331,7 +331,7 @@ func (b *geometryBuilder) item(item otmap.Item, p tilePosition, anchorX, anchorY
 		b.rect(anchorX, anchorY, spriteSize, spriteSize, missingSpriteColor.withAlpha(missingSpriteColor.alpha*color.alpha))
 		return 0
 	}
-	at := itemPattern(itemType, look, item.Subtype, p, hook)
+	at := itemPattern(itemType, look, item.Subtype, position, hook)
 	b.drawLook(look, uint32(itemType.ClientID), at, anchorX, anchorY, color, b.view(ViewAnimation), nil)
 	if look.lightLevel > 0 {
 		b.light(look, at, anchorX, anchorY)
@@ -341,9 +341,9 @@ func (b *geometryBuilder) item(item otmap.Item, p tilePosition, anchorX, anchorY
 
 // itemPattern picks the pattern the client draws an item with: by fluid
 // color, hook, stack count or position.
-func itemPattern(itemType *otitems.Type, look *thingLook, subtype uint16, p tilePosition, hook int) pattern {
+func itemPattern(itemType *otitems.Type, look *thingLook, subtype uint16, position tilePosition, hook int) pattern {
 	group := look.frameGroup
-	at := pattern{z: p.z % int(group.PatternZ)}
+	at := pattern{z: position.z % int(group.PatternZ)}
 	switch {
 	case itemType.Flags&(otitems.FlagSplash|otitems.FlagFluidContainer) != 0:
 		fluid := int(subtype) % fluidColors
@@ -353,7 +353,7 @@ func itemPattern(itemType *otitems.Type, look *thingLook, subtype uint16, p tile
 	case itemType.Flags.Has(otitems.FlagStackable) && group.PatternX == stackPatternColumns && group.PatternY == stackPatternRows:
 		at.x, at.y = stackPattern(int(subtype))
 	default:
-		at.x, at.y = p.x%int(group.PatternX), p.y%int(group.PatternY)
+		at.x, at.y = position.x%int(group.PatternX), position.y%int(group.PatternY)
 	}
 	return at
 }
@@ -376,7 +376,7 @@ func stackPattern(count int) (x, y int) {
 }
 
 // creature emits a creature as the client draws it standing still.
-func (b *geometryBuilder) creature(creature otmap.Creature, p tilePosition, anchorX, anchorY int) {
+func (b *geometryBuilder) creature(creature otmap.Creature, position tilePosition, anchorX, anchorY int) {
 	spriteSize := b.scene.SpriteSize
 	color := white
 	if creature.Selected {
@@ -384,7 +384,7 @@ func (b *geometryBuilder) creature(creature otmap.Creature, p tilePosition, anch
 	}
 	outfit := b.scene.Outfit(creature.Name)
 	if outfit.LookItem != 0 {
-		b.item(otmap.Item{ID: outfit.LookItem}, p, anchorX, anchorY, color, hookNone)
+		b.item(otmap.Item{ID: outfit.LookItem}, position, anchorX, anchorY, color, hookNone)
 		return
 	}
 	if outfit.LookType == 0 {
@@ -501,7 +501,7 @@ func selectionDim(item otmap.Item) float64 {
 
 // tile emits one tile, stacked as the client does: ground, borders,
 // bottom items, common items, creatures, top items.
-func (b *geometryBuilder) tile(tile *otmap.Tile, p tilePosition, anchorX, anchorY int) {
+func (b *geometryBuilder) tile(tile *otmap.Tile, position tilePosition, anchorX, anchorY int) {
 	spriteSize := b.scene.SpriteSize
 	things := len(tile.Items)
 	if tile.Ground.ID != 0 {
@@ -514,7 +514,7 @@ func (b *geometryBuilder) tile(tile *otmap.Tile, p tilePosition, anchorX, anchor
 		b.shade()
 	}
 	if tile.Ground.ID != 0 {
-		elevation += b.item(tile.Ground, p, anchorX, anchorY, color.scaled(selectionDim(tile.Ground)), hook)
+		elevation += b.item(tile.Ground, position, anchorX, anchorY, color.scaled(selectionDim(tile.Ground)), hook)
 	}
 	var topItems []otmap.Item
 	for _, pass := range [...]uint8{topBorder, topBottom, topCommon} {
@@ -541,14 +541,14 @@ func (b *geometryBuilder) tile(tile *otmap.Tile, p tilePosition, anchorX, anchor
 			if b.view(ViewGhostItems) && topOrder == topCommon && itemType != nil && itemType.Flags.Has(otitems.FlagPickupable) {
 				itemColor.alpha = ghostItemAlpha
 			}
-			elevation += b.item(item, p, anchorX-elevation, anchorY-elevation, itemColor, hook)
+			elevation += b.item(item, position, anchorX-elevation, anchorY-elevation, itemColor, hook)
 			elevation = min(elevation, maxElevation)
 		}
 	}
 	creatures := tile.Creatures()
 	if b.view(ViewCreatures) {
 		for _, creature := range creatures {
-			b.creature(creature, p, anchorX-elevation, anchorY-elevation)
+			b.creature(creature, position, anchorX-elevation, anchorY-elevation)
 		}
 	}
 	// Top items start again from the tile's corner (client: Tile::drawTop).
@@ -558,7 +558,7 @@ func (b *geometryBuilder) tile(tile *otmap.Tile, p tilePosition, anchorX, anchor
 		if b.skip(b.scene.Items.Get(item.ID)) {
 			continue
 		}
-		topElevation += b.item(item, p, anchorX-topElevation, anchorY-topElevation, white.scaled(selectionDim(item)), hook)
+		topElevation += b.item(item, position, anchorX-topElevation, anchorY-topElevation, white.scaled(selectionDim(item)), hook)
 		topElevation = min(topElevation, maxElevation)
 	}
 	b.onTop = false

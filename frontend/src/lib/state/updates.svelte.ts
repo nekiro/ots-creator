@@ -24,7 +24,7 @@ export async function initUpdates(autoCheck: boolean): Promise<void> {
     return; // not running inside Wails
   }
   Events.On(Updater.Events.DownloadStarted, () => (updates.stage = "downloading"));
-  Events.On(Updater.Events.DownloadProgress, (e: { data: { written: number; total: number } }) => (updates.progress = e.data));
+  Events.On(Updater.Events.DownloadProgress, (event: { data: { written: number; total: number } }) => (updates.progress = event.data));
   Events.On(Updater.Events.Verifying, () => (updates.stage = "verifying"));
   Events.On(Updater.Events.Installing, () => (updates.stage = "installing"));
   Events.On(Updater.Events.UpdateReady, () => (updates.stage = "restarting"));
@@ -44,8 +44,8 @@ export async function checkForUpdates(manual: boolean): Promise<void> {
     } else if (manual) {
       toast(`OTS Creator ${updates.version} is up to date.`, "success");
     }
-  } catch (e) {
-    if (manual) toast(`Update check failed: ${errorMessage(e)}`, "error");
+  } catch (event) {
+    if (manual) toast(`Update check failed: ${errorMessage(event)}`, "error");
   } finally {
     updates.checking = false;
   }
@@ -57,8 +57,8 @@ export async function installUpdate(): Promise<void> {
   updates.progress = null;
   try {
     await UpdateService.Install();
-  } catch (e) {
+  } catch (event) {
     updates.stage = "idle";
-    toast(`Update failed: ${errorMessage(e)}`, "error");
+    toast(`Update failed: ${errorMessage(event)}`, "error");
   }
 }

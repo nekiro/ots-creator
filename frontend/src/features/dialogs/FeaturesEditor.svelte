@@ -26,16 +26,16 @@
 </script>
 
 <div class="features">
-  {#each items as it}
-    <label class="row" title={it.hint}>
-      <input class="t-check" type="checkbox" bind:checked={features[it.key]} disabled={it.key !== "transparency" && forced[it.key]} />
-      <span>{it.label}</span>
-      {#if it.key !== "transparency" && forced[it.key]}<span class="t-label">(required)</span>{/if}
+  {#each items as item}
+    <label class="row" title={item.hint}>
+      <input class="t-check" type="checkbox" bind:checked={features[item.key]} disabled={item.key !== "transparency" && forced[item.key]} />
+      <span>{item.label}</span>
+      {#if item.key !== "transparency" && forced[item.key]}<span class="t-label">(required)</span>{/if}
     </label>
   {/each}
   <label class="row">
     <span class="t-label">Sprite size</span>
-    <Select value={features.spriteSize} disabled={sizeLocked} options={[32, 64, 128, 256].map((s) => ({ value: s, label: `${s}×${s}` }))} onchange={(value) => (features.spriteSize = value)} />
+    <Select value={features.spriteSize} disabled={sizeLocked} options={[32, 64, 128, 256].map((size) => ({ value: size, label: `${size}×${size}` }))} onchange={(value) => (features.spriteSize = value)} />
   </label>
 </div>
 

@@ -39,7 +39,7 @@ func LoadProgress(path string, items Items, format Format, progress Progress) (*
 	if err != nil {
 		return nil, nil, err
 	}
-	m, warnings, err := readOTBM(data, items, format, progress)
+	gameMap, warnings, err := readOTBM(data, items, format, progress)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -67,19 +67,19 @@ func LoadProgress(path string, items Items, format Format, progress Progress) (*
 		warnings = append(warnings, fileWarnings...)
 		return name
 	}
-	m.HouseFile = readAux(m.HouseFile, base+"-house.xml", func(fileData []byte) ([]string, error) { return ReadHouses(m, fileData) })
-	if m.SpawnFormat == SpawnsSeparate {
-		m.SpawnFile = readAux(m.SpawnFile, base+"-monster.xml", func(fileData []byte) ([]string, error) { return ReadSpawns(m, fileData, false) })
-		m.NpcFile = readAux(m.NpcFile, base+"-npc.xml", func(fileData []byte) ([]string, error) { return ReadSpawns(m, fileData, true) })
+	gameMap.HouseFile = readAux(gameMap.HouseFile, base+"-house.xml", func(fileData []byte) ([]string, error) { return ReadHouses(gameMap, fileData) })
+	if gameMap.SpawnFormat == SpawnsSeparate {
+		gameMap.SpawnFile = readAux(gameMap.SpawnFile, base+"-monster.xml", func(fileData []byte) ([]string, error) { return ReadSpawns(gameMap, fileData, false) })
+		gameMap.NpcFile = readAux(gameMap.NpcFile, base+"-npc.xml", func(fileData []byte) ([]string, error) { return ReadSpawns(gameMap, fileData, true) })
 	} else {
-		m.SpawnFile = readAux(m.SpawnFile, base+"-spawn.xml", func(fileData []byte) ([]string, error) { return ReadSpawns(m, fileData, false) })
+		gameMap.SpawnFile = readAux(gameMap.SpawnFile, base+"-spawn.xml", func(fileData []byte) ([]string, error) { return ReadSpawns(gameMap, fileData, false) })
 	}
-	if m.ZoneFile != "" {
-		m.ZoneFile = readAux(m.ZoneFile, base+"-zones.xml", func(fileData []byte) ([]string, error) { return nil, ReadZones(m, fileData) })
+	if gameMap.ZoneFile != "" {
+		gameMap.ZoneFile = readAux(gameMap.ZoneFile, base+"-zones.xml", func(fileData []byte) ([]string, error) { return nil, ReadZones(gameMap, fileData) })
 	}
 	// Loading spawns sets tiles; a freshly loaded map has no changes.
-	m.ClearModified()
-	return m, warnings, nil
+	gameMap.ClearModified()
+	return gameMap, warnings, nil
 }
 
 // ClearModified clears the modified state of every tile.
@@ -92,12 +92,12 @@ func (m *Map) ClearModified() {
 
 // Save writes the map and its auxiliary files next to it. File names come
 // from the map (defaults derive from the map name). It returns warnings.
-func Save(path string, m *Map, items Items, format Format) ([]string, error) {
-	return SaveProgress(path, m, items, format, nil)
+func Save(path string, gameMap *Map, items Items, format Format) ([]string, error) {
+	return SaveProgress(path, gameMap, items, format, nil)
 }
 
 // SaveProgress is Save that reports its progress (progress may be nil).
-func SaveProgress(path string, m *Map, items Items, format Format, progress Progress) ([]string, error) {
+func SaveProgress(path string, gameMap *Map, items Items, format Format, progress Progress) ([]string, error) {
 	if progress == nil {
 		progress = func(Stage, int, int) {}
 	}
@@ -109,18 +109,18 @@ func SaveProgress(path string, m *Map, items Items, format Format, progress Prog
 		}
 		*name = baseName(*name)
 	}
-	defaultName(&m.HouseFile, "-house.xml")
-	if m.SpawnFormat == SpawnsSeparate {
-		defaultName(&m.SpawnFile, "-monster.xml")
-		defaultName(&m.NpcFile, "-npc.xml")
+	defaultName(&gameMap.HouseFile, "-house.xml")
+	if gameMap.SpawnFormat == SpawnsSeparate {
+		defaultName(&gameMap.SpawnFile, "-monster.xml")
+		defaultName(&gameMap.NpcFile, "-npc.xml")
 	} else {
-		defaultName(&m.SpawnFile, "-spawn.xml")
+		defaultName(&gameMap.SpawnFile, "-spawn.xml")
 	}
-	if len(m.Zones) > 0 {
-		defaultName(&m.ZoneFile, "-zones.xml")
+	if len(gameMap.Zones) > 0 {
+		defaultName(&gameMap.ZoneFile, "-zones.xml")
 	}
 	var buf bytes.Buffer
-	if err := writeOTBM(&buf, m, items, format, func(done, total int) { progress(StageEncode, done, total) }); err != nil {
+	if err := writeOTBM(&buf, gameMap, items, format, func(done, total int) { progress(StageEncode, done, total) }); err != nil {
 		return nil, err
 	}
 	var warnings []string
@@ -129,22 +129,22 @@ func SaveProgress(path string, m *Map, items Items, format Format, progress Prog
 		return nil, err
 	}
 	progress(StageWrite, 1, 4)
-	if err := fsutil.WriteAtomic(filepath.Join(dir, m.HouseFile), WriteHouses(m)); err != nil {
+	if err := fsutil.WriteAtomic(filepath.Join(dir, gameMap.HouseFile), WriteHouses(gameMap)); err != nil {
 		return nil, err
 	}
 	progress(StageWrite, 2, 4)
-	monsters, npcs, unsaved := WriteSpawns(m)
-	if err := fsutil.WriteAtomic(filepath.Join(dir, m.SpawnFile), monsters); err != nil {
+	monsters, npcs, unsaved := WriteSpawns(gameMap)
+	if err := fsutil.WriteAtomic(filepath.Join(dir, gameMap.SpawnFile), monsters); err != nil {
 		return nil, err
 	}
 	if npcs != nil {
-		if err := fsutil.WriteAtomic(filepath.Join(dir, m.NpcFile), npcs); err != nil {
+		if err := fsutil.WriteAtomic(filepath.Join(dir, gameMap.NpcFile), npcs); err != nil {
 			return nil, err
 		}
 	}
 	progress(StageWrite, 3, 4)
-	if m.ZoneFile != "" {
-		if err := fsutil.WriteAtomic(filepath.Join(dir, m.ZoneFile), WriteZones(m)); err != nil {
+	if gameMap.ZoneFile != "" {
+		if err := fsutil.WriteAtomic(filepath.Join(dir, gameMap.ZoneFile), WriteZones(gameMap)); err != nil {
 			return nil, err
 		}
 	}
@@ -152,6 +152,6 @@ func SaveProgress(path string, m *Map, items Items, format Format, progress Prog
 	if unsaved > 0 {
 		warnings = append(warnings, fmt.Sprintf("%d creatures are outside every spawn and were not saved", unsaved))
 	}
-	m.ClearModified()
+	gameMap.ClearModified()
 	return warnings, nil
 }

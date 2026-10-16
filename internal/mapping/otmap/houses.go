@@ -9,7 +9,7 @@ import (
 )
 
 // ReadHouses applies a houses.xml to the map.
-func ReadHouses(m *Map, data []byte) ([]string, error) {
+func ReadHouses(gameMap *Map, data []byte) ([]string, error) {
 	doc, err := xmltree.Parse(data)
 	if err != nil {
 		return nil, err
@@ -24,10 +24,10 @@ func ReadHouses(m *Map, data []byte) ([]string, error) {
 			warnings = append(warnings, "house without an id discarded")
 			continue
 		}
-		house := m.Houses[id]
+		house := gameMap.Houses[id]
 		if house == nil {
 			house = &House{ID: id}
-			m.Houses[id] = house
+			gameMap.Houses[id] = house
 		}
 		house.Name = node.Attrs["name"]
 		if house.Name == "" {
@@ -44,9 +44,9 @@ func ReadHouses(m *Map, data []byte) ([]string, error) {
 }
 
 // HouseSizes counts the tiles of every house.
-func HouseSizes(m *Map) map[uint32]int {
+func HouseSizes(gameMap *Map) map[uint32]int {
 	sizes := map[uint32]int{}
-	for _, chunk := range m.chunks {
+	for _, chunk := range gameMap.chunks {
 		// House tiles are never packed.
 		chunk.eachPtr(func(tile *Tile) {
 			if tile.HouseID != 0 {
@@ -58,11 +58,11 @@ func HouseSizes(m *Map) map[uint32]int {
 }
 
 // WriteHouses returns a houses.xml.
-func WriteHouses(m *Map) []byte {
+func WriteHouses(gameMap *Map) []byte {
 	w := newXMLWriter()
 	w.elem("houses", nil, false)
-	sizes := HouseSizes(m)
-	for _, house := range m.SortedHouses() {
+	sizes := HouseSizes(gameMap)
+	for _, house := range gameMap.SortedHouses() {
 		attrs := []xmlAttr{
 			{"name", house.Name}, {"houseid", itoa(house.ID)},
 			{"entryx", itoa(house.Exit.X)}, {"entryy", itoa(house.Exit.Y)}, {"entryz", itoa(house.Exit.Z)},

@@ -28,7 +28,7 @@ const entries = [
 ];
 
 const base = { section: "all", tags: [], query: "", sort: "new" as const, spriteSize: 0 };
-const ids = (es: MarketEntry[]) => es.map((e) => e.id);
+const ids = (entries: MarketEntry[]) => entries.map((entry) => entry.id);
 
 describe("market filter", () => {
   it("sorts newest first by default", () => {

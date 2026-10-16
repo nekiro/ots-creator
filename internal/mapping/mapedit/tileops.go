@@ -127,23 +127,9 @@ func (e *Editor) hasWall(tile *otmap.Tile) bool {
 	return false
 }
 
-func (e *Editor) hasCarpet(tile *otmap.Tile) bool {
-	for _, item := range tile.Items {
-		if info := e.Brushes.info[item.ID]; info != nil && info.carpet != nil {
-			return true
-		}
-	}
-	return false
-}
+func (e *Editor) hasCarpet(tile *otmap.Tile) bool { return e.hasJoined(tile, &carpetKind) }
 
-func (e *Editor) hasTable(tile *otmap.Tile) bool {
-	for _, item := range tile.Items {
-		if info := e.Brushes.info[item.ID]; info != nil && info.table != nil {
-			return true
-		}
-	}
-	return false
-}
+func (e *Editor) hasTable(tile *otmap.Tile) bool { return e.hasJoined(tile, &tableKind) }
 
 // posAt is a shorthand for building positions from ints (callers check range).
 func posAt(x, y, z int) otmap.Position {

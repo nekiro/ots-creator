@@ -6,7 +6,7 @@
   import { pickPosition } from "../../../lib/map/editor/world";
   import Icon from "../../../lib/ui/Icon.svelte";
 
-  let { value, pickLabel, onchange }: { value: Position | null | undefined; pickLabel: string; onchange: (p: Position) => void } = $props();
+  let { value, pickLabel, onchange }: { value: Position | null | undefined; pickLabel: string; onchange: (position: Position) => void } = $props();
   const set = $derived(!!value && (value.x > 0 || value.y > 0));
 </script>
 
@@ -16,8 +16,8 @@
     value={set ? fmtPos(value) : ""}
     placeholder="not set"
     onchange={(event) => {
-      const p = parsePos(event.currentTarget.value);
-      if (p) onchange(p);
+      const position = parsePos(event.currentTarget.value);
+      if (position) onchange(position);
     }}
   />
   <button class="t-icon-btn" title="Pick on the map" onclick={() => pickPosition(pickLabel, onchange)}><Icon name="picker" /></button>

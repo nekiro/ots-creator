@@ -26,8 +26,8 @@
   const name = $derived(value && map.items ? map.items.name(value) : "");
 
   function show() {
-    const b = input.getBoundingClientRect();
-    rect = { left: toCss(b.left), top: toCss(b.bottom), width: Math.max(toCss(b.width), 240) };
+    const bounds = input.getBoundingClientRect();
+    rect = { left: toCss(bounds.left), top: toCss(bounds.bottom), width: Math.max(toCss(bounds.width), 240) };
     open = true;
     active = 0;
   }

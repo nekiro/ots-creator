@@ -24,23 +24,23 @@ export function totalSprites(layout: Layout): number {
   return layout.width * layout.height * layout.layers * layout.patternX * layout.patternY * layout.patternZ * layout.frames;
 }
 
-export function spriteIndex(layout: Layout, w: number, h: number, pos: TexturePos): number {
+export function spriteIndex(layout: Layout, tileX: number, tileY: number, pos: TexturePos): number {
   const frame = pos.frame % Math.max(layout.frames, 1);
-  return ((((((frame * layout.patternZ + pos.z) * layout.patternY + pos.y) * layout.patternX + pos.x) * layout.layers + pos.layer) * layout.height + h) * layout.width) + w;
+  return ((((((frame * layout.patternZ + pos.z) * layout.patternY + pos.y) * layout.patternX + pos.x) * layout.layers + pos.layer) * layout.height + tileY) * layout.width) + tileX;
 }
 
-/** Pixel offset of tile (w, h) inside a texture; tile (0,0) is bottom-right. */
-export function tileOffset(layout: Layout, w: number, h: number, size: number): [number, number] {
-  return [(layout.width - 1 - w) * size, (layout.height - 1 - h) * size];
+/** Pixel offset of tile (tileX, tileY) inside a texture; tile (0,0) is bottom-right. */
+export function tileOffset(layout: Layout, tileX: number, tileY: number, size: number): [number, number] {
+  return [(layout.width - 1 - tileX) * size, (layout.height - 1 - tileY) * size];
 }
 
 /** All sprite slot indices of one texture with their pixel offsets. */
 export function textureSlots(layout: Layout, pos: TexturePos, size: number): { slot: number; x: number; y: number }[] {
   const out: { slot: number; x: number; y: number }[] = [];
-  for (let h = 0; h < layout.height; h++) {
-    for (let w = 0; w < layout.width; w++) {
-      const [x, y] = tileOffset(layout, w, h, size);
-      out.push({ slot: spriteIndex(layout, w, h, pos), x, y });
+  for (let tileY = 0; tileY < layout.height; tileY++) {
+    for (let tileX = 0; tileX < layout.width; tileX++) {
+      const [x, y] = tileOffset(layout, tileX, tileY, size);
+      out.push({ slot: spriteIndex(layout, tileX, tileY, pos), x, y });
     }
   }
   return out;
@@ -69,10 +69,10 @@ export function resizeSprites(old: Layout, sprites: number[], next: Layout): num
       for (let y = 0; y < kept("patternY"); y++)
         for (let x = 0; x < kept("patternX"); x++)
           for (let layer = 0; layer < kept("layers"); layer++)
-            for (let h = 0; h < kept("height"); h++)
-              for (let w = 0; w < kept("width"); w++) {
+            for (let tileY = 0; tileY < kept("height"); tileY++)
+              for (let tileX = 0; tileX < kept("width"); tileX++) {
                 const pos = { layer, x, y, z, frame };
-                out[spriteIndex(next, w, h, pos)] = sprites[spriteIndex(old, w, h, pos)] ?? 0;
+                out[spriteIndex(next, tileX, tileY, pos)] = sprites[spriteIndex(old, tileX, tileY, pos)] ?? 0;
               }
   return out;
 }

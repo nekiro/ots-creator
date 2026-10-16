@@ -12,7 +12,7 @@
   import { clamp } from "../../lib/util/math";
 
   let {
-    queue: q,
+    queue: dropQueue,
     category,
     onshow,
     onshowSlot,
@@ -25,7 +25,7 @@
     onshowSlot?: (id: number) => void;
   } = $props();
 
-  const queue = $derived(q.list(category));
+  const queue = $derived(dropQueue.list(category));
   const next = $derived<QueueItem | null>(queue[0] ?? null);
 
   // Slots of A: every id and one past the end (dropping there appends).
@@ -33,22 +33,22 @@
   let empty = $state<number[] | null>(null);
   let request = 0;
   $effect(() => {
-    const c = category;
+    const searched = category;
     void app.rev;
     if (!emptyOnly) {
       empty = null;
       return;
     }
-    const n = ++request;
-    ThingService.Find(c, { content: "empty", flag: "", name: "" }).then(
-      (r) => n === request && (empty = r ?? []),
-      (err) => n === request && toast(errorMessage(err), "error"),
+    const requestId = ++request;
+    ThingService.Find(searched, { content: "empty", flag: "", name: "" }).then(
+      (found) => requestId === request && (empty = found ?? []),
+      (err) => requestId === request && toast(errorMessage(err), "error"),
     );
   });
   const first = $derived(minId(category));
   const end = $derived(app.maxId(category) + 1);
   const count = $derived((empty ? empty.length : end - first) + 1);
-  const idAt = (i: number) => (i === count - 1 ? end : empty ? empty[i] : first + i);
+  const idAt = (index: number) => (index === count - 1 ? end : empty ? empty[index] : first + index);
 
   let jump = $state("");
   let scrollTo = $state<number | null>(null);
@@ -56,17 +56,17 @@
     if (event.key !== "Enter") return;
     const id = parseInt(jump, 10);
     if (!Number.isFinite(id)) return;
-    const i = empty ? empty.findIndex((x) => x >= id) : clamp(id, first, end) - first;
-    scrollTo = i < 0 ? count - 1 : i;
+    const index = empty ? empty.findIndex((emptyId) => emptyId >= id) : clamp(id, first, end) - first;
+    scrollTo = index < 0 ? count - 1 : index;
   }
 
   // Ids that just got objects light up for a moment.
   let recent = $state<Set<number>>(new Set());
   let timer: ReturnType<typeof setTimeout> | undefined;
-  async function dropAt(at: number, n = 1, free = false) {
-    const got = await q.drop(category, at, n, free);
-    if (!got.length) return;
-    recent = new Set(got);
+  async function dropAt(at: number, amount = 1, free = false) {
+    const dropped = await dropQueue.drop(category, at, amount, free);
+    if (!dropped.length) return;
+    recent = new Set(dropped);
     clearTimeout(timer);
     timer = setTimeout(() => (recent = new Set()), 1500);
   }
@@ -77,7 +77,7 @@
     const none = () => !queue.length || !!app.busy;
     const at = id === end ? 0 : id;
     const items: MenuEntry[] = [
-      { label: next !== null ? `Drop ${q.label(next)} here` : "Drop next here", action: () => dropAt(at), disabled: none },
+      { label: next !== null ? `Drop ${dropQueue.label(next)} here` : "Drop next here", action: () => dropAt(at), disabled: none },
       { label: `Drop all ${queue.length} from here (free ids)`, action: () => dropAt(at === 0 ? end : at, 0, true), disabled: none },
       { label: `Drop all ${queue.length} from here (in a row)`, action: () => dropAt(at === 0 ? end : at, 0, false), disabled: none },
       { label: `Drop all ${queue.length} at the end`, action: () => dropAt(0, 0), disabled: none },
@@ -88,11 +88,11 @@
 
   function queueMenu(event: MouseEvent, key: number | string) {
     openContextMenu(event, [
-      { label: "Drop next", action: () => q.toFront(category, key) },
-      { label: "Remove from queue", action: () => q.dequeue(category, [key]) },
+      { label: "Drop next", action: () => dropQueue.toFront(category, key) },
+      { label: "Remove from queue", action: () => dropQueue.dequeue(category, [key]) },
       { label: "Show in list", action: () => onshow(key) },
       "-",
-      { label: "Clear queue", action: () => q.clear(category) },
+      { label: "Clear queue", action: () => dropQueue.clear(category) },
     ]);
   }
 </script>
@@ -100,20 +100,20 @@
 <div class="drop col">
   <div class="row head">
     <strong>Queue</strong>
-    <span class="t-label">{queue.length ? `${queue.length} ${CATEGORY_NAMES[category]}(s) ${q.src.from}` : "empty"}</span>
+    <span class="t-label">{queue.length ? `${queue.length} ${CATEGORY_NAMES[category]}(s) ${dropQueue.src.from}` : "empty"}</span>
     <span class="grow"></span>
-    <button class="t-icon-btn" title="Clear the queue" disabled={!queue.length} onclick={() => q.clear(category)}><Icon name="close" /></button>
+    <button class="t-icon-btn" title="Clear the queue" disabled={!queue.length} onclick={() => dropQueue.clear(category)}><Icon name="close" /></button>
   </div>
   <div class="queue t-panel">
     {#if !queue.length}
-      <div class="t-label hint">{q.src.hint}</div>
+      <div class="t-label hint">{dropQueue.src.hint}</div>
     {:else}
-      {#each queue as it, i (it.key)}
-        {@const src = q.thumb(it)}
-        {@const label = q.label(it)}
-        <button class="q" class:next={i === 0} title={i === 0 ? `${label} drops next (right click for more)` : `${label}: click to drop next`} onclick={() => q.toFront(category, it.key)} oncontextmenu={(event) => queueMenu(event, it.key)}>
+      {#each queue as item, i (item.key)}
+        {@const src = dropQueue.thumb(item)}
+        {@const label = dropQueue.label(item)}
+        <button class="q" class:next={i === 0} title={i === 0 ? `${label} drops next (right click for more)` : `${label}: click to drop next`} onclick={() => dropQueue.toFront(category, item.key)} oncontextmenu={(event) => queueMenu(event, item.key)}>
           <span class="t-slot"><img class="pixel" {src} alt="" decoding="async" draggable="false" use:imgLoading={src} /></span>
-          <span class="id">{typeof it.key === "number" ? it.key : label}</span>
+          <span class="id">{typeof item.key === "number" ? item.key : label}</span>
         </button>
       {/each}
     {/if}
@@ -144,7 +144,7 @@
         >
           <span class="t-slot">
             {#if next !== null && hovered === id}
-              {@const src = q.thumb(next)}
+              {@const src = dropQueue.thumb(next)}
               <img class="pixel ghost" {src} alt="" decoding="async" draggable="false" />
             {:else if isEnd}
               <Icon name="plus" />

@@ -3,15 +3,15 @@
   import type { MenuEntry, MenuItem } from "../menu.svelte";
 
   let { items, onpick }: { items: MenuEntry[]; onpick: (item: MenuItem) => void } = $props();
-  const checkable = $derived(items.some((it) => it !== "-" && it.checked));
+  const checkable = $derived(items.some((entry) => entry !== "-" && entry.checked));
 </script>
 
-{#each items as it}
-  {#if it === "-"}
+{#each items as entry}
+  {#if entry === "-"}
     <div class="t-menu-sep"></div>
   {:else}
-    <button class="t-menu-entry" role="menuitem" disabled={it.disabled?.()} onclick={() => onpick(it)}>
-      <span>{#if checkable}<span class="mark">{it.checked?.() ? "✓" : ""}</span>{/if}{it.label}</span>{#if it.keys}<kbd>{it.keys}</kbd>{/if}
+    <button class="t-menu-entry" role="menuitem" disabled={entry.disabled?.()} onclick={() => onpick(entry)}>
+      <span>{#if checkable}<span class="mark">{entry.checked?.() ? "✓" : ""}</span>{/if}{entry.label}</span>{#if entry.keys}<kbd>{entry.keys}</kbd>{/if}
     </button>
   {/if}
 {/each}

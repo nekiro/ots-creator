@@ -194,7 +194,7 @@ func TestDoodadScatterCount(t *testing.T) {
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			e := testEditor(t)
-			brush := &DoodadBrush{opts: testCase.options}
+			brush := &DoodadBrush{options: testCase.options}
 			for range 20 {
 				got := e.doodadScatterCount(brush, testCase.size, testCase.shape, testCase.thickness)
 				if got < testCase.least || got > testCase.most {
@@ -420,8 +420,8 @@ func TestDoodadSkipsDuplicateItemOnWalkableTile(t *testing.T) {
 
 func TestDoodadFits(t *testing.T) {
 	plain := &DoodadBrush{owned: map[uint16]bool{stoneID: true}}
-	onBlocking := &DoodadBrush{opts: materials.DoodadOptions{OnBlocking: true}, owned: map[uint16]bool{stoneID: true}}
-	onDuplicate := &DoodadBrush{opts: materials.DoodadOptions{OnDuplicate: true}, owned: map[uint16]bool{stoneID: true}}
+	onBlocking := &DoodadBrush{options: materials.DoodadOptions{OnBlocking: true}, owned: map[uint16]bool{stoneID: true}}
+	onDuplicate := &DoodadBrush{options: materials.DoodadOptions{OnDuplicate: true}, owned: map[uint16]bool{stoneID: true}}
 	walkable := &otmap.Tile{Ground: otmap.Item{ID: sandID}, Items: tileopsItems(bagID)}
 	noGround := &otmap.Tile{Items: tileopsItems(bagID)}
 	blocked := &otmap.Tile{Ground: otmap.Item{ID: sandID}, Items: tileopsItems(treeID)}

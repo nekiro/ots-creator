@@ -17,21 +17,21 @@
   const thumb = $derived(thumbWidth(track, min, max));
   const offset = $derived(thumbOffset(value, track, min, max));
 
-  function set(v: number) {
-    v = clamp(Math.round(v), min, max);
-    if (v !== value) value = v;
+  function set(next: number) {
+    next = clamp(Math.round(next), min, max);
+    if (next !== value) value = next;
   }
 
   let trackEl: HTMLDivElement;
   function drag(event: PointerEvent) {
     if (disabled || event.button !== 0) return;
     event.preventDefault();
-    const el = event.currentTarget as HTMLElement;
-    el.setPointerCapture(event.pointerId);
+    const handle = event.currentTarget as HTMLElement;
+    handle.setPointerCapture(event.pointerId);
     const move = (event: PointerEvent) => set(valueAt(toCss(event.clientX - trackEl.getBoundingClientRect().left), track, min, max));
     move(event);
-    el.onpointermove = move;
-    el.onpointerup = el.onpointercancel = () => (el.onpointermove = el.onpointerup = el.onpointercancel = null);
+    handle.onpointermove = move;
+    handle.onpointerup = handle.onpointercancel = () => (handle.onpointermove = handle.onpointerup = handle.onpointercancel = null);
   }
 
   function onwheel(event: WheelEvent) {
@@ -41,8 +41,8 @@
   }
 
   function onkeydown(event: KeyboardEvent) {
-    const d: Record<string, number> = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1 };
-    if (event.key in d) set(value + d[event.key]);
+    const steps: Record<string, number> = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1 };
+    if (event.key in steps) set(value + steps[event.key]);
     else if (event.key === "Home") set(min);
     else if (event.key === "End") set(max);
     else return;

@@ -155,14 +155,12 @@ func isMaskColumns(img *image.NRGBA, texture, cols int) bool {
 			for x := bounds.Min.X + col*texture; x < bounds.Min.X+(col+1)*texture; x++ {
 				i := img.PixOffset(x, y)
 				red, green, blue, alpha := img.Pix[i], img.Pix[i+1], img.Pix[i+2], img.Pix[i+3]
-				if alpha == 0 || (red == 0xFF && green == 0 && blue == 0xFF) {
+				if alpha == 0 || isMagenta(img.Pix[i:]) {
 					continue
 				}
 				opaque++
-				high := func(value uint8) bool { return value >= 0xE0 }
-				low := func(value uint8) bool { return value <= 0x20 }
 				switch {
-				case high(red) && high(green) && low(blue), high(red) && low(green) && low(blue), low(red) && high(green) && low(blue), low(red) && low(green) && high(blue):
+				case isHigh(red) && isHigh(green) && isLow(blue), isHigh(red) && isLow(green) && isLow(blue), isLow(red) && isHigh(green) && isLow(blue), isLow(red) && isLow(green) && isHigh(blue):
 					template++
 				}
 			}
@@ -170,6 +168,12 @@ func isMaskColumns(img *image.NRGBA, texture, cols int) bool {
 	}
 	return opaque > 0 && template*10 >= opaque*9
 }
+
+// isHigh reports whether a color channel is close to full.
+func isHigh(value uint8) bool { return value >= 0xE0 }
+
+// isLow reports whether a color channel is close to zero.
+func isLow(value uint8) bool { return value <= 0x20 }
 
 // looksLikeAddons reports whether rows come in groups of three where the
 // second and third rows are small overlays (addon 1 and 2) of the first.
@@ -180,7 +184,7 @@ func looksLikeAddons(img *image.NRGBA, texture, rows int) bool {
 		for y := bounds.Min.Y + row*texture; y < bounds.Min.Y+(row+1)*texture; y++ {
 			for x := bounds.Min.X; x < bounds.Max.X; x++ {
 				i := img.PixOffset(x, y)
-				if img.Pix[i+3] != 0 && !(img.Pix[i] == 0xFF && img.Pix[i+1] == 0 && img.Pix[i+2] == 0xFF) {
+				if img.Pix[i+3] != 0 && !isMagenta(img.Pix[i:]) {
 					counts[row]++
 				}
 			}

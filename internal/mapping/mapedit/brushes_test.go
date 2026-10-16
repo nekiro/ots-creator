@@ -5,8 +5,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/nekiro/ots-creator/internal/mapping/materials"
 	"github.com/nekiro/ots-creator/internal/core/otitems"
+	"github.com/nekiro/ots-creator/internal/mapping/materials"
 )
 
 // brushesTestEditor is testEditor with its materials changed by mutate and
@@ -31,8 +31,8 @@ func TestChanceListSkipsZeroIDsAndCountsNegativeChancesAsZero(t *testing.T) {
 	if !slices.Equal(list.ids, []uint16{grassA, grassB, sandID}) {
 		t.Errorf("ids = %v, want [%d %d %d] (id 0 skipped)", list.ids, grassA, grassB, sandID)
 	}
-	if !slices.Equal(list.cum, []int{3, 3, 5}) {
-		t.Errorf("cumulative = %v, want [3 3 5] (negative chance counts as 0)", list.cum)
+	if !slices.Equal(list.cumulative, []int{3, 3, 5}) {
+		t.Errorf("cumulative = %v, want [3 3 5] (negative chance counts as 0)", list.cumulative)
 	}
 	if list.total != 5 {
 		t.Errorf("total = %d, want 5", list.total)

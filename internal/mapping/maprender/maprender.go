@@ -5,10 +5,10 @@
 package maprender
 
 import (
-	"github.com/nekiro/ots-creator/internal/mapping/materials"
 	"github.com/nekiro/ots-creator/internal/core/otitems"
-	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/mapping/materials"
+	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
 // ThingSource gives the client things sprites are drawn from.

@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nekiro/ots-creator/internal/formats/itemsotb"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/itemsotb"
 )
 
 // otbProject compiles a client with items 100..105 (sprites 1..6) and

@@ -9,36 +9,38 @@
   import { commands, openedNote } from "../../lib/commands";
   import { prefs, recentDir, shortPath } from "../../lib/state/prefs.svelte";
   import type { Recent } from "../../lib/api";
+  import { OTB_FILTERS } from "../../lib/commands/shared";
+  import { keyOfVersion, loadVersions } from "../../lib/versions";
 
   const recent = $derived((prefs.settings.recent ?? []).slice(0, 5));
 
   /** Fills the form with a recent client, so its version and features can be changed before opening. */
-  async function pickRecent(r: Recent) {
+  async function pickRecent(client: Recent) {
     // Assets have nothing to choose.
-    if (r.format === Format.FormatAssets) return openRecent(r);
-    await inspect(r.datPath);
+    if (client.format === Format.FormatAssets) return openRecent(client);
+    await inspect(client.datPath);
     if (!files) return;
-    features = { ...r.features };
-    if (!isAssets && versions.some((value) => keyOf(value) === keyOf(r.version))) {
-      versionKey = keyOf(r.version);
+    features = { ...client.features };
+    if (!isAssets && versions.some((value) => keyOfVersion(value) === keyOfVersion(client.version))) {
+      versionKey = keyOfVersion(client.version);
       error = "";
     }
   }
 
   /** Opens a recent client right away with the version and features it was saved with. */
-  function openRecent(r: Recent) {
+  function openRecent(client: Recent) {
     if (other) {
-      void openOther(r);
+      void openOther(client);
       return;
     }
     app.dialog = null;
-    void commands.openRecent(r);
+    void commands.openRecent(client);
   }
 
-  async function openOther(r: Recent) {
-    const format = r.format === Format.FormatAssets ? Format.FormatAssets : Format.FormatDat;
-    const req = { format, datPath: r.datPath, sprPath: r.sprPath, version: r.version, features: r.features, otbPath: null };
-    if ((await run("Loading client", () => CompareService.Open(req)))?.open) close();
+  async function openOther(client: Recent) {
+    const format = client.format === Format.FormatAssets ? Format.FormatAssets : Format.FormatDat;
+    const request = { format, datPath: client.datPath, sprPath: client.sprPath, version: client.version, features: client.features, otbPath: null };
+    if ((await run("Loading client", () => CompareService.Open(request)))?.open) close();
   }
 
   let versions = $state<Version[]>([]);
@@ -52,13 +54,12 @@
    * remembered for the client is used. */
   let otbChosen = $state(false);
 
-  const keyOf = (v: Version) => `${v.value}|${v.name}|${v.datSignature}|${v.sprSignature}`;
   const isAssets = $derived(files?.format === Format.FormatAssets);
-  const version = $derived(isAssets ? files!.detected : (versions.find((value) => keyOf(value) === versionKey) ?? null));
-  const hex = (n: number) => "0x" + n.toString(16).toUpperCase();
+  const version = $derived(isAssets ? files!.detected : (versions.find((value) => keyOfVersion(value) === versionKey) ?? null));
+  const hex = (value: number) => "0x" + value.toString(16).toUpperCase();
 
   onMount(async () => {
-    versions = ((await ProjectService.Versions()) ?? []).slice().reverse();
+    versions = await loadVersions();
     const dropped = app.openPath;
     app.openPath = "";
     if (dropped) await inspectAndOpen(dropped);
@@ -76,9 +77,9 @@
   }
 
   async function browseOtb() {
-    const p = await DialogService.OpenFiles("itemsOtb", "items.otb", [{ name: "Server items (items.otb)", pattern: "*.otb" }], false);
-    if (p?.length) {
-      otbPath = p[0];
+    const paths = await DialogService.OpenFiles("itemsOtb", "items.otb", OTB_FILTERS, false);
+    if (paths?.length) {
+      otbPath = paths[0];
       otbChosen = true;
     }
   }
@@ -89,7 +90,7 @@
       files = await ProjectService.Inspect(dir);
       features = { ...files.features };
       if (!otbChosen) otbPath = files.otbPath;
-      if (files.detected) versionKey = keyOf(files.detected);
+      if (files.detected) versionKey = keyOfVersion(files.detected);
       else error = `Unknown signatures (dat ${hex(files.datSignature)}, spr ${hex(files.sprSignature)}). Choose the version manually.`;
     } catch (err) {
       files = null;
@@ -107,14 +108,14 @@
 
   async function open() {
     if (!files || !version) return;
-    const f = files;
+    const chosen = files;
     // The compared client never syncs an items.otb.
-    const req = { format: f.format, datPath: f.datPath, sprPath: f.sprPath, version: f.detected ? null : version, features, otbPath: other || !otbChosen ? null : otbPath };
-    const st = await run("Loading client", () => (other ? CompareService.Open(req) : ProjectService.Open(req)));
-    if (st?.open) {
+    const request = { format: chosen.format, datPath: chosen.datPath, sprPath: chosen.sprPath, version: chosen.detected ? null : version, features, otbPath: other || !otbChosen ? null : otbPath };
+    const opened = await run("Loading client", () => (other ? CompareService.Open(request) : ProjectService.Open(request)));
+    if (opened?.open) {
       close();
-      openedNote(st);
-      toast(`Loaded ${version.name}: ${st.info.counts.items - 99} items, ${st.info.counts.sprites} sprites.`, "success");
+      openedNote(opened);
+      toast(`Loaded ${version.name}: ${opened.info.counts.items - 99} items, ${opened.info.counts.sprites} sprites.`, "success");
     }
   }
 </script>
@@ -133,11 +134,11 @@
       {#if recent.length}
         <div class="t-label">Recent clients</div>
         <div class="recent t-panel">
-          {#each recent as r (r.datPath)}
-            <button class="ritem" title={`${r.datPath}
-Click to choose features, double click to open as before`} onclick={() => pickRecent(r)} ondblclick={() => openRecent(r)}>
-              <span class="rver">{r.version.name}</span>
-              <span class="rdir">{shortPath(recentDir(r), 56)}</span>
+          {#each recent as client (client.datPath)}
+            <button class="ritem" title={`${client.datPath}
+Click to choose features, double click to open as before`} onclick={() => pickRecent(client)} ondblclick={() => openRecent(client)}>
+              <span class="rver">{client.version.name}</span>
+              <span class="rdir">{shortPath(recentDir(client), 56)}</span>
             </button>
           {/each}
         </div>
@@ -160,7 +161,7 @@ Click to choose features, double click to open as before`} onclick={() => pickRe
       </div>
       <label class="row">
         <span class="t-label">Version</span>
-        <Select grow value={versionKey} options={versions.map((value) => ({ value: keyOf(value), label: value.name }))} onchange={(value) => (versionKey = value)} />
+        <Select grow value={versionKey} options={versions.map((value) => ({ value: keyOfVersion(value), label: value.name }))} onchange={(value) => (versionKey = value)} />
         {#if files.detected}<span class="ok">detected</span>{/if}
       </label>
       <div class="t-label">Features</div>

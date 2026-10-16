@@ -1,13 +1,14 @@
 <script lang="ts">
   import { frameGroupAt } from "../lib/thing";
   import { CATEGORY_NAMES, Category, Format, type FrameGroup } from "../lib/api";
-  import { clampField, FLAG_GROUPS, flagVisible, getPath, setPath, type Field } from "../lib/flags";
+  import { clampField, FLAG_GROUPS, flagMatches, flagVisible, getPath, setPath, type Field } from "../lib/flags";
   import { setAllDurations, setLayout, type LayoutKey } from "../lib/render/frameGroups";
   import { app, applyDraft, revertDraft } from "../lib/state/app.svelte";
   import MiniWindow from "../lib/ui/MiniWindow.svelte";
   import NumberField from "../lib/ui/NumberField.svelte";
   import Select from "../lib/ui/Select.svelte";
   import Icon from "../lib/ui/Icon.svelte";
+  import FlagFields from "./FlagFields.svelte";
 
   let { group = $bindable(0) }: { group?: number } = $props();
 
@@ -59,10 +60,6 @@
     return options;
   }
 
-  function matches(label: string, key: string) {
-    const query = filter.trim().toLowerCase();
-    return !query || label.toLowerCase().includes(query) || key.toLowerCase().includes(query);
-  }
 
   const isOutfit = $derived(draft?.category === Category.CategoryOutfit);
   // Asset sprites are at most 64x64 pixels.
@@ -170,7 +167,7 @@
         <h4>Flags</h4>
         <input class="t-input filter" placeholder="Filter flags…" bind:value={filter} />
         {#each FLAG_GROUPS as flagGroup}
-          {@const flags = flagGroup.flags.filter((flag) => flagVisible(flag.key, draft.category, !!(draft.props as any)[flag.key]) && matches(flag.label, flag.key))}
+          {@const flags = flagGroup.flags.filter((flag) => flagVisible(flag.key, draft.category, !!(draft.props as any)[flag.key]) && flagMatches(filter, flag.label, flag.key))}
           {#if flags.length}
             <div class="group">
               <button class="ghead" onclick={() => (collapsed[flagGroup.title] = !collapsed[flagGroup.title])}>
@@ -186,34 +183,7 @@
                       <span class:on>{flag.label}</span>
                     </label>
                     {#if on && flag.fields}
-                      <div class="fields">
-                        {#each flag.fields as field}
-                          <label class="row">
-                            <span class="t-label">{field.label}</span>
-                            {#if field.kind === "mask"}
-                              <span class="mask">
-                                {#each field.options ?? [] as [bit, name]}
-                                  <label class="row"
-                                    ><input
-                                      class="t-check"
-                                      type="checkbox"
-                                      checked={(fieldValue(field) & bit) !== 0}
-                                      onchange={(event) => setField(field, event.currentTarget.checked ? fieldValue(field) | bit : fieldValue(field) & ~bit)}
-                                    />{name}</label
-                                  >
-                                {/each}
-                                {#if !fieldValue(field)}<span class="t-label">(any)</span>{/if}
-                              </span>
-                            {:else if field.kind === "select"}
-                              <Select grow value={fieldValue(field)} options={selectOptions(field)} onchange={(value) => setField(field, value)} />
-                            {:else if field.kind === "text"}
-                              <input class="t-input grow" value={fieldValue(field)} onchange={(event) => setField(field, event.currentTarget.value)} />
-                            {:else}
-                              <NumberField value={fieldValue(field)} min={field.kind === "i16" ? -32768 : 0} max={field.kind === "i16" ? 32767 : 65535} onchange={(value) => setField(field, value)} />
-                            {/if}
-                          </label>
-                        {/each}
-                      </div>
+                      <FlagFields fields={flag.fields} value={fieldValue} onset={setField} options={selectOptions} showAny />
                     {/if}
                     {#if on && flag.key === "hasBones"}
                       <div class="fields">
@@ -347,11 +317,7 @@
     padding: 4px;
     margin-bottom: 4px;
   }
-  .mask {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2px 8px;
-  }
+
   .flag.unsupported {
     opacity: 0.45;
   }

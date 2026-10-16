@@ -55,8 +55,8 @@ type FindResult struct {
 
 // Find searches items on the map.
 func (ms *MapService) Find(id int, query mapedit.FindQuery) (found FindResult, err error) {
-	err = ms.withMap(id, func(m *openMap, _ *mapData) error {
-		found.Results, found.More = m.editor.Find(query)
+	err = ms.withMap(id, func(opened *openMap, _ *mapData) error {
+		found.Results, found.More = opened.editor.Find(query)
 		return nil
 	})
 	return found, err
@@ -78,8 +78,8 @@ func (ms *MapService) Replace(id int, from, to []uint16, inSelection bool) (MapC
 
 // Stats returns map statistics.
 func (ms *MapService) Stats(id int) (stats mapedit.Statistics, err error) {
-	err = ms.withMap(id, func(m *openMap, _ *mapData) error {
-		stats = m.editor.Stats()
+	err = ms.withMap(id, func(opened *openMap, _ *mapData) error {
+		stats = opened.editor.Stats()
 		return nil
 	})
 	return stats, err

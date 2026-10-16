@@ -13,6 +13,6 @@ initScrollButtons();
 
 // No browser context menu (Inspect, Reload...) anywhere: the app opens its
 // own menus from oncontextmenu handlers, which still run.
-window.addEventListener("contextmenu", (e) => e.preventDefault());
+window.addEventListener("contextmenu", (event) => event.preventDefault());
 
 mount(playWindow ? PlayWindow : App, { target: document.getElementById("app")! });

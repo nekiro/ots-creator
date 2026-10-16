@@ -15,6 +15,9 @@ export class LightPass {
   private texture: WebGLTexture;
   private uniforms: Record<string, WebGLUniformLocation | null> = {};
   private pixels = new Uint8Array(0);
+  /** Size of the texture storage, reused while the grid keeps its size. */
+  private textureWidth = 0;
+  private textureHeight = 0;
 
   constructor(
     private gl: WebGL2RenderingContext,
@@ -52,7 +55,13 @@ export class LightPass {
     gl.activeTexture(gl.TEXTURE0 + LIGHT_UNIT);
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, grid.width, grid.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    if (grid.width === this.textureWidth && grid.height === this.textureHeight) {
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, grid.width, grid.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    } else {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, grid.width, grid.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      this.textureWidth = grid.width;
+      this.textureHeight = grid.height;
+    }
     gl.useProgram(this.program);
     gl.uniform1i(this.uniforms.u_light, LIGHT_UNIT);
     gl.uniform2f(this.uniforms.u_screen, screenWidth, screenHeight);

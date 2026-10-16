@@ -28,22 +28,24 @@
   import Icon from "../../lib/ui/Icon.svelte";
   import Preview, { type PreviewSource } from "../Preview.svelte";
   import PanStage from "../../lib/ui/PanStage.svelte";
-  import { ZOOM_LEVELS, stepZoom, zoomLabel } from "../../lib/pan.svelte";
+  import { ZOOM_LEVELS, stepZoom, zoomLabel } from "../../lib/render/zoom";
   import { compose } from "../../lib/render/compose";
   import { contentBox } from "../../lib/render/bounds";
   import VirtualGrid from "../../lib/ui/VirtualGrid.svelte";
   import { DEFAULT_COLORS } from "../../lib/render/outfit";
   import { fileQueue } from "../../lib/state/queue.svelte";
   import DropPanel from "./DropPanel.svelte";
-  import { formatKb } from "../../lib/util/format";
+  import { formatKb, plural } from "../../lib/util/format";
+  import { basename, dirname } from "../../lib/util/path";
+  import { IMAGE_FILTERS, OBJECT_FILTERS } from "../../lib/commands/shared";
   import { LruCache } from "../../lib/util/lruCache";
   import { decodeObjectFile } from "../../lib/objectFile";
   import { nextIndex } from "../../lib/ui/listNav";
 
   const FILTERS = [
     { name: "Objects and images (*.otobj, *.obd, *.png, *.bmp, *.gif, *.jpg)", pattern: "*.otobj;*.obd;*.png;*.bmp;*.gif;*.jpg;*.jpeg" },
-    { name: "Object files (*.otobj, *.obd)", pattern: "*.otobj;*.obd" },
-    { name: "Images (*.png, *.bmp, *.gif, *.jpg)", pattern: "*.png;*.bmp;*.gif;*.jpg;*.jpeg" },
+    OBJECT_FILTERS[0],
+    ...IMAGE_FILTERS,
   ];
 
   let dir = $state("");
@@ -64,10 +66,10 @@
   const frameGroup = $derived(frameGroupAt(thing, group));
   const get = (id: number) => (id > 0 ? pixels[id - 1] : undefined);
   const source = $derived<PreviewSource | null>(thing && file ? { key: current, thing, get, size: file.spriteSize } : null);
-  const index = $derived(entries.findIndex((event) => event.path === current));
+  const index = $derived(entries.findIndex((candidate) => candidate.path === current));
   const entry = $derived(entries[index] ?? null);
-  const name = $derived(current.replace(/^.*[\\/]/, ""));
-  const counts = $derived({ obd: entries.filter((event) => event.kind === "obd").length, image: entries.filter((event) => event.kind === "image").length });
+  const name = $derived(basename(current));
+  const counts = $derived({ obd: entries.filter((candidate) => candidate.kind === "obd").length, image: entries.filter((candidate) => candidate.kind === "image").length });
 
   onMount(() => {
     const path = app.obdPath;
@@ -85,7 +87,7 @@
 
   /** Shows a file and lists the other files of its folder. */
   async function open(path: string) {
-    const folder = path.replace(/[\\/][^\\/]*$/, "");
+    const folder = dirname(path);
     if (!samePath(folder, dir)) {
       dir = folder;
       wanted.length = 0;
@@ -99,7 +101,7 @@
         listing = false;
       }
     }
-    await show(entries.find((event) => samePath(event.path, path))?.path ?? path);
+    await show(entries.find((candidate) => samePath(candidate.path, path))?.path ?? path);
     await tick();
     list?.querySelector<HTMLElement>(".vgrid")?.focus();
   }
@@ -111,8 +113,8 @@
   // Recently read files, so browsing back and forth is instant. Neighbours
   // of the shown file are read ahead (slow drives make every read count).
   const CACHE_SIZE = 32;
-  const CELL_W = 64;
-  const CELL_H = 64;
+  const CELL_WIDTH = 64;
+  const CELL_HEIGHT = 64;
   const cache = new LruCache<string, Promise<Loaded>>(CACHE_SIZE);
 
   function read(path: string): Promise<Loaded> {
@@ -127,9 +129,9 @@
   function load(path: string): Promise<Loaded> {
     return OBJECT_EXT.test(path)
       ? ThingService.ReadObject(path).then((file) => ({ kind: "obd", ...decodeObjectFile(file, "empty object file") }))
-      : ViewerService.ReadImage(path).then((img) => {
-          if (!img) throw new Error("empty image");
-          return { kind: "image", image: { ...img, url: `data:image/png;base64,${img.png}` } };
+      : ViewerService.ReadImage(path).then((imageFile) => {
+          if (!imageFile) throw new Error("empty image");
+          return { kind: "image", image: { ...imageFile, url: `data:image/png;base64,${imageFile.png}` } };
         });
   }
 
@@ -216,7 +218,7 @@
   }
 
   function onkeydown(event: KeyboardEvent, columns: number) {
-    const pageRows = Math.max(1, Math.floor((list?.clientHeight ?? 0) / CELL_H));
+    const pageRows = Math.max(1, Math.floor((list?.clientHeight ?? 0) / CELL_HEIGHT));
     const next = nextIndex(event.key, index < 0 ? 0 : index, entries.length, { columns, pageRows });
     if (next === null || !entries.length) return;
     event.preventDefault();
@@ -252,17 +254,17 @@
       fileQueue.dequeue(queued.category, [path]);
       return;
     }
-    let r: Loaded;
+    let loaded: Loaded;
     try {
-      r = await read(path);
+      loaded = await read(path);
     } catch (err) {
       toast(errorMessage(err), "error");
       return;
     }
-    if (r.kind !== "obd") return;
-    const thumb = thumbs.get(path) || thumbnail(r.thing, r.pixels, r.file.spriteSize);
-    fileQueue.enqueue(r.thing.category, [{ key: path, label: path.replace(/^.*[\\/]/, ""), thumb }]);
-    dropCategory = r.thing.category;
+    if (loaded.kind !== "obd") return;
+    const thumb = thumbs.get(path) || thumbnail(loaded.thing, loaded.pixels, loaded.file.spriteSize);
+    fileQueue.enqueue(loaded.thing.category, [{ key: path, label: basename(path), thumb }]);
+    dropCategory = loaded.thing.category;
   }
 
   async function importImage() {
@@ -282,19 +284,19 @@
 Click to open another file` : "Open a file"} onclick={browse}>{dir || "No folder"}</button>
       <div class="list t-panel" bind:this={list}>
         {#if entries.length}
-          <VirtualGrid count={entries.length} cellWidth={CELL_W} cellHeight={CELL_H} gap={2} {scrollTo} {onkeydown}>
+          <VirtualGrid count={entries.length} cellWidth={CELL_WIDTH} cellHeight={CELL_HEIGHT} gap={2} {scrollTo} {onkeydown}>
             {#snippet cell(i)}
-              {@const e = entries[i]}
-              {@const src = thumbs.get(e.path)}
+              {@const fileEntry = entries[i]}
+              {@const src = thumbs.get(fileEntry.path)}
               <button
                 class="entry"
-                class:on={e.path === current}
-                class:busy={loading && e.path === current}
-                class:queued={queuedPaths.has(e.path)}
-                title={e.kind === "obd" ? `${e.name}${queuedPaths.has(e.path) ? " (queued)" : ""}\nDouble click queues it` : `${e.name}\nImage, not an object`}
-                onclick={() => show(e.path)}
-                ondblclick={() => e.kind === "obd" && toggleQueue(e.path)}
-                use:wantThumb={e.path}
+                class:on={fileEntry.path === current}
+                class:busy={loading && fileEntry.path === current}
+                class:queued={queuedPaths.has(fileEntry.path)}
+                title={fileEntry.kind === "obd" ? `${fileEntry.name}${queuedPaths.has(fileEntry.path) ? " (queued)" : ""}\nDouble click queues it` : `${fileEntry.name}\nImage, not an object`}
+                onclick={() => show(fileEntry.path)}
+                ondblclick={() => fileEntry.kind === "obd" && toggleQueue(fileEntry.path)}
+                use:wantThumb={fileEntry.path}
               >
                 <span class="thumb">
                   {#if src}
@@ -302,29 +304,29 @@ Click to open another file` : "Open a file"} onclick={browse}>{dir || "No folder
                   {:else if src === ""}
                     <Icon name="close" />
                   {:else}
-                    <span class="spinner"></span>
+                    <span class="t-spinner"></span>
                   {/if}
-                  {#if e.kind === "image"}<span class="badge img">IMG</span>{/if}
-                  {#if queuedPaths.has(e.path)}<span class="badge q">Q</span>{/if}
+                  {#if fileEntry.kind === "image"}<span class="badge img">IMG</span>{/if}
+                  {#if queuedPaths.has(fileEntry.path)}<span class="badge q">Q</span>{/if}
                 </span>
-                <span class="fname">{e.name.replace(/\.[^.]+$/, "")}</span>
+                <span class="fname">{fileEntry.name.replace(/\.[^.]+$/, "")}</span>
               </button>
             {/snippet}
           </VirtualGrid>
         {:else if listing}
-          <div class="t-label none"><span class="spinner"></span>Reading folder…</div>
+          <div class="t-label none"><span class="t-spinner"></span>Reading folder…</div>
         {:else if dir}
           <button class="t-label none open" onclick={browse}>No object files or images here.<br />Click to open another file.</button>
         {:else}
           <button class="t-label none open" onclick={browse}><Icon name="open" /><br />Click to open a file and list its folder.</button>
         {/if}
       </div>
-      <div class="t-label">{counts.obd} object{counts.obd === 1 ? "" : "s"} · {counts.image} image{counts.image === 1 ? "" : "s"} · arrows to browse</div>
+      <div class="t-label">{plural(counts.obd, "object")} · {plural(counts.image, "image")} · arrows to browse</div>
     </div>
 
     <div class="view col" class:dim={loading}>
       {#if loading}
-        <div class="loader t-panel" role="status"><span class="spinner"></span>Loading {name}…</div>
+        <div class="loader t-panel" role="status"><span class="t-spinner"></span>Loading {name}…</div>
       {/if}
       {#if source}
         <Preview {source} bind:group />
@@ -371,9 +373,9 @@ Click to open another file` : "Open a file"} onclick={browse}>{dir || "No folder
         </div>
       {/if}
       <div class="t-tabs cats">
-        {#each CATEGORIES as c}
-          {@const n = queueCounts.get(c) ?? 0}
-          <button class="t-tab" class:on={dropCategory === c} title={CATEGORY_LABELS[c]} onclick={() => (dropCategory = c)}>{CATEGORY_LABELS[c]}{n ? ` (${n})` : ""}</button>
+        {#each CATEGORIES as category}
+          {@const queuedCount = queueCounts.get(category) ?? 0}
+          <button class="t-tab" class:on={dropCategory === category} title={CATEGORY_LABELS[category]} onclick={() => (dropCategory = category)}>{CATEGORY_LABELS[category]}{queuedCount ? ` (${queuedCount})` : ""}</button>
         {/each}
       </div>
       <div class="side-panel">
@@ -559,24 +561,12 @@ Click to open another file` : "Open a file"} onclick={browse}>{dir || "No folder
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .spinner {
+  .t-spinner {
     flex: none;
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    border: 2px solid rgba(232, 196, 106, 0.25);
-    border-top-color: var(--gold);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
   }
-  .none .spinner {
+  .none .t-spinner {
     margin-right: 6px;
     vertical-align: -2px;
-  }
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
   }
   .entry.busy .thumb {
     animation: pulse 0.8s ease-in-out infinite alternate;

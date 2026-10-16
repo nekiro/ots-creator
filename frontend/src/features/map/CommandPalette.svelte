@@ -35,38 +35,38 @@
   const commands = $derived.by<Entry[]>(() => {
     const out: Entry[] = [];
     for (const menu of mapMenus()) {
-      for (const e of menu.items) {
-        if (e === "-" || e.disabled?.()) continue;
-        out.push({ group: "Commands", label: e.label.replace(/…$/, ""), detail: menu.label, keys: e.keys, run: e.action });
+      for (const menuItem of menu.items) {
+        if (menuItem === "-" || menuItem.disabled?.()) continue;
+        out.push({ group: "Commands", label: menuItem.label.replace(/…$/, ""), detail: menu.label, keys: menuItem.keys, run: menuItem.action });
       }
     }
     out.push({ group: "Commands", label: "Editor settings", detail: "Settings", run: () => (map.dialog = "settings") });
     return out;
   });
 
-  const q = $derived(text.trim().toLowerCase());
+  const query = $derived(text.trim().toLowerCase());
   const entries = $derived.by<Entry[]>(() => {
     const out: Entry[] = [];
-    const has = map.activeId !== null;
-    const p = has ? parsePos(text) : null;
-    if (p) out.push({ group: "Go to", label: `Go to ${fmtPos(p)}`, run: () => (goTo(p), mapCommands.inspect(p)) });
-    if (!q) return [...out, ...commands.slice(0, 40)];
-    const match = (s: string) => s.toLowerCase().includes(q);
-    if (has) {
-      for (const t of towns()) if (match(t.name)) out.push({ group: "Places", label: t.name, detail: "town", run: () => (mapCommands.focus({ kind: "town", id: t.id }), t.temple.x && goTo(t.temple)) });
-      for (const h of houses()) if (match(h.name)) out.push({ group: "Places", label: h.name, detail: "house", run: () => (mapCommands.focus({ kind: "house", id: h.id }), goHouse(h)) });
-      for (const w of map.active?.waypoints ?? []) if (w && match(w.name)) out.push({ group: "Places", label: w.name, detail: "waypoint", run: () => (mapCommands.focus({ kind: "waypoint", name: w.name }), goTo(w.pos)) });
+    const hasMap = map.activeId !== null;
+    const position = hasMap ? parsePos(text) : null;
+    if (position) out.push({ group: "Go to", label: `Go to ${fmtPos(position)}`, run: () => (goTo(position), mapCommands.inspect(position)) });
+    if (!query) return [...out, ...commands.slice(0, 40)];
+    const match = (label: string) => label.toLowerCase().includes(query);
+    if (hasMap) {
+      for (const town of towns()) if (match(town.name)) out.push({ group: "Places", label: town.name, detail: "town", run: () => (mapCommands.focus({ kind: "town", id: town.id }), town.temple.x && goTo(town.temple)) });
+      for (const house of houses()) if (match(house.name)) out.push({ group: "Places", label: house.name, detail: "house", run: () => (mapCommands.focus({ kind: "house", id: house.id }), goHouse(house)) });
+      for (const waypoint of map.active?.waypoints ?? []) if (waypoint && match(waypoint.name)) out.push({ group: "Places", label: waypoint.name, detail: "waypoint", run: () => (mapCommands.focus({ kind: "waypoint", name: waypoint.name }), goTo(waypoint.pos)) });
     }
-    const brushes = (map.palette?.brushes ?? []).filter((b): b is PaletteBrush => !!b && match(b.name)).slice(0, 30);
-    for (const b of brushes) out.push({ group: "Brushes", label: b.name, detail: b.kind, icon: { id: b.look }, run: () => selectBrush({ kind: b.kind === "decoration" ? "wall" : b.kind, name: b.name, look: b.look, label: b.name }) });
-    for (const c of (map.palette?.creatures ?? []).filter((c): c is CreatureType => !!c && match(c.name)).slice(0, 20)) {
-      out.push({ group: "Creatures", label: c.name, detail: c.npc ? "NPC" : "monster", icon: { outfit: c.outfit.lookItem ? 0 : c.outfit.lookType, id: c.outfit.lookItem }, run: () => selectBrush({ kind: "creature", creature: c.name, npc: !!c.npc, label: c.name }) });
+    const brushes = (map.palette?.brushes ?? []).filter((brush): brush is PaletteBrush => !!brush && match(brush.name)).slice(0, 30);
+    for (const brush of brushes) out.push({ group: "Brushes", label: brush.name, detail: brush.kind, icon: { id: brush.look }, run: () => selectBrush({ kind: brush.kind === "decoration" ? "wall" : brush.kind, name: brush.name, look: brush.look, label: brush.name }) });
+    for (const creature of (map.palette?.creatures ?? []).filter((creature): creature is CreatureType => !!creature && match(creature.name)).slice(0, 20)) {
+      out.push({ group: "Creatures", label: creature.name, detail: creature.npc ? "NPC" : "monster", icon: { outfit: creature.outfit.lookItem ? 0 : creature.outfit.lookType, id: creature.outfit.lookItem }, run: () => selectBrush({ kind: "creature", creature: creature.name, npc: !!creature.npc, label: creature.name }) });
     }
-    for (const id of map.items?.search(q, 30) ?? []) {
+    for (const id of map.items?.search(query, 30) ?? []) {
       const name = map.items!.name(id);
       out.push({ group: "Items", label: name, detail: String(id), icon: { id }, run: () => selectBrush({ kind: "raw", item: id, look: id, label: name }) });
     }
-    for (const c of commands) if (match(c.label) || match(c.detail ?? "")) out.push(c);
+    for (const command of commands) if (match(command.label) || match(command.detail ?? "")) out.push(command);
     return out.slice(0, 120);
   });
 
@@ -75,10 +75,10 @@
     active = 0;
   });
 
-  function run(e: Entry | undefined) {
-    if (!e) return;
+  function run(entry: Entry | undefined) {
+    if (!entry) return;
     close();
-    void Promise.resolve(e.run());
+    void Promise.resolve(entry.run());
   }
 
   function onkey(event: KeyboardEvent) {
@@ -88,9 +88,9 @@
       close();
     } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
-      const n = entries.length;
-      if (!n) return;
-      active = (active + (event.key === "ArrowDown" ? 1 : n - 1)) % n;
+      const count = entries.length;
+      if (!count) return;
+      active = (active + (event.key === "ArrowDown" ? 1 : count - 1)) % count;
       void tick().then(() => list?.querySelector(".on")?.scrollIntoView({ block: "nearest" }));
     } else if (event.key === "Enter") {
       event.preventDefault();
@@ -104,13 +104,13 @@
   <div class="box t-window" transition:pop|global role="dialog" aria-label="Command palette">
     <input class="t-input big" bind:this={input} bind:value={text} placeholder="Position, place, brush, item, creature or command…" onkeydown={onkey} spellcheck="false" />
     <div class="list" bind:this={list}>
-      {#each entries as e, i}
-        {#if i === 0 || entries[i - 1].group !== e.group}<div class="m-sect">{e.group}</div>{/if}
-        <button class="m-row" class:on={i === active} onmousemove={() => (active = i)} onclick={() => run(e)}>
-          {#if e.icon}<span class="t-slot sm"><ItemIcon id={e.icon.id ?? 0} outfit={e.icon.outfit ?? 0} size={24} /></span>{/if}
-          <span class="m-name">{e.label}</span>
-          {#if e.detail}<span class="m-meta">{e.detail}</span>{/if}
-          {#if e.keys}<kbd>{e.keys}</kbd>{/if}
+      {#each entries as entry, i}
+        {#if i === 0 || entries[i - 1].group !== entry.group}<div class="m-sect">{entry.group}</div>{/if}
+        <button class="m-row" class:on={i === active} onmousemove={() => (active = i)} onclick={() => run(entry)}>
+          {#if entry.icon}<span class="t-slot sm"><ItemIcon id={entry.icon.id ?? 0} outfit={entry.icon.outfit ?? 0} size={24} /></span>{/if}
+          <span class="m-name">{entry.label}</span>
+          {#if entry.detail}<span class="m-meta">{entry.detail}</span>{/if}
+          {#if entry.keys}<kbd>{entry.keys}</kbd>{/if}
         </button>
       {:else}
         <div class="m-empty">Nothing matches. Positions like 1000 1000 7 or {"{x = 1000, y = 1000, z = 7}"} work too.</div>

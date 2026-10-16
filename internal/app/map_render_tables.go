@@ -68,39 +68,39 @@ const (
 // Appearance is what the map renderer needs to draw a client thing.
 type Appearance struct {
 	ID        uint32   `json:"id"`
-	Width     uint8    `json:"w"`
-	Height    uint8    `json:"h"`
-	Layers    uint8    `json:"l"`
-	PatternX  uint8    `json:"px"`
-	PatternY  uint8    `json:"py"`
-	PatternZ  uint8    `json:"pz"`
-	Frames    uint8    `json:"f"`
-	Sprites   []uint32 `json:"s"`
-	Durations []uint32 `json:"d,omitempty"`
-	OffsetX   int16    `json:"ox,omitempty"`
-	OffsetY   int16    `json:"oy,omitempty"`
-	Elevation uint16   `json:"el,omitempty"`
+	Width     uint8    `json:"width"`
+	Height    uint8    `json:"height"`
+	Layers    uint8    `json:"layers"`
+	PatternX  uint8    `json:"patternX"`
+	PatternY  uint8    `json:"patternY"`
+	PatternZ  uint8    `json:"patternZ"`
+	Frames    uint8    `json:"frames"`
+	Sprites   []uint32 `json:"sprites"`
+	Durations []uint32 `json:"durations,omitempty"`
+	OffsetX   int16    `json:"offsetX,omitempty"`
+	OffsetY   int16    `json:"offsetY,omitempty"`
+	Elevation uint16   `json:"elevation,omitempty"`
 	// Flags: 1 animate always, 2 hangable, 4 hook south, 8 hook east,
 	// 16 lying object, 32 translucent, 64 top, 128 bottom, 256 border,
 	// 512 ground, 1024 dont hide, 2048 full ground.
-	Flags      uint32 `json:"fl"`
-	LightLevel uint16 `json:"ll,omitempty"`
-	LightColor uint16 `json:"lc,omitempty"`
+	Flags      uint32 `json:"flags"`
+	LightLevel uint16 `json:"lightLevel,omitempty"`
+	LightColor uint16 `json:"lightColor,omitempty"`
 	// Moving is the frame group of a walking outfit (only its size,
 	// patterns, frames and sprites), when the outfit has one.
-	Moving *Appearance `json:"mv,omitempty"`
+	Moving *Appearance `json:"moving,omitempty"`
 }
 
 // Appearances returns render data of client things (missing ids are left
 // out).
 func (ms *MapService) Appearances(category thing.Category, ids []uint32) ([]Appearance, error) {
-	p, err := ms.session.Project()
+	proj, err := ms.session.Project()
 	if err != nil {
 		return nil, errNoClient
 	}
 	out := make([]Appearance, 0, len(ids))
 	for _, id := range ids {
-		found, err := p.Thing(category, id)
+		found, err := proj.Thing(category, id)
 		if err != nil || len(found.FrameGroups) == 0 {
 			continue
 		}

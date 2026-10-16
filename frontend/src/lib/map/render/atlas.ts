@@ -8,7 +8,7 @@ import { ATLAS } from "../constants";
 export type AtlasKey = number | string;
 
 export class Atlas {
-  tex: WebGLTexture;
+  texture: WebGLTexture;
   readonly perRow: number;
   readonly perLayer: number;
   layers: number = ATLAS.startLayers;
@@ -32,7 +32,7 @@ export class Atlas {
   ) {
     this.perRow = Math.floor(ATLAS.size / cell);
     this.perLayer = this.perRow * this.perRow;
-    this.tex = this.create(this.layers);
+    this.texture = this.create(this.layers);
     this.used = new Uint32Array(this.layers * this.perLayer);
     const white = new Uint8Array(cell * cell * 4).fill(255);
     gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, 0, cell, cell, 1, gl.RGBA, gl.UNSIGNED_BYTE, white);
@@ -44,14 +44,14 @@ export class Atlas {
 
   private create(layers: number): WebGLTexture {
     const gl = this.gl;
-    const tex = gl.createTexture()!;
-    gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex);
+    const texture = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
     gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.RGBA8, ATLAS.size, ATLAS.size, layers);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    return tex;
+    return texture;
   }
 
   /** Starts a frame: cells used from now on are protected from reuse. */
@@ -59,7 +59,7 @@ export class Atlas {
     this.frame++;
     this.uploads = 0;
     this.pending = false;
-    this.gl.bindTexture(this.gl.TEXTURE_2D_ARRAY, this.tex);
+    this.gl.bindTexture(this.gl.TEXTURE_2D_ARRAY, this.texture);
   }
 
   /** Marks cells used this frame without looking them up (cached geometry). */
@@ -74,14 +74,20 @@ export class Atlas {
     this.used[cell] = this.frame;
   }
 
+  /** The cell of key when it is already in the atlas (marked used), else -1.
+   * Hot loops check this first so a cache hit allocates no callback. */
+  cached(key: AtlasKey): number {
+    const slot = this.slots.get(key);
+    if (slot === undefined) return -1;
+    this.used[slot] = this.frame;
+    return slot;
+  }
+
   /** Cell of a key, uploading its pixels when needed; -1 when the pixels
    * are not available yet or the upload budget is spent. */
   cellOf(key: AtlasKey, pixels: () => Uint8ClampedArray | undefined | null): number {
-    const cached = this.slots.get(key);
-    if (cached !== undefined) {
-      this.used[cached] = this.frame;
-      return cached;
-    }
+    const cached = this.cached(key);
+    if (cached >= 0) return cached;
     if (this.uploads >= ATLAS.uploadsPerFrame) {
       this.pending = true;
       return -1;
@@ -118,8 +124,8 @@ export class Atlas {
 
   private grow(layers: number): void {
     const gl = this.gl;
-    const old = this.tex;
-    const tex = this.create(layers);
+    const old = this.texture;
+    const texture = this.create(layers);
     const framebuffer = gl.createFramebuffer();
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, framebuffer);
     for (let layer = 0; layer < this.layers; layer++) {
@@ -129,8 +135,8 @@ export class Atlas {
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
     gl.deleteFramebuffer(framebuffer);
     gl.deleteTexture(old);
-    this.tex = tex;
-    gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex);
+    this.texture = texture;
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
     const used = new Uint32Array(layers * this.perLayer);
     used.set(this.used);
     this.used = used;
@@ -178,6 +184,6 @@ export class Atlas {
   }
 
   dispose(): void {
-    this.gl.deleteTexture(this.tex);
+    this.gl.deleteTexture(this.texture);
   }
 }

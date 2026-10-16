@@ -58,9 +58,9 @@
     const cam = map.cam;
     const tileSize = spriteSize();
     const canvas = document.querySelector<HTMLCanvasElement>("canvas.map-gl");
-    const w = canvas ? canvas.clientWidth / cam.zoom / tileSize : 40;
-    const h = canvas ? canvas.clientHeight / cam.zoom / tileSize : 30;
-    return { x: center.x - w / 2 - origin.x, y: center.y - h / 2 - origin.y, w, h };
+    const width = canvas ? canvas.clientWidth / cam.zoom / tileSize : 40;
+    const height = canvas ? canvas.clientHeight / cam.zoom / tileSize : 30;
+    return { x: center.x - width / 2 - origin.x, y: center.y - height / 2 - origin.y, w: width, h: height };
   });
 
   let timer = 0;

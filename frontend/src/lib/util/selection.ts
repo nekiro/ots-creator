@@ -20,3 +20,22 @@ export function idRange(from: number, to: number): number[] {
 export function anchoredRange(anchor: number, range: number[]): number[] {
   return [anchor, ...range.filter((id) => id !== anchor)];
 }
+
+/**
+ * A click on an item of an anchored selection: Shift selects from the anchor
+ * (Ctrl adds that range), Ctrl toggles the item, a plain click selects only
+ * it. rangeFrom gives the ids from the anchor to the clicked item.
+ */
+export function clickSelection(
+  event: MouseEvent,
+  selection: number[],
+  anchor: number | null,
+  id: number,
+  rangeFrom: (anchor: number) => number[],
+): { selection: number[]; anchor: number | null } {
+  if (event.shiftKey && anchor !== null) {
+    const range = rangeFrom(anchor);
+    return { selection: event.ctrlKey ? [...new Set([...selection, ...range])] : range, anchor };
+  }
+  return { selection: event.ctrlKey || event.metaKey ? toggleId(selection, id) : [id], anchor: id };
+}

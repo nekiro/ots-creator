@@ -2,16 +2,17 @@
   import { commands } from "../lib/commands";
   import { app } from "../lib/state/app.svelte";
   import { map, warningCount } from "../lib/map/state.svelte";
+  import { plural } from "../lib/util/format";
 
   let { mapHover = "" }: { mapHover?: string } = $props();
-  const m = $derived(map.active);
+  const activeMap = $derived(map.active);
   const warnings = $derived(map.activeId !== null ? warningCount(map.loadWarnings[map.activeId]) : 0);
 
   const info = $derived(app.project?.info);
   const flags = $derived.by(() => {
-    const f = info?.features;
-    if (!f) return "";
-    return [f.extended && "extended", f.transparency && "transparency", f.improvedAnimations && "animations", f.frameGroups && "frame groups", f.spriteSize !== 32 && `${f.spriteSize}px`]
+    const features = info?.features;
+    if (!features) return "";
+    return [features.extended && "extended", features.transparency && "transparency", features.improvedAnimations && "animations", features.frameGroups && "frame groups", features.spriteSize !== 32 && `${features.spriteSize}px`]
       .filter(Boolean)
       .join(" · ");
   });
@@ -21,12 +22,12 @@
   <!-- The client info gives way first on a narrow window: the busy text and
        the stop button always stay visible. -->
   <div class="info">
-    {#if map.mode === "map" && m}
-      <span class="v">{m.name}</span>
-      {#if m.changed}<span class="changed">● unsaved changes</span>{/if}
+    {#if map.mode === "map" && activeMap}
+      <span class="v">{activeMap.name}</span>
+      {#if activeMap.changed}<span class="changed">● unsaved changes</span>{/if}
       <span>Floor <b>{map.floor}</b></span>
-      <span>Tiles <b>{m.tiles.toLocaleString()}</b></span>
-      {#if m.selection}<span>Selected <b>{m.selection.toLocaleString()}</b>{#if m.selection > 1} <span class="t-label">({m.selMax.x - m.selMin.x + 1}×{m.selMax.y - m.selMin.y + 1})</span>{/if}</span>{/if}
+      <span>Tiles <b>{activeMap.tiles.toLocaleString()}</b></span>
+      {#if activeMap.selection}<span>Selected <b>{activeMap.selection.toLocaleString()}</b>{#if activeMap.selection > 1} <span class="t-label">({activeMap.selMax.x - activeMap.selMin.x + 1}×{activeMap.selMax.y - activeMap.selMin.y + 1})</span>{/if}</span>{/if}
       <span class="sep"></span>
       <span class="hover">{mapHover}</span>
     {:else if map.mode === "map"}
@@ -50,11 +51,11 @@
   {#if app.busy || app.stoppable}
     <span class="busy" class:fixed={app.stoppable}>{app.busy ?? "Exporting"}…</span>
     {#if app.stoppable}<button class="t-btn danger stop" title="Stop the export" disabled={app.stopping} onclick={commands.stopTask}>{app.stopping ? "Stopping" : "Stop"}</button>{/if}
-  {:else if map.mode === "map" && m}
+  {:else if map.mode === "map" && activeMap}
     {#if warnings}
-      <button class="warn" title="Problems found while loading the map: click to see them" onclick={() => (map.dialog = "warnings")}>⚠ {warnings.toLocaleString()} warning{warnings > 1 ? "s" : ""}</button>
+      <button class="warn" title="Problems found while loading the map: click to see them" onclick={() => (map.dialog = "warnings")}>⚠ {plural(warnings, "warning")}</button>
     {/if}
-    <span class="t-label path" title={m.path}>{m.path || "not saved"}</span>
+    <span class="t-label path" title={activeMap.path}>{activeMap.path || "not saved"}</span>
   {:else if info && app.open}
     <span class="t-label path" title={info.datPath}>{info.datPath || "not saved"}</span>
   {/if}

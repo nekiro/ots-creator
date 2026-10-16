@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/nekiro/ots-creator/internal/formats/spr"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/spr"
 )
 
 // Diff statuses of one id in two clients.

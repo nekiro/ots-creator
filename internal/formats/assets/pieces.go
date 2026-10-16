@@ -30,22 +30,9 @@ func tiles(spriteType int) int {
 // Count returns the number of pieces.
 func (m *PieceMap) Count() uint32 { return m.count }
 
-func (m *PieceMap) sheetOf(id uint32) (int, bool) {
-	i, found := slices.BinarySearchFunc(m.sheets, id, func(sheet Sheet, id uint32) int {
-		switch {
-		case sheet.Last < id:
-			return -1
-		case sheet.First > id:
-			return 1
-		}
-		return 0
-	})
-	return i, found
-}
-
 // Pieces implements SpriteMap.
 func (m *PieceMap) Pieces(id uint32) (first uint32, width, height int, ok bool) {
-	i, ok := m.sheetOf(id)
+	i, ok := findSheet(m.sheets, id)
 	if !ok {
 		return 0, 0, 0, false
 	}

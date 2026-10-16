@@ -47,12 +47,12 @@ function limitsFloorsView(world: FloorWorld, items: number[], isFreeView: boolea
 export function firstVisibleFloor(world: FloorWorld, camera: Position): number {
   let firstFloor = 0;
   if (camera.z > GROUND_FLOOR) firstFloor = Math.max(camera.z - UNDERGROUND_RANGE, UNDERGROUND_FLOOR);
-  for (let ix = -1; ix <= 1 && firstFloor < camera.z; ix++) {
-    for (let iy = -1; iy <= 1 && firstFloor < camera.z; iy++) {
-      const x = camera.x + ix;
-      const y = camera.y + iy;
+  for (let offsetX = -1; offsetX <= 1 && firstFloor < camera.z; offsetX++) {
+    for (let offsetY = -1; offsetY <= 1 && firstFloor < camera.z; offsetY++) {
+      const x = camera.x + offsetX;
+      const y = camera.y + offsetY;
       const lookPossible = isLookPossible(world, x, y, camera.z);
-      if (!((ix === 0 && iy === 0) || (Math.abs(ix) !== Math.abs(iy) && lookPossible))) continue;
+      if (!((offsetX === 0 && offsetY === 0) || (Math.abs(offsetX) !== Math.abs(offsetY) && lookPossible))) continue;
       // Straight up, and up the diagonal the client draws upper floors along.
       let upperZ = camera.z;
       let coveredX = x;

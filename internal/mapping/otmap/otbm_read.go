@@ -7,8 +7,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/nekiro/ots-creator/internal/formats/otbnode"
 	"github.com/nekiro/ots-creator/internal/core/otitems"
+	"github.com/nekiro/ots-creator/internal/formats/otbnode"
 )
 
 // otbmIdentifiers are the identifiers an OTBM file may start with.
@@ -19,7 +19,7 @@ var otbmIdentifiers = []string{"OTBM", "\x00\x00\x00\x00"}
 const streamDepth = 2
 
 type reader struct {
-	m        *Map
+	gameMap  *Map
 	items    Items
 	format   Format
 	version  uint32
@@ -44,11 +44,11 @@ func (r *reader) warn(format string, args ...any) {
 
 // ReadOTBM parses OTBM data. Unknown or broken parts are skipped and
 // reported as warnings.
-func ReadOTBM(data []byte, items Items, f Format) (*Map, []string, error) {
-	return readOTBM(data, items, f, nil)
+func ReadOTBM(data []byte, items Items, format Format) (*Map, []string, error) {
+	return readOTBM(data, items, format, nil)
 }
 
-func readOTBM(data []byte, items Items, f Format, progress Progress) (*Map, []string, error) {
+func readOTBM(data []byte, items Items, format Format, progress Progress) (*Map, []string, error) {
 	if len(data) >= 4 {
 		if identifier := string(data[:4]); !slices.Contains(otbmIdentifiers, identifier) {
 			return nil, nil, fmt.Errorf("%w: identifier %q", ErrNotOTBM, identifier)
@@ -66,7 +66,7 @@ func readOTBM(data []byte, items Items, f Format, progress Progress) (*Map, []st
 	root, _, err := otbnode.Stream(data, streamDepth, reportTiles, func(stack []*otbnode.Node, node *otbnode.Node) error {
 		if r == nil {
 			var err error
-			if r, err = newReader(stack[0], stack[1], items, f); err != nil {
+			if r, err = newReader(stack[0], stack[1], items, format); err != nil {
 				return err
 			}
 		}
@@ -94,22 +94,22 @@ func readOTBM(data []byte, items Items, f Format, progress Progress) (*Map, []st
 		if len(root.Children) > 0 {
 			mapData = root.Children[0]
 		}
-		if r, err = newReader(root, mapData, items, f); err != nil {
+		if r, err = newReader(root, mapData, items, format); err != nil {
 			return nil, nil, err
 		}
 	}
-	for _, chunk := range r.m.chunks {
+	for _, chunk := range r.gameMap.chunks {
 		chunk.clip()
 	}
 	for problem, count := range r.warned {
 		r.warnings = append(r.warnings, fmt.Sprintf("%d more not listed: %s", count, problem))
 	}
-	return r.m, r.warnings, nil
+	return r.gameMap, r.warnings, nil
 }
 
 // newReader reads the header (root node) and map data properties into a
 // new map.
-func newReader(root, mapData *otbnode.Node, items Items, f Format) (*reader, error) {
+func newReader(root, mapData *otbnode.Node, items Items, format Format) (*reader, error) {
 	header := otbnode.NewReader(root.Props)
 	version := header.U32()
 	width, height := header.U16(), header.U16()
@@ -117,9 +117,9 @@ func newReader(root, mapData *otbnode.Node, items Items, f Format) (*reader, err
 	if header.Err() != nil {
 		return nil, fmt.Errorf("%w: header: %v", ErrNotOTBM, header.Err())
 	}
-	m := New(width, height)
-	m.ItemsMajor, m.ItemsMinor = itemsMajor, itemsMinor
-	r := &reader{m: m, items: items, format: f, version: version, warned: map[string]int{}}
+	gameMap := New(width, height)
+	gameMap.ItemsMajor, gameMap.ItemsMinor = itemsMajor, itemsMinor
+	r := &reader{gameMap: gameMap, items: items, format: format, version: version, warned: map[string]int{}}
 	if version > otbmNewest {
 		r.warn("OTBM version %d is newer than the editor knows; the map may load wrong", version)
 	}
@@ -133,20 +133,20 @@ func newReader(root, mapData *otbnode.Node, items Items, f Format) (*reader, err
 		case attrDescription:
 			descriptions = append(descriptions, props.String())
 		case attrSpawnFile:
-			m.SpawnFile = props.String()
+			gameMap.SpawnFile = props.String()
 		case attrHouseFile:
-			m.HouseFile = props.String()
+			gameMap.HouseFile = props.String()
 		case attrSpawnNpcFile:
-			m.NpcFile = props.String()
-			m.SpawnFormat = SpawnsSeparate
+			gameMap.NpcFile = props.String()
+			gameMap.SpawnFormat = SpawnsSeparate
 		case attrZoneFile:
-			m.ZoneFile = props.String()
+			gameMap.ZoneFile = props.String()
 		default:
 			r.warn("unknown map header attribute %d", attr)
 			props.Skip(props.Remaining())
 		}
 	}
-	m.Description = pickDescription(descriptions)
+	gameMap.Description = pickDescription(descriptions)
 	return r, nil
 }
 
@@ -183,21 +183,21 @@ func (r *reader) area(node *otbnode.Node) {
 			r.warn("tile without position in area %d,%d,%d", baseX, baseY, floor)
 			continue
 		}
-		if r.m.Has(pos) {
+		if r.gameMap.Has(pos) {
 			r.warn("duplicate tile at %d,%d,%d discarded", pos.X, pos.Y, pos.Z)
 			continue
 		}
 		r.tile(tile, tileNode, tileProps, pos)
 		if tile.HouseID != 0 {
-			if _, ok := r.m.Houses[tile.HouseID]; !ok {
-				r.m.Houses[tile.HouseID] = &House{ID: tile.HouseID, Name: fmt.Sprintf("House #%d", tile.HouseID)}
+			if _, ok := r.gameMap.Houses[tile.HouseID]; !ok {
+				r.gameMap.Houses[tile.HouseID] = &House{ID: tile.HouseID, Name: fmt.Sprintf("House #%d", tile.HouseID)}
 			}
 		}
 		if len(tile.Items) == 0 {
 			tile.Items = nil
 		}
 		// Keep empty house/flag tiles: SetTile drops truly empty ones.
-		r.m.SetTile(pos, tile)
+		r.gameMap.SetTile(pos, tile)
 	}
 }
 
@@ -293,12 +293,12 @@ func (r *reader) itemNode(node *otbnode.Node, pos Position) (Item, bool) {
 	return item, true
 }
 
-func readItemAttrs(props *otbnode.Reader, item *Item, f Format) error {
+func readItemAttrs(props *otbnode.Reader, item *Item, format Format) error {
 	for props.More() {
 		attr := props.U8()
 		switch attr {
 		case attrCount:
-			if f.CountU16 {
+			if format.CountU16 {
 				item.Subtype = props.U16()
 			} else {
 				item.Subtype = uint16(props.U8())
@@ -389,11 +389,11 @@ func (r *reader) towns(node *otbnode.Node) {
 			r.warn("broken town node")
 			continue
 		}
-		if _, duplicate := r.m.Towns[town.ID]; duplicate {
+		if _, duplicate := r.gameMap.Towns[town.ID]; duplicate {
 			r.warn("duplicate town id %d discarded", town.ID)
 			continue
 		}
-		r.m.Towns[town.ID] = town
+		r.gameMap.Towns[town.ID] = town
 	}
 }
 
@@ -408,6 +408,6 @@ func (r *reader) waypoints(node *otbnode.Node) {
 			r.warn("broken waypoint node")
 			continue
 		}
-		r.m.Waypoints = append(r.m.Waypoints, waypoint)
+		r.gameMap.Waypoints = append(r.gameMap.Waypoints, waypoint)
 	}
 }

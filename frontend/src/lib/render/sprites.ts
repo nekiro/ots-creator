@@ -26,13 +26,13 @@ export class SpriteCache {
     this.inflight.clear();
     if (ids === null) this.entries.clear();
     else for (const id of ids) this.entries.delete(id);
-    for (const fn of this.listeners) fn(ids);
+    for (const listener of this.listeners) listener(ids);
   }
 
-  /** Calls fn with the dropped sprites (null: all) on every invalidation. */
-  onInvalidate(fn: (ids: number[] | null) => void): () => void {
-    this.listeners.add(fn);
-    return () => this.listeners.delete(fn);
+  /** Calls listener with the dropped sprites (null: all) on every invalidation. */
+  onInvalidate(listener: (ids: number[] | null) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
 
   get(id: number): SpriteEntry | undefined {
@@ -60,15 +60,15 @@ export class SpriteCache {
 
   private async fetchChunk(ids: number[], gen: number): Promise<void> {
     try {
-      const resp = await fetch(this.url(ids, gen));
-      if (!resp.ok) throw new Error(await resp.text());
-      const size = Number(resp.headers.get("X-Sprite-Size")) || 32;
+      const response = await fetch(this.url(ids, gen));
+      if (!response.ok) throw new Error(await response.text());
+      const size = Number(response.headers.get("X-Sprite-Size")) || 32;
       this.size = size;
-      const buf = new Uint8ClampedArray(await resp.arrayBuffer());
+      const pixels = new Uint8ClampedArray(await response.arrayBuffer());
       if (gen !== this.gen) return;
       const bytes = size * size * 4;
       // Views into one buffer: no per-sprite copies.
-      ids.forEach((id, i) => this.entries.set(id, { pixels: buf.subarray(i * bytes, (i + 1) * bytes) }));
+      ids.forEach((id, i) => this.entries.set(id, { pixels: pixels.subarray(i * bytes, (i + 1) * bytes) }));
     } finally {
       if (gen === this.gen) for (const id of ids) this.inflight.delete(id);
     }

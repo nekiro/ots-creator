@@ -164,6 +164,12 @@ const CATEGORY_FLAGS: Record<number, ReadonlySet<string>> = {
 
 /** Whether the editor shows a flag for a category. A flag that is already set
  * always shows, so stray flags can still be cleared. */
+/** Whether a flag matches the filter text by its label or key. */
+export function flagMatches(filter: string, label: string, key: string): boolean {
+  const query = filter.trim().toLowerCase();
+  return !query || label.toLowerCase().includes(query) || key.toLowerCase().includes(query);
+}
+
 export function flagVisible(key: string, category: number, set: boolean): boolean {
   if (set) return true;
   const allowed = CATEGORY_FLAGS[category];

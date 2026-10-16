@@ -7,11 +7,11 @@
   import NumberField from "../../../lib/ui/NumberField.svelte";
   import Select from "../../../lib/ui/Select.svelte";
 
-  let { info: m }: { info: MapInfo } = $props();
-  const p = $derived(m.props);
+  let { info }: { info: MapInfo } = $props();
+  const properties = $derived(info.props);
 
   function set(patch: Partial<Properties>) {
-    const next = { ...p, ...patch };
+    const next = { ...properties, ...patch };
     void edit((id) => MapService.SetProperties(id, next));
   }
 
@@ -23,8 +23,8 @@
     if (counting) return;
     counting = true;
     try {
-      stats = await MapService.Stats(m.id);
-      statsRev = m.rev;
+      stats = await MapService.Stats(info.id);
+      statsRev = info.rev;
       error = "";
     } catch (err) {
       error = errorMessage(err);
@@ -35,14 +35,14 @@
   // Counts when shown and again a moment after edits; big maps only on
   // request since counting them takes a while.
   $effect(() => {
-    const rev = m.rev;
+    const rev = info.rev;
     if (statsRev === rev) return;
-    if (statsRev >= 0 && m.tiles > 400_000) return;
-    const t = setTimeout(() => void count(), statsRev < 0 ? 0 : 700);
-    return () => clearTimeout(t);
+    if (statsRev >= 0 && info.tiles > 400_000) return;
+    const timer = setTimeout(() => void count(), statsRev < 0 ? 0 : 700);
+    return () => clearTimeout(timer);
   });
 
-  const separate = $derived(p.spawnFormat === SpawnFormat.SpawnsSeparate);
+  const separate = $derived(properties.spawnFormat === SpawnFormat.SpawnsSeparate);
   const rows = $derived(
     stats
       ? [
@@ -64,35 +64,35 @@
 </script>
 
 <div class="m-form">
-  <label class="col"><span class="t-label">Description</span><textarea class="t-input text" value={p.description} placeholder="Shown to players by some servers" onchange={(event) => set({ description: event.currentTarget.value })}></textarea></label>
+  <label class="col"><span class="t-label">Description</span><textarea class="t-input text" value={properties.description} placeholder="Shown to players by some servers" onchange={(event) => set({ description: event.currentTarget.value })}></textarea></label>
   <div class="m-field">
     <span class="m-lbl">Spawns</span>
-    <Select grow value={p.spawnFormat} options={[{ value: SpawnFormat.SpawnsSingle, label: "One file (monsters and NPCs)" }, { value: SpawnFormat.SpawnsSeparate, label: "Separate monster and NPC files" }]} onchange={(value) => set({ spawnFormat: value })} />
+    <Select grow value={properties.spawnFormat} options={[{ value: SpawnFormat.SpawnsSingle, label: "One file (monsters and NPCs)" }, { value: SpawnFormat.SpawnsSeparate, label: "Separate monster and NPC files" }]} onchange={(value) => set({ spawnFormat: value })} />
   </div>
   <div class="m-field">
     <span class="m-lbl">Size</span>
-    <NumberField value={p.width} min={1} max={65535} width={64} onchange={(value) => set({ width: value })} /><span>×</span><NumberField value={p.height} min={1} max={65535} width={64} onchange={(value) => set({ height: value })} />
+    <NumberField value={properties.width} min={1} max={65535} width={64} onchange={(value) => set({ width: value })} /><span>×</span><NumberField value={properties.height} min={1} max={65535} width={64} onchange={(value) => set({ height: value })} />
   </div>
 
   <details class="files">
     <summary class="t-label">Files saved with the map</summary>
     <div class="m-form inner">
-      <div class="m-field"><span class="m-lbl">Houses</span><input class="t-input" value={p.houseFile} placeholder="{m.name.replace(/\.otbm$/i, '')}-house.xml" onchange={(event) => set({ houseFile: event.currentTarget.value })} /></div>
-      <div class="m-field"><span class="m-lbl">{separate ? "Monsters" : "Spawns"}</span><input class="t-input" value={p.spawnFile} placeholder="{m.name.replace(/\.otbm$/i, '')}-{separate ? 'monster' : 'spawn'}.xml" onchange={(event) => set({ spawnFile: event.currentTarget.value })} /></div>
-      {#if separate}<div class="m-field"><span class="m-lbl">NPCs</span><input class="t-input" value={p.npcFile} placeholder="{m.name.replace(/\.otbm$/i, '')}-npc.xml" onchange={(event) => set({ npcFile: event.currentTarget.value })} /></div>{/if}
-      <div class="m-field"><span class="m-lbl">Zones</span><input class="t-input" value={p.zoneFile} placeholder="{m.name.replace(/\.otbm$/i, '')}-zones.xml" onchange={(event) => set({ zoneFile: event.currentTarget.value })} /></div>
-      <div class="t-label path">{m.path || "Not saved yet"}</div>
+      <div class="m-field"><span class="m-lbl">Houses</span><input class="t-input" value={properties.houseFile} placeholder="{info.name.replace(/\.otbm$/i, '')}-house.xml" onchange={(event) => set({ houseFile: event.currentTarget.value })} /></div>
+      <div class="m-field"><span class="m-lbl">{separate ? "Monsters" : "Spawns"}</span><input class="t-input" value={properties.spawnFile} placeholder="{info.name.replace(/\.otbm$/i, '')}-{separate ? 'monster' : 'spawn'}.xml" onchange={(event) => set({ spawnFile: event.currentTarget.value })} /></div>
+      {#if separate}<div class="m-field"><span class="m-lbl">NPCs</span><input class="t-input" value={properties.npcFile} placeholder="{info.name.replace(/\.otbm$/i, '')}-npc.xml" onchange={(event) => set({ npcFile: event.currentTarget.value })} /></div>{/if}
+      <div class="m-field"><span class="m-lbl">Zones</span><input class="t-input" value={properties.zoneFile} placeholder="{info.name.replace(/\.otbm$/i, '')}-zones.xml" onchange={(event) => set({ zoneFile: event.currentTarget.value })} /></div>
+      <div class="t-label path">{info.path || "Not saved yet"}</div>
     </div>
   </details>
 
   <div class="m-sect">
     On the map <span class="grow"></span>
-    <button class="t-icon-btn" title={statsRev === m.rev ? "Up to date" : "Count again"} disabled={counting} onclick={count}><Icon name="refresh" /></button>
+    <button class="t-icon-btn" title={statsRev === info.rev ? "Up to date" : "Count again"} disabled={counting} onclick={count}><Icon name="refresh" /></button>
   </div>
   {#if error}
     <p class="warn">{error}</p>
   {:else if stats}
-    <div class="stats" class:stale={statsRev !== m.rev}>
+    <div class="stats" class:stale={statsRev !== info.rev}>
       {#each rows as [k, v]}
         <span class="k">{k}</span><span class="v">{Number(v).toLocaleString()}</span>
       {/each}

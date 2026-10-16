@@ -71,14 +71,14 @@
 
   const GAP = 4; // pixels between textures (unscaled)
   const grid = $derived(sheetGrid(frameGroup));
-  const texW = $derived(frameGroup.width * size);
-  const texH = $derived(frameGroup.height * size);
-  const sheetW = $derived(grid.columns * (texW + GAP) - GAP);
-  const sheetH = $derived(grid.rows * (texH + GAP) - GAP);
+  const textureWidth = $derived(frameGroup.width * size);
+  const textureHeight = $derived(frameGroup.height * size);
+  const sheetWidth = $derived(grid.columns * (textureWidth + GAP) - GAP);
+  const sheetHeight = $derived(grid.rows * (textureHeight + GAP) - GAP);
   const STAGE_MARGIN = 24;
   // Like the preview: no huge zoom on big screens.
   const MAX_FIT_ZOOM = 4;
-  const fit = $derived(stageSize[0] ? zoomToFit(stageSize[0], stageSize[1], sheetW, sheetH, STAGE_MARGIN, MAX_FIT_ZOOM) : 1);
+  const fit = $derived(stageSize[0] ? zoomToFit(sheetWidth, sheetHeight, stageSize[0], stageSize[1], MAX_FIT_ZOOM, STAGE_MARGIN, 1) : 1);
   $effect(() => {
     fitZoom = fit;
   });
@@ -87,8 +87,8 @@
   // A canvas, not a scrolled box: the sheet is centered and panned
   // (space + drag, middle button drag, wheel; ctrl+wheel zooms).
   const view = new PanView(
-    () => ({ w: sheetW * zoom, h: sheetH * zoom, sw: stageSize[0], sh: stageSize[1] }),
-    (d) => onwheelzoom?.(d),
+    () => ({ width: sheetWidth * zoom, height: sheetHeight * zoom, stageWidth: stageSize[0], stageHeight: stageSize[1] }),
+    (delta) => onwheelzoom?.(delta),
   );
   // Zooming keeps the centered pixel; fitting the window or another object centers.
   let lastZoom = 0;
@@ -115,7 +115,7 @@
         for (let tileY = 0; tileY < frameGroup.height; tileY++)
           for (let tileX = 0; tileX < frameGroup.width; tileX++) {
             const [offsetX, offsetY] = tileOffset(frameGroup, tileX, tileY, size);
-            out.push({ slot: spriteIndex(frameGroup, tileX, tileY, pos), x: column * (texW + GAP) + offsetX, y: row * (texH + GAP) + offsetY, pos });
+            out.push({ slot: spriteIndex(frameGroup, tileX, tileY, pos), x: column * (textureWidth + GAP) + offsetX, y: row * (textureHeight + GAP) + offsetY, pos });
           }
       }
     return out;
@@ -123,8 +123,8 @@
   // Slots a drop of dropCount sprites at dropSlot would fill.
   const filling = $derived(dropSlot === null ? null : new Set(Array.from({ length: dropCount }, (_, i) => dropSlot! + i)));
   const selectedSet = $derived(new Set(selected));
-  const isCurrent = (p: TexturePos) =>
-    p.layer === current.layer && p.x === current.x && p.y === current.y && p.z === current.z && p.frame === current.frame;
+  const isCurrent = (pos: TexturePos) =>
+    pos.layer === current.layer && pos.x === current.x && pos.y === current.y && pos.z === current.z && pos.frame === current.frame;
 
   $effect(() => {
     if (!stage) return;
@@ -137,14 +137,14 @@
   $effect(() => {
     void loaded;
     if (!canvas) return;
-    canvas.width = Math.max(1, sheetW);
-    canvas.height = Math.max(1, sheetH);
+    canvas.width = Math.max(1, sheetWidth);
+    canvas.height = Math.max(1, sheetHeight);
     const ctx = canvas.getContext("2d")!;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     for (let row = 0; row < grid.rows; row++)
       for (let column = 0; column < grid.columns; column++) {
         const image = compose(frameGroup, frameGroup.sprites, size, { pos: sheetCellPos(frameGroup, column, row), colors }, get);
-        ctx.putImageData(image, column * (texW + GAP), row * (texH + GAP));
+        ctx.putImageData(image, column * (textureWidth + GAP), row * (textureHeight + GAP));
       }
   });
 
@@ -168,35 +168,35 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="sheet checker" class:pan-ready={view.ready} class:panning={view.dragging} bind:this={stage} {...view.handlers}>
-  <div class="wrap" style="width:{sheetW * zoom}px;height:{sheetH * zoom}px;transform:{view.transform}">
+  <div class="wrap" style="width:{sheetWidth * zoom}px;height:{sheetHeight * zoom}px;transform:{view.transform}">
     <canvas bind:this={canvas} class="pixel" style="width:100%;height:100%"></canvas>
     {#if pixelGrid && zoom >= PIXEL_GRID_ZOOM}
       <div class="pixel-grid" style="background-size:{zoom}px {zoom}px"></div>
     {/if}
     {#each Array.from({ length: grid.rows * grid.columns }, (_, i) => i) as i (i)}
-      {@const c = i % grid.columns}
-      {@const r = Math.floor(i / grid.columns)}
+      {@const column = i % grid.columns}
+      {@const row = Math.floor(i / grid.columns)}
       <div
         class="tex"
-        class:cur={isCurrent(sheetCellPos(frameGroup, c, r))}
-        style="left:{c * (texW + GAP) * zoom - 1}px;top:{r * (texH + GAP) * zoom - 1}px;width:{texW * zoom + 2}px;height:{texH * zoom + 2}px"
+        class:cur={isCurrent(sheetCellPos(frameGroup, column, row))}
+        style="left:{column * (textureWidth + GAP) * zoom - 1}px;top:{row * (textureHeight + GAP) * zoom - 1}px;width:{textureWidth * zoom + 2}px;height:{textureHeight * zoom + 2}px"
       ></div>
     {/each}
-    {#each tiles as t (t.slot)}
-      {@const id = frameGroup.sprites[t.slot]}
+    {#each tiles as tile (tile.slot)}
+      {@const id = frameGroup.sprites[tile.slot]}
       <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
       <div
         class="slot"
         class:grid={showGrid}
         class:sel={id !== 0 && selectedSet.has(id)}
-        class:drop={filling?.has(t.slot)}
-        style="left:{t.x * zoom}px;top:{t.y * zoom}px;width:{size * zoom}px;height:{size * zoom}px"
-        title="Frame {t.pos.frame + 1}, pattern {t.pos.x},{t.pos.y},{t.pos.z}, layer {t.pos.layer}: slot {t.slot} → sprite #{id}{id ? '' : ' (empty)'}"
-        onclick={() => onpick(t.slot, t.pos)}
-        ondblclick={() => onopen(t.pos)}
-        ondragover={(event) => dragOver(event, t.slot)}
+        class:drop={filling?.has(tile.slot)}
+        style="left:{tile.x * zoom}px;top:{tile.y * zoom}px;width:{size * zoom}px;height:{size * zoom}px"
+        title="Frame {tile.pos.frame + 1}, pattern {tile.pos.x},{tile.pos.y},{tile.pos.z}, layer {tile.pos.layer}: slot {tile.slot} → sprite #{id}{id ? '' : ' (empty)'}"
+        onclick={() => onpick(tile.slot, tile.pos)}
+        ondblclick={() => onopen(tile.pos)}
+        ondragover={(event) => dragOver(event, tile.slot)}
         ondragleave={() => (dropSlot = null)}
-        ondrop={(event) => drop(event, t.slot)}
+        ondrop={(event) => drop(event, tile.slot)}
       ></div>
     {/each}
   </div>

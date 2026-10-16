@@ -20,8 +20,8 @@ export class HoverAnim {
   ) {}
 
   /** Frame group to animate: outfits walk when they have a walking group. */
-  static group(t: Thing): number {
-    return t.category === Category.CategoryOutfit && t.frameGroups.length > 1 ? 1 : 0;
+  static group(thing: Thing): number {
+    return thing.category === Category.CategoryOutfit && thing.frameGroups.length > 1 ? 1 : 0;
   }
 
   enter(id: number): void {
@@ -35,7 +35,7 @@ export class HoverAnim {
         if (!group || group.frames < 2) return;
         await this.cache.load(group.sprites);
         if (this.id !== id) return;
-        this.current = { id, thing: thing };
+        this.current = { id, thing };
         this.ready++;
       } catch {
         /* thumbnail stays static */

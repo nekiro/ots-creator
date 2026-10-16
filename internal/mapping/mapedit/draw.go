@@ -7,8 +7,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/nekiro/ots-creator/internal/mapping/materials"
 	"github.com/nekiro/ots-creator/internal/core/otitems"
+	"github.com/nekiro/ots-creator/internal/mapping/materials"
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
@@ -112,12 +112,20 @@ func addArea(tiles *posSet, center otmap.Position, size int, shape string) {
 	size = max(size, 0)
 	for dy := -size; dy <= size; dy++ {
 		for dx := -size; dx <= size; dx++ {
-			if shape == shapeCircle && math.Sqrt(float64(dx*dx+dy*dy)) >= float64(size)+circleEdgeSlack {
+			if shape == shapeCircle && !inCircle(dx, dy, size) {
 				continue
 			}
 			tiles.addXY(int(center.X)+dx, int(center.Y)+dy, int(center.Z))
 		}
 	}
+}
+
+// inCircle reports whether the offset dx, dy from the center is inside a
+// circle brush of a size. Comparing squares gives the same result as the
+// distance for every integer offset and size.
+func inCircle(dx, dy, size int) bool {
+	radius := float64(size) + circleEdgeSlack
+	return float64(dx*dx+dy*dy) < radius*radius
 }
 
 func addOutline(tiles *posSet, x0, y0, x1, y1, z int) {
@@ -234,7 +242,7 @@ func (e *Editor) floodFill(start otmap.Position, brush string) *posSet {
 				continue
 			}
 			next := posAt(nextX, nextY, int(current.Z))
-			if filled.seen[next] || !matches(e.Map.Tile(next)) {
+			if filled.seen[next] || !matches(e.peekPos(next)) {
 				continue
 			}
 			filled.add(next)
@@ -353,7 +361,7 @@ func (e *Editor) drawOptionalBorder(tx *Tx, req DrawRequest, area *posSet) {
 			}
 			tx.Edit(pos).State |= otmap.StateOptionalBorder
 		}
-		e.borderize(tx, pos)
+		e.fitBorders(tx, pos)
 	}
 }
 
@@ -428,7 +436,7 @@ func (e *Editor) drawGround(tx *Tx, req DrawRequest, area *posSet) error {
 	}
 	if e.Settings.Automagic {
 		for _, pos := range area.ring().list {
-			e.borderize(tx, pos)
+			e.fitBorders(tx, pos)
 		}
 	}
 	return nil
@@ -454,10 +462,7 @@ func (e *Editor) drawEraser(tx *Tx, req DrawRequest, area *posSet) {
 	}
 	if e.Settings.Automagic {
 		for _, pos := range area.ring().list {
-			e.borderize(tx, pos)
-			e.wallize(tx, pos)
-			e.tableize(tx, pos)
-			e.carpetize(tx, pos)
+			e.fitToNeighbors(tx, pos)
 		}
 	}
 }
@@ -489,45 +494,39 @@ func (e *Editor) drawWalls(tx *Tx, req DrawRequest, area *posSet) error {
 	}
 	if e.Settings.Automagic && !wall.decoration {
 		for _, pos := range area.ring().list {
-			e.wallize(tx, pos)
+			e.fitWalls(tx, pos)
 		}
 	}
 	return nil
 }
 
 func (e *Editor) drawCarpetTable(tx *Tx, req DrawRequest, area *posSet) error {
-	isCarpet := req.Kind == KindCarpet
-	carpetBrush, tableBrush := e.Brushes.Carpet(req.Name), e.Brushes.Table(req.Name)
-	if (isCarpet && carpetBrush == nil) || (!isCarpet && tableBrush == nil) {
+	// A missing brush stays a nil joinedBrush, not one holding a nil pointer.
+	kind, brush := &tableKind, joinedBrush(nil)
+	if req.Kind == KindCarpet {
+		kind = &carpetKind
+		if carpet := e.Brushes.Carpet(req.Name); carpet != nil {
+			brush = carpet
+		}
+	} else if table := e.Brushes.Table(req.Name); table != nil {
+		brush = table
+	}
+	if brush == nil {
 		return fmt.Errorf("%w: %s %q", ErrNoBrush, req.Kind, req.Name)
 	}
 	for _, pos := range area.list {
 		current := tx.Get(pos)
 		if req.Erase {
-			if current == nil || (isCarpet && !e.hasCarpet(current)) || (!isCarpet && !e.hasTable(current)) {
+			if current == nil || !e.hasJoined(current, kind) {
 				continue
 			}
-			tile := tx.Edit(pos)
-			if isCarpet {
-				e.removeCarpets(tile)
-			} else {
-				e.removeTables(tile)
-			}
+			e.removeJoined(tx.Edit(pos), kind)
 			continue
 		}
-		tile := tx.Edit(pos)
-		if isCarpet {
-			e.drawCarpet(tile, carpetBrush)
-		} else {
-			e.drawTable(tile, tableBrush)
-		}
+		e.drawJoined(tx.Edit(pos), kind, brush)
 	}
 	for _, pos := range area.ring().list {
-		if isCarpet {
-			e.carpetize(tx, pos)
-		} else {
-			e.tableize(tx, pos)
-		}
+		e.fitJoined(tx, pos, kind)
 	}
 	return nil
 }
@@ -550,7 +549,7 @@ func (e *Editor) drawDoorRequest(tx *Tx, req DrawRequest) {
 			points.add(target)
 		}
 		for _, pos := range points.ring().list {
-			e.wallize(tx, pos)
+			e.fitWalls(tx, pos)
 		}
 	}
 }

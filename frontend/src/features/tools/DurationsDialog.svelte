@@ -6,16 +6,16 @@
 
   const DEFAULTS: Record<number, number> = { 1: 500, 2: 300, 3: 100, 4: 75 };
 
-  let cats = $state<Record<number, boolean>>({ [app.category]: true });
+  let checked = $state<Record<number, boolean>>({ [app.category]: true });
   let min = $state(DEFAULTS[app.category] ?? 100);
   let max = $state(DEFAULTS[app.category] ?? 100);
 
-  const chosen = $derived(CATEGORIES.filter((c) => cats[c]));
+  const chosen = $derived(CATEGORIES.filter((category) => checked[category]));
 
   async function apply() {
-    const n = await run("Setting durations", () => ThingService.SetDurations(chosen, min, Math.max(min, max)));
-    if (n === undefined) return;
-    toast(`Updated ${n} animated object(s).`, "success");
+    const updated = await run("Setting durations", () => ThingService.SetDurations(chosen, min, Math.max(min, max)));
+    if (updated === undefined) return;
+    toast(`Updated ${updated} animated object(s).`, "success");
     app.dialog = null;
   }
 </script>
@@ -24,8 +24,8 @@
   <div class="col">
     <p>Sets the duration of every frame of every animated object in the chosen categories.</p>
     <div class="row cats">
-      {#each CATEGORIES as c}
-        <label class="row"><input class="t-check" type="checkbox" bind:checked={cats[c]} />{CATEGORY_LABELS[c]}</label>
+      {#each CATEGORIES as category}
+        <label class="row"><input class="t-check" type="checkbox" bind:checked={checked[category]} />{CATEGORY_LABELS[category]}</label>
       {/each}
     </div>
     <div class="row">
@@ -34,8 +34,8 @@
       <span class="t-label">ms</span>
     </div>
     <div class="row">
-      {#each CATEGORIES as c}
-        <button class="t-btn" onclick={() => (min = max = DEFAULTS[c])} title="Default for {CATEGORY_LABELS[c].toLowerCase()}">{CATEGORY_LABELS[c]} {DEFAULTS[c]}</button>
+      {#each CATEGORIES as category}
+        <button class="t-btn" onclick={() => (min = max = DEFAULTS[category])} title="Default for {CATEGORY_LABELS[category].toLowerCase()}">{CATEGORY_LABELS[category]} {DEFAULTS[category]}</button>
       {/each}
     </div>
     {#if !app.project?.info.features.improvedAnimations}

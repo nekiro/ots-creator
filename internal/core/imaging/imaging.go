@@ -140,10 +140,16 @@ func CropToContent(img *image.NRGBA) *image.NRGBA {
 func RemoveMagenta(img *image.NRGBA) {
 	pixels := img.Pix
 	for i := 0; i+3 < len(pixels); i += 4 {
-		if pixels[i] == 0xFF && pixels[i+1] == 0 && pixels[i+2] == 0xFF && pixels[i+3] == 0xFF {
+		if isMagenta(pixels[i:]) && pixels[i+3] == 0xFF {
 			pixels[i], pixels[i+1], pixels[i+2], pixels[i+3] = 0, 0, 0, 0
 		}
 	}
+}
+
+// isMagenta reports whether the RGBA pixel at the start of pixel has the
+// color of Magenta, whatever its alpha.
+func isMagenta(pixel []byte) bool {
+	return pixel[0] == 0xFF && pixel[1] == 0 && pixel[2] == 0xFF
 }
 
 // Normalize clears the color of fully transparent pixels so identical
@@ -179,9 +185,17 @@ func Tile(img *image.NRGBA, x, y, size int) []byte {
 
 // PutTile draws RGBA sprite bytes at (x, y), replacing destination pixels.
 func PutTile(img *image.NRGBA, x, y, size int, pixels []byte) {
-	for row := 0; row < size; row++ {
-		offset := img.PixOffset(x, y+row)
-		copy(img.Pix[offset:offset+size*4], pixels[row*size*4:(row+1)*size*4])
+	CopyRect(img.Pix, img.Stride/4, x-img.Rect.Min.X, y-img.Rect.Min.Y, pixels, size, 0, 0, size, size)
+}
+
+// CopyRect copies a width x height block of RGBA pixels at (sourceX,
+// sourceY) of source to (destinationX, destinationY) of destination. Both
+// buffers hold rows of destinationWidth and sourceWidth pixels.
+func CopyRect(destination []byte, destinationWidth, destinationX, destinationY int, source []byte, sourceWidth, sourceX, sourceY, width, height int) {
+	for row := range height {
+		destinationOffset := ((destinationY+row)*destinationWidth + destinationX) * 4
+		sourceOffset := ((sourceY+row)*sourceWidth + sourceX) * 4
+		copy(destination[destinationOffset:destinationOffset+width*4], source[sourceOffset:sourceOffset+width*4])
 	}
 }
 

@@ -4,23 +4,23 @@
   // vertical by default, horizontal for a `vertical` (column) splitter.
   import { toCss } from "../pixelscale";
 
-  let { ondrag, onend, vertical = false }: { ondrag: (d: number) => void; onend?: () => void; vertical?: boolean } = $props();
+  let { ondrag, onend, vertical = false }: { ondrag: (delta: number) => void; onend?: () => void; vertical?: boolean } = $props();
   let active = $state(false);
 
   function onpointerdown(event: PointerEvent) {
     if (event.button !== 0) return;
     event.preventDefault();
-    const el = event.currentTarget as HTMLElement;
-    el.setPointerCapture(event.pointerId);
+    const handle = event.currentTarget as HTMLElement;
+    handle.setPointerCapture(event.pointerId);
     active = true;
     let last = vertical ? event.clientX : event.clientY;
-    el.onpointermove = (event) => {
-      const p = vertical ? event.clientX : event.clientY;
-      ondrag(toCss(p - last));
-      last = p;
+    handle.onpointermove = (event) => {
+      const position = vertical ? event.clientX : event.clientY;
+      ondrag(toCss(position - last));
+      last = position;
     };
-    el.onpointerup = el.onpointercancel = () => {
-      el.onpointermove = el.onpointerup = el.onpointercancel = null;
+    handle.onpointerup = handle.onpointercancel = () => {
+      handle.onpointermove = handle.onpointerup = handle.onpointercancel = null;
       active = false;
       onend?.();
     };

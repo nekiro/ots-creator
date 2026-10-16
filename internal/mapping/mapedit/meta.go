@@ -88,7 +88,7 @@ func (e *Editor) RemoveHouse(id uint32) {
 	tx := e.Begin("Remove house", 0)
 	tx.Meta()
 	delete(e.Map.Houses, id)
-	e.Map.Each(func(pos otmap.Position, tile *otmap.Tile) {
+	e.Map.EachStored(func(pos otmap.Position, tile *otmap.Tile) {
 		if tile.HouseID == id {
 			edited := tx.Edit(pos)
 			edited.HouseID = 0
@@ -101,7 +101,7 @@ func (e *Editor) RemoveHouse(id uint32) {
 // HouseTiles returns the tiles of a house.
 func (e *Editor) HouseTiles(id uint32) []otmap.Position {
 	var out []otmap.Position
-	e.Map.Each(func(pos otmap.Position, tile *otmap.Tile) {
+	e.Map.EachStored(func(pos otmap.Position, tile *otmap.Tile) {
 		if tile.HouseID == id {
 			out = append(out, pos)
 		}
@@ -202,7 +202,7 @@ func (e *Editor) RemoveZone(id uint16) {
 	tx := e.Begin("Remove zone", 0)
 	tx.Meta()
 	e.Map.Zones = slices.DeleteFunc(e.Map.Zones, func(zone otmap.Zone) bool { return zone.ID == id })
-	e.Map.Each(func(pos otmap.Position, tile *otmap.Tile) {
+	e.Map.EachStored(func(pos otmap.Position, tile *otmap.Tile) {
 		if slices.Contains(tile.Zones(), id) {
 			edited := tx.Edit(pos)
 			edited.Ext.Zones = slices.DeleteFunc(edited.Ext.Zones, func(zoneID uint16) bool { return zoneID == id })
@@ -227,15 +227,15 @@ type ImportOptions struct {
 }
 
 // Import merges another map into this one.
-func (e *Editor) Import(src *otmap.Map, options ImportOptions) (int, error) {
+func (e *Editor) Import(source *otmap.Map, options ImportOptions) (int, error) {
 	tx := e.Begin("Import map", 0)
 	tx.Meta()
-	houseIDs := e.importHouses(src, options)
+	houseIDs := e.importHouses(source, options)
 	if options.Towns {
-		e.importTownsAndWaypoints(src, options)
+		e.importTownsAndWaypoints(source, options)
 	}
 	var failed error
-	src.Each(func(sourcePos otmap.Position, sourceTile *otmap.Tile) {
+	source.Each(func(sourcePos otmap.Position, sourceTile *otmap.Tile) {
 		targetPos, ok := sourcePos.Add(options.DX, options.DY, options.DZ)
 		if !ok {
 			failed = errors.New("some tiles were outside the map and were skipped")
@@ -247,11 +247,11 @@ func (e *Editor) Import(src *otmap.Map, options ImportOptions) (int, error) {
 	return changed, failed
 }
 
-// importHouses adds the houses of src that are missing and returns the new
+// importHouses adds the houses of source that are missing and returns the new
 // id of each imported house id.
-func (e *Editor) importHouses(src *otmap.Map, options ImportOptions) map[uint32]uint32 {
+func (e *Editor) importHouses(source *otmap.Map, options ImportOptions) map[uint32]uint32 {
 	houseIDs := map[uint32]uint32{}
-	for _, house := range src.SortedHouses() {
+	for _, house := range source.SortedHouses() {
 		switch options.Houses {
 		case importHousesSkip:
 			continue
@@ -275,10 +275,10 @@ func (e *Editor) importHouses(src *otmap.Map, options ImportOptions) map[uint32]
 	return houseIDs
 }
 
-// importTownsAndWaypoints adds the towns and waypoints of src that are
+// importTownsAndWaypoints adds the towns and waypoints of source that are
 // missing.
-func (e *Editor) importTownsAndWaypoints(src *otmap.Map, options ImportOptions) {
-	for _, town := range src.SortedTowns() {
+func (e *Editor) importTownsAndWaypoints(source *otmap.Map, options ImportOptions) {
+	for _, town := range source.SortedTowns() {
 		if e.Map.Towns[town.ID] == nil {
 			imported := *town
 			if temple, ok := imported.Temple.Add(options.DX, options.DY, options.DZ); ok {
@@ -287,7 +287,7 @@ func (e *Editor) importTownsAndWaypoints(src *otmap.Map, options ImportOptions) 
 			e.Map.Towns[town.ID] = &imported
 		}
 	}
-	for _, waypoint := range src.Waypoints {
+	for _, waypoint := range source.Waypoints {
 		if e.Map.Waypoint(waypoint.Name) == nil {
 			imported := *waypoint
 			if pos, ok := imported.Pos.Add(options.DX, options.DY, options.DZ); ok {
@@ -340,12 +340,12 @@ func (e *Editor) importTile(target, sourceTile *otmap.Tile, houseIDs map[uint32]
 // top item with a color, else the ground.
 func (e *Editor) MinimapColor(tile *otmap.Tile) uint8 {
 	for i := len(tile.Items) - 1; i >= 0; i-- {
-		if typ := e.itemType(tile.Items[i].ID); typ != nil && typ.MinimapColor != 0 {
-			return uint8(typ.MinimapColor)
+		if itemType := e.itemType(tile.Items[i].ID); itemType != nil && itemType.MinimapColor != 0 {
+			return uint8(itemType.MinimapColor)
 		}
 	}
-	if typ := e.itemType(tile.Ground.ID); typ != nil {
-		return uint8(typ.MinimapColor)
+	if itemType := e.itemType(tile.Ground.ID); itemType != nil {
+		return uint8(itemType.MinimapColor)
 	}
 	return 0
 }

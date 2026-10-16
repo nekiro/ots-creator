@@ -108,7 +108,10 @@ func (db *DB) Search(query string, limit int) []uint16 {
 		}
 	}
 	for _, itemType := range db.items {
-		if itemType == nil || len(out) >= limit {
+		if len(out) >= limit {
+			break
+		}
+		if itemType == nil {
 			continue
 		}
 		if strings.Contains(strings.ToLower(itemType.Name), query) && !slices.Contains(out, itemType.ID) {

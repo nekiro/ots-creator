@@ -8,8 +8,9 @@
 // screen pixels (quadBatch.ts). Sprites live in a texture array atlas.
 import { Atlas } from "./atlas";
 import { ChunkBuffers } from "./chunkBuffers";
-import { chunkKey } from "../data/chunks";
-import { ALPHA, BLOCK_CHUNKS, COLORS, DEPTH_RANGE, GROUND_FLOOR, LIGHT_REACH, LIMITS, PLAY, ZOOM } from "../constants";
+import { chunkKey, chunkOfTile } from "../data/chunks";
+import { TOP_ORDER } from "../data/items";
+import { ALPHA, BLOCK_CHUNKS, COLORS, DEPTH_RANGE, GROUND_FLOOR, LIGHT_REACH, LIMITS, MAX_FLOOR, PLAY, ZOOM } from "../constants";
 import { GEO, GEO_BLOCK, encodeGeoSignature, geoBits, type GeoChunk } from "./geo";
 import { ambientIntensity, DAYLIGHT_INTENSITY, WHITE_LIGHT_COLOR, type ExtraLight } from "./lightMap";
 import { walkingTileOffset } from "../play/walk";
@@ -19,10 +20,7 @@ import { drawOverlays } from "./overlays";
 import { QuadBatch } from "./quadBatch";
 import type { FrameResult, Scene } from "./scene";
 import { ThingDrawer } from "../data/things";
-import { Camera, floorsToDraw } from "../view/view";
-
-/** Top order of on-top items (ItemIndex.top). */
-const TOP_ORDER_TOP = 3;
+import { Camera, floorsToDraw, type TileRange } from "../view/view";
 
 /** Floors of the play view, bottom up. */
 function playFloors(play: { firstFloor: number; lastFloor: number }): number[] {
@@ -31,9 +29,9 @@ function playFloors(play: { firstFloor: number; lastFloor: number }): number[] {
   return floors;
 }
 
-/** The chunk a tile is in (one coordinate). */
-function chunkOfTile(tile: number): number {
-  return tile >> 5;
+/** The chunks a tile range covers (tiles before 0 count as tile 0). */
+function chunkRange(range: TileRange): TileRange {
+  return { x0: chunkOfTile(Math.max(0, range.x0)), y0: chunkOfTile(Math.max(0, range.y0)), x1: chunkOfTile(Math.max(0, range.x1)), y1: chunkOfTile(Math.max(0, range.y1)) };
 }
 
 /** The chunks a frame draws, and how many of them are still loading. */
@@ -134,7 +132,7 @@ export class MapRenderer {
     // Only while nothing else loads: those requests would hold up what comes into view.
     if (!plan.notReady && scene.geo.idle()) {
       for (const z of [floor - 1, floor + 1]) {
-        if (z < 0 || z > 15 || chunksByFloor.has(z)) continue;
+        if (z < 0 || z > MAX_FLOOR || chunksByFloor.has(z)) continue;
         for (const chunk of this.chunksNearby(scene, camera, z, plan)) this.chunks.prefetch(chunk);
       }
     }
@@ -179,7 +177,7 @@ export class MapRenderer {
     const size = scene.spriteSize;
     this.flushScreen(scene);
     const look = scene.looks.outfits.get(play.player.lookType);
-    const [dx, dy] = walkingTileOffset(Math.trunc(play.offsetX), Math.trunc(play.offsetY), look?.ox ?? 0, look?.oy ?? 0, size);
+    const [dx, dy] = walkingTileOffset(Math.trunc(play.offsetX), Math.trunc(play.offsetY), look?.offsetX ?? 0, look?.offsetY ?? 0, size);
     const walkX = play.x + dx;
     const walkY = play.y + dy;
     // A diagonal corner tile takes the elevation of the player's own tile.
@@ -203,8 +201,8 @@ export class MapRenderer {
     if (!tile) return 0;
     let elevation = 0;
     for (const id of tile.ids) {
-      if (scene.items.top[id] === TOP_ORDER_TOP) continue;
-      elevation += scene.looks.items.get(scene.items.client[id])?.el ?? 0;
+      if (scene.items.top[id] === TOP_ORDER.top) continue;
+      elevation += scene.looks.items.get(scene.items.client[id])?.elevation ?? 0;
     }
     return Math.min(elevation, PLAY.maxElevation);
   }
@@ -242,10 +240,10 @@ export class MapRenderer {
   /** The chunks of floor z whose lights can reach into the view: the
    * chunks in view and those up to LIGHT_REACH tiles around it. */
   private chunksLighting(scene: Scene, camera: Camera, z: number, plan: ChunkPlan): GeoChunk[] {
-    const range = camera.tiles(z, LIGHT_REACH, LIGHT_REACH);
+    const span = chunkRange(camera.tiles(z, LIGHT_REACH, LIGHT_REACH));
     const out: GeoChunk[] = [...(plan.underneath.get(z) ?? [])];
-    for (let chunkY = chunkOfTile(Math.max(0, range.y0)); chunkY <= chunkOfTile(Math.max(0, range.y1)); chunkY++) {
-      for (let chunkX = chunkOfTile(Math.max(0, range.x0)); chunkX <= chunkOfTile(Math.max(0, range.x1)); chunkX++) {
+    for (let chunkY = span.y0; chunkY <= span.y1; chunkY++) {
+      for (let chunkX = span.x0; chunkX <= span.x1; chunkX++) {
         const chunk = scene.geo.get(chunkKey(chunkX, chunkY, z), plan.signature);
         if (chunk) out.push(chunk);
       }
@@ -287,11 +285,12 @@ export class MapRenderer {
     const range = camera.tiles(z, 1, 3);
     const out: GeoChunk[] = [];
     if (range.x1 < 0 || range.y1 < 0) return out;
+    const span = chunkRange(range);
     const alignToBlock = (chunk: number) => chunk - (chunk % blockSize);
     // Row by row: a sprite only overlaps tiles up and left of it, which
     // this order has already drawn, as a tile by tile walk would.
-    for (let chunkY = alignToBlock(chunkOfTile(Math.max(0, range.y0))); chunkY <= chunkOfTile(range.y1); chunkY += blockSize) {
-      for (let chunkX = alignToBlock(chunkOfTile(Math.max(0, range.x0))); chunkX <= chunkOfTile(range.x1); chunkX += blockSize) {
+    for (let chunkY = alignToBlock(span.y0); chunkY <= span.y1; chunkY += blockSize) {
+      for (let chunkX = alignToBlock(span.x0); chunkX <= span.x1; chunkX += blockSize) {
         const key = chunkKey(chunkX, chunkY, z);
         if (blockSize === 1) {
           // Tiles of the floor in view feed the overlays and previews.
@@ -334,8 +333,9 @@ export class MapRenderer {
     const range = camera.tiles(z, 1, 3);
     const out: GeoChunk[] = [];
     if (range.x1 < 0 || range.y1 < 0) return out;
-    for (let chunkY = chunkOfTile(Math.max(0, range.y0)); chunkY <= chunkOfTile(range.y1); chunkY += blockSize) {
-      for (let chunkX = chunkOfTile(Math.max(0, range.x0)); chunkX <= chunkOfTile(range.x1); chunkX += blockSize) {
+    const span = chunkRange(range);
+    for (let chunkY = span.y0; chunkY <= span.y1; chunkY += blockSize) {
+      for (let chunkX = span.x0; chunkX <= span.x1; chunkX += blockSize) {
         const key = chunkKey(chunkX - (chunkX % blockSize), chunkY - (chunkY % blockSize), z) + (blockSize > 1 ? GEO_BLOCK : 0);
         const chunk = scene.geo.get(key, signature);
         if (chunk) out.push(chunk);

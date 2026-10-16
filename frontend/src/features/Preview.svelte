@@ -83,7 +83,7 @@
     if (!frameGroup || !stageSize[0]) return 4;
     const contentWidth = canvasSize[0] || frameGroup.width * size;
     const contentHeight = canvasSize[1] || frameGroup.height * size;
-    return fitZoom(stageSize[0], stageSize[1], contentWidth, contentHeight, STAGE_MARGIN, MAX_FIT_ZOOM);
+    return fitZoom(contentWidth, contentHeight, stageSize[0], stageSize[1], MAX_FIT_ZOOM, STAGE_MARGIN, 1);
   });
   const zoom = $derived(manualZoom ?? fittedZoom);
 
@@ -104,7 +104,12 @@
   // The stage is a canvas, not a scrolled box: the texture is centered and
   // moved by the pan offset (space + drag, middle button drag, wheel).
   const view = new PanView(
-    () => ({ w: (canvasSize[0] || (frameGroup?.width ?? 1) * size) * zoom, h: (canvasSize[1] || (frameGroup?.height ?? 1) * size) * zoom, sw: stageSize[0], sh: stageSize[1] }),
+    () => ({
+      width: (canvasSize[0] || (frameGroup?.width ?? 1) * size) * zoom,
+      height: (canvasSize[1] || (frameGroup?.height ?? 1) * size) * zoom,
+      stageWidth: stageSize[0],
+      stageHeight: stageSize[1],
+    }),
     (delta) => setZoom(zoom + delta),
   );
 

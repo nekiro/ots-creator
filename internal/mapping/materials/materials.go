@@ -270,11 +270,7 @@ func (m *Materials) Save(path string) error {
 	if err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, fsutil.FileMode); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+	return fsutil.WriteAtomic(path, data)
 }
 
 // Brush returns a brush by name (case-insensitive) or nil.
@@ -424,20 +420,20 @@ func (m *Materials) Merge(other *Materials) {
 	m.MetaItems = appendMissingIDs(m.MetaItems, other.MetaItems)
 }
 
-func appendMissing(dst, src []string) []string {
-	for _, entry := range src {
-		if !slices.ContainsFunc(dst, func(present string) bool { return strings.EqualFold(present, entry) }) {
-			dst = append(dst, entry)
+func appendMissing(list, additions []string) []string {
+	for _, entry := range additions {
+		if !slices.ContainsFunc(list, func(present string) bool { return strings.EqualFold(present, entry) }) {
+			list = append(list, entry)
 		}
 	}
-	return dst
+	return list
 }
 
-func appendMissingIDs(dst, src []uint16) []uint16 {
-	for _, entry := range src {
-		if !slices.Contains(dst, entry) {
-			dst = append(dst, entry)
+func appendMissingIDs(list, additions []uint16) []uint16 {
+	for _, entry := range additions {
+		if !slices.Contains(list, entry) {
+			list = append(list, entry)
 		}
 	}
-	return dst
+	return list
 }

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/nekiro/ots-creator/internal/formats/obd"
 	"github.com/nekiro/ots-creator/internal/core/project"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/obd"
 )
 
 // ThingService edits things. Sheets and pixels are in thing_sheets.go.
@@ -20,12 +20,12 @@ func NewThingService(session *Session) *ThingService { return &ThingService{sess
 
 // edit runs fn on the open project; changed reports whether fn changed it
 // (the session then tells the frontend).
-func (ts *ThingService) edit(fn func(p *project.Project) (changed bool, err error)) error {
-	p, err := ts.session.Project()
+func (ts *ThingService) edit(fn func(proj *project.Project) (changed bool, err error)) error {
+	proj, err := ts.session.Project()
 	if err != nil {
 		return err
 	}
-	changed, err := fn(p)
+	changed, err := fn(proj)
 	if changed {
 		ts.session.Changed()
 	}
@@ -34,54 +34,54 @@ func (ts *ThingService) edit(fn func(p *project.Project) (changed bool, err erro
 
 // editAll is edit for changes that always change the project when they
 // succeed.
-func (ts *ThingService) editAll(fn func(p *project.Project) error) error {
-	return ts.edit(func(p *project.Project) (bool, error) {
-		err := fn(p)
+func (ts *ThingService) editAll(fn func(proj *project.Project) error) error {
+	return ts.edit(func(proj *project.Project) (bool, error) {
+		err := fn(proj)
 		return err == nil, err
 	})
 }
 
 // Get returns one thing.
 func (ts *ThingService) Get(category thing.Category, id uint32) (*thing.Thing, error) {
-	p, err := ts.session.Project()
+	proj, err := ts.session.Project()
 	if err != nil {
 		return nil, err
 	}
-	return p.Thing(category, id)
+	return proj.Thing(category, id)
 }
 
 // Find returns the ids of things in a category that match the filter.
 func (ts *ThingService) Find(category thing.Category, filter project.Filter) ([]uint32, error) {
-	p, err := ts.session.Project()
+	proj, err := ts.session.Project()
 	if err != nil {
 		return nil, err
 	}
-	return p.FindThings(category, filter)
+	return proj.FindThings(category, filter)
 }
 
 // Names returns the names of the named things of a category, by id.
 func (ts *ThingService) Names(category thing.Category) (map[uint32]string, error) {
-	p, err := ts.session.Project()
+	proj, err := ts.session.Project()
 	if err != nil {
 		return nil, err
 	}
-	return p.Names(category), nil
+	return proj.Names(category), nil
 }
 
 // Update replaces a thing.
 func (ts *ThingService) Update(updated *thing.Thing) error {
-	return ts.editAll(func(p *project.Project) error { return p.UpdateThing(updated) })
+	return ts.editAll(func(proj *project.Project) error { return proj.UpdateThing(updated) })
 }
 
 // UpdateMany replaces several things in one undo step.
 func (ts *ThingService) UpdateMany(things []*thing.Thing) error {
-	return ts.editAll(func(p *project.Project) error { return p.UpdateThings(things) })
+	return ts.editAll(func(proj *project.Project) error { return proj.UpdateThings(things) })
 }
 
 // Add appends an empty thing and returns its id.
 func (ts *ThingService) Add(category thing.Category) (id uint32, err error) {
-	err = ts.editAll(func(p *project.Project) (err error) {
-		id, err = p.AddThing(category)
+	err = ts.editAll(func(proj *project.Project) (err error) {
+		id, err = proj.AddThing(category)
 		return err
 	})
 	return id, err
@@ -89,8 +89,8 @@ func (ts *ThingService) Add(category thing.Category) (id uint32, err error) {
 
 // Duplicate copies things to the end of their category.
 func (ts *ThingService) Duplicate(category thing.Category, ids []uint32) (copies []uint32, err error) {
-	err = ts.editAll(func(p *project.Project) (err error) {
-		copies, err = p.DuplicateThings(category, ids)
+	err = ts.editAll(func(proj *project.Project) (err error) {
+		copies, err = proj.DuplicateThings(category, ids)
 		return err
 	})
 	return copies, err
@@ -98,14 +98,14 @@ func (ts *ThingService) Duplicate(category thing.Category, ids []uint32) (copies
 
 // Remove removes things (see project.RemoveThings).
 func (ts *ThingService) Remove(category thing.Category, ids []uint32) error {
-	return ts.editAll(func(p *project.Project) error { return p.RemoveThings(category, ids) })
+	return ts.editAll(func(proj *project.Project) error { return proj.RemoveThings(category, ids) })
 }
 
 // Move moves things to the ids from at on; see project.MoveThings. It
 // returns the new ids of ids.
 func (ts *ThingService) Move(category thing.Category, ids []uint32, at uint32, options project.MoveOptions) (moved []uint32, err error) {
-	err = ts.editAll(func(p *project.Project) (err error) {
-		moved, err = p.MoveThings(category, ids, at, options)
+	err = ts.editAll(func(proj *project.Project) (err error) {
+		moved, err = proj.MoveThings(category, ids, at, options)
 		return err
 	})
 	if err != nil {
@@ -117,8 +117,8 @@ func (ts *ThingService) Move(category thing.Category, ids []uint32, at uint32, o
 // Patch applies the same property changes to several things (bulk edit)
 // and returns how many changed.
 func (ts *ThingService) Patch(category thing.Category, ids []uint32, patch project.PropsPatch) (changed int, err error) {
-	err = ts.edit(func(p *project.Project) (bool, error) {
-		changed, err = p.PatchThings(category, ids, patch)
+	err = ts.edit(func(proj *project.Project) (bool, error) {
+		changed, err = proj.PatchThings(category, ids, patch)
 		return err == nil && changed > 0, err
 	})
 	return changed, err
@@ -127,8 +127,8 @@ func (ts *ThingService) Patch(category thing.Category, ids []uint32, patch proje
 // SetDurations sets every frame duration of animated things in the given
 // categories and returns how many things changed.
 func (ts *ThingService) SetDurations(categories []thing.Category, minMs, maxMs uint32) (changed int, err error) {
-	err = ts.edit(func(p *project.Project) (bool, error) {
-		changed, err = p.SetDurations(categories, minMs, maxMs)
+	err = ts.edit(func(proj *project.Project) (bool, error) {
+		changed, err = proj.SetDurations(categories, minMs, maxMs)
 		return err == nil && changed > 0, err
 	})
 	return changed, err
@@ -137,8 +137,8 @@ func (ts *ThingService) SetDurations(categories []thing.Category, minMs, maxMs u
 // ConvertFrameGroups splits outfits into idle and walking groups, or
 // merges them back into one group.
 func (ts *ThingService) ConvertFrameGroups(toGroups bool) (result project.ConvertResult, err error) {
-	err = ts.edit(func(p *project.Project) (bool, error) {
-		result = p.ConvertFrameGroups(toGroups)
+	err = ts.edit(func(proj *project.Project) (bool, error) {
+		result = proj.ConvertFrameGroups(toGroups)
 		return result.Converted > 0, nil
 	})
 	return result, err
@@ -162,13 +162,13 @@ func (ts *ThingService) ImportObjects(paths []string, replaceID uint32) ([]Impor
 		return nil, errors.New("replace needs exactly one file")
 	}
 	results := make([]ImportResult, 0, len(paths))
-	err := ts.edit(func(p *project.Project) (bool, error) {
+	err := ts.edit(func(proj *project.Project) (bool, error) {
 		for _, path := range paths {
 			result := ImportResult{Path: path}
 			data, err := readObject(path)
 			if err == nil {
 				result.Category = data.Thing.Category
-				result.ID, err = p.ImportOBD(data, replaceID)
+				result.ID, err = proj.ImportOBD(data, replaceID)
 			}
 			if err != nil {
 				result.Error = err.Error()
@@ -187,7 +187,7 @@ func (ts *ThingService) ImportObjects(paths []string, replaceID uint32) ([]Impor
 // targets[i], replacing the things there (targets past the end extend the
 // category). It is one undoable edit and returns the ids.
 func (ts *ThingService) ImportObjectsTo(category thing.Category, paths []string, targets []uint32) (ids []uint32, err error) {
-	err = ts.editAll(func(p *project.Project) error {
+	err = ts.editAll(func(proj *project.Project) error {
 		if len(paths) == 0 {
 			return errors.New("nothing to import")
 		}
@@ -197,7 +197,7 @@ func (ts *ThingService) ImportObjectsTo(category thing.Category, paths []string,
 				return fmt.Errorf("%s: %w", filepath.Base(path), err)
 			}
 		}
-		ids, err = p.ImportOBDsTo(category, objects, targets)
+		ids, err = proj.ImportOBDsTo(category, objects, targets)
 		return err
 	})
 	if err != nil {
@@ -209,24 +209,24 @@ func (ts *ThingService) ImportObjectsTo(category thing.Category, paths []string,
 // PlanTargets returns count target ids of the open client from id from on:
 // free ids only (see project.FreeIDs), or consecutive ids.
 func (ts *ThingService) PlanTargets(category thing.Category, from uint32, count int, freeOnly bool) (TargetPlan, error) {
-	p, err := ts.session.Project()
+	proj, err := ts.session.Project()
 	if err != nil {
 		return TargetPlan{}, err
 	}
-	return planTargets(p, category, from, count, freeOnly)
+	return planTargets(proj, category, from, count, freeOnly)
 }
 
 // ExportObjects writes one file per thing into dir, named
 // {category}_{id}.otobj or .obd by format (ObjectOTOBJ or ObjectOBD).
 // Imports accept every version of both formats.
 func (ts *ThingService) ExportObjects(category thing.Category, ids []uint32, dir, format string) ([]string, error) {
-	p, err := ts.session.Project()
+	proj, err := ts.session.Project()
 	if err != nil {
 		return nil, err
 	}
 	var written []string
 	for _, id := range ids {
-		path, err := exportObject(p, category, id, dir, format)
+		path, err := exportObject(proj, category, id, dir, format)
 		if err != nil {
 			return written, err
 		}

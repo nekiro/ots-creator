@@ -3,6 +3,7 @@
 package fsutil
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"io/fs"
@@ -50,6 +51,34 @@ func WriteAtomic(path string, data []byte) error {
 		_, err := tmp.Write(data)
 		return err
 	})
+}
+
+// WriteJSON writes value as JSON indented with indent to path, creating
+// its folder, with WriteAtomic. An empty path writes nothing.
+func WriteJSON(path string, value any, indent string) error {
+	if path == "" {
+		return nil
+	}
+	data, err := json.MarshalIndent(value, "", indent)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), DirMode); err != nil {
+		return err
+	}
+	return WriteAtomic(path, data)
+}
+
+// AppendOtherPaths appends to out the entries of list whose path (given by
+// pathOf) is not the same file as path, keeping their order. It trims
+// recent file lists.
+func AppendOtherPaths[T any](out, list []T, path string, pathOf func(T) string) []T {
+	for _, entry := range list {
+		if !SamePath(pathOf(entry), path) {
+			out = append(out, entry)
+		}
+	}
+	return out
 }
 
 // CopyFile copies src to dst. An existing dst is kept: callers copy content

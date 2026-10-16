@@ -1,5 +1,7 @@
 package otmap
 
+import "cmp"
+
 // Map limits.
 const (
 	MaxFloor    = 15
@@ -23,6 +25,11 @@ func (p Position) Add(dx, dy, dz int) (Position, bool) {
 		return Position{}, false
 	}
 	return Position{uint16(x), uint16(y), uint8(z)}, true
+}
+
+// ComparePositions orders positions by floor, then row, then column.
+func ComparePositions(left, right Position) int {
+	return cmp.Or(cmp.Compare(left.Z, right.Z), cmp.Compare(left.Y, right.Y), cmp.Compare(left.X, right.X))
 }
 
 // ChunkKey identifies a chunk.

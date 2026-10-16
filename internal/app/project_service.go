@@ -13,7 +13,7 @@ type ProjectService struct {
 }
 
 // NewProjectService returns the service.
-func NewProjectService(s *Session) *ProjectService { return &ProjectService{session: s} }
+func NewProjectService(session *Session) *ProjectService { return &ProjectService{session: session} }
 
 // Cancel stops the running export; it then returns ErrCanceled.
 func (ps *ProjectService) Cancel() { ps.session.Cancel() }
@@ -62,30 +62,30 @@ func openProject(req OpenRequest) (*project.Project, error) {
 
 // Open loads a client and makes it the current project.
 func (ps *ProjectService) Open(req OpenRequest) (State, error) {
-	p, err := openProject(req)
+	proj, err := openProject(req)
 	if err != nil {
 		return ps.session.State(), err
 	}
 	// The items.otb remembered for the client is optional: a missing or
 	// broken file is reported, never stops the client from opening.
 	var otbErr error
-	path := ps.otbPath(p.Info().DatPath)
+	path := ps.otbPath(proj.Info().DatPath)
 	if req.OTBPath != nil {
 		path = *req.OTBPath
-		otbErr = ps.rememberOTB(p.Info().DatPath, path)
+		otbErr = ps.rememberOTB(proj.Info().DatPath, path)
 	}
 	if path != "" {
-		if _, err := p.AttachOTB(path); err != nil {
+		if _, err := proj.AttachOTB(path); err != nil {
 			otbErr = err
 		}
 	}
-	ps.session.Set(p)
+	ps.session.Set(proj)
 	ps.session.saved()
-	st := ps.session.State()
+	state := ps.session.State()
 	if otbErr != nil {
-		st.OTBError = otbErr.Error()
+		state.OTBError = otbErr.Error()
 	}
-	return st, nil
+	return state, nil
 }
 
 func (ps *ProjectService) otbPath(client string) string {
@@ -105,41 +105,41 @@ func (ps *ProjectService) rememberOTB(client, otb string) error {
 // AttachItemsOTB keeps an items.otb in sync with the client: compiling
 // then updates it too. It is remembered for the client.
 func (ps *ProjectService) AttachItemsOTB(path string) (State, error) {
-	p, err := ps.session.Project()
+	proj, err := ps.session.Project()
 	if err != nil {
 		return ps.session.State(), err
 	}
-	if _, err := p.AttachOTB(path); err != nil {
+	if _, err := proj.AttachOTB(path); err != nil {
 		return ps.session.State(), err
 	}
 	ps.session.Changed()
-	return ps.session.State(), ps.rememberOTB(p.Info().DatPath, path)
+	return ps.session.State(), ps.rememberOTB(proj.Info().DatPath, path)
 }
 
 // DetachItemsOTB stops keeping the items.otb in sync and forgets it.
 func (ps *ProjectService) DetachItemsOTB() (State, error) {
-	p, err := ps.session.Project()
+	proj, err := ps.session.Project()
 	if err != nil {
 		return ps.session.State(), err
 	}
-	p.DetachOTB()
+	proj.DetachOTB()
 	ps.session.Changed()
-	return ps.session.State(), ps.rememberOTB(p.Info().DatPath, "")
+	return ps.session.State(), ps.rememberOTB(proj.Info().DatPath, "")
 }
 
 // ItemsOTBPreview reports what compiling would change in the attached
 // items.otb.
 func (ps *ProjectService) ItemsOTBPreview() (project.OTBReport, error) {
-	p, err := ps.session.Project()
+	proj, err := ps.session.Project()
 	if err != nil {
 		return project.OTBReport{}, err
 	}
-	return p.OTBPreview()
+	return proj.OTBPreview()
 }
 
 // New creates an empty client.
-func (ps *ProjectService) New(v client.Version, f client.Features) State {
-	ps.session.Set(project.New(v, f))
+func (ps *ProjectService) New(version client.Version, features client.Features) State {
+	ps.session.Set(project.New(version, features))
 	return ps.session.State()
 }
 
@@ -161,32 +161,45 @@ type CompileRequest struct {
 
 // Compile saves to the current files with the current settings.
 func (ps *ProjectService) Compile() (project.CompileStats, error) {
-	p, err := ps.session.Project()
+	proj, err := ps.session.Project()
 	if err != nil {
 		return project.CompileStats{}, err
 	}
-	info := p.Info()
+	info := proj.Info()
 	if info.DatPath == "" || (info.Format != project.FormatAssets && info.SprPath == "") {
 		return project.CompileStats{}, errors.New("the client has never been saved, use Compile As")
 	}
-	return ps.CompileAs(CompileRequest{Format: info.Format, DatPath: info.DatPath, SprPath: info.SprPath, Version: info.Version, Features: info.Features})
+	return ps.CompileAs(currentFilesRequest(info))
+}
+
+// currentFilesRequest compiles a client to its current files with its
+// current settings.
+func currentFilesRequest(info project.Info) CompileRequest {
+	return CompileRequest{Format: info.Format, DatPath: info.DatPath, SprPath: info.SprPath, Version: info.Version, Features: info.Features}
+}
+
+// options returns the compile options of the request.
+func (req CompileRequest) options(progress func(done, total int)) project.CompileOptions {
+	return project.CompileOptions{Format: req.Format, DatPath: req.DatPath, SprPath: req.SprPath, Version: req.Version, Features: req.Features, WriteOTFI: req.WriteOTFI, Progress: progress}
 }
 
 // CompileAs saves to new files, optionally with another version/features.
 // For an asset folder it reports the sheets it removed.
 func (ps *ProjectService) CompileAs(req CompileRequest) (project.CompileStats, error) {
-	p, err := ps.session.Project()
+	proj, err := ps.session.Project()
 	if err != nil {
 		return project.CompileStats{}, err
 	}
 	var stats project.CompileStats
-	err = p.Compile(project.CompileOptions{Format: req.Format, DatPath: req.DatPath, SprPath: req.SprPath, Version: req.Version, Features: req.Features, WriteOTFI: req.WriteOTFI, Progress: ps.session.reporter("Compiling"), Stats: &stats})
+	options := req.options(ps.session.reporter("Compiling"))
+	options.Stats = &stats
+	err = proj.Compile(options)
 	ps.session.Changed()
 	if err == nil {
 		ps.session.saved()
 		// Compiled to new files: the items.otb stays with the client.
-		if otb := p.OTB(); otb != nil {
-			_ = ps.rememberOTB(p.Info().DatPath, otb.Path)
+		if otb := proj.OTB(); otb != nil {
+			_ = ps.rememberOTB(proj.Info().DatPath, otb.Path)
 		}
 	}
 	return stats, err
@@ -194,12 +207,12 @@ func (ps *ProjectService) CompileAs(req CompileRequest) (project.CompileStats, e
 
 // Warnings lists properties that would be lost when compiling to a format
 // and version.
-func (ps *ProjectService) Warnings(format project.Format, v client.Version) ([]string, error) {
-	p, err := ps.session.Project()
+func (ps *ProjectService) Warnings(format project.Format, version client.Version) ([]string, error) {
+	proj, err := ps.session.Project()
 	if err != nil {
 		return nil, err
 	}
-	return p.Warnings(format, v), nil
+	return proj.Warnings(format, version), nil
 }
 
 // Undo reverts the last edit and returns its label.
@@ -215,11 +228,11 @@ func (ps *ProjectService) Redo() (string, error) {
 // history runs Undo or Redo and returns the label of the step ("" when
 // there was none).
 func (ps *ProjectService) history(step func(*project.Project) string) (string, error) {
-	p, err := ps.session.Project()
+	proj, err := ps.session.Project()
 	if err != nil {
 		return "", err
 	}
-	label := step(p)
+	label := step(proj)
 	if label != "" {
 		ps.session.Changed()
 	}

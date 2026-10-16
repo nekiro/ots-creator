@@ -3,20 +3,20 @@ package app
 import (
 	"testing"
 
+	"github.com/nekiro/ots-creator/internal/core/thing"
 	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
 	"github.com/nekiro/ots-creator/internal/mapping/maprender"
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
-	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
 func BenchmarkGeometry(b *testing.B) {
 	ms, s := mapTestService(b)
-	p, _ := s.Project()
-	ids, _ := p.AddSprites([][]byte{make([]byte, 32*32*4), make([]byte, 32*32*4)})
+	proj, _ := s.Project()
+	ids, _ := proj.AddSprites([][]byte{make([]byte, 32*32*4), make([]byte, 32*32*4)})
 	for i, id := range []uint32{100, 101} {
-		g, _ := p.Thing(thing.CategoryItem, id)
+		g, _ := proj.Thing(thing.CategoryItem, id)
 		g.FrameGroups[0].Sprites[0] = ids[i]
-		p.UpdateThing(g)
+		proj.UpdateThing(g)
 	}
 	info, _ := ms.NewMap(NewMapOptions{Width: 1024, Height: 1024})
 	var pts []otmap.Position
@@ -27,8 +27,8 @@ func BenchmarkGeometry(b *testing.B) {
 	}
 	ms.Draw(info.ID, mapedit.DrawRequest{Kind: mapedit.KindRaw, Item: 100, Points: pts, Size: 1})
 	ms.Draw(info.ID, mapedit.DrawRequest{Kind: mapedit.KindRaw, Item: 101, Points: pts, Size: 1})
-	m, data, _ := ms.get(info.ID)
-	scene := ms.scene(m, data)
+	opened, data, _ := ms.get(info.ID)
+	scene := ms.scene(opened, data)
 	var keys []otmap.ChunkKey
 	for cy := 0; cy < 32; cy++ {
 		for cx := 0; cx < 32; cx++ {

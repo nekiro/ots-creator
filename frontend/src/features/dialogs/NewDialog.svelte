@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { ProjectService, type Features, type Version } from "../../lib/api";
+  import { loadVersions } from "../../lib/versions";
   import { app, run, toast } from "../../lib/state/app.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Select from "../../lib/ui/Select.svelte";
@@ -12,15 +13,15 @@
   const version = $derived(versions[index]);
 
   onMount(async () => {
-    versions = ((await ProjectService.Versions()) ?? []).slice().reverse();
-    const i = versions.findIndex((value) => value.value === 1098);
-    index = i >= 0 ? i : 0;
+    versions = await loadVersions();
+    const defaultIndex = versions.findIndex((value) => value.value === 1098);
+    index = defaultIndex >= 0 ? defaultIndex : 0;
   });
 
   async function create() {
     if (!version) return;
-    const st = await run("Creating", () => ProjectService.New(version, features));
-    if (st?.open) {
+    const created = await run("Creating", () => ProjectService.New(version, features));
+    if (created?.open) {
       app.dialog = null;
       toast(`New ${version.name} client created. Use Compile As to save it.`, "success");
     }

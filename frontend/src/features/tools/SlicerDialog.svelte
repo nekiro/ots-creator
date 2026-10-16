@@ -23,18 +23,18 @@
   let picked = $state<Set<string>>(new Set());
 
   const cells = $derived(grid.columns * grid.rows);
-  const key = (c: number, r: number) => `${c},${r}`;
+  const cellKeyOf = (column: number, row: number) => `${column},${row}`;
 
   async function load(file: File | undefined) {
     if (!file) return;
     try {
-      const bmp = await createImageBitmap(file);
-      const off = new OffscreenCanvas(bmp.width, bmp.height);
-      const ctx = off.getContext("2d")!;
-      ctx.drawImage(bmp, 0, 0);
-      const data = ctx.getImageData(0, 0, bmp.width, bmp.height);
+      const decoded = await createImageBitmap(file);
+      const offscreen = new OffscreenCanvas(decoded.width, decoded.height);
+      const ctx = offscreen.getContext("2d")!;
+      ctx.drawImage(decoded, 0, 0);
+      const data = ctx.getImageData(0, 0, decoded.width, decoded.height);
       bitmap?.close();
-      bitmap = bmp;
+      bitmap = decoded;
       img = { width: data.width, height: data.height, data: data.data };
       name = file.name;
       grid = fitGrid(data.width, data.height, size);
@@ -44,9 +44,9 @@
     }
   }
 
-  function setOffset(axis: "offsetX" | "offsetY", v: number) {
+  function setOffset(axis: "offsetX" | "offsetY", value: number) {
     if (!img) return;
-    const next = { ...grid, [axis]: v };
+    const next = { ...grid, [axis]: value };
     const fit = fitGrid(img.width, img.height, size, next.offsetX, next.offsetY);
     grid = { ...next, columns: Math.min(grid.columns, fit.columns) || fit.columns, rows: Math.min(grid.rows, fit.rows) || fit.rows };
     picked = new Set();
@@ -55,14 +55,14 @@
   // Draw the image, the grid and the picked cells.
   $effect(() => {
     if (!canvas || !img || !bitmap) return;
-    const w = img.width * zoom;
-    const h = img.height * zoom;
-    canvas.width = w;
-    canvas.height = h;
+    const canvasWidth = img.width * zoom;
+    const canvasHeight = img.height * zoom;
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
     const ctx = canvas.getContext("2d")!;
     ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, w, h);
-    ctx.drawImage(bitmap, 0, 0, w, h);
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+    ctx.drawImage(bitmap, 0, 0, canvasWidth, canvasHeight);
     const cell = size * zoom;
     const originX = grid.offsetX * zoom;
     const originY = grid.offsetY * zoom;
@@ -97,7 +97,7 @@
   function toggle(event: MouseEvent) {
     const cell = cellAt(event);
     if (!cell) return;
-    const cellKey = key(...cell);
+    const cellKey = cellKeyOf(...cell);
     const next = new Set(picked);
     if (next.has(cellKey)) next.delete(cellKey);
     else next.add(cellKey);
@@ -109,7 +109,7 @@
     const out: Uint8ClampedArray[] = [];
     for (let row = 0; row < grid.rows; row++)
       for (let column = 0; column < grid.columns; column++) {
-        if (picked.size && !picked.has(key(column, row))) continue;
+        if (picked.size && !picked.has(cellKeyOf(column, row))) continue;
         const pixels = cutCell(img, grid, column, row, size, magenta);
         if (!skipEmpty || !isEmpty(pixels)) out.push(pixels);
       }

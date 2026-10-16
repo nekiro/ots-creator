@@ -8,7 +8,7 @@
   import Dialog from "../../../lib/ui/Dialog.svelte";
   import NumberField from "../../../lib/ui/NumberField.svelte";
 
-  let s = $state<EditorSettings>(
+  let settings = $state<EditorSettings>(
     map.settings
       ? { ...map.settings }
       : { automagic: true, eraserLeaveUnique: true, houseRemoveItems: true, autoDoorId: true, doodadEraseLike: false, defaultSpawnTime: 60, autoCreateSpawn: true, rawReplaceBottom: false, countU16: false },
@@ -31,12 +31,12 @@
   let keys = $state<Record<string, string[]>>({ ...map.keys });
   let recording = $state<string | null>(null);
 
-  const same = (a: string[], b: string[]) => a.length === b.length && a.every((k, i) => k === b[i]);
+  const same = (first: string[], second: string[]) => first.length === second.length && first.every((key, i) => key === second[i]);
 
-  function setKeys(a: KeyAction, list: string[]) {
+  function setKeys(action: KeyAction, list: string[]) {
     const next = { ...keys };
-    if (same(list, a.keys)) delete next[a.id];
-    else next[a.id] = list;
+    if (same(list, action.keys)) delete next[action.id];
+    else next[action.id] = list;
     keys = next;
   }
 
@@ -52,12 +52,12 @@
     }
     const combo = comboOf(event);
     if (!combo) return;
-    const target = KEY_ACTIONS.find((a) => a.id === recording)!;
-    for (const a of KEY_ACTIONS) {
-      const list = keysOf(a, keys);
-      if (a !== target && list.includes(combo)) {
-        setKeys(a, list.filter((k) => k !== combo));
-        toast(`${combo} no longer does "${a.label}".`);
+    const target = KEY_ACTIONS.find((action) => action.id === recording)!;
+    for (const action of KEY_ACTIONS) {
+      const list = keysOf(action, keys);
+      if (action !== target && list.includes(combo)) {
+        setKeys(action, list.filter((key) => key !== combo));
+        toast(`${combo} no longer does "${action.label}".`);
       }
     }
     const list = keysOf(target, keys);
@@ -67,9 +67,9 @@
 
   async function save() {
     try {
-      await MapService.SetEditorSettings($state.snapshot(s));
+      await MapService.SetEditorSettings($state.snapshot(settings));
       await MapService.SetKeys($state.snapshot(keys));
-      map.settings = { ...s };
+      map.settings = { ...settings };
       map.keys = $state.snapshot(keys);
       map.dialog = null;
     } catch (err) {
@@ -87,33 +87,33 @@
   </div>
   {#if tab === "general"}
     <div class="col form">
-      {#each OPTIONS as o}
+      {#each OPTIONS as option}
         <label class="opt">
-          <input class="t-check" type="checkbox" checked={!!s[o.key]} onchange={(event) => ((s as unknown as Record<string, unknown>)[o.key] = event.currentTarget.checked)} />
-          <span class="col"><span>{o.label}</span><span class="t-label hint">{o.hint}</span></span>
+          <input class="t-check" type="checkbox" checked={!!settings[option.key]} onchange={(event) => ((settings as unknown as Record<string, unknown>)[option.key] = event.currentTarget.checked)} />
+          <span class="col"><span>{option.label}</span><span class="t-label hint">{option.hint}</span></span>
         </label>
       {/each}
-      <div class="row"><span>Default spawn time</span><NumberField value={s.defaultSpawnTime} min={1} max={86400} width={60} onchange={(value) => (s.defaultSpawnTime = value)} /><span class="t-label">seconds</span></div>
+      <div class="row"><span>Default spawn time</span><NumberField value={settings.defaultSpawnTime} min={1} max={86400} width={60} onchange={(value) => (settings.defaultSpawnTime = value)} /><span class="t-label">seconds</span></div>
     </div>
   {:else}
     <div class="t-label hint">Click + and press a key. Click a key to remove it. Esc, the arrows, 1–9 and mouse gestures cannot be changed.</div>
     <div class="t-panel keys">
-      {#each KEY_GROUPS as g}
-        <div class="m-sect">{g}</div>
-        {#each KEY_ACTIONS.filter((a) => a.group === g) as a (a.id)}
-          {@const list = keysOf(a, keys)}
+      {#each KEY_GROUPS as group}
+        <div class="m-sect">{group}</div>
+        {#each KEY_ACTIONS.filter((action) => action.group === group) as action (action.id)}
+          {@const list = keysOf(action, keys)}
           <div class="krow">
-            <span class="klabel">{a.label}</span>
-            {#each list as k}
-              <button class="key" title="Remove {k}" onclick={() => setKeys(a, list.filter((x) => x !== k))}>{k}</button>
+            <span class="klabel">{action.label}</span>
+            {#each list as key}
+              <button class="key" title="Remove {key}" onclick={() => setKeys(action, list.filter((other) => other !== key))}>{key}</button>
             {/each}
-            {#if recording === a.id}
+            {#if recording === action.id}
               <span class="key rec">Press a key…</span>
             {:else}
-              <button class="key add" title="Add a key" onclick={() => (recording = a.id)}>+</button>
+              <button class="key add" title="Add a key" onclick={() => (recording = action.id)}>+</button>
             {/if}
-            {#if a.id in keys}
-              <button class="reset" title="Back to {a.keys.join(', ') || 'none'}" onclick={() => setKeys(a, a.keys)}>↺</button>
+            {#if action.id in keys}
+              <button class="reset" title="Back to {action.keys.join(', ') || 'none'}" onclick={() => setKeys(action, action.keys)}>↺</button>
             {/if}
           </div>
         {/each}

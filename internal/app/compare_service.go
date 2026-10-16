@@ -44,12 +44,12 @@ func (cs *CompareService) State() State { return cs.session.OtherState() }
 
 // Open loads the second client.
 func (cs *CompareService) Open(req OpenRequest) (State, error) {
-	p, err := openProject(req)
+	proj, err := openProject(req)
 	if err != nil {
 		return cs.session.OtherState(), err
 	}
 	cs.forget()
-	cs.session.SetOther(p)
+	cs.session.SetOther(proj)
 	return cs.session.OtherState(), nil
 }
 
@@ -151,9 +151,9 @@ type TargetPlan struct {
 	Taken []uint32 `json:"taken"`
 }
 
-// planTargets returns count target ids in p from id from on: free ids only
+// planTargets returns count target ids in proj from id from on: free ids only
 // (see project.FreeIDs), or consecutive ids.
-func planTargets(p *project.Project, category thing.Category, from uint32, count int, freeOnly bool) (TargetPlan, error) {
+func planTargets(proj *project.Project, category thing.Category, from uint32, count int, freeOnly bool) (TargetPlan, error) {
 	if count <= 0 {
 		return TargetPlan{IDs: []uint32{}, Taken: []uint32{}}, nil
 	}
@@ -162,14 +162,14 @@ func planTargets(p *project.Project, category thing.Category, from uint32, count
 	}
 	from = max(from, category.MinID())
 	if freeOnly {
-		ids, err := p.FreeIDs(category, from, count)
+		ids, err := proj.FreeIDs(category, from, count)
 		return TargetPlan{IDs: ids, Taken: []uint32{}}, err
 	}
 	ids := make([]uint32, count)
 	for i := range ids {
 		ids[i] = from + uint32(i)
 	}
-	return TargetPlan{IDs: ids, Taken: p.TakenIDs(category, ids)}, nil
+	return TargetPlan{IDs: ids, Taken: proj.TakenIDs(category, ids)}, nil
 }
 
 // Revert puts copied things back as they were before they were copied, in
@@ -218,11 +218,7 @@ func (cs *CompareService) Compile() error {
 	if err != nil {
 		return err
 	}
-	info := other.Info()
-	err = other.Compile(project.CompileOptions{
-		Format: info.Format, DatPath: info.DatPath, SprPath: info.SprPath, Version: info.Version,
-		Features: info.Features, Progress: cs.session.reporter("Compiling B"),
-	})
+	err = other.Compile(currentFilesRequest(other.Info()).options(cs.session.reporter("Compiling B")))
 	cs.session.OtherChanged()
 	return err
 }

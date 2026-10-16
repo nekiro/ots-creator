@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Format, SpriteService, formatSize, type OptimizeResult } from "../../lib/api";
+  import { Format, SpriteService, type OptimizeResult } from "../../lib/api";
+  import { formatSize } from "../../lib/util/format";
   import { app, run } from "../../lib/state/app.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import ProgressBar from "../../lib/ui/ProgressBar.svelte";
@@ -15,9 +16,9 @@
 
   async function optimize() {
     stage = "running";
-    const res = await run("Optimizing sprites", () => SpriteService.Optimize({ duplicates, empty, unused }));
-    if (res) {
-      result = res;
+    const optimized = await run("Optimizing sprites", () => SpriteService.Optimize({ duplicates, empty, unused }));
+    if (optimized) {
+      result = optimized;
       app.selectedSprites = [];
       stage = "done";
     } else {
@@ -40,7 +41,7 @@
     </div>
   {:else if stage === "running"}
     <div class="col loading" role="status">
-      <div class="row"><span class="spinner"></span>Optimizing sprites…</div>
+      <div class="row"><span class="t-spinner"></span>Optimizing sprites…</div>
       {#if app.progress}<ProgressBar {percent} label="{Math.floor(percent)}%" />{/if}
     </div>
   {:else if result}
@@ -75,19 +76,6 @@
   .loading {
     padding: 12px 0;
     color: var(--text-bright);
-  }
-  .spinner {
-    width: 12px;
-    height: 12px;
-    border: 2px solid rgba(232, 196, 106, 0.25);
-    border-top-color: var(--gold);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
   }
   .result {
     display: grid;

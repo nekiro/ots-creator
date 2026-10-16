@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/nekiro/ots-creator/internal/core/imaging"
 	"github.com/nekiro/ots-creator/internal/formats/assets"
 	"github.com/nekiro/ots-creator/internal/formats/spr"
 )
@@ -77,10 +78,7 @@ func (b *sheetBase) piecePixels(id uint32) ([]byte, error) {
 	}
 	const tileSize = assets.TileSize
 	out := make([]byte, tileSize*tileSize*4)
-	for y := range tileSize {
-		offset := ((piece.Y+y)*assets.SheetSize + piece.X) * 4
-		copy(out[y*tileSize*4:(y+1)*tileSize*4], sheet[offset:offset+tileSize*4])
-	}
+	imaging.CopyRect(out, tileSize, 0, 0, sheet, assets.SheetSize, piece.X, piece.Y, tileSize, tileSize)
 	return out, nil
 }
 

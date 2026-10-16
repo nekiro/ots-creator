@@ -21,6 +21,8 @@
   } from "../../lib/api";
   import { formatIds, groupOptions, LICENSES, MAX_TAGS, parseIds, tagGroups, tagProblem, type TagKind } from "../../lib/market";
   import { clamp } from "../../lib/util/math";
+  import { basename } from "../../lib/util/path";
+  import { OBJECT_FILTERS } from "../../lib/commands/shared";
   import { decodeObjectFile } from "../../lib/objectFile";
   import { app, applyDraft, run, toast, versions, type ShareTarget } from "../../lib/state/app.svelte";
   import { readStored, writeStored } from "../../lib/state/storage";
@@ -54,7 +56,7 @@
   // A file from disk: an OBD object or an image cut into sprites.
   const FILE_FILTERS = [
     { name: "Objects and images (*.otobj, *.obd, *.png, *.bmp, *.gif)", pattern: "*.otobj;*.obd;*.png;*.bmp;*.gif" },
-    { name: "Object files (*.otobj, *.obd)", pattern: "*.otobj;*.obd" },
+    OBJECT_FILTERS[0],
     { name: "Images (*.png, *.bmp, *.gif)", pattern: "*.png;*.bmp;*.gif" },
   ];
   const OBD_EXT = OBJECT_EXT;
@@ -62,7 +64,7 @@
   let fileThing = $state<{ thing: Thing; pixels: Uint8ClampedArray[]; size: number } | null>(null);
   let fileImage = $state<{ url: string; width: number; height: number } | null>(null);
   let fileError = $state("");
-  const fileName = (path: string) => path.replace(/^.*[\\/]/, "");
+
   const isObdFile = $derived(target.kind === "file" && OBD_EXT.test(target.path));
   const fileGrid = $derived(!!fileImage && fileImage.width % fileSize === 0 && fileImage.height % fileSize === 0);
   const fileGet = (id: number) => (id > 0 ? fileThing?.pixels[id - 1] : undefined);
@@ -78,15 +80,15 @@
     fileImage = null;
     fileError = "";
     if (!path) return;
-    if (!nameTouched) name = fileName(path).replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
+    if (!nameTouched) name = basename(path).replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
     try {
       if (OBD_EXT.test(path)) {
         const decoded = decodeObjectFile(await ThingService.ReadObject(path), "empty object file");
         fileThing = { thing: decoded.thing, pixels: decoded.pixels, size: decoded.file.spriteSize };
       } else {
-        const img = await ViewerService.ReadImage(path);
-        if (!img) throw new Error("empty image");
-        fileImage = { url: `data:image/png;base64,${img.png}`, width: img.width, height: img.height };
+        const imageFile = await ViewerService.ReadImage(path);
+        if (!imageFile) throw new Error("empty image");
+        fileImage = { url: `data:image/png;base64,${imageFile.png}`, width: imageFile.width, height: imageFile.height };
       }
     } catch (err) {
       fileError = errorMessage(err);
@@ -137,9 +139,9 @@
     if (target.kind === "object") return `${CATEGORY_NAMES[target.category]} #${target.id}`;
     if (target.kind === "sprites") return `${target.ids.length} sprite(s)`;
     if (!target.path) return "No file chosen";
-    if (fileThing) return `${CATEGORY_NAMES[fileThing.thing.category]} · ${fileName(target.path)}`;
-    if (fileImage) return `${fileImage.width}×${fileImage.height} image · ${fileName(target.path)}`;
-    return fileName(target.path);
+    if (fileThing) return `${CATEGORY_NAMES[fileThing.thing.category]} · ${basename(target.path)}`;
+    if (fileImage) return `${fileImage.width}×${fileImage.height} image · ${basename(target.path)}`;
+    return basename(target.path);
   });
   const empty = $derived(
     (target.kind === "sprites" && target.ids.length === 0) ||
@@ -171,14 +173,14 @@
   async function share() {
     if (target.kind === "object" && app.dirty) await applyDraft();
     writeStored(LICENSE_KEY, license);
-    const req = { name: name.trim(), author: author.trim(), tags, description: description.trim(), license, captcha };
+    const request = { name: name.trim(), author: author.trim(), tags, description: description.trim(), license, captcha };
     const shared = target;
     const id = await run("Sharing to the market", () =>
       shared.kind === "object"
-        ? MarketService.ShareObject(shared.category, shared.id, req)
+        ? MarketService.ShareObject(shared.category, shared.id, request)
         : shared.kind === "sprites"
-          ? MarketService.ShareSprites(shared.ids, req)
-          : MarketService.ShareFile(shared.path, fileSize, req),
+          ? MarketService.ShareSprites(shared.ids, request)
+          : MarketService.ShareFile(shared.path, fileSize, request),
     );
     if (id) {
       sharedId = id;
@@ -224,7 +226,7 @@
           {#if target.kind === "file"}
             <div class="row pickrow">
               <button class="t-btn" onclick={chooseFile}>Choose…</button>
-              <span class="t-label fname" title={target.path}>{target.path ? fileName(target.path) : "An .otobj or .obd file, or an image"}</span>
+              <span class="t-label fname" title={target.path}>{target.path ? basename(target.path) : "An .otobj or .obd file, or an image"}</span>
               {#if target.path && !isObdFile}
                 <span class="grow"></span>
                 <Select

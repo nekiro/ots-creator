@@ -12,12 +12,12 @@ export function pop(_node: Element, { duration = 180, y = -8 }: { duration?: num
   return {
     duration,
     easing: cubicOut,
-    css: (t, u) => `opacity:${t};transform:translateY(${u * y}px) scale(${0.96 + 0.04 * t})`,
+    css: (progress, remaining) => `opacity:${progress};transform:translateY(${remaining * y}px) scale(${0.96 + 0.04 * progress})`,
   };
 }
 
 /** The dimmed backdrop behind a window. */
 export function backdrop(_node: Element, { duration = 160 }: { duration?: number } = {}): TransitionConfig {
   if (reduced()) return { duration: 0 };
-  return { duration, easing: cubicOut, css: (t) => `opacity:${t}` };
+  return { duration, easing: cubicOut, css: (progress) => `opacity:${progress}` };
 }

@@ -18,6 +18,7 @@
   import { MapRenderer } from "../../lib/map/render/renderer";
   import { bresenhamLine, screenToTile } from "../../lib/map/editor/tileGeometry";
   import { clamp } from "../../lib/util/math";
+  import { isTyping } from "../../lib/ui/typing";
   import { applyChange, edit, map, onMapChange, selectBrush, setCam, useCreature, type BrushSel } from "../../lib/map/state.svelte";
   import { mapContextMenu, openText, readableIndex } from "../../lib/map/view/menus";
   import FloorLadder from "./FloorLadder.svelte";
@@ -85,6 +86,10 @@
     return () => clearInterval(timer);
   });
 
+  const markers = $derived(markersOf(map.active));
+  /** Plain copy for the render loop: proxy reads per chunk and tile add up. */
+  const viewOptions = $derived($state.snapshot(map.view));
+
   function draw() {
     raf = 0;
     frameTimes.push(performance.now());
@@ -94,7 +99,6 @@
     const tileSize = spriteSize();
     const dpr = window.devicePixelRatio || 1;
     const scale = cam.zoom * dpr;
-    const markers = markersOf(map.active);
     const { ghosts, rects } = computePreview({
       drag,
       hover: map.hover,
@@ -126,7 +130,7 @@
         items: map.items,
         looks,
         sprites: spriteCache,
-        opts: map.view,
+        opts: viewOptions,
         time: performance.now(),
         house: map.brush?.kind === "house" || map.brush?.kind === "houseExit" ? (map.brush.house ?? 0) : 0,
         ghosts,
@@ -413,7 +417,7 @@
   function onkey(event: KeyboardEvent) {
     const was = { ...modifiers };
     readModifiers(event);
-    if (event.code === "Space" && !(event.target as HTMLElement).closest("input, textarea")) {
+    if (event.code === "Space" && !isTyping(event)) {
       spaceHeld = event.type === "keydown";
       if (map.mode === "map" && map.activeId !== null) event.preventDefault();
     }
@@ -514,7 +518,7 @@
   // Redraw on any state the frame depends on.
   $effect(() => {
     void [map.activeId, map.cam.x, map.cam.y, map.cam.zoom, map.cam.floor, map.dataRev, map.tool, map.brush, map.size, map.shape, map.fill, map.pasting, map.active?.houses, map.active?.waypoints, map.active?.towns];
-    void JSON.stringify(map.view);
+    void viewOptions;
     requestDraw();
   });
 

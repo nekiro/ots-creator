@@ -67,18 +67,18 @@ func OpenMapStore() *MapStore {
 // NewMapStore loads map editor settings from path ("" keeps them in
 // memory only).
 func NewMapStore(path string) *MapStore {
-	st := &MapStore{path: path, data: mapStoreData{Profiles: map[string]MapDataConfig{}}}
+	store := &MapStore{path: path, data: mapStoreData{Profiles: map[string]MapDataConfig{}}}
 	if path == "" {
-		return st
+		return store
 	}
-	data, err := os.ReadFile(st.path)
+	data, err := os.ReadFile(store.path)
 	if err == nil {
-		_ = json.Unmarshal(data, &st.data)
+		_ = json.Unmarshal(data, &store.data)
 	}
-	if st.data.Profiles == nil {
-		st.data.Profiles = map[string]MapDataConfig{}
+	if store.data.Profiles == nil {
+		store.data.Profiles = map[string]MapDataConfig{}
 	}
-	return st
+	return store
 }
 
 // Dir returns the folder of the settings ("" when unknown).
@@ -90,18 +90,10 @@ func (st *MapStore) Dir() string {
 }
 
 func (st *MapStore) saveLocked() error {
-	if st.path == "" {
-		return nil
-	}
-	data, err := json.MarshalIndent(st.data, "", "\t")
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(st.path), fsutil.DirMode); err != nil {
-		return err
-	}
-	return fsutil.WriteAtomic(st.path, data)
+	return fsutil.WriteJSON(st.path, st.data, "\t")
 }
+
+func recentMapPath(recent RecentMap) string { return recent.Path }
 
 func profileKey(client string) string { return strings.ToLower(filepath.Clean(client)) }
 
@@ -132,12 +124,7 @@ func (st *MapStore) Recent() []RecentMap {
 func (st *MapStore) AddRecent(recent RecentMap) error {
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	out := []RecentMap{recent}
-	for _, entry := range st.data.Recent {
-		if !fsutil.SamePath(entry.Path, recent.Path) {
-			out = append(out, entry)
-		}
-	}
+	out := fsutil.AppendOtherPaths([]RecentMap{recent}, st.data.Recent, recent.Path, recentMapPath)
 	st.data.Recent = out[:min(len(out), maxRecentMaps)]
 	return st.saveLocked()
 }
@@ -147,10 +134,8 @@ func (st *MapStore) RemoveRecent(path string) error {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	var out []RecentMap
-	for _, entry := range st.data.Recent {
-		if path != "" && !fsutil.SamePath(entry.Path, path) {
-			out = append(out, entry)
-		}
+	if path != "" {
+		out = fsutil.AppendOtherPaths(out, st.data.Recent, path, recentMapPath)
 	}
 	st.data.Recent = out
 	return st.saveLocked()

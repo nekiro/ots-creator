@@ -2,16 +2,16 @@
   import { answer, confirmState, DESTRUCTIVE } from "../confirm.svelte";
   import Dialog from "./Dialog.svelte";
 
-  const q = $derived(confirmState.question);
+  const question = $derived(confirmState.question);
 </script>
 
-{#if q}
-  <Dialog title={q.title} width={380} onclose={() => answer(false)}>
-    <p>{q.message}</p>
+{#if question}
+  <Dialog title={question.title} width={380} onclose={() => answer(false)}>
+    <p>{question.message}</p>
     {#snippet footer()}
       <span class="grow"></span>
-      <button class="t-btn primary" class:danger={q.danger ?? DESTRUCTIVE.test(q.ok)} onclick={() => answer(true)}>{q.ok}</button>
-      {#if q.alt}<button class="t-btn" onclick={() => answer("alt")}>{q.alt}</button>{/if}
+      <button class="t-btn primary" class:danger={question.danger ?? DESTRUCTIVE.test(question.ok)} onclick={() => answer(true)}>{question.ok}</button>
+      {#if question.alt}<button class="t-btn" onclick={() => answer("alt")}>{question.alt}</button>{/if}
       <button class="t-btn" onclick={() => answer(false)}>Cancel</button>
     {/snippet}
   </Dialog>

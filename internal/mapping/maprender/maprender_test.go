@@ -5,10 +5,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/nekiro/ots-creator/internal/mapping/materials"
 	"github.com/nekiro/ots-creator/internal/core/otitems"
-	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/mapping/materials"
+	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
 type fakeThings map[uint32]*thing.Thing

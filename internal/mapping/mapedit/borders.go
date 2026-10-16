@@ -1,8 +1,8 @@
 package mapedit
 
 import (
+	"cmp"
 	"slices"
-	"sort"
 
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
@@ -274,9 +274,11 @@ func (e *Editor) planBorders(pos otmap.Position, self *GroundBrush, optional boo
 // stackClusters puts the border pieces of the clusters on the plan, the
 // cluster with the lowest z order lowest.
 func (plan *borderPlan) stackClusters(clusters []borderCluster) {
-	sort.SliceStable(clusters, func(a, b int) bool { return clusters[a].z < clusters[b].z })
-	// Each piece goes to the bottom, so the lowest cluster ends lowest.
-	putBottom := func(id uint16) { plan.ids = slices.Insert(plan.ids, 0, id) }
+	slices.SortStableFunc(clusters, func(left, right borderCluster) int { return cmp.Compare(left.z, right.z) })
+	// Each piece goes to the bottom, so the lowest cluster ends lowest. The
+	// pieces are collected top first and reversed once at the end.
+	var topFirst []uint16
+	putBottom := func(id uint16) { topFirst = append(topFirst, id) }
 	for i := len(clusters) - 1; i >= 0; i-- {
 		cluster := clusters[i]
 		if cluster.border == nil {
@@ -301,6 +303,8 @@ func (plan *borderPlan) stackClusters(clusters []borderCluster) {
 			}
 		}
 	}
+	slices.Reverse(topFirst)
+	plan.ids = append(topFirst, plan.ids...)
 }
 
 // applySpecificCases runs the specific cases of the border blocks on the
@@ -352,12 +356,21 @@ func (e *Editor) applySpecific(ids []uint16, specific specificCase) []uint16 {
 	return ids
 }
 
-// borderize redoes the borders of the tile at pos after its neighborhood
+// fitBorders redoes the borders of the tile at pos after its neighborhood
 // changed. Unlike RME it does not wipe the tile: it compares the plans
 // from before and after the action and swaps only the pieces of the
 // border sets they use. Borders it does not know stay, and a tile whose
 // plan did not change is left alone.
-func (e *Editor) borderize(tx *Tx, pos otmap.Position) { e.reborder(tx, pos, false) }
+func (e *Editor) fitBorders(tx *Tx, pos otmap.Position) { e.reborder(tx, pos, false) }
+
+// fitToNeighbors fits the borders, walls, tables and carpets of the tile at
+// pos to its neighbors (automagic after a change next to it).
+func (e *Editor) fitToNeighbors(tx *Tx, pos otmap.Position) {
+	e.fitBorders(tx, pos)
+	e.fitWalls(tx, pos)
+	e.fitTables(tx, pos)
+	e.fitCarpets(tx, pos)
+}
 
 // reborder redoes the borders at pos. full replaces every material border
 // on the tile; it is used by the borderize commands and when the ground
@@ -366,7 +379,7 @@ func (e *Editor) reborder(tx *Tx, pos otmap.Position, full bool) {
 	current := tx.Get(pos)
 	self := e.groundBrushOf(current)
 	newPlan := e.planBorders(pos, self, current != nil && e.hasOptionalBorder(current), func(neighborPos otmap.Position) *GroundBrush {
-		return e.groundBrushOf(e.Map.Tile(neighborPos))
+		return e.groundBrushOf(e.peekPos(neighborPos))
 	})
 	if current == nil && len(newPlan.ids) == 0 {
 		return
@@ -390,12 +403,24 @@ func (e *Editor) reborder(tx *Tx, pos otmap.Position, full bool) {
 			return oldPlan.managed[id] || newPlan.managed[id] || slices.Contains(oldPlan.ids, id)
 		}
 	}
-	sameID := func(restacked, existing otmap.Item) bool { return restacked.ID == existing.ID }
-	if current != nil && !dropOptional && slices.EqualFunc(e.restack(current.Items, newPlan.ids, drop), current.Items, sameID) {
+	var currentItems []otmap.Item
+	if current != nil {
+		currentItems = current.Items
+	}
+	restacked := e.restack(currentItems, newPlan.ids, drop)
+	sameID := func(restackedItem, existing otmap.Item) bool { return restackedItem.ID == existing.ID }
+	if current != nil && !dropOptional && slices.EqualFunc(restacked, current.Items, sameID) {
 		return
 	}
 	tile := tx.Edit(pos)
-	tile.Items = e.restack(tile.Items, newPlan.ids, drop)
+	if tile != current {
+		// The restacked items share extras with current, which can be the
+		// tile from before the action: the edited tile gets its own copies.
+		for i := range restacked {
+			restacked[i] = restacked[i].Clone()
+		}
+	}
+	tile.Items = restacked
 	if dropOptional {
 		tile.State &^= otmap.StateOptionalBorder
 	}

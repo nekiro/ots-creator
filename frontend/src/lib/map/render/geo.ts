@@ -2,6 +2,8 @@
 // app/map_http.go): the quads of a 32x32 chunk ready for the GPU, fetched
 // per chunk and the view options they depend on.
 import { res } from "../data/api";
+import { chunkKey, inBatches, splitKey, trimStore } from "../data/chunks";
+import { BLOCK_CHUNKS } from "../constants";
 
 /** View option bits of the geometry (app/map_http.go). */
 export const GEO = {
@@ -75,8 +77,8 @@ export function encodeGeoSignature({ bits, house, blockSize }: GeoSignature): st
   return `${bits}|${house}|${blockSize}`;
 }
 
-export function decodeGeoSignature(sig: string): GeoSignature {
-  const [bits, house, blockSize] = sig.split("|").map(Number);
+export function decodeGeoSignature(signature: string): GeoSignature {
+  const [bits, house, blockSize] = signature.split("|").map(Number);
   return { bits, house, blockSize };
 }
 
@@ -84,11 +86,11 @@ export interface GeoChunk {
   key: number;
   /** Quads, QUAD_BYTES each, in world pixels from the chunk's corner. */
   quads: Uint8Array;
-  n: number;
+  quadCount: number;
   /** Animated pieces, three values each: quad, client item id, frame 0 sprite index. */
-  anim: Uint32Array;
+  animated: Uint32Array;
   /** Colored outfit pieces, four values each: quad, sprite, template sprite, colors (head, body, legs, feet bytes). */
-  comp: Uint32Array;
+  composed: Uint32Array;
   /** Every plain sprite the quads use. */
   sprites: Uint32Array;
   /** Light sources, LIGHT_BYTES each: int16 x, y (world pixels from the chunk's corner), uint8 level, uint8 color (8-bit client color). */
@@ -98,15 +100,15 @@ export interface GeoChunk {
   /** Tiles with a ground, one bit each row by row (null: none): they hide the light of the floors under them. */
   shades: Uint8Array | null;
   /** What it was built for. */
-  sig: string;
+  signature: string;
 }
 
 /** Decodes a geometry response. */
-export function decodeGeo(buf: ArrayBuffer, sig: string): GeoChunk[] {
-  const view = new DataView(buf);
+export function decodeGeo(buffer: ArrayBuffer, signature: string): GeoChunk[] {
+  const view = new DataView(buffer);
   const out: GeoChunk[] = [];
   let offset = 0;
-  while (offset + 24 <= buf.byteLength) {
+  while (offset + 24 <= buffer.byteLength) {
     const key = view.getUint32(offset, true);
     const quadCount = view.getUint32(offset + 4, true);
     const animCount = view.getUint32(offset + 8, true);
@@ -114,31 +116,32 @@ export function decodeGeo(buf: ArrayBuffer, sig: string): GeoChunk[] {
     const spriteCount = view.getUint32(offset + 16, true);
     const lightCount = view.getUint32(offset + 20, true);
     offset += 24;
-    const quads = new Uint8Array(buf, offset, quadCount * QUAD_BYTES);
+    const quads = new Uint8Array(buffer, offset, quadCount * QUAD_BYTES);
     offset += quadCount * QUAD_BYTES;
     // Every part is a multiple of 4 bytes long, so the views stay aligned.
-    const anim = new Uint32Array(buf, offset, animCount * 3);
+    const animated = new Uint32Array(buffer, offset, animCount * 3);
     offset += animCount * 12;
-    const comp = new Uint32Array(buf, offset, composedCount * 4);
+    const composed = new Uint32Array(buffer, offset, composedCount * 4);
     offset += composedCount * 16;
-    const sprites = new Uint32Array(buf, offset, spriteCount);
+    const sprites = new Uint32Array(buffer, offset, spriteCount);
     offset += spriteCount * 4;
-    const lights = new DataView(buf, offset, lightCount * LIGHT_BYTES);
+    const lights = new DataView(buffer, offset, lightCount * LIGHT_BYTES);
     offset += lightCount * LIGHT_BYTES;
     const shadeBytes = view.getUint32(offset, true);
     offset += 4;
-    const shades = shadeBytes ? new Uint8Array(buf, offset, shadeBytes) : null;
+    const shades = shadeBytes ? new Uint8Array(buffer, offset, shadeBytes) : null;
     offset += shadeBytes;
-    out.push({ key, quads, n: quadCount, anim, comp, sprites, lights, lightCount, shades, sig });
+    out.push({ key, quads, quadCount, animated, composed, sprites, lights, lightCount, shades, signature });
   }
   return out;
 }
 
+/** Chunks per request. */
 const BATCH = 64;
 
 interface Entry {
   chunk: GeoChunk | null;
-  sig: string;
+  signature: string;
   /** Changed on the map since it was fetched. */
   stale: boolean;
 }
@@ -154,12 +157,12 @@ export class GeoStore {
   private queued = new Map<string, Set<number>>();
   /** Request number of the newest request of each chunk: older answers are dropped. */
   private latest = new Map<number, number>();
-  private seq = 0;
+  private requestNumber = 0;
   private timer = 0;
   /** Recent requests: when each ended, its whole time and the backend's build time (ms). */
   private times: { at: number; total: number; build: number }[] = [];
   /** The loading burst under way (from the first request until nothing loads), logged when it ends. */
-  private burst: { start: number; reqs: number; chunks: number; bytes: number; packed: number; total: number; max: number; build: number; wait: number } | null = null;
+  private burst: { start: number; requests: number; chunks: number; bytes: number; packed: number; total: number; max: number; build: number; wait: number } | null = null;
 
   constructor(
     readonly mapId: number,
@@ -168,75 +171,72 @@ export class GeoStore {
 
   /**
    * The geometry of a chunk: null when it is empty, undefined when none is
-   * loaded yet. sig is "opts|house|block" (block > 1: key is a block key,
-   * see GEO_BLOCK).
+   * loaded yet. signature is "opts|house|block" (block > 1: key is a block
+   * key, see GEO_BLOCK).
    */
-  get(key: number, sig: string): GeoChunk | null | undefined {
+  get(key: number, signature: string): GeoChunk | null | undefined {
     const entry = this.chunks.get(key);
-    const fresh = entry && !entry.stale && entry.sig === sig;
-    if (!fresh && this.inflight.get(key) !== sig) this.queue(key, sig);
+    const fresh = entry && !entry.stale && entry.signature === signature;
+    if (!fresh && this.inflight.get(key) !== signature) this.queue(key, signature);
     return entry?.chunk;
   }
 
-  private queue(key: number, sig: string): void {
-    this.burst ??= { start: performance.now(), reqs: 0, chunks: 0, bytes: 0, packed: 0, total: 0, max: 0, build: 0, wait: 0 };
-    this.inflight.set(key, sig);
-    let keys = this.queued.get(sig);
-    if (!keys) this.queued.set(sig, (keys = new Set()));
+  private queue(key: number, signature: string): void {
+    this.burst ??= { start: performance.now(), requests: 0, chunks: 0, bytes: 0, packed: 0, total: 0, max: 0, build: 0, wait: 0 };
+    this.inflight.set(key, signature);
+    let keys = this.queued.get(signature);
+    if (!keys) this.queued.set(signature, (keys = new Set()));
     keys.add(key);
     if (!this.timer) this.timer = requestAnimationFrame(() => this.flush());
   }
 
   private flush(): void {
     this.timer = 0;
-    for (const [sig, set] of this.queued) {
-      const keys = [...set];
-      for (let i = 0; i < keys.length; i += BATCH) void this.fetch(keys.slice(i, i + BATCH), sig);
-    }
+    for (const [signature, keys] of this.queued) inBatches([...keys], BATCH, (batch) => void this.fetch(batch, signature));
     this.queued.clear();
   }
 
-  private async fetch(keys: number[], sig: string): Promise<void> {
-    const seq = ++this.seq;
-    for (const key of keys) this.latest.set(key, seq);
-    const { bits, house, blockSize } = decodeGeoSignature(sig);
+  private async fetch(keys: number[], signature: string): Promise<void> {
+    const requestNumber = ++this.requestNumber;
+    for (const key of keys) this.latest.set(key, requestNumber);
+    const { bits, house, blockSize } = decodeGeoSignature(signature);
     const base = blockSize > 1 ? GEO_BLOCK : 0;
     const started = performance.now();
     try {
-      const response = await fetch(res.geo(this.mapId, keys.map((key) => key - base), bits, house, blockSize) + `&q=${seq}`);
+      const response = await fetch(res.geo(this.mapId, keys.map((key) => key - base), bits, house, blockSize) + `&q=${requestNumber}`);
       if (!response.ok) throw new Error(await response.text());
-      const head = performance.now();
+      const firstByteAt = performance.now();
       // The backend sends raw deflate (see app/map_http.go buildGeo).
-      const buf = await new Response(response.body!.pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer();
-      const chunks = decodeGeo(buf, sig);
+      const buffer = await new Response(response.body!.pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer();
+      const chunks = decodeGeo(buffer, signature);
       const now = performance.now();
       const build = Number(response.headers.get("X-Build-Ms")) || 0;
       this.times.push({ at: now, total: now - started, build });
       const burst = this.burst;
       if (burst) {
-        burst.reqs++;
+        burst.requests++;
         burst.chunks += keys.length;
-        burst.bytes += buf.byteLength;
+        burst.bytes += buffer.byteLength;
         burst.packed += Number(response.headers.get("X-Packed-Bytes")) || 0;
         burst.total += now - started;
         burst.max = Math.max(burst.max, now - started);
         burst.build += build;
         // Until the answer started: queue, lock and build.
-        burst.wait += head - started;
+        burst.wait += firstByteAt - started;
       }
       for (const chunk of chunks) {
         chunk.key += base;
-        if (this.latest.get(chunk.key) !== seq) continue;
-        this.chunks.set(chunk.key, { chunk: chunk.n ? chunk : null, sig, stale: false });
+        if (this.latest.get(chunk.key) !== requestNumber) continue;
+        this.chunks.set(chunk.key, { chunk: chunk.quadCount ? chunk : null, signature, stale: false });
       }
       this.onload();
     } catch {
       // The map was closed or the request failed: try again on demand.
     } finally {
       for (const key of keys) {
-        if (this.latest.get(key) === seq) {
+        if (this.latest.get(key) === requestNumber) {
           this.latest.delete(key);
-          if (this.inflight.get(key) === sig) this.inflight.delete(key);
+          if (this.inflight.get(key) === signature) this.inflight.delete(key);
         }
       }
       this.logBurst();
@@ -248,8 +248,8 @@ export class GeoStore {
     const burst = this.burst;
     if (!burst || !this.idle()) return;
     this.burst = null;
-    if (!burst.reqs) return;
-    const requests = burst.reqs;
+    if (!burst.requests) return;
+    const requests = burst.requests;
     const line =
       `[map geo] ${burst.chunks} chunks in ${requests} requests, ${(burst.bytes / 1048576).toFixed(1)} MB (${(burst.packed / 1048576).toFixed(1)} MB sent), ` +
         `done after ${Math.round(performance.now() - burst.start)} ms; per request: ` +
@@ -272,9 +272,9 @@ export class GeoStore {
     const all = new Set<number>();
     for (const key of keys) {
       all.add(key);
-      // The blocks holding the chunk, for every block size the renderer uses.
-      const [cx, cy, z] = [Math.floor(key / 32768), Math.floor(key / 16) & 0x7ff, key & 15];
-      for (const size of [2, 4, 8]) all.add(GEO_BLOCK + (cx - (cx % size)) * 32768 + (cy - (cy % size)) * 16 + z);
+      // The block holding the chunk, of the block size the renderer uses.
+      const [chunkX, chunkY, z] = splitKey(key);
+      all.add(GEO_BLOCK + chunkKey(chunkX - (chunkX % BLOCK_CHUNKS), chunkY - (chunkY % BLOCK_CHUNKS), z));
     }
     for (const key of all) {
       const entry = this.chunks.get(key);
@@ -311,10 +311,6 @@ export class GeoStore {
 
   /** Forgets chunks far from a view to bound memory. */
   trim(keep: (key: number) => boolean, max = 12000): void {
-    if (this.chunks.size <= max) return;
-    for (const key of this.chunks.keys()) {
-      if (!keep(key)) this.chunks.delete(key);
-      if (this.chunks.size <= max * 0.75) break;
-    }
+    trimStore(this.chunks, keep, max);
   }
 }

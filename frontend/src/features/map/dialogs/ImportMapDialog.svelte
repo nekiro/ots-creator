@@ -17,16 +17,16 @@
   let busy = $state(false);
 
   async function browse() {
-    const p = await DialogService.OpenFiles("importMap", "Map to import", [{ name: "OTBM maps (*.otbm)", pattern: "*.otbm" }], false);
-    if (p?.length) path = p[0];
+    const paths = await DialogService.OpenFiles("importMap", "Map to import", [{ name: "OTBM maps (*.otbm)", pattern: "*.otbm" }], false);
+    if (paths?.length) path = paths[0];
   }
 
   async function run() {
     busy = true;
-    const ch = await edit((id) => MapService.ImportMap(id, path, { dx, dy, dz, houses, replace, towns }));
+    const change = await edit((id) => MapService.ImportMap(id, path, { dx, dy, dz, houses, replace, towns }));
     busy = false;
-    if (ch) {
-      toast(`Imported ${ch.count.toLocaleString()} tiles.`, "success");
+    if (change) {
+      toast(`Imported ${change.count.toLocaleString()} tiles.`, "success");
       map.dialog = null;
     }
   }

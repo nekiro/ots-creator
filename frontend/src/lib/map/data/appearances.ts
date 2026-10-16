@@ -19,42 +19,47 @@ export const AF = {
   fullGround: 2048,
 } as const;
 
-export interface Look extends Omit<Appearance, "s" | "ox" | "oy" | "el" | "mv"> {
-  s: number[];
+export interface Look extends Omit<Appearance, "sprites" | "offsetX" | "offsetY" | "elevation" | "moving"> {
+  sprites: number[];
   /** The walking frame group of an outfit that has one. */
-  mv: Look | null;
-  ox: number;
-  oy: number;
-  el: number;
+  moving: Look | null;
+  offsetX: number;
+  offsetY: number;
+  elevation: number;
   /** Cumulative frame end times (ms) for animated things. */
-  cum: number[] | null;
-  total: number;
+  frameEnds: number[] | null;
+  loopDuration: number;
 }
 
 function prepare(appearance: Appearance): Look {
   const look = appearance as unknown as Look;
-  look.s = appearance.s ?? [];
-  look.ox = appearance.ox ?? 0;
-  look.oy = appearance.oy ?? 0;
-  look.el = appearance.el ?? 0;
-  look.cum = null;
-  look.total = 0;
-  look.mv = appearance.mv ? prepare(appearance.mv) : null;
-  if (appearance.f > 1) {
-    const durations = appearance.d && appearance.d.length === appearance.f ? appearance.d : new Array(appearance.f).fill(appearance.f > 1 ? 500 : 0);
+  look.sprites = appearance.sprites ?? [];
+  look.offsetX = appearance.offsetX ?? 0;
+  look.offsetY = appearance.offsetY ?? 0;
+  look.elevation = appearance.elevation ?? 0;
+  look.frameEnds = null;
+  look.loopDuration = 0;
+  look.moving = appearance.moving ? prepare(appearance.moving) : null;
+  if (appearance.frames > 1) {
+    const durations = appearance.durations && appearance.durations.length === appearance.frames ? appearance.durations : new Array(appearance.frames).fill(appearance.frames > 1 ? 500 : 0);
     let end = 0;
-    look.cum = durations.map((duration) => (end += Math.max(duration, 50)));
-    look.total = end;
+    look.frameEnds = durations.map((duration) => (end += Math.max(duration, 50)));
+    look.loopDuration = end;
   }
   return look;
 }
 
 /** Frame of an animation at a time (all instances run in sync). */
 export function frameAt(look: Look, time: number): number {
-  if (!look.cum) return 0;
-  const inLoop = time % look.total;
-  for (let i = 0; i < look.cum.length; i++) if (inLoop < look.cum[i]) return i;
+  if (!look.frameEnds) return 0;
+  const inLoop = time % look.loopDuration;
+  for (let i = 0; i < look.frameEnds.length; i++) if (inLoop < look.frameEnds[i]) return i;
   return 0;
+}
+
+/** Index in look.sprites of the first piece of a layer of a frame and pattern (pieces follow row by row, width a row). */
+export function spriteIndex(look: Look, frame: number, patternX: number, patternY: number, patternZ: number, layer: number): number {
+  return ((((frame * look.patternZ + patternZ) * look.patternY + patternY) * look.patternX + patternX) * look.layers + layer) * look.height * look.width;
 }
 
 class Cache {
@@ -62,7 +67,7 @@ class Cache {
   private queued = new Set<number>();
   private timer = 0;
   constructor(
-    private cat: Category,
+    private category: Category,
     private onload: () => void,
   ) {}
 
@@ -81,11 +86,11 @@ class Cache {
     for (let i = 0; i < ids.length; i += 400) {
       const batch = ids.slice(i, i + 400);
       try {
-        const list = (await MapService.Appearances(this.cat, batch)) ?? [];
+        const list = (await MapService.Appearances(this.category, batch)) ?? [];
         const found = new Set<number>();
-        for (const a of list) {
-          this.map.set(a.id, prepare(a));
-          found.add(a.id);
+        for (const appearance of list) {
+          this.map.set(appearance.id, prepare(appearance));
+          found.add(appearance.id);
         }
         for (const id of batch) {
           if (!found.has(id)) this.map.set(id, null);

@@ -2,6 +2,9 @@
 // names and minimap colors, in typed arrays for fast lookups while drawing.
 import type { ItemTable } from "./api";
 
+/** Top orders of ItemIndex.top: common items, borders, bottom items (walls) and top items. */
+export const TOP_ORDER = { common: 0, border: 1, bottom: 2, top: 3 } as const;
+
 export class ItemIndex {
   readonly maxId: number;
   readonly client: Uint16Array;
@@ -17,7 +20,7 @@ export class ItemIndex {
   readonly bits: Record<string, number>;
   readonly mode: string;
   /** Lowercase names for searching. */
-  private lower: string[];
+  private lowercaseNames: string[];
 
   constructor(table: ItemTable) {
     this.maxId = table.maxId ?? 0;
@@ -30,7 +33,7 @@ export class ItemIndex {
     this.speed = new Uint16Array(count);
     this.exists = new Uint8Array(count);
     this.names = new Array(count);
-    this.lower = new Array(count);
+    this.lowercaseNames = new Array(count);
     this.ids = table.ids ?? [];
     this.bits = (table.flagbits ?? {}) as Record<string, number>;
     this.mode = table.mode;
@@ -46,7 +49,7 @@ export class ItemIndex {
       this.exists[id] = 1;
       const name = table.names?.[i] ?? "";
       this.names[id] = name;
-      this.lower[id] = name.toLowerCase();
+      this.lowercaseNames[id] = name.toLowerCase();
     }
   }
 
@@ -68,32 +71,49 @@ export class ItemIndex {
     const text = query.trim().toLowerCase();
     if (!text) return [];
     const out: number[] = [];
-    const num = /^\d+$/.test(text) ? Number(text) : NaN;
-    if (this.has(num)) out.push(num);
+    const queryId = /^\d+$/.test(text) ? Number(text) : NaN;
+    if (this.has(queryId)) out.push(queryId);
     // "100-200" lists an id range.
-    const range = text.match(/^(\d+)\text*-\text*(\d+)$/);
+    const range = text.match(/^(\d+)\s*-\s*(\d+)$/);
     if (range) {
       for (let id = Number(range[1]); id <= Math.min(Number(range[2]), this.maxId) && out.length < limit; id++) {
-        if (this.has(id) && id !== num) out.push(id);
+        if (this.has(id) && id !== queryId) out.push(id);
       }
       return out;
     }
     for (const id of this.ids) {
       if (out.length >= limit) break;
-      if (id !== num && this.lower[id]?.includes(text)) out.push(id);
+      if (id !== queryId && this.lowercaseNames[id]?.includes(text)) out.push(id);
     }
     return out;
   }
 }
 
+/** Rgb of each 8-bit client color, three bytes each: a 6x6x6 cube, black at 0 and from 216 (client: Color::from8bit). */
+export const CLIENT_COLOR_RGB: Uint8Array = (() => {
+  const table = new Uint8Array(256 * 3);
+  for (let color = 1; color < 216; color++) {
+    table[color * 3] = Math.floor(color / 36) * 51;
+    table[color * 3 + 1] = (Math.floor(color / 6) % 6) * 51;
+    table[color * 3 + 2] = (color % 6) * 51;
+  }
+  return table;
+})();
+
+/** Offset of an 8-bit client color in CLIENT_COLOR_RGB; colors outside the cube are black. */
+export function clientColorOffset(color: number): number {
+  return color > 0 && color < 216 ? color * 3 : 0;
+}
+
 /** Tibia minimap color index to CSS rgb. */
 export function minimapCss(color: number): string {
   if (color >= 216) return "#000";
-  return `rgb(${Math.floor(color / 36) % 6 * 51},${Math.floor(color / 6) % 6 * 51},${(color % 6) * 51})`;
+  const offset = clientColorOffset(color);
+  return `rgb(${CLIENT_COLOR_RGB[offset]},${CLIENT_COLOR_RGB[offset + 1]},${CLIENT_COLOR_RGB[offset + 2]})`;
 }
 
 /** Tibia minimap color index to 0xRRGGBB. */
 export function minimapRgb(color: number): [number, number, number] {
-  if (color >= 216 || color <= 0) return [0, 0, 0];
-  return [(Math.floor(color / 36) % 6) * 51, (Math.floor(color / 6) % 6) * 51, (color % 6) * 51];
+  const offset = clientColorOffset(color);
+  return [CLIENT_COLOR_RGB[offset], CLIENT_COLOR_RGB[offset + 1], CLIENT_COLOR_RGB[offset + 2]];
 }

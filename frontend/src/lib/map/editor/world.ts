@@ -4,26 +4,48 @@ import { ask, askText } from "../../confirm.svelte";
 import { toast } from "../../state/app.svelte";
 import { MapService, type HouseInfo, type Position, type Town } from "../data/api";
 import { goTo, mapCommands, spriteSize } from "../view/commands";
-import { worldToTile } from "../view/coords";
+import { worldToPosition } from "../view/coords";
 import { edit, map, selectBrush } from "../state.svelte";
 
 /** Tile at the center of the view. */
 export function viewCenter(): Position {
-  const cam = map.cam;
-  const tile = worldToTile(cam.x, cam.y, cam.floor, spriteSize());
-  return { x: Math.max(0, tile.x), y: Math.max(0, tile.y), z: cam.floor };
+  const camera = map.cam;
+  return worldToPosition(camera.x, camera.y, camera.floor, spriteSize());
+}
+
+/** The entries of a list from the map info without its gaps, kept per list:
+ * map infos are replaced, never changed in place (map.maps is raw state). */
+const presentCache = new WeakMap<object, unknown[]>();
+const NOTHING: never[] = [];
+function present<Entry>(list: (Entry | null)[] | null | undefined): Entry[] {
+  if (!list) return NOTHING;
+  let entries = presentCache.get(list) as Entry[] | undefined;
+  if (!entries) presentCache.set(list, (entries = list.filter((entry): entry is Entry => !!entry)));
+  return entries;
 }
 
 export function towns(): Town[] {
-  return (map.active?.towns ?? []).filter((town): town is Town => !!town);
+  return present(map.active?.towns);
 }
 
 export function houses(): HouseInfo[] {
-  return (map.active?.houses ?? []).filter((house): house is HouseInfo => !!house);
+  return present(map.active?.houses);
 }
 
+/** Town names by id, kept per towns list. */
+const townNamesCache = new WeakMap<object, Map<number, string>>();
+
 export function townName(id: number): string {
-  return towns().find((town) => town.id === id)?.name ?? "No town";
+  const list = map.active?.towns;
+  if (!list) return "No town";
+  let names = townNamesCache.get(list);
+  if (!names) {
+    names = new Map();
+    // The first town with an id wins, as a search from the start would.
+    for (const town of present(list)) if (!names.has(town.id)) names.set(town.id, town.name);
+    townNamesCache.set(list, names);
+  }
+  return names.get(id) ?? "No town";
 }
 
 /** Adds a town with its temple at the view center and shows it. */

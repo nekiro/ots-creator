@@ -24,7 +24,7 @@ export class QuadBatch {
     corners: WebGLBuffer,
   ) {
     this.program = compileProgram(gl, QUAD_VERT, SPRITE_FRAG);
-    for (const name of ["u_screen", "u_off", "u_scale", "u_half", "u_alpha", "u_perRow", "u_uvCell", "u_tex", "u_depth"]) this.uniforms[name] = gl.getUniformLocation(this.program, name);
+    for (const name of ["u_screen", "u_offset", "u_scale", "u_half", "u_alpha", "u_perRow", "u_uvCell", "u_tex", "u_depth"]) this.uniforms[name] = gl.getUniformLocation(this.program, name);
     this.instances = gl.createBuffer()!;
     this.vao = createQuadVao(gl, corners, this.instances);
   }
@@ -34,8 +34,8 @@ export class QuadBatch {
     this.quadCount = 0;
   }
 
-  /** A sprite quad (cell: atlas cell, -1 hides it) tinted with r, g, b, a. */
-  push(x: number, y: number, width: number, height: number, cell: number, r: number, g: number, b: number, a: number): void {
+  /** A sprite quad (cell: atlas cell, -1 hides it) tinted with red, green, blue, alpha. */
+  push(x: number, y: number, width: number, height: number, cell: number, red: number, green: number, blue: number, alpha: number): void {
     if ((this.quadCount + 1) * GPU.floatsPerQuad > this.quads.length) {
       const grown = new Float32Array(this.quads.length * 2);
       grown.set(this.quads);
@@ -55,10 +55,10 @@ export class QuadBatch {
       quads[offset + 4] = Math.floor(cell / atlas.perLayer);
       quads[offset + 5] = cell % atlas.perLayer;
     }
-    quads[offset + 6] = r;
-    quads[offset + 7] = g;
-    quads[offset + 8] = b;
-    quads[offset + 9] = a;
+    quads[offset + 6] = red;
+    quads[offset + 7] = green;
+    quads[offset + 8] = blue;
+    quads[offset + 9] = alpha;
     this.quadCount++;
   }
 
@@ -81,7 +81,7 @@ export class QuadBatch {
     const gl = this.gl;
     if (!this.quadCount) return false;
     this.useSprites(scene);
-    gl.uniform2f(this.uniforms.u_off, 0, 0);
+    gl.uniform2f(this.uniforms.u_offset, 0, 0);
     gl.uniform1f(this.uniforms.u_scale, 1);
     gl.uniform2f(this.uniforms.u_half, 0, 0);
     gl.uniform1f(this.uniforms.u_alpha, 1);
@@ -101,7 +101,7 @@ export class QuadBatch {
     const atlas = this.atlas!;
     gl.useProgram(this.program);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D_ARRAY, atlas.tex);
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, atlas.texture);
     gl.uniform1i(this.uniforms.u_tex, 0);
     gl.uniform2f(this.uniforms.u_screen, scene.width, scene.height);
     gl.uniform1f(this.uniforms.u_perRow, atlas.perRow);

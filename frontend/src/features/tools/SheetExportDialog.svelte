@@ -10,7 +10,7 @@
   import Icon from "../../lib/ui/Icon.svelte";
   import Select from "../../lib/ui/Select.svelte";
   import PanStage from "../../lib/ui/PanStage.svelte";
-  import { ZOOM_LEVELS, fitZoom, stepZoom, zoomLabel } from "../../lib/pan.svelte";
+  import { ZOOM_LEVELS, fitZoom, stepZoom, zoomLabel } from "../../lib/render/zoom";
 
   const category = app.category;
   const id = app.focused!;
@@ -29,7 +29,7 @@
   // The saved object: the sheet is rendered from it, not from the editor.
   $effect(() => {
     void versions.thing(category, id);
-    ThingService.Get(category, id).then((t) => (thing = t ? normalizeThing(t) : null));
+    ThingService.Get(category, id).then((saved) => (thing = saved ? normalizeThing(saved) : null));
   });
 
   // ALL_GROUPS: idle and walking frames in one sheet (needs one layout).
@@ -37,20 +37,20 @@
   const groups = $derived(thing?.frameGroups ?? []);
   const sameLayout = $derived(
     groups.length === 2 &&
-      (["width", "height", "layers", "patternX", "patternY", "patternZ"] as const).every((k) => groups[0][k] === groups[1][k]),
+      (["width", "height", "layers", "patternX", "patternY", "patternZ"] as const).every((field) => groups[0][field] === groups[1][field]),
   );
   // The whole outfit by default; one group when the layouts differ.
   let picked = $state<number | null>(null);
   const effective = $derived(picked ?? (groups.length > 1 ? (sameLayout ? ALL_GROUPS : group) : 0));
-  const g = $derived.by(() => {
+  const frameGroup = $derived.by(() => {
     if (!thing) return null;
     if (effective !== ALL_GROUPS) return groups[Math.min(effective, groups.length - 1)] ?? null;
     return { ...groups[0], frames: groups[0].frames + groups[1].frames, sprites: [...groups[0].sprites, ...groups[1].sprites] };
   });
-  const bg = $derived(transparent && format === "png");
-  const url = $derived(res.sheet(category, id, effective, bg, versions.thing(category, id)));
-  const columns = $derived(g ? g.patternZ * g.patternX * g.layers : 0);
-  const rows = $derived(g ? g.frames * g.patternY : 0);
+  const transparentBackground = $derived(transparent && format === "png");
+  const url = $derived(res.sheet(category, id, effective, transparentBackground, versions.thing(category, id)));
+  const columns = $derived(frameGroup ? frameGroup.patternZ * frameGroup.patternX * frameGroup.layers : 0);
+  const rows = $derived(frameGroup ? frameGroup.frames * frameGroup.patternY : 0);
   // Whole pixels when the sheet fits; big sheets shrink to fit.
   const fit = $derived(fitZoom(natural[0], natural[1], stageSize[0], stageSize[1]));
   const scale = $derived(zoom || fit);
@@ -61,8 +61,8 @@
     failed = false;
   });
 
-  function zoomBy(d: number) {
-    zoom = stepZoom(scale, d);
+  function zoomBy(direction: number) {
+    zoom = stepZoom(scale, direction);
   }
 
   // Fit also centers the sheet again.
@@ -73,13 +73,13 @@
   }
 
   function loaded(event: Event) {
-    const img = event.currentTarget as HTMLImageElement;
-    natural = [img.naturalWidth, img.naturalHeight];
+    const image = event.currentTarget as HTMLImageElement;
+    natural = [image.naturalWidth, image.naturalHeight];
     loading = false;
   }
 
   async function save() {
-    if (await commands.saveSheet(effective, format, bg)) app.dialog = null;
+    if (await commands.saveSheet(effective, format, transparentBackground)) app.dialog = null;
   }
 </script>
 
@@ -97,7 +97,7 @@
         />
       </PanStage>
       {#if loading && !failed}
-        <div class="loader t-panel" role="status"><span class="spinner"></span>Rendering…</div>
+        <div class="loader t-panel" role="status"><span class="t-spinner"></span>Rendering…</div>
       {/if}
       {#if failed}
         <span class="err">The sheet could not be rendered.</span>
@@ -127,7 +127,7 @@
         <span class="t-label lbl">Background</span>
         <Select
           grow
-          value={bg ? "transparent" : "magenta"}
+          value={transparentBackground ? "transparent" : "magenta"}
           disabled={format !== "png"}
           options={[
             { value: "magenta", label: "Magenta" },
@@ -138,12 +138,12 @@
       </label>
       {#if format !== "png"}<p class="t-label note">{format.toUpperCase()} has no transparency: empty pixels are magenta.</p>{/if}
 
-      {#if g}
+      {#if frameGroup}
         <div class="info t-panel">
           <span class="t-label">Image</span><span>{natural[0] || "…"}×{natural[1] || "…"} px</span>
           <span class="t-label">Grid</span><span>{columns}×{rows} textures</span>
-          <span class="t-label">Texture</span><span>{g.width * size}×{g.height * size} px</span>
-          <span class="t-label">Sprites</span><span>{g.sprites.length}</span>
+          <span class="t-label">Texture</span><span>{frameGroup.width * size}×{frameGroup.height * size} px</span>
+          <span class="t-label">Sprites</span><span>{frameGroup.sprites.length}</span>
         </div>
       {/if}
 
@@ -164,7 +164,7 @@
   </div>
   {#snippet footer()}
     <span class="grow"></span>
-    <button class="t-btn primary" disabled={!g || failed || !!app.busy} onclick={save}>Export…</button>
+    <button class="t-btn primary" disabled={!frameGroup || failed || !!app.busy} onclick={save}>Export…</button>
     <button class="t-btn" onclick={() => (app.dialog = null)}>Cancel</button>
   {/snippet}
 </Dialog>
@@ -201,19 +201,6 @@
     gap: 8px;
     padding: 8px 14px;
     color: var(--text-bright);
-  }
-  .spinner {
-    width: 12px;
-    height: 12px;
-    border: 2px solid rgba(232, 196, 106, 0.25);
-    border-top-color: var(--gold);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
   }
   .side {
     width: 210px;

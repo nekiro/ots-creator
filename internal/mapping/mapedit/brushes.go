@@ -8,27 +8,27 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/nekiro/ots-creator/internal/mapping/materials"
 	"github.com/nekiro/ots-creator/internal/core/otitems"
+	"github.com/nekiro/ots-creator/internal/mapping/materials"
 )
 
 type chanceList struct {
-	ids   []uint16
-	cum   []int // cumulative chances
-	total int
+	ids        []uint16
+	cumulative []int // running sum of the chances
+	total      int
 }
 
 func newChanceList(chances []materials.Chance) chanceList {
-	var l chanceList
+	var list chanceList
 	for _, chance := range chances {
 		if chance.ID == 0 {
 			continue
 		}
-		l.total += max(chance.Chance, 0)
-		l.ids = append(l.ids, chance.ID)
-		l.cum = append(l.cum, l.total)
+		list.total += max(chance.Chance, 0)
+		list.ids = append(list.ids, chance.ID)
+		list.cumulative = append(list.cumulative, list.total)
 	}
-	return l
+	return list
 }
 
 func (l *chanceList) pick(rng *rand.Rand) uint16 {
@@ -39,7 +39,7 @@ func (l *chanceList) pick(rng *rand.Rand) uint16 {
 		return l.ids[0]
 	}
 	roll := rng.IntN(l.total) + 1
-	for i, cumulative := range l.cum {
+	for i, cumulative := range l.cumulative {
 		if roll <= cumulative {
 			return l.ids[i]
 		}
@@ -181,8 +181,10 @@ type doodadSingle struct {
 }
 
 type doodadComposite struct {
-	chance int
-	tiles  []materials.CompositeTile
+	// cumulativeChance is the sum of the chances of this composite and the
+	// ones before it (singles keep their own chance instead).
+	cumulativeChance int
+	tiles            []materials.CompositeTile
 }
 
 type doodadAlt struct {
@@ -197,12 +199,12 @@ type doodadAlt struct {
 
 // DoodadBrush places random decoration.
 type DoodadBrush struct {
-	id    int
-	Name  string
-	look  uint16
-	opts  materials.DoodadOptions
-	alts  []*doodadAlt
-	owned map[uint16]bool
+	id      int
+	Name    string
+	look    uint16
+	options materials.DoodadOptions
+	alts    []*doodadAlt
+	owned   map[uint16]bool
 }
 
 func (d *DoodadBrush) alt(variation int) *doodadAlt {
@@ -260,18 +262,18 @@ func NewBrushes(items *otitems.DB, materialsDB *materials.Materials) *Brushes {
 	if materialsDB == nil {
 		materialsDB = materials.New()
 	}
-	b := &Brushes{
+	brushes := &Brushes{
 		items: items, Materials: materialsDB,
 		grounds: map[string]*GroundBrush{}, walls: map[string]*WallBrush{}, carpets: map[string]*CarpetBrush{},
 		tables: map[string]*TableBrush{}, doodads: map[string]*DoodadBrush{}, info: map[uint16]*itemInfo{},
 	}
 	items.MarkMeta(materialsDB.MetaItems)
-	borders := b.indexBorders(materialsDB.Borders)
+	borders := brushes.indexBorders(materialsDB.Borders)
 	// First pass: create brushes so rules can reference any brush by name.
-	b.createBrushes(materialsDB.Brushes)
-	b.buildBrushes(materialsDB.Brushes, borders)
-	b.resolveWallRedirects()
-	return b
+	brushes.createBrushes(materialsDB.Brushes)
+	brushes.buildBrushes(materialsDB.Brushes, borders)
+	brushes.resolveWallRedirects()
+	return brushes
 }
 
 // indexBorders creates and registers the shared borders, keyed by border id.
@@ -313,13 +315,13 @@ func (b *Brushes) createBrushes(materialBrushes []*materials.Brush) {
 // resolveBrushID returns the id of the ground or wall brush named in a rule,
 // or toAll, toNone or toUnknown.
 func (b *Brushes) resolveBrushID(name string) int {
-	switch lower(name) {
+	key := lower(name)
+	switch key {
 	case "all":
 		return toAll
 	case "none", "":
 		return toNone
 	}
-	key := lower(name)
 	if ground := b.grounds[key]; ground != nil {
 		return ground.id
 	}
@@ -588,7 +590,7 @@ func (b *Brushes) buildTable(table *TableBrush, material *materials.Brush) {
 
 func (b *Brushes) buildDoodad(doodad *DoodadBrush, material *materials.Brush) {
 	if material.Doodad != nil {
-		doodad.opts = *material.Doodad
+		doodad.options = *material.Doodad
 	}
 	for _, alternative := range material.Alternatives {
 		alt := &doodadAlt{ownedItems: map[uint16]bool{}}
@@ -599,7 +601,7 @@ func (b *Brushes) buildDoodad(doodad *DoodadBrush, material *materials.Brush) {
 		}
 		for _, composite := range alternative.Composites {
 			alt.compositeTotal += max(composite.Chance, 0)
-			alt.composites = append(alt.composites, doodadComposite{chance: alt.compositeTotal, tiles: composite.Tiles})
+			alt.composites = append(alt.composites, doodadComposite{cumulativeChance: alt.compositeTotal, tiles: composite.Tiles})
 			for _, tile := range composite.Tiles {
 				for _, item := range tile.Items {
 					alt.ownedItems[item.ID] = true

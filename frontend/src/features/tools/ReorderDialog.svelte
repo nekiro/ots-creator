@@ -11,6 +11,7 @@
   import VirtualGrid from "../../lib/ui/VirtualGrid.svelte";
   import { loading as imgLoading } from "../../lib/ui/loading";
   import { clamp } from "../../lib/util/math";
+  import { clickSelection, idRange } from "../../lib/util/selection";
 
   let category = $state<Category>(app.category);
   let insert = $state(false);
@@ -20,7 +21,7 @@
   const first = $derived(minId(category));
   const end = $derived(app.maxId(category) + 1);
   const count = $derived(end - first + 1);
-  const idAt = (i: number) => first + i;
+  const idAt = (index: number) => first + index;
 
   let selected = $state<number[]>([]);
   let anchor: number | null = null;
@@ -43,8 +44,8 @@
     return out;
   });
 
-  function setCategory(c: Category) {
-    category = c;
+  function setCategory(next: Category) {
+    category = next;
     selected = [];
     held = [];
     anchor = null;
@@ -57,20 +58,14 @@
       return;
     }
     if (id === end) return;
-    if (event.shiftKey && anchor !== null) {
-      const [lo, hi] = anchor < id ? [anchor, id] : [id, anchor];
-      const range = Array.from({ length: hi - lo + 1 }, (_, k) => lo + k);
-      selected = event.ctrlKey ? [...new Set([...selected, ...range])] : range;
-      return;
-    }
-    anchor = id;
-    if (event.ctrlKey || event.metaKey) selected = selectedSet.has(id) ? selected.filter((x) => x !== id) : [...selected, id];
-    else selected = [id];
+    const next = clickSelection(event, selected, anchor, id, (from) => idRange(from, id));
+    selected = next.selection;
+    anchor = next.anchor;
   }
 
   function cut() {
     if (!selected.length) return;
-    held = [...selected].sort((a, b) => a - b);
+    held = [...selected].sort((left, right) => left - right);
     toast(`Click the slot where ${held.length > 1 ? `#${held[0]} and the others go` : `#${held[0]} goes`} (Esc cancels).`, "info", 3500, "reorder");
   }
 
@@ -96,7 +91,7 @@
       selected = [id];
       anchor = id;
     }
-    dragging = [...selected].sort((a, b) => a - b);
+    dragging = [...selected].sort((left, right) => left - right);
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", dragging.join(","));
   }
@@ -113,35 +108,35 @@
     if (ids.length) void move(ids, id);
   }
 
-  async function move(ids: number[], at: number, ins = insert) {
+  async function move(ids: number[], at: number, insertMode = insert) {
     if (!ids.length) return;
-    const n = ids.length;
-    const got = await run("Moving", () => ThingService.Move(category, ids, at, { insert: ins, updateRefs: updateRefs && category === Category.CategoryItem }));
+    const movedCount = ids.length;
+    const moved = await run("Moving", () => ThingService.Move(category, ids, at, { insert: insertMode, updateRefs: updateRefs && category === Category.CategoryItem }));
     held = [];
     over = null;
-    if (!got) return;
-    selected = got;
-    anchor = got[0] ?? null;
-    recent = new Set(got);
+    if (!moved) return;
+    selected = moved;
+    anchor = moved[0] ?? null;
+    recent = new Set(moved);
     setTimeout(() => (recent = new Set()), 1500);
-    const lo = Math.min(...got);
-    const hi = Math.max(...got);
-    toast(`Moved ${n} ${CATEGORY_NAMES[category]}(s) to ${lo === hi ? `#${lo}` : `#${lo}-#${hi}`}. Ctrl+Z undoes it.`, "success", 3500, "reorder");
+    const low = Math.min(...moved);
+    const high = Math.max(...moved);
+    toast(`Moved ${movedCount} ${CATEGORY_NAMES[category]}(s) to ${low === high ? `#${low}` : `#${low}-#${high}`}. Ctrl+Z undoes it.`, "success", 3500, "reorder");
   }
 
   /** Swaps the two selected objects. */
   function swapTwo() {
     if (selected.length !== 2) return;
-    const [a, b] = selected;
-    void move([a], b, false);
+    const [firstId, secondId] = selected;
+    void move([firstId], secondId, false);
   }
 
   let target = $state("");
-  function moveTo(e?: KeyboardEvent) {
-    if (e && e.key !== "Enter") return;
+  function moveTo(event?: KeyboardEvent) {
+    if (event && event.key !== "Enter") return;
     const at = parseInt(target, 10);
     if (!Number.isFinite(at) || !selected.length) return;
-    void move([...selected].sort((a, b) => a - b), at);
+    void move([...selected].sort((left, right) => left - right), at);
   }
 
   let jump = $state("");
@@ -163,8 +158,8 @@
   <div class="col reorder">
     <div class="row">
       <div class="t-tabs">
-        {#each CATEGORIES as c}
-          <button class="t-tab" class:on={category === c} onclick={() => setCategory(c)}>{CATEGORY_LABELS[c]}</button>
+        {#each CATEGORIES as tabCategory}
+          <button class="t-tab" class:on={category === tabCategory} onclick={() => setCategory(tabCategory)}>{CATEGORY_LABELS[tabCategory]}</button>
         {/each}
       </div>
       <span class="grow"></span>

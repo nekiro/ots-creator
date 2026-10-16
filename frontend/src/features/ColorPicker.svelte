@@ -1,10 +1,10 @@
 <script lang="ts">
   import { hsiToRgb, PALETTE_SIZE } from "../lib/render/outfit";
 
-  let { label, value, onchange }: { label: string; value: number; onchange: (v: number) => void } = $props();
+  let { label, value, onchange }: { label: string; value: number; onchange: (color: number) => void } = $props();
   let open = $state(false);
 
-  const hex = (c: number) => "#" + hsiToRgb(c).toString(16).padStart(6, "0");
+  const hex = (color: number) => "#" + hsiToRgb(color).toString(16).padStart(6, "0");
   // The client shows the palette as 7 rows of 19 colors.
   const cells = Array.from({ length: PALETTE_SIZE }, (_, i) => i);
 </script>
@@ -15,14 +15,14 @@
   {#if open}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="pop t-frame-up" onmouseleave={() => (open = false)}>
-      {#each cells as c}
+      {#each cells as color}
         <button
           class="cell"
-          class:on={c === value}
-          style="background:{hex(c)}"
-          title={String(c)}
+          class:on={color === value}
+          style="background:{hex(color)}"
+          title={String(color)}
           onclick={() => {
-            onchange(c);
+            onchange(color);
             open = false;
           }}
         ></button>

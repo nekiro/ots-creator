@@ -1,7 +1,6 @@
 package mapedit
 
 import (
-	"cmp"
 	"errors"
 	"slices"
 
@@ -26,75 +25,57 @@ func floorRange(z int, mode string) (int, int) {
 }
 
 // selection tracking: positions of tiles with something selected.
-func (e *Editor) syncSel(pos otmap.Position) {
-	if e.sel == nil {
-		e.sel = map[otmap.Position]struct{}{}
+func (e *Editor) syncSelection(pos otmap.Position) {
+	if e.selectedPositions == nil {
+		e.selectedPositions = map[otmap.Position]struct{}{}
 	}
-	if e.Map.Tile(pos).Selected() {
-		e.sel[pos] = struct{}{}
+	if e.peekPos(pos).Selected() {
+		e.selectedPositions[pos] = struct{}{}
 	} else {
-		delete(e.sel, pos)
+		delete(e.selectedPositions, pos)
 	}
 }
 
 // RebuildSelection scans the map for selected tiles (after loading).
 func (e *Editor) RebuildSelection() {
-	e.sel = map[otmap.Position]struct{}{}
-	for _, chunk := range e.Map.Chunks() {
-		chunk.Each(func(pos otmap.Position, tile *otmap.Tile) {
-			if tile.Selected() {
-				e.sel[pos] = struct{}{}
-			}
-		})
-	}
+	e.selectedPositions = map[otmap.Position]struct{}{}
+	e.Map.EachStored(func(pos otmap.Position, tile *otmap.Tile) {
+		if tile.Selected() {
+			e.selectedPositions[pos] = struct{}{}
+		}
+	})
 }
 
 // Selected returns the positions with something selected, sorted.
 func (e *Editor) Selected() []otmap.Position {
-	positions := make([]otmap.Position, 0, len(e.sel))
-	for pos := range e.sel {
+	positions := make([]otmap.Position, 0, len(e.selectedPositions))
+	for pos := range e.selectedPositions {
 		positions = append(positions, pos)
 	}
-	slices.SortFunc(positions, func(a, b otmap.Position) int {
-		return cmp.Or(cmp.Compare(a.Z, b.Z), cmp.Compare(a.Y, b.Y), cmp.Compare(a.X, b.X))
-	})
+	slices.SortFunc(positions, otmap.ComparePositions)
 	return positions
 }
 
 // SelectionCount returns the number of tiles with a selection.
-func (e *Editor) SelectionCount() int { return len(e.sel) }
+func (e *Editor) SelectionCount() int { return len(e.selectedPositions) }
 
 // SelectionBounds returns the selected area.
 func (e *Editor) SelectionBounds() (lowest, highest otmap.Position, ok bool) {
 	first := true
-	for pos := range e.sel {
+	for pos := range e.selectedPositions {
 		if first {
 			lowest, highest, first = pos, pos, false
 			continue
 		}
-		lowest.X, lowest.Y, lowest.Z = minU(lowest.X, pos.X), minU(lowest.Y, pos.Y), minU(lowest.Z, pos.Z)
-		highest.X, highest.Y, highest.Z = maxU(highest.X, pos.X), maxU(highest.Y, pos.Y), maxU(highest.Z, pos.Z)
+		lowest.X, lowest.Y, lowest.Z = min(lowest.X, pos.X), min(lowest.Y, pos.Y), min(lowest.Z, pos.Z)
+		highest.X, highest.Y, highest.Z = max(highest.X, pos.X), max(highest.Y, pos.Y), max(highest.Z, pos.Z)
 	}
 	return lowest, highest, !first
 }
 
-func minU[T uint8 | uint16](a, b T) T {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func maxU[T uint8 | uint16](a, b T) T {
-	if a > b {
-		return a
-	}
-	return b
-}
-
 // ClearSelection deselects everything.
 func (e *Editor) ClearSelection() {
-	if len(e.sel) == 0 {
+	if len(e.selectedPositions) == 0 {
 		return
 	}
 	tx := e.BeginSelection()
@@ -144,12 +125,12 @@ func allSelected(tile *otmap.Tile) bool {
 
 // equalSelection reports whether two tiles have the same ground and items
 // selected.
-func equalSelection(a, b *otmap.Tile) bool {
-	if a.Ground.Selected != b.Ground.Selected || len(a.Items) != len(b.Items) {
+func equalSelection(left, right *otmap.Tile) bool {
+	if left.Ground.Selected != right.Ground.Selected || len(left.Items) != len(right.Items) {
 		return false
 	}
-	for i := range a.Items {
-		if a.Items[i].Selected != b.Items[i].Selected {
+	for i := range left.Items {
+		if left.Items[i].Selected != right.Items[i].Selected {
 			return false
 		}
 	}
@@ -381,7 +362,8 @@ func (e *Editor) Copy() *Clip {
 	}
 	clip := &Clip{Width: int(highest.X-lowest.X) + 1, Height: int(highest.Y-lowest.Y) + 1}
 	for _, pos := range e.Selected() {
-		clipTile := extract(e.Map.Tile(pos).Clone(), false)
+		// extract without take only reads the tile.
+		clipTile := extract(e.Map.Tile(pos), false)
 		if clipTile.empty() {
 			continue
 		}
@@ -444,16 +426,13 @@ func (e *Editor) autoAround(tx *Tx, changed *posSet) {
 		return
 	}
 	for _, pos := range changed.ring().list {
-		e.borderize(tx, pos)
-		e.wallize(tx, pos)
-		e.tableize(tx, pos)
-		e.carpetize(tx, pos)
+		e.fitToNeighbors(tx, pos)
 	}
 }
 
 // DeleteSelection removes everything selected.
 func (e *Editor) DeleteSelection(label string) int {
-	if len(e.sel) == 0 {
+	if len(e.selectedPositions) == 0 {
 		return 0
 	}
 	if label == "" {
@@ -472,7 +451,7 @@ func (e *Editor) DeleteSelection(label string) int {
 
 // MoveSelection moves the selection by an offset.
 func (e *Editor) MoveSelection(dx, dy, dz int) error {
-	if len(e.sel) == 0 || (dx == 0 && dy == 0 && dz == 0) {
+	if len(e.selectedPositions) == 0 || (dx == 0 && dy == 0 && dz == 0) {
 		return nil
 	}
 	selected := e.Selected()
@@ -514,21 +493,12 @@ func (e *Editor) MoveSelection(dx, dy, dz int) error {
 
 // BorderizeSelection redoes borders of the selected tiles.
 func (e *Editor) BorderizeSelection() int {
-	tx := e.Begin("Borderize selection", 0)
-	for _, pos := range e.Selected() {
-		e.reborder(tx, pos, true)
-		e.wallize(tx, pos)
-	}
-	return tx.Commit()
+	return e.borderizePositions("Borderize selection", e.Selected())
 }
 
 // RandomizeSelection rerolls the grounds of the selected tiles.
 func (e *Editor) RandomizeSelection() int {
-	tx := e.Begin("Randomize selection", 0)
-	for _, pos := range e.Selected() {
-		e.randomize(tx, pos)
-	}
-	return tx.Commit()
+	return e.randomizePositions("Randomize selection", e.Selected())
 }
 
 // randomize rerolls the ground of one tile from its ground brush.

@@ -1,6 +1,7 @@
 // Map tiles fetched from /res/map/{id}/chunks in 32x32 chunks per floor.
 // Only chunks a change touched are fetched again.
 import { res } from "./api";
+import { MAX_FLOOR } from "../constants";
 
 export const CHUNK = 32;
 
@@ -47,7 +48,7 @@ export interface TileData {
   /** Items bottom to top; the ground first when flags has TileFlags.ground. */
   ids: Uint16Array;
   subs: Uint16Array;
-  iflags: Uint8Array;
+  itemFlags: Uint8Array;
   creatures: CreatureData[] | null;
   spawn: { radius: number; selected: boolean } | null;
   spawnNpc: { radius: number; selected: boolean } | null;
@@ -62,12 +63,17 @@ export interface ChunkData {
   count: number;
 }
 
-export function chunkKey(cx: number, cy: number, z: number): number {
-  return cx * 32768 + cy * 16 + z;
+export function chunkKey(chunkX: number, chunkY: number, z: number): number {
+  return chunkX * 32768 + chunkY * 16 + z;
+}
+
+/** The chunk a tile is in (one coordinate). */
+export function chunkOfTile(tile: number): number {
+  return tile >> 5;
 }
 
 export function keyOf(x: number, y: number, z: number): number {
-  return chunkKey(x >> 5, y >> 5, z);
+  return chunkKey(chunkOfTile(x), chunkOfTile(y), z);
 }
 
 export function splitKey(key: number): [number, number, number] {
@@ -85,20 +91,20 @@ const NO_IDS = new Uint16Array(0);
 const NO_FLAGS = new Uint8Array(0);
 
 /** Decodes a chunk response into chunks. */
-export function decodeChunks(buf: ArrayBuffer): ChunkData[] {
-  const view = new DataView(buf);
-  const bytes = new Uint8Array(buf);
+export function decodeChunks(buffer: ArrayBuffer): ChunkData[] {
+  const view = new DataView(buffer);
+  const bytes = new Uint8Array(buffer);
   let offset = 0;
   const out: ChunkData[] = [];
   // The item arrays of all tiles are views into three shared buffers: an
   // array buffer per tile costs several times its few bytes. An item takes
   // at least 5 bytes of the response, which bounds the item count.
-  const room = Math.floor(buf.byteLength / 5) + 1;
+  const room = Math.floor(buffer.byteLength / 5) + 1;
   const allIds = new Uint16Array(room);
   const allSubs = new Uint16Array(room);
   const allFlags = new Uint8Array(room);
   let itemCursor = 0;
-  while (offset + 6 <= buf.byteLength) {
+  while (offset + 6 <= buffer.byteLength) {
     const key = view.getUint32(offset, true);
     const count = view.getUint16(offset + 4, true);
     offset += 6;
@@ -115,12 +121,12 @@ export function decodeChunks(buf: ArrayBuffer): ChunkData[] {
       const itemCount = view.getUint8(offset++);
       const ids = itemCount ? allIds.subarray(itemCursor, itemCursor + itemCount) : NO_IDS;
       const subs = itemCount ? allSubs.subarray(itemCursor, itemCursor + itemCount) : NO_IDS;
-      const iflags = itemCount ? allFlags.subarray(itemCursor, itemCursor + itemCount) : NO_FLAGS;
+      const itemFlags = itemCount ? allFlags.subarray(itemCursor, itemCursor + itemCount) : NO_FLAGS;
       itemCursor += itemCount;
       for (let i = 0; i < itemCount; i++) {
         ids[i] = view.getUint16(offset, true);
         subs[i] = view.getUint16(offset + 2, true);
-        iflags[i] = view.getUint8(offset + 4);
+        itemFlags[i] = view.getUint8(offset + 4);
         offset += 5;
       }
       let creatures: CreatureData[] | null = null;
@@ -143,10 +149,10 @@ export function decodeChunks(buf: ArrayBuffer): ChunkData[] {
             lookItem: view.getUint16(offset + 10, true),
             name: "",
           };
-          const len = view.getUint8(offset + 12);
+          const nameLength = view.getUint8(offset + 12);
           offset += 13;
-          creature.name = decoder.decode(bytes.subarray(offset, offset + len));
-          offset += len;
+          creature.name = decoder.decode(bytes.subarray(offset, offset + nameLength));
+          offset += nameLength;
           creatures.push(creature);
         }
       }
@@ -171,19 +177,34 @@ export function decodeChunks(buf: ArrayBuffer): ChunkData[] {
       }
       let text: string | null = null;
       if (flags & TileFlags.text) {
-        const len = view.getUint16(offset, true);
+        const textLength = view.getUint16(offset, true);
         offset += 2;
-        text = decoder.decode(bytes.subarray(offset, offset + len));
-        offset += len;
+        text = decoder.decode(bytes.subarray(offset, offset + textLength));
+        offset += textLength;
       }
-      tiles[index] = { flags, house, ids, subs, iflags, creatures, spawn, spawnNpc, zones, text };
+      tiles[index] = { flags, house, ids, subs, itemFlags, creatures, spawn, spawnNpc, zones, text };
     }
     out.push({ key, tiles, count });
   }
   return out;
 }
 
+/** Chunks per request. */
 const BATCH = 96;
+
+/** Forgets entries of a chunk store far from a view to bound memory: once above max, down to three quarters of it. */
+export function trimStore(store: Map<number, unknown>, keep: (key: number) => boolean, max: number): void {
+  if (store.size <= max) return;
+  for (const key of store.keys()) {
+    if (!keep(key)) store.delete(key);
+    if (store.size <= max * 0.75) break;
+  }
+}
+
+/** Calls request with the keys split into batches of at most size keys. */
+export function inBatches(keys: number[], size: number, request: (batch: number[]) => void): void {
+  for (let i = 0; i < keys.length; i += size) request(keys.slice(i, i + size));
+}
 
 /**
  * Chunks of one map. get() returns what is loaded and queues the rest;
@@ -193,11 +214,12 @@ export class ChunkStore {
   private chunks = new Map<number, ChunkData | null>();
   private queued = new Set<number>();
   private inflight = new Set<number>();
-  private gen = 0;
+  /** Bumped when every chunk is dropped: answers to older requests are stale. */
+  private generation = 0;
   private timer = 0;
   /** Request number of the newest request of each chunk: older answers are stale. */
   private latest = new Map<number, number>();
-  private seq = 0;
+  private requestNumber = 0;
   rev = 0;
 
   constructor(
@@ -217,16 +239,21 @@ export class ChunkStore {
     return this.chunks.get(key);
   }
 
+  /** The tile, its chunk requested when not loaded. */
   tile(x: number, y: number, z: number): TileData | undefined {
-    if (x < 0 || y < 0 || z < 0 || z > 15) return undefined;
-    const chunk = this.get(keyOf(x, y, z));
-    return chunk ? chunk.tiles[tileIndex(x, y)] : undefined;
+    return this.tileIn(x, y, z, true);
   }
 
   /** The tile when its chunk is loaded (no request). */
   peekTile(x: number, y: number, z: number): TileData | undefined {
-    if (x < 0 || y < 0 || z < 0 || z > 15) return undefined;
-    const chunk = this.chunks.get(keyOf(x, y, z));
+    return this.tileIn(x, y, z, false);
+  }
+
+  /** request: fetch the chunk when not loaded. */
+  private tileIn(x: number, y: number, z: number, request: boolean): TileData | undefined {
+    if (x < 0 || y < 0 || z < 0 || z > MAX_FLOOR) return undefined;
+    const key = keyOf(x, y, z);
+    const chunk = request ? this.get(key) : this.chunks.get(key);
     return chunk ? chunk.tiles[tileIndex(x, y)] : undefined;
   }
 
@@ -239,31 +266,35 @@ export class ChunkStore {
     this.timer = 0;
     const keys = [...this.queued];
     this.queued.clear();
-    for (let i = 0; i < keys.length; i += BATCH) {
-      const batch = keys.slice(i, i + BATCH);
-      for (const key of batch) this.inflight.add(key);
-      void this.fetch(batch, this.gen);
-    }
+    this.request(keys);
   }
 
-  private async fetch(keys: number[], gen: number): Promise<void> {
-    const seq = ++this.seq;
-    for (const key of keys) this.latest.set(key, seq);
+  /** Fetches chunks in batches, marking them in flight. */
+  private request(keys: number[]): void {
+    inBatches(keys, BATCH, (batch) => {
+      for (const key of batch) this.inflight.add(key);
+      void this.fetch(batch, this.generation);
+    });
+  }
+
+  private async fetch(keys: number[], generation: number): Promise<void> {
+    const requestNumber = ++this.requestNumber;
+    for (const key of keys) this.latest.set(key, requestNumber);
     try {
-      const response = await fetch(res.chunks(this.mapId, keys, this.rev) + `&q=${seq}`);
+      const response = await fetch(res.chunks(this.mapId, keys, this.rev) + `&q=${requestNumber}`);
       if (!response.ok) throw new Error(await response.text());
       const data = decodeChunks(await response.arrayBuffer());
-      if (gen !== this.gen) return;
+      if (generation !== this.generation) return;
       for (const chunk of data) {
-        if (this.latest.get(chunk.key) === seq) this.chunks.set(chunk.key, chunk.count ? chunk : null);
+        if (this.latest.get(chunk.key) === requestNumber) this.chunks.set(chunk.key, chunk.count ? chunk : null);
       }
       this.onload();
     } catch {
       // The map was closed or the request failed: try again on demand.
     } finally {
-      if (gen === this.gen) {
+      if (generation === this.generation) {
         for (const key of keys) {
-          if (this.latest.get(key) === seq) {
+          if (this.latest.get(key) === requestNumber) {
             this.inflight.delete(key);
             this.latest.delete(key);
           }
@@ -276,7 +307,7 @@ export class ChunkStore {
   invalidate(keys: number[] | null, rev: number): void {
     this.rev = rev;
     if (keys === null) {
-      this.gen++;
+      this.generation++;
       this.chunks.clear();
       this.inflight.clear();
       this.queued.clear();
@@ -285,21 +316,11 @@ export class ChunkStore {
     // Refetch changed chunks right away, keeping the old data until the
     // new one arrives so the map does not flicker.
     const fresh = keys.filter((key) => this.chunks.has(key) || this.inflight.has(key));
-    if (fresh.length) {
-      for (let i = 0; i < fresh.length; i += BATCH) {
-        const batch = fresh.slice(i, i + BATCH);
-        for (const key of batch) this.inflight.add(key);
-        void this.fetch(batch, this.gen);
-      }
-    }
+    this.request(fresh);
   }
 
   /** Forgets chunks far from a view to bound memory. */
   trim(keep: (key: number) => boolean, max = 3000): void {
-    if (this.chunks.size <= max) return;
-    for (const key of this.chunks.keys()) {
-      if (!keep(key)) this.chunks.delete(key);
-      if (this.chunks.size <= max * 0.75) break;
-    }
+    trimStore(this.chunks, keep, max);
   }
 }

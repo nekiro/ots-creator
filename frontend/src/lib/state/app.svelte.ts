@@ -50,16 +50,18 @@ export type ShareTarget = (
 };
 
 class AppState {
-  project = $state<State | null>(null);
+  project = $state.raw<State | null>(null);
   /** Second client of the compare window (B). */
-  other = $state<State | null>(null);
+  other = $state.raw<State | null>(null);
   category = $state<Category>(Category.CategoryItem);
   /** Selected thing ids in the current category (first = focused). */
-  selection = $state<number[]>([]);
+  selection = $state.raw<number[]>([]);
+  readonly selectionSet = $derived(new Set(this.selection));
   /** Working copy of the focused thing; edits apply on "Apply". */
   draft = $state<Thing | null>(null);
   original = $state<string>("");
-  selectedSprites = $state<number[]>([]);
+  selectedSprites = $state.raw<number[]>([]);
+  readonly selectedSpriteSet = $derived(new Set(this.selectedSprites));
   toasts = $state<Toast[]>([]);
   dialog = $state<DialogName>(null);
   busy = $state<string | null>(null);
@@ -124,16 +126,16 @@ class ResourceVersions {
       this.sprites.clear();
       this.cache.invalidate(null);
     } else {
-      for (const t of delta.things ?? []) this.things.set(`${t.category}:${t.id}`, rev);
+      for (const thing of delta.things ?? []) this.things.set(`${thing.category}:${thing.id}`, rev);
       for (const id of delta.sprites ?? []) this.sprites.set(id, rev);
       this.cache.invalidate(delta.sprites ?? []);
     }
     this.tick++;
   }
 
-  thing(c: Category, id: number): string {
+  thing(category: Category, id: number): string {
     void this.tick;
-    return `${this.epoch}.${this.things.get(`${c}:${id}`) ?? 0}`;
+    return `${this.epoch}.${this.things.get(`${category}:${id}`) ?? 0}`;
   }
 
   sprite(id: number): string {
@@ -151,7 +153,7 @@ const toastTimers = new Map<number, ReturnType<typeof setTimeout>>();
 /** Toasts shown at once; older ones make room for new ones. */
 const MAX_TOASTS = 4;
 /** Shows a toast. One with the key of a shown toast replaces it and keeps it up longer. */
-export function toast(text: string, kind: ToastKind = "info", ms = 3500, key?: string, action?: Toast["action"]): void {
+export function toast(text: string, kind: ToastKind = "info", duration = 3500, key?: string, action?: Toast["action"]): void {
   const old = key ? app.toasts.find((other) => other.key === key) : undefined;
   const shown = old ? { ...old, kind, text, action } : { id: ++toastSeq, kind, text, key, action };
   app.toasts = old ? app.toasts.map((other) => (other.id === shown.id ? shown : other)) : [...app.toasts, shown];
@@ -169,7 +171,7 @@ export function toast(text: string, kind: ToastKind = "info", ms = 3500, key?: s
         app.toasts = app.toasts.filter((other) => other.id !== shown.id);
         toastTimers.delete(shown.id);
       },
-      kind === "error" ? ms * 2 : ms,
+      kind === "error" ? duration * 2 : duration,
     ),
   );
 }
@@ -183,11 +185,11 @@ export function hasToast(key: string): boolean {
  * Runs an async action with a busy indicator and error toast. A modal run
  * also covers the window with a loader (BusyOverlay) until it ends.
  */
-export async function run<T>(label: string, fn: () => Promise<T>, opts?: { modal?: boolean }): Promise<T | undefined> {
+export async function run<T>(label: string, task: () => Promise<T>, options?: { modal?: boolean }): Promise<T | undefined> {
   app.busy = label;
-  if (opts?.modal) app.modal = label;
+  if (options?.modal) app.modal = label;
   try {
-    return await fn();
+    return await task();
   } catch (err) {
     toast(errorMessage(err), "error");
     return undefined;
@@ -262,7 +264,7 @@ function setDraft(thing: Parameters<typeof normalizeThing>[0]): void {
 export async function select(id: number, additive = false): Promise<void> {
   if (!app.open) return;
   if (additive) {
-    app.selection = app.selection.includes(id) ? app.selection.filter((selected) => selected !== id) : [...app.selection, id];
+    app.selection = app.selectionSet.has(id) ? app.selection.filter((selected) => selected !== id) : [...app.selection, id];
     return;
   }
   app.selection = [id];

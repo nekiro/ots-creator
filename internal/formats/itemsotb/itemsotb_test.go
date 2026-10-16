@@ -5,8 +5,8 @@ import (
 	"crypto/md5"
 	"testing"
 
-	"github.com/nekiro/ots-creator/internal/formats/otbnode"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/otbnode"
 )
 
 // sample builds an items.otb by hand, with an unknown attribute, a

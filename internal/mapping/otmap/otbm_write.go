@@ -6,8 +6,8 @@ import (
 	"math"
 	"strings"
 
-	"github.com/nekiro/ots-creator/internal/formats/otbnode"
 	"github.com/nekiro/ots-creator/internal/core/otitems"
+	"github.com/nekiro/ots-creator/internal/formats/otbnode"
 )
 
 const (
@@ -19,26 +19,26 @@ const (
 )
 
 // WriteOTBM writes the map. Meta items (editor-only) are left out.
-func WriteOTBM(out io.Writer, m *Map, items Items, f Format) error {
-	return writeOTBM(out, m, items, f, nil)
+func WriteOTBM(out io.Writer, gameMap *Map, items Items, format Format) error {
+	return writeOTBM(out, gameMap, items, format, nil)
 }
 
 // writeOTBM is WriteOTBM that reports the chunks written (progress may be
 // nil).
-func writeOTBM(out io.Writer, m *Map, items Items, f Format, progress func(done, total int)) error {
+func writeOTBM(out io.Writer, gameMap *Map, items Items, format Format, progress func(done, total int)) error {
 	nodes := otbnode.NewWriter(out, [4]byte{'O', 'T', 'B', 'M'})
 	nodes.Start(nodeRoot)
 	nodes.U32(OTBMVersion)
-	nodes.U16(m.Width)
-	nodes.U16(m.Height)
-	nodes.U32(m.ItemsMajor)
-	nodes.U32(m.ItemsMinor)
+	nodes.U16(gameMap.Width)
+	nodes.U16(gameMap.Height)
+	nodes.U32(gameMap.ItemsMajor)
+	nodes.U32(gameMap.ItemsMinor)
 	nodes.Start(nodeMapData)
-	writeMapHeader(nodes, m)
-	w := &writer{nodes: nodes, items: items, format: f}
-	w.tiles(m, progress)
+	writeMapHeader(nodes, gameMap)
+	w := &writer{nodes: nodes, items: items, format: format}
+	w.tiles(gameMap, progress)
 	nodes.Start(nodeTowns)
-	for _, town := range m.SortedTowns() {
+	for _, town := range gameMap.SortedTowns() {
 		nodes.Start(nodeTown)
 		nodes.U32(town.ID)
 		nodes.String(town.Name)
@@ -47,7 +47,7 @@ func writeOTBM(out io.Writer, m *Map, items Items, f Format, progress func(done,
 	}
 	nodes.End()
 	nodes.Start(nodeWaypoints)
-	for _, waypoint := range m.Waypoints {
+	for _, waypoint := range gameMap.Waypoints {
 		nodes.Start(nodeWaypoint)
 		nodes.String(waypoint.Name)
 		w.position(waypoint.Pos)
@@ -60,24 +60,24 @@ func writeOTBM(out io.Writer, m *Map, items Items, f Format, progress func(done,
 }
 
 // writeMapHeader writes the attributes of the map data node.
-func writeMapHeader(nodes *otbnode.Writer, m *Map) {
+func writeMapHeader(nodes *otbnode.Writer, gameMap *Map) {
 	nodes.U8(attrDescription)
 	nodes.String("Saved with " + Generator)
-	if m.Description != "" {
+	if gameMap.Description != "" {
 		nodes.U8(attrDescription)
-		nodes.String(m.Description)
+		nodes.String(gameMap.Description)
 	}
 	nodes.U8(attrSpawnFile)
-	nodes.String(baseName(m.SpawnFile))
+	nodes.String(baseName(gameMap.SpawnFile))
 	nodes.U8(attrHouseFile)
-	nodes.String(baseName(m.HouseFile))
-	if m.SpawnFormat == SpawnsSeparate {
+	nodes.String(baseName(gameMap.HouseFile))
+	if gameMap.SpawnFormat == SpawnsSeparate {
 		nodes.U8(attrSpawnNpcFile)
-		nodes.String(baseName(m.NpcFile))
+		nodes.String(baseName(gameMap.NpcFile))
 	}
-	if m.ZoneFile != "" || len(m.Zones) > 0 {
+	if gameMap.ZoneFile != "" || len(gameMap.Zones) > 0 {
 		nodes.U8(attrZoneFile)
-		nodes.String(baseName(m.ZoneFile))
+		nodes.String(baseName(gameMap.ZoneFile))
 	}
 }
 
@@ -94,28 +94,28 @@ type writer struct {
 	format Format
 }
 
-func (w *writer) position(p Position) {
-	w.nodes.U16(p.X)
-	w.nodes.U16(p.Y)
-	w.nodes.U8(p.Z)
+func (w *writer) position(position Position) {
+	w.nodes.U16(position.X)
+	w.nodes.U16(position.Y)
+	w.nodes.U8(position.Z)
 }
 
 // tiles writes the tiles in tile area nodes.
-func (w *writer) tiles(m *Map, progress func(done, total int)) {
+func (w *writer) tiles(gameMap *Map, progress func(done, total int)) {
 	area := struct {
 		base Position
 		open bool
 	}{}
-	chunks := m.Chunks()
+	chunks := gameMap.Chunks()
 	for i, chunk := range chunks {
 		if progress != nil && i%progressEveryChunks == 0 {
 			progress(i, len(chunks))
 		}
-		chunk.Each(func(p Position, tile *Tile) {
+		chunk.Each(func(position Position, tile *Tile) {
 			if tile.Ground.ID == 0 && len(tile.Items) == 0 && tile.HouseID == 0 && tile.Flags == 0 && len(tile.Zones()) == 0 {
 				return // creature or spawn only: saved in the spawn file
 			}
-			base := Position{X: p.X & areaMask, Y: p.Y & areaMask, Z: p.Z}
+			base := Position{X: position.X & areaMask, Y: position.Y & areaMask, Z: position.Z}
 			if !area.open || base != area.base {
 				if area.open {
 					w.nodes.End()
@@ -124,7 +124,7 @@ func (w *writer) tiles(m *Map, progress func(done, total int)) {
 				w.position(base)
 				area.base, area.open = base, true
 			}
-			w.tile(p, tile)
+			w.tile(position, tile)
 		})
 	}
 	if area.open {
@@ -137,14 +137,14 @@ func (w *writer) meta(id uint16) bool {
 	return itemType != nil && itemType.Flags.Has(otitems.FlagMeta)
 }
 
-func (w *writer) tile(p Position, tile *Tile) {
+func (w *writer) tile(position Position, tile *Tile) {
 	if tile.HouseID != 0 {
 		w.nodes.Start(nodeHouseTile)
 	} else {
 		w.nodes.Start(nodeTile)
 	}
-	w.nodes.U8(uint8(p.X &^ areaMask))
-	w.nodes.U8(uint8(p.Y &^ areaMask))
+	w.nodes.U8(uint8(position.X &^ areaMask))
+	w.nodes.U8(uint8(position.Y &^ areaMask))
 	if tile.HouseID != 0 {
 		w.nodes.U32(tile.HouseID)
 	}
@@ -274,8 +274,8 @@ func (w *writer) attributeMap(attrs []Attr) {
 }
 
 // EncodeOTBM returns the map as OTBM bytes.
-func EncodeOTBM(m *Map, items Items, f Format) ([]byte, error) {
+func EncodeOTBM(gameMap *Map, items Items, format Format) ([]byte, error) {
 	var buf bytes.Buffer
-	err := WriteOTBM(&buf, m, items, f)
+	err := WriteOTBM(&buf, gameMap, items, format)
 	return buf.Bytes(), err
 }

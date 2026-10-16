@@ -19,9 +19,9 @@ const maxMinimapSide = 2048
 
 // mapRequest is a request for one open map, made under the read lock.
 type mapRequest struct {
-	m     *openMap
-	data  *mapData
-	query url.Values
+	opened *openMap
+	data   *mapData
+	query  url.Values
 }
 
 // serveMap handles the requests of the map renderer:
@@ -36,12 +36,7 @@ func (ms *MapService) serveMap(w http.ResponseWriter, r *http.Request, parts []s
 		http.NotFound(w, r)
 		return
 	}
-	handlers := map[string]func(http.ResponseWriter, mapRequest){
-		"chunks":  ms.serveChunks,
-		"geo":     ms.serveGeometry,
-		"minimap": serveMinimap,
-	}
-	handler, ok := handlers[parts[1]]
+	handler, ok := mapHandlers[parts[1]]
 	if !ok {
 		http.NotFound(w, r)
 		return
@@ -51,25 +46,32 @@ func (ms *MapService) serveMap(w http.ResponseWriter, r *http.Request, parts []s
 		http.Error(w, "bad map id", http.StatusBadRequest)
 		return
 	}
-	m, data, unlock, err := ms.read(id)
+	opened, data, unlock, err := ms.read(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 	defer unlock()
 	w.Header().Set("Cache-Control", "no-store")
-	handler(w, mapRequest{m: m, data: data, query: r.URL.Query()})
+	handler(ms, w, mapRequest{opened: opened, data: data, query: r.URL.Query()})
+}
+
+// mapHandlers serves the requests of serveMap by their last path part.
+var mapHandlers = map[string]func(*MapService, http.ResponseWriter, mapRequest){
+	"chunks":  (*MapService).serveChunks,
+	"geo":     (*MapService).serveGeometry,
+	"minimap": (*MapService).serveMinimap,
 }
 
 // scene is what maprender draws the map from.
-func (ms *MapService) scene(m *openMap, data *mapData) *maprender.Scene {
+func (ms *MapService) scene(opened *openMap, data *mapData) *maprender.Scene {
 	return &maprender.Scene{
-		Map:          m.editor.Map,
-		Items:        m.editor.Items,
+		Map:          opened.editor.Map,
+		Items:        opened.editor.Items,
 		Things:       data.project,
 		SpriteSize:   data.project.SpriteSize(),
 		SpritePixels: data.project.SpritePixels,
-		IsBlocking:   m.editor.IsBlocking,
+		IsBlocking:   opened.editor.IsBlocking,
 		Outfit: func(creature string) materials.Outfit {
 			outfit, _ := data.outfit(creature)
 			return outfit
@@ -105,7 +107,7 @@ func (ms *MapService) serveChunks(w http.ResponseWriter, request mapRequest) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Write(maprender.EncodeChunks(ms.scene(request.m, request.data), keys))
+	w.Write(maprender.EncodeChunks(ms.scene(request.opened, request.data), keys))
 }
 
 func (ms *MapService) serveGeometry(w http.ResponseWriter, request mapRequest) {
@@ -120,7 +122,7 @@ func (ms *MapService) serveGeometry(w http.ResponseWriter, request mapRequest) {
 		Block:     min(max(queryInt(request.query, "b"), 1), maprender.MaxBlock),
 	}
 	start := time.Now()
-	data, rawSize, err := maprender.BuildGeometry(ms.scene(request.m, request.data), keys, options)
+	data, rawSize, err := maprender.BuildGeometry(ms.scene(request.opened, request.data), keys, options)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -133,7 +135,7 @@ func (ms *MapService) serveGeometry(w http.ResponseWriter, request mapRequest) {
 	w.Write(data)
 }
 
-func serveMinimap(w http.ResponseWriter, request mapRequest) {
+func (ms *MapService) serveMinimap(w http.ResponseWriter, request mapRequest) {
 	query := request.query
 	x, y, floor := queryInt(query, "x"), queryInt(query, "y"), queryInt(query, "z")
 	width, height := queryInt(query, "w"), queryInt(query, "h")
@@ -141,7 +143,7 @@ func serveMinimap(w http.ResponseWriter, request mapRequest) {
 		http.Error(w, "bad area", http.StatusBadRequest)
 		return
 	}
-	data, err := imaging.EncodePNG(minimapImage(request.m.editor, image.Rect(x, y, x+width, y+height), floor))
+	data, err := imaging.EncodePNG(minimapImage(request.opened.editor, image.Rect(x, y, x+width, y+height), floor))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

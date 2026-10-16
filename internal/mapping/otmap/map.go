@@ -87,6 +87,39 @@ func (m *Map) Tile(pos Position) *Tile {
 	return chunk.get(localIndex(pos))
 }
 
+// Peek returns the tile at pos or nil without copying a packed tile: it is
+// unpacked into scratch and buf (see Chunk.Peek) and only valid until they
+// are reused. Treat it as read-only.
+func (m *Map) Peek(pos Position, scratch *Tile, buf []Item) *Tile {
+	chunk := m.chunks[KeyOf(pos)]
+	if chunk == nil {
+		return nil
+	}
+	index := localIndex(pos)
+	return chunk.Peek(index&(ChunkSize-1), index>>ChunkBits, scratch, buf)
+}
+
+// PeekAt is Peek for x, y, z; out of range coordinates are nil.
+func (m *Map) PeekAt(x, y, z int, scratch *Tile, buf []Item) *Tile {
+	if x < 0 || y < 0 || z < 0 || x > 0xFFFF || y > 0xFFFF || z > MaxFloor {
+		return nil
+	}
+	return m.Peek(Position{uint16(x), uint16(y), uint8(z)}, scratch, buf)
+}
+
+// stored returns the tile at pos when it is stored as *Tile (see
+// EachStored), else nil: a cheap lookup for creatures, spawns and houses.
+func (m *Map) stored(pos Position) *Tile {
+	chunk := m.chunks[KeyOf(pos)]
+	if chunk == nil {
+		return nil
+	}
+	if cell := chunk.cells[localIndex(pos)]; cell&cellPtr != 0 {
+		return chunk.ptrs[cell&^cellPtr]
+	}
+	return nil
+}
+
 // Has reports whether there is a tile at pos.
 func (m *Map) Has(pos Position) bool {
 	chunk := m.chunks[KeyOf(pos)]
@@ -194,6 +227,16 @@ func (m *Map) Chunks() []*Chunk {
 func (m *Map) Each(fn func(pos Position, tile *Tile)) {
 	for _, chunk := range m.Chunks() {
 		chunk.Each(fn)
+	}
+}
+
+// EachStored calls fn in save order for every tile stored as *Tile: those
+// with flags, a house, a state, an ext (creatures, spawns, zones) or
+// selected items (see packable). Plain packed tiles are skipped without
+// unpacking, so scans for such tiles should use it instead of Each.
+func (m *Map) EachStored(fn func(pos Position, tile *Tile)) {
+	for _, chunk := range m.Chunks() {
+		chunk.eachStored(fn)
 	}
 }
 

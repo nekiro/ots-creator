@@ -20,8 +20,8 @@ import (
 	"strings"
 
 	"github.com/nekiro/ots-creator/internal/core/imaging"
-	"github.com/nekiro/ots-creator/internal/formats/obd"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/obd"
 )
 
 // Version is the format version this package writes and the highest it

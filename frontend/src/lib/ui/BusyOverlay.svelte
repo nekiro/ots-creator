@@ -12,7 +12,7 @@
   <div class="overlay" transition:backdrop|global>
     <div class="t-window box" transition:pop|global role="alertdialog" aria-busy="true" aria-label={app.modal}>
       <div class="t-window-title">{app.modal}</div>
-      <div class="row msg" role="status"><span class="spinner"></span>Please wait…</div>
+      <div class="row msg" role="status"><span class="t-spinner"></span>Please wait…</div>
       <ProgressBar percent={app.progress ? percent : 0} label={app.progress ? `${Math.floor(percent)}%` : ""} />
     </div>
   </div>
@@ -38,18 +38,5 @@
   }
   .msg {
     color: var(--text-bright);
-  }
-  .spinner {
-    width: 12px;
-    height: 12px;
-    border: 2px solid rgba(232, 196, 106, 0.25);
-    border-top-color: var(--gold);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
   }
 </style>

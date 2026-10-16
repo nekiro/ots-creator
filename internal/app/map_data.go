@@ -9,12 +9,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/nekiro/ots-creator/internal/fsutil"
-	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
-	"github.com/nekiro/ots-creator/internal/mapping/materials"
 	"github.com/nekiro/ots-creator/internal/core/otitems"
 	"github.com/nekiro/ots-creator/internal/core/project"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/fsutil"
+	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
+	"github.com/nekiro/ots-creator/internal/mapping/materials"
 )
 
 // Item data sources of MapDataConfig.ItemsMode.
@@ -50,8 +50,8 @@ func (source projectSource) Thing(_ thing.Category, id uint32) (*thing.Thing, er
 	return nil, errors.New("missing")
 }
 
-func clientKey(p *project.Project) string {
-	info := p.Info()
+func clientKey(proj *project.Project) string {
+	info := proj.Info()
 	if info.DatPath == "" {
 		return "unsaved client " + info.Version.Name
 	}
@@ -84,12 +84,12 @@ func (ms *MapService) dataConfig(config *MapDataConfig, client, hint string) Map
 
 // loadData builds the item database and brushes for the open client.
 func (ms *MapService) loadData(config *MapDataConfig, hint string) (*mapData, error) {
-	p, err := ms.session.Project()
+	proj, err := ms.session.Project()
 	if err != nil {
 		return nil, errNoClient
 	}
-	client := clientKey(p)
-	data := &mapData{project: p, client: client, config: ms.dataConfig(config, client, hint)}
+	client := clientKey(proj)
+	data := &mapData{project: proj, client: client, config: ms.dataConfig(config, client, hint)}
 	if err := data.loadItems(); err != nil {
 		return nil, err
 	}
@@ -193,11 +193,11 @@ func (data *mapData) outfit(creature string) (materials.Outfit, bool) {
 // ensure returns the data of the open client, building it when the client
 // changed.
 func (ms *MapService) ensure(hint string) (*mapData, error) {
-	p, err := ms.session.Project()
+	proj, err := ms.session.Project()
 	if err != nil {
 		return nil, errNoClient
 	}
-	if ms.data != nil && ms.data.project == p {
+	if ms.data != nil && ms.data.project == proj {
 		return ms.data, nil
 	}
 	data, err := ms.loadData(nil, hint)
@@ -210,9 +210,9 @@ func (ms *MapService) ensure(hint string) (*mapData, error) {
 
 func (ms *MapService) setData(data *mapData) {
 	ms.data = data
-	for _, m := range ms.maps {
-		m.editor.Items = data.items
-		m.editor.SetBrushes(data.brushes)
+	for _, opened := range ms.maps {
+		opened.editor.Items = data.items
+		opened.editor.SetBrushes(data.brushes)
 	}
 }
 
@@ -311,8 +311,8 @@ func (ms *MapService) Reload() (DataInfo, error) {
 func (ms *MapService) SetEditorSettings(settings mapedit.Settings) error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
-	for _, m := range ms.maps {
-		m.editor.Settings = settings
+	for _, opened := range ms.maps {
+		opened.editor.Settings = settings
 	}
 	return ms.store.SetEditorSettings(settings)
 }

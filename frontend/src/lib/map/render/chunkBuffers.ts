@@ -2,7 +2,7 @@
 // drawn with the camera offset, freed when not drawn for a while. The chunk
 // shader finds sprites through cell indexes, so atlas changes never upload
 // chunks again; only animated pieces are patched.
-import { frameAt, type Look } from "../data/appearances";
+import { frameAt, spriteIndex, type Look } from "../data/appearances";
 import type { Atlas } from "./atlas";
 import { CellIndex } from "./cellIndex";
 import { CHUNK, splitKey } from "../data/chunks";
@@ -59,7 +59,7 @@ export class ChunkBuffers {
     private missing: Set<number>,
   ) {
     this.program = compileProgram(gl, CHUNK_VERT, SPRITE_FRAG);
-    for (const name of ["u_screen", "u_off", "u_tile", "u_S", "u_scale", "u_half", "u_alpha", "u_perRow", "u_perLayer", "u_uvCell", "u_tex", "u_ind", "u_indC"]) this.uniforms[name] = gl.getUniformLocation(this.program, name);
+    for (const name of ["u_screen", "u_offset", "u_tile", "u_spriteSize", "u_scale", "u_half", "u_alpha", "u_perRow", "u_perLayer", "u_uvCell", "u_tex", "u_spriteCells", "u_composedCells"]) this.uniforms[name] = gl.getUniformLocation(this.program, name);
     this.spriteCells = new CellIndex(gl, 2, 2048, 64);
     this.composedCells = new CellIndex(gl, 3, 1024, 4);
   }
@@ -89,7 +89,7 @@ export class ChunkBuffers {
   /** Another program was bound: the next chunk drawn binds the chunk program again. */
   unbind(): void {
     this.boundAlpha = -1;
-    this.boundTexture = this.atlas!.tex;
+    this.boundTexture = this.atlas!.texture;
   }
 
   /** Uploads a chunk next to the view in spare upload time, kept as if drawn. */
@@ -127,9 +127,9 @@ export class ChunkBuffers {
     }
     // Composed outfit pieces point at their entry in the composed index.
     const quads = chunk.quads;
-    if (chunk.comp.length) {
+    if (chunk.composed.length) {
       const view = new DataView(quads.buffer, quads.byteOffset, quads.byteLength);
-      const composed = chunk.comp;
+      const composed = chunk.composed;
       for (let i = 0; i < composed.length; i += 4) {
         const key = composedKey(composed[i + 1], composed[i + 2], composed[i + 3]);
         let index = this.composedIds.get(key);
@@ -142,12 +142,12 @@ export class ChunkBuffers {
       }
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer.buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, quads, chunk.anim.length ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, quads, chunk.animated.length ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW);
     buffer.source = chunk;
     buffer.atlas = null;
-    buffer.quads = chunk.anim.length ? quads : null;
+    buffer.quads = chunk.animated.length ? quads : null;
     // Only animated chunks patch their quads: the others need no CPU copy.
-    if (!chunk.anim.length) chunk.quads = NO_QUADS;
+    if (!chunk.animated.length) chunk.quads = NO_QUADS;
     return buffer;
   }
 
@@ -165,7 +165,7 @@ export class ChunkBuffers {
       if (cell < 0) ready = false;
       else cells.push(cell);
     }
-    const composed = buffer.source.comp;
+    const composed = buffer.source.composed;
     for (let i = 0; i < composed.length; i += 4) {
       const key = composedKey(composed[i + 1], composed[i + 2], composed[i + 3]);
       const index = this.composedIds.get(key)!;
@@ -223,11 +223,11 @@ export class ChunkBuffers {
     const gl = this.gl;
     const [chunkX, chunkY] = splitKey(buffer.source.key % GEO_BLOCK);
     this.bindProgram(scene, alpha);
-    gl.uniform2f(this.uniforms.u_off, (chunkX * CHUNK - floorShift) * scene.spriteSize - scene.camX, (chunkY * CHUNK - floorShift) * scene.spriteSize - scene.camY);
+    gl.uniform2f(this.uniforms.u_offset, (chunkX * CHUNK - floorShift) * scene.spriteSize - scene.camX, (chunkY * CHUNK - floorShift) * scene.spriteSize - scene.camY);
     // Tile ranks from the camera keep the depth values small.
     gl.uniform2f(this.uniforms.u_tile, chunkX * CHUNK - Math.round(scene.camX / scene.spriteSize), chunkY * CHUNK - Math.round(scene.camY / scene.spriteSize));
     gl.bindVertexArray(buffer.vao);
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, buffer.source.n);
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, buffer.source.quadCount);
     gl.bindVertexArray(null);
   }
 
@@ -236,7 +236,7 @@ export class ChunkBuffers {
     const quads = buffer.quads!;
     const view = new DataView(quads.buffer, quads.byteOffset, quads.byteLength);
     // Three values per animated piece: quad index, client item id, frame 0 sprite index.
-    const animated = buffer.source.anim;
+    const animated = buffer.source.animated;
     let changed = false;
     let lastItemId = -1;
     let look: Look | null | undefined = null;
@@ -246,10 +246,10 @@ export class ChunkBuffers {
         lastItemId = animated[i + 1];
         look = scene.looks.items.get(lastItemId);
         if (look === undefined) result.pending = true;
-        if (look) frameOffset = frameAt(look, scene.time) * look.pz * look.py * look.px * look.l * look.h * look.w;
+        if (look) frameOffset = spriteIndex(look, frameAt(look, scene.time), 0, 0, 0, 0);
       }
       if (!look) continue;
-      const spriteId = look.s[animated[i + 2] + frameOffset] ?? 0;
+      const spriteId = look.sprites[animated[i + 2] + frameOffset] ?? 0;
       let value = GEO_HIDDEN;
       if (spriteId) {
         const cell = this.cellOfSprite(scene, spriteId);
@@ -287,22 +287,22 @@ export class ChunkBuffers {
   private bindProgram(scene: Scene, alpha: number): void {
     const gl = this.gl;
     // Uploads to the atlas or the cell index may have happened since.
-    if (this.boundAlpha < 0 || this.boundTexture !== this.atlas!.tex) {
+    if (this.boundAlpha < 0 || this.boundTexture !== this.atlas!.texture) {
       const atlas = this.atlas!;
       const uniforms = this.uniforms;
       gl.useProgram(this.program);
       gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D_ARRAY, atlas.tex);
-      this.boundTexture = atlas.tex;
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, atlas.texture);
+      this.boundTexture = atlas.texture;
       gl.uniform1i(uniforms.u_tex, 0);
-      gl.uniform1i(uniforms.u_ind, this.spriteCells.unit);
-      gl.uniform1i(uniforms.u_indC, this.composedCells.unit);
+      gl.uniform1i(uniforms.u_spriteCells, this.spriteCells.unit);
+      gl.uniform1i(uniforms.u_composedCells, this.composedCells.unit);
       gl.uniform2f(uniforms.u_screen, scene.width, scene.height);
       gl.uniform1ui(uniforms.u_perRow, atlas.perRow);
       gl.uniform1ui(uniforms.u_perLayer, atlas.perLayer);
       gl.uniform1f(uniforms.u_uvCell, atlas.uvCell);
       gl.uniform1f(uniforms.u_scale, scene.scale);
-      gl.uniform1f(uniforms.u_S, scene.spriteSize);
+      gl.uniform1f(uniforms.u_spriteSize, scene.spriteSize);
       gl.uniform2f(uniforms.u_half, scene.width / 2, scene.height / 2);
       this.boundAlpha = -1;
     }

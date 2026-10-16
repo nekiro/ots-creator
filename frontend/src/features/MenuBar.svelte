@@ -70,12 +70,12 @@
     },
     {
       label: "View",
-      items: SCALE_MODES.map((m) => ({
-        label: m.label,
-        checked: () => scaleMode === m.value,
+      items: SCALE_MODES.map((menu) => ({
+        label: menu.label,
+        checked: () => scaleMode === menu.value,
         action: () => {
-          scaleMode = m.value;
-          void setMode(m.value);
+          scaleMode = menu.value;
+          void setMode(menu.value);
         },
       })),
     },
@@ -91,11 +91,11 @@
   ]);
 
   // Help and the scale modes stay; the rest depends on the editor.
-  const viewScale = $derived(objectMenus.find((m) => m.label === "View")!);
-  const help = $derived(objectMenus.find((m) => m.label === "Help")!);
+  const viewScale = $derived(objectMenus.find((menu) => menu.label === "View")!);
+  const help = $derived(objectMenus.find((menu) => menu.label === "Help")!);
   const menus = $derived(
     map.mode === "map"
-      ? [...mapMenus().map((m) => (m.label === "View" ? { ...m, items: [...m.items, "-" as const, ...viewScale.items] } : m)), help]
+      ? [...mapMenus().map((menu) => (menu.label === "View" ? { ...menu, items: [...menu.items, "-" as const, ...viewScale.items] } : menu)), help]
       : objectMenus,
   );
 
@@ -116,17 +116,17 @@
     <button class="mode" class:on={map.mode === "objects"} role="tab" aria-selected={map.mode === "objects"} title="Object editor" onclick={() => mapCommands.setMode("objects")}>Objects</button>
     <button class="mode" class:on={map.mode === "map"} role="tab" aria-selected={map.mode === "map"} title="Map editor" onclick={() => mapCommands.setMode("map")}>Map</button>
   </div>
-  {#each menus as m, i}
+  {#each menus as menu, i}
     <div class="menu">
       <button
         class="top"
         class:on={openMenu === i}
         onmousedown={() => (openMenu = openMenu === i ? null : i)}
-        onmouseenter={() => openMenu !== null && (openMenu = i)}>{m.label}</button
+        onmouseenter={() => openMenu !== null && (openMenu = i)}>{menu.label}</button
       >
       {#if openMenu === i}
         <div class="drop t-menu" role="menu">
-          <MenuEntries items={m.items} onpick={pick} />
+          <MenuEntries items={menu.items} onpick={pick} />
         </div>
       {/if}
     </div>

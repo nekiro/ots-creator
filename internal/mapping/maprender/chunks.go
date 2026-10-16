@@ -108,15 +108,15 @@ func (w *chunkWriter) chunk(scene *Scene, key otmap.ChunkKey) {
 		return
 	}
 	tiles := 0
-	chunk.Each(func(p otmap.Position, tile *otmap.Tile) {
+	chunk.Each(func(position otmap.Position, tile *otmap.Tile) {
 		tiles++
-		w.tile(scene, p, tile)
+		w.tile(scene, position, tile)
 	})
 	binary.LittleEndian.PutUint16(w.buf[countAt:], uint16(tiles))
 }
 
-func (w *chunkWriter) tile(scene *Scene, p otmap.Position, tile *otmap.Tile) {
-	localX, localY := int(p.X&(otmap.ChunkSize-1)), int(p.Y&(otmap.ChunkSize-1))
+func (w *chunkWriter) tile(scene *Scene, position otmap.Position, tile *otmap.Tile) {
+	localX, localY := int(position.X&(otmap.ChunkSize-1)), int(position.Y&(otmap.ChunkSize-1))
 	w.u16(uint16(localY<<otmap.ChunkBits | localX))
 	creatures := tile.Creatures()
 	text := topText(tile)

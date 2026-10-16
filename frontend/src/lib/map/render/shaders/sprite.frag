@@ -7,7 +7,7 @@ in vec3 v_uv;
 in vec4 v_color;
 out vec4 outColor;
 void main() {
-  vec4 t = texture(u_tex, v_uv);
-  if (t.a == 0.0) discard;
-  outColor = t * v_color;
+  vec4 texel = texture(u_tex, v_uv);
+  if (texel.a == 0.0) discard;
+  outColor = texel * v_color;
 }

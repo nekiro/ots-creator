@@ -134,11 +134,23 @@ const (
 	wallS
 )
 
-// wallNeighborOffsets holds the x, y offset of each wall neighbor bit.
-var wallNeighborOffsets = [...]struct {
+// neighborOffset is a neighbor of a tile: its bit in a neighbor mask and
+// its x, y offset.
+type neighborOffset struct {
 	bit    int
 	dx, dy int
-}{{wallN, 0, -1}, {wallW, -1, 0}, {wallE, 1, 0}, {wallS, 0, 1}}
+}
+
+// wallNeighborOffsets holds the x, y offset of each wall neighbor bit.
+var wallNeighborOffsets = [...]neighborOffset{{wallN, 0, -1}, {wallW, -1, 0}, {wallE, 1, 0}, {wallS, 0, 1}}
+
+// neighborOffsets8 is neighbors8 with the bit of each neighbor.
+var neighborOffsets8 = func() (offsets [len(neighbors8)]neighborOffset) {
+	for i, offset := range neighbors8 {
+		offsets[i] = neighborOffset{1 << i, offset[0], offset[1]}
+	}
+	return offsets
+}()
 
 // ---------------------------------------------------------------------
 // Item stacking.

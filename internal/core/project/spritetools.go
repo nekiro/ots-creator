@@ -40,12 +40,12 @@ func (p *Project) FindSprites(filter string) ([]uint32, error) {
 			}
 		}
 	case SpritesDuplicate:
-		dups, err := p.duplicateSprites()
+		duplicates, err := p.duplicateSprites()
 		if err != nil {
 			return nil, err
 		}
 		for id := uint32(1); id <= count; id++ {
-			if dups[id] != 0 {
+			if duplicates[id] != 0 {
 				out = append(out, id)
 			}
 		}
@@ -109,29 +109,12 @@ func (p *Project) ReplaceSpriteRefs(from []uint32, to uint32) (int, error) {
 		return 0, nil
 	}
 	edit := p.record(fmt.Sprintf("Replace %d sprite reference(s) with %d", len(replace), to))
-	changed := 0
-	for _, category := range thing.Categories {
-		for _, current := range p.things.Things[category] {
-			if current == nil {
-				continue
-			}
-			var object *thing.Thing
-			for groupIndex, group := range current.FrameGroups {
-				for slot, id := range group.Sprites {
-					if replace[id] {
-						if object == nil {
-							object = current.Clone()
-						}
-						object.FrameGroups[groupIndex].Sprites[slot] = to
-					}
-				}
-			}
-			if object != nil {
-				edit.setThing(category, object.ID, object)
-				changed++
-			}
+	changed := p.remapSpriteRefs(edit, func(id uint32) uint32 {
+		if replace[id] {
+			return to
 		}
-	}
+		return id
+	})
 	edit.commit()
 	return changed, nil
 }
@@ -146,18 +129,25 @@ func (p *Project) duplicateSprites() ([]uint32, error) {
 	if err := p.sprites.eachHash(func(id uint32, contentHash spriteHash) { hashes[id] = contentHash }); err != nil {
 		return nil, err
 	}
-	dups := make([]uint32, count+1)
-	first := make(map[spriteHash]uint32, count)
-	for id := uint32(1); id <= count; id++ {
+	return firstOfEachHash(hashes), nil
+}
+
+// firstOfEachHash maps every id of hashes (indexed by sprite id, 0 unused)
+// whose hash an earlier id has to the first such id (0: not a duplicate;
+// empty sprites are never duplicates).
+func firstOfEachHash(hashes []spriteHash) []uint32 {
+	duplicates := make([]uint32, len(hashes))
+	first := make(map[spriteHash]uint32, len(hashes))
+	for id := 1; id < len(hashes); id++ {
 		contentHash := hashes[id]
 		if contentHash == (spriteHash{}) {
 			continue
 		}
 		if firstID, ok := first[contentHash]; ok {
-			dups[id] = firstID
+			duplicates[id] = firstID
 		} else {
-			first[contentHash] = id
+			first[contentHash] = uint32(id)
 		}
 	}
-	return dups, nil
+	return duplicates
 }

@@ -12,9 +12,9 @@ import (
 
 	"github.com/nekiro/ots-creator/internal/fsutil"
 
+	"github.com/nekiro/ots-creator/internal/core/thing"
 	"github.com/nekiro/ots-creator/internal/formats/assets"
 	"github.com/nekiro/ots-creator/internal/formats/dat"
-	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
 // copyChunk is the number of files one worker copies at a time when the

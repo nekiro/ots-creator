@@ -31,9 +31,9 @@
   let jump = $state("");
   const name = $derived(/^\s*\d*\s*$/.test(jump) ? "" : jump.trim());
   // Names of the named objects of the category (asset clients).
-  let names = $state<Record<number, string>>({});
+  let names = $state.raw<Record<number, string>>({});
   // Matching ids while a filter is active; null shows the whole range.
-  let ids = $state<number[] | null>(null);
+  let ids = $state.raw<number[] | null>(null);
 
   const flagOptions = $derived([
     { value: "", label: "Any flag" },
@@ -123,7 +123,7 @@
   }
 
   function oncontextmenu(event: MouseEvent, id: number) {
-    if (!app.selection.includes(id)) void select(id);
+    if (!app.selectionSet.has(id)) void select(id);
     openContextMenu(event, objectMenu(true));
   }
 
@@ -157,8 +157,8 @@
     </span>
   {/snippet}
   <div class="t-tabs">
-    {#each CATEGORIES as c}
-      <button class="t-tab" class:on={app.category === c} onclick={() => setCategory(c)}>{CATEGORY_LABELS[c]}</button>
+    {#each CATEGORIES as tabCategory}
+      <button class="t-tab" class:on={app.category === tabCategory} onclick={() => setCategory(tabCategory)}>{CATEGORY_LABELS[tabCategory]}</button>
     {/each}
   </div>
   <div class="bar">
@@ -175,7 +175,7 @@
             id={thingDropId(id)}
             data-file-drop-target
             class="thing"
-            class:sel={app.selection.includes(id)}
+            class:sel={app.selectionSet.has(id)}
             class:focus={app.focused === id}
             title={names[id] ? `#${id} ${names[id]}` : `#${id}`}
             onclick={(event) => click(event, id)}

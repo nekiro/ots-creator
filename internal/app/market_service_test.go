@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"github.com/nekiro/ots-creator/internal/core/client"
+	"github.com/nekiro/ots-creator/internal/core/thing"
 	"github.com/nekiro/ots-creator/internal/market"
 	"github.com/nekiro/ots-creator/internal/market/markettest"
 	"github.com/nekiro/ots-creator/internal/settings"
-	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
 func marketEnv(t *testing.T, srv *markettest.Server) (*MarketService, *settings.Store) {
@@ -36,7 +36,7 @@ func TestMarketShareImportDelete(t *testing.T) {
 	if c := m.Config(); !c.Browse || !c.Share || c.CaptchaURL != srv.URL+"/captcha" || c.CaptchaOrigin != srv.URL {
 		t.Fatalf("config %+v", c)
 	}
-	p, _ := m.session.Project()
+	proj, _ := m.session.Project()
 	img := filepath.Join(t.TempDir(), "tiles.png")
 	writePNG(t, img, 64, 32, [4]byte{200, 10, 10, 255})
 	ids, err := NewSpriteService(m.session).ImportImages([]string{img})
@@ -49,7 +49,7 @@ func TestMarketShareImportDelete(t *testing.T) {
 	if err := ts.Update(it); err != nil {
 		t.Fatal(err)
 	}
-	_ = p
+	_ = proj
 
 	req := ShareRequest{Name: "Red box", Author: " nekiro ", Tags: []string{"Box", " red "}, License: "CC0-1.0", Captcha: "ok"}
 	boxID, err := m.ShareObject(thing.CategoryItem, 100, req)

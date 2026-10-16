@@ -23,7 +23,7 @@
   }
 
   onMount(() => {
-    const off = Events.On("map:changed", (event: { data: { id: number; chunks: number[] | null } | null }) => {
+    const offChanged = Events.On("map:changed", (event: { data: { id: number; chunks: number[] | null } | null }) => {
       if (event.data?.id !== mapId) return;
       for (const changed of listeners) changed(event.data.chunks ?? []);
     });
@@ -32,7 +32,7 @@
       await loadMapData();
       ready = true;
     })();
-    return off;
+    return offChanged;
   });
 </script>
 

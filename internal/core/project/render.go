@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"image"
 
-	"github.com/nekiro/ots-creator/internal/formats/spr"
+	"github.com/nekiro/ots-creator/internal/core/imaging"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/spr"
 )
 
 // TexturePos selects one texture of a frame group.
@@ -60,11 +61,7 @@ func (p *Project) Render(category thing.Category, id uint32, pos TexturePos) (*i
 			if err := spr.DecompressInto(buf, compressed, size, p.features.Transparency); err != nil {
 				continue
 			}
-			originX := (int(group.Width) - 1 - tileX) * size
-			originY := (int(group.Height) - 1 - tileY) * size
-			for y := 0; y < size; y++ {
-				copy(img.Pix[(originY+y)*img.Stride+originX*4:(originY+y)*img.Stride+(originX+size)*4], buf[y*size*4:(y+1)*size*4])
-			}
+			imaging.PutTile(img, (int(group.Width)-1-tileX)*size, (int(group.Height)-1-tileY)*size, size, buf)
 		}
 	}
 	return img, nil

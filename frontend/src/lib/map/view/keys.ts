@@ -3,9 +3,10 @@
 // actions). Mouse gestures, Esc, the arrows and 1-9 are fixed.
 import { errorMessage } from "../../api";
 import { toast } from "../../state/app.svelte";
-import { mapCommands } from "./commands";
+import { mapCommands, selectionScope } from "./commands";
 import { comboOf } from "./keycombo";
 import { map, selectBrush } from "../state.svelte";
+import { MAX_BRUSH_SIZE } from "../constants";
 
 export { comboOf };
 
@@ -24,14 +25,12 @@ export interface KeyAction {
   repeat?: boolean;
 }
 
-const sel = () => ({ inSelection: !!map.active?.selection });
-
 export const KEY_ACTIONS: KeyAction[] = [
   { id: "brush", group: "Drawing", label: "Brush tool", keys: ["B"], run: () => (map.tool = "brush") },
   { id: "eraser", group: "Drawing", label: "Eraser", keys: ["E"], run: mapCommands.eraser },
   { id: "fill", group: "Drawing", label: "Fill with the ground brush", keys: ["F"], run: () => (map.fill = !map.fill) },
   { id: "sizeDown", group: "Drawing", label: "Smaller brush", keys: ["["], run: () => (map.size = Math.max(0, map.size - 1)), repeat: true },
-  { id: "sizeUp", group: "Drawing", label: "Bigger brush", keys: ["]"], run: () => (map.size = Math.min(15, map.size + 1)), repeat: true },
+  { id: "sizeUp", group: "Drawing", label: "Bigger brush", keys: ["]"], run: () => (map.size = Math.min(MAX_BRUSH_SIZE, map.size + 1)), repeat: true },
   { id: "shape", group: "Drawing", label: "Square or round brush", keys: ["Q"], run: () => (map.shape = map.shape === "square" ? "circle" : "square") },
   { id: "automagic", group: "Drawing", label: "Automatic borders and walls", keys: ["A"], run: mapCommands.toggleAutomagic },
 
@@ -62,8 +61,8 @@ export const KEY_ACTIONS: KeyAction[] = [
   { id: "undo", group: "Map", label: "Undo", keys: ["Ctrl+Z"], run: mapCommands.undo, repeat: true },
   { id: "redo", group: "Map", label: "Redo", keys: ["Ctrl+Y", "Ctrl+Shift+Z"], run: mapCommands.redo, repeat: true },
   { id: "palette", group: "Map", label: "Go to anything", keys: ["Ctrl+K", "Ctrl+P", "Ctrl+G"], run: () => mapCommands.commandPalette(), always: true },
-  { id: "find", group: "Map", label: "Find", keys: ["Ctrl+F"], run: () => mapCommands.find(sel()) },
-  { id: "replace", group: "Map", label: "Replace", keys: ["Ctrl+H"], run: () => mapCommands.find({ ...sel(), replace: true }) },
+  { id: "find", group: "Map", label: "Find", keys: ["Ctrl+F"], run: () => mapCommands.find(selectionScope()) },
+  { id: "replace", group: "Map", label: "Replace", keys: ["Ctrl+H"], run: () => mapCommands.find({ ...selectionScope(), replace: true }) },
   { id: "shortcuts", group: "Map", label: "Keyboard shortcuts", keys: ["F1"], run: () => (map.dialog = "shortcuts"), always: true },
 ];
 
@@ -107,9 +106,9 @@ export function mapShortcut(event: KeyboardEvent): boolean {
   if (!combo) return false;
   const typing = (event.target as HTMLElement).closest("input, textarea, select, [contenteditable]") !== null;
   const ready = !typing && map.activeId !== null;
-  const run = (fn: () => unknown) => {
+  const run = (action: () => unknown) => {
     event.preventDefault();
-    Promise.resolve(fn()).catch((err) => toast(errorMessage(err), "error"));
+    Promise.resolve(action()).catch((err) => toast(errorMessage(err), "error"));
     return true;
   };
   for (const action of KEY_ACTIONS) {

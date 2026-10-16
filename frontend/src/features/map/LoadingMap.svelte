@@ -8,16 +8,16 @@
 
   // The last state stays shown while the window fades out.
   let last = map.loading!;
-  const l = $derived.by(() => (last = map.loading ?? last));
+  const loading = $derived.by(() => (last = map.loading ?? last));
 </script>
 
 <div class="overlay" transition:backdrop|global>
-  <div class="t-window dialog" transition:pop|global role="dialog" aria-modal="true" aria-label={l.title ?? "Opening map"}>
-    <div class="t-window-title">{l.title ?? "Opening map"}</div>
+  <div class="t-window dialog" transition:pop|global role="dialog" aria-modal="true" aria-label={loading.title ?? "Opening map"}>
+    <div class="t-window-title">{loading.title ?? "Opening map"}</div>
     <div class="body">
-      <div class="name" title={l.name}>{l.name}</div>
-      <ProgressBar percent={l.percent} label="{Math.floor(l.percent)}%" />
-      <div class="t-label step">{l.step}…</div>
+      <div class="name" title={loading.name}>{loading.name}</div>
+      <ProgressBar percent={loading.percent} label="{Math.floor(loading.percent)}%" />
+      <div class="t-label step">{loading.step}…</div>
     </div>
   </div>
 </div>

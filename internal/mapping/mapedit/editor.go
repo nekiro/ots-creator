@@ -126,23 +126,38 @@ type Editor struct {
 	clean int
 	rng   *rand.Rand
 	// dirty collects the chunks changed since the last TakeDirty.
-	dirty    map[otmap.ChunkKey]bool
-	metaDirt bool
+	dirty     map[otmap.ChunkKey]bool
+	metaDirty bool
 	// doodad is the current doodad placement preview.
 	doodad *DoodadBuffer
-	// sel holds the positions of tiles with something selected.
-	sel map[otmap.Position]struct{}
+	// selectedPositions holds the positions of tiles with something selected.
+	selectedPositions map[otmap.Position]struct{}
 	// replace is the ground an Alt ground stroke replaces.
 	replace strokeReplace
+	// peekScratch and peekItems hold the tile returned by peek.
+	peekScratch otmap.Tile
+	peekItems   [32]otmap.Item
+}
+
+// peek returns the map tile at x, y, z for a read-only look that ends
+// before the next peek: packed tiles are unpacked into the editor's scratch
+// instead of a new copy (see otmap.Map.Peek).
+func (e *Editor) peek(x, y, z int) *otmap.Tile {
+	return e.Map.PeekAt(x, y, z, &e.peekScratch, e.peekItems[:])
+}
+
+// peekPos is peek for a position.
+func (e *Editor) peekPos(pos otmap.Position) *otmap.Tile {
+	return e.Map.Peek(pos, &e.peekScratch, e.peekItems[:])
 }
 
 // New returns an editor for a map.
 func New(gameMap *otmap.Map, items *otitems.DB, brushes *Brushes) *Editor {
 	return &Editor{
 		Map: gameMap, Items: items, Brushes: brushes, Settings: DefaultSettings(),
-		rng:   rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), rngStream)),
-		dirty: map[otmap.ChunkKey]bool{},
-		sel:   map[otmap.Position]struct{}{},
+		rng:               rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), rngStream)),
+		dirty:             map[otmap.ChunkKey]bool{},
+		selectedPositions: map[otmap.Position]struct{}{},
 	}
 }
 
@@ -188,7 +203,7 @@ func (e *Editor) TakeDirty() (chunks []otmap.ChunkKey, meta bool) {
 		chunks = append(chunks, chunk)
 	}
 	clear(e.dirty)
-	meta, e.metaDirt = e.metaDirt, false
+	meta, e.metaDirty = e.metaDirty, false
 	return chunks, meta
 }
 
@@ -205,11 +220,11 @@ func (e *Editor) Undo() string {
 		tileChange := action.changes[i]
 		e.Map.SetTile(tileChange.pos, tileChange.before.Clone())
 		e.markDirty(tileChange.pos)
-		e.syncSel(tileChange.pos)
+		e.syncSelection(tileChange.pos)
 	}
 	if action.metaBefore != nil {
 		action.metaBefore.restore(e.Map)
-		e.metaDirt = true
+		e.metaDirty = true
 	}
 	e.redo = append(e.redo, action)
 	return action.Label
@@ -225,11 +240,11 @@ func (e *Editor) Redo() string {
 	for _, tileChange := range action.changes {
 		e.Map.SetTile(tileChange.pos, tileChange.after.Clone())
 		e.markDirty(tileChange.pos)
-		e.syncSel(tileChange.pos)
+		e.syncSelection(tileChange.pos)
 	}
 	if action.metaAfter != nil {
 		action.metaAfter.restore(e.Map)
-		e.metaDirt = true
+		e.metaDirty = true
 	}
 	e.undo = append(e.undo, action)
 	return action.Label
@@ -238,7 +253,7 @@ func (e *Editor) Redo() string {
 // Tx collects the changes of one action. Tiles are copied on first write,
 // so the map never shares tiles with the history.
 type Tx struct {
-	e       *Editor
+	editor  *Editor
 	label   string
 	stroke  int64
 	before  map[otmap.Position]*otmap.Tile
@@ -254,7 +269,7 @@ func (t *Tx) Label() string { return t.label }
 // Begin starts an action. Actions with the same non-zero stroke merge into
 // one undo step (a brush stroke sent in several requests).
 func (e *Editor) Begin(label string, stroke int64) *Tx {
-	return &Tx{e: e, label: label, stroke: stroke, before: map[otmap.Position]*otmap.Tile{}, written: map[otmap.Position]bool{}}
+	return &Tx{editor: e, label: label, stroke: stroke, before: map[otmap.Position]*otmap.Tile{}, written: map[otmap.Position]bool{}}
 }
 
 // BeginSelection starts a change that is not recorded in the history
@@ -266,20 +281,20 @@ func (e *Editor) BeginSelection() *Tx {
 }
 
 // Get returns the current tile (read-only).
-func (t *Tx) Get(pos otmap.Position) *otmap.Tile { return t.e.Map.Tile(pos) }
+func (t *Tx) Get(pos otmap.Position) *otmap.Tile { return t.editor.Map.Tile(pos) }
 
 // Prior returns the tile at pos as it was before this action (read-only).
 func (t *Tx) Prior(pos otmap.Position) *otmap.Tile {
 	if beforeTile, seen := t.before[pos]; seen {
 		return beforeTile
 	}
-	return t.e.Map.Tile(pos)
+	return t.editor.Map.Tile(pos)
 }
 
 // Edit returns a writable copy of the tile at pos, creating an empty tile.
 // The copy is stored in the map right away so neighbors see it.
 func (t *Tx) Edit(pos otmap.Position) *otmap.Tile {
-	current := t.e.Map.Tile(pos)
+	current := t.editor.Map.Tile(pos)
 	if t.written[pos] && current != nil {
 		return current
 	}
@@ -294,23 +309,23 @@ func (t *Tx) Edit(pos otmap.Position) *otmap.Tile {
 	if !t.noUndo {
 		tile.State |= otmap.StateModified
 	}
-	t.e.Map.Put(pos, tile)
+	t.editor.Map.Put(pos, tile)
 	t.written[pos] = true
-	t.e.markDirty(pos)
+	t.editor.markDirty(pos)
 	return tile
 }
 
 // Meta records the map data outside tiles before it changes.
 func (t *Tx) Meta() {
 	if t.meta == nil {
-		t.meta = snapshotMeta(t.e.Map)
+		t.meta = snapshotMeta(t.editor.Map)
 	}
-	t.e.metaDirt = true
+	t.editor.metaDirty = true
 }
 
 // Commit finishes the action and returns the number of changed tiles.
 func (t *Tx) Commit() int {
-	editor := t.e
+	editor := t.editor
 	changes := t.collectChanges()
 	if t.noUndo || (len(changes) == 0 && t.meta == nil) {
 		return len(changes)
@@ -344,11 +359,11 @@ func (t *Tx) Commit() int {
 // collectChanges prunes the written tiles and returns the ones that changed,
 // in the order they were first written.
 func (t *Tx) collectChanges() []change {
-	editor := t.e
+	editor := t.editor
 	var changes []change
 	for _, pos := range t.order {
 		editor.Map.Prune(pos)
-		editor.syncSel(pos)
+		editor.syncSelection(pos)
 		after := editor.Map.Tile(pos)
 		before := t.before[pos]
 		if before == nil && after == nil {

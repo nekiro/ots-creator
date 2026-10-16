@@ -25,36 +25,36 @@
     stageSize?: [number, number];
   } = $props();
 
-  let sw = $state(0);
-  let sh = $state(0);
-  let cw = $state(0);
-  let ch = $state(0);
+  let stageWidth = $state(0);
+  let stageHeight = $state(0);
+  let contentWidth = $state(0);
+  let contentHeight = $state(0);
   const view = new PanView(
-    () => ({ w: cw * zoom, h: ch * zoom, sw, sh }),
-    (d) => onzoom?.(d),
+    () => ({ width: contentWidth * zoom, height: contentHeight * zoom, stageWidth, stageHeight }),
+    (delta) => onzoom?.(delta),
   );
 
   // Zoom and centering glide; panning by hand follows the mouse directly.
   let animate = $state(false);
-  let animTimer: ReturnType<typeof setTimeout> | undefined;
+  let glideTimer: ReturnType<typeof setTimeout> | undefined;
   function glide() {
     animate = true;
-    clearTimeout(animTimer);
-    animTimer = setTimeout(() => (animate = false), 220);
+    clearTimeout(glideTimer);
+    glideTimer = setTimeout(() => (animate = false), 220);
   }
 
   $effect(() => {
-    stageSize = [sw, sh];
+    stageSize = [stageWidth, stageHeight];
   });
   // Zooming keeps the centered pixel in place.
   let lastZoom = 0;
   $effect(() => {
-    const z = zoom;
-    if (lastZoom && z !== lastZoom) {
+    const nextZoom = zoom;
+    if (lastZoom && nextZoom !== lastZoom) {
       glide();
-      view.rescale(z / lastZoom);
+      view.rescale(nextZoom / lastZoom);
     }
-    lastZoom = z;
+    lastZoom = nextZoom;
   });
   let lastKey: string | undefined;
   $effect(() => {
@@ -69,12 +69,12 @@
 <svelte:window onkeydown={view.key} onkeyup={view.key} onblur={view.blur} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="pan-stage" class:ready={view.ready} class:panning={view.dragging} bind:clientWidth={sw} bind:clientHeight={sh} {...view.handlers}>
+<div class="pan-stage" class:ready={view.ready} class:panning={view.dragging} bind:clientWidth={stageWidth} bind:clientHeight={stageHeight} {...view.handlers}>
   <div
     class="content"
     class:animate={animate && !view.dragging}
-    bind:offsetWidth={cw}
-    bind:offsetHeight={ch}
+    bind:offsetWidth={contentWidth}
+    bind:offsetHeight={contentHeight}
     style="transform:{view.transform} scale({zoom})"
   >
     {@render children()}

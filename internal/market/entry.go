@@ -12,8 +12,8 @@ import (
 	"slices"
 
 	"github.com/nekiro/ots-creator/internal/core/imaging"
-	"github.com/nekiro/ots-creator/internal/formats/obd"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/obd"
 )
 
 // Info is what the app reads from an entry's file when sharing it; the

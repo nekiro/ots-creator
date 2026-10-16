@@ -3,12 +3,12 @@
 </script>
 
 <div class="toasts" aria-live="polite">
-  {#each app.toasts as t (t.id)}
-    <div class="toast t-frame-up {t.kind}">
-      {t.text}
-      {#if t.action}
-        {@const a = t.action}
-        <button class="t-btn act" onclick={() => ((app.toasts = app.toasts.filter((x) => x.id !== t.id)), a.run())}>{a.label}</button>
+  {#each app.toasts as shown (shown.id)}
+    <div class="toast t-frame-up {shown.kind}">
+      {shown.text}
+      {#if shown.action}
+        {@const action = shown.action}
+        <button class="t-btn act" onclick={() => ((app.toasts = app.toasts.filter((other) => other.id !== shown.id)), action.run())}>{action.label}</button>
       {/if}
     </div>
   {/each}

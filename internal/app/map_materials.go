@@ -146,8 +146,8 @@ func (ms *MapService) SaveCreature(creature materials.CreatureType) error {
 // DoodadFromSelection creates a doodad brush from the selected items, as
 // one composite relative to the selection's top-left tile.
 func (ms *MapService) DoodadFromSelection(id int, name string, tilesets []string) error {
-	return ms.withMap(id, func(m *openMap, data *mapData) error {
-		clip := m.editor.Copy()
+	return ms.withMap(id, func(opened *openMap, data *mapData) error {
+		clip := opened.editor.Copy()
 		if clip == nil {
 			return errors.New("select the items of the doodad first")
 		}

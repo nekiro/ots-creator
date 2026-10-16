@@ -6,8 +6,8 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 
-	"github.com/nekiro/ots-creator/internal/formats/binio"
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/binio"
 )
 
 // The editor works with 32x32 pieces like dat/spr clients. An official

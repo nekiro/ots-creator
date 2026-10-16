@@ -5,7 +5,7 @@ uniform vec2 u_screen;
 uniform vec4 u_rect;
 out vec2 v_uv;
 void main() {
-  vec2 p = u_rect.xy + a_corner * u_rect.zw;
-  gl_Position = vec4(p.x / u_screen.x * 2.0 - 1.0, 1.0 - p.y / u_screen.y * 2.0, 0.0, 1.0);
+  vec2 pixel = u_rect.xy + a_corner * u_rect.zw;
+  gl_Position = vec4(pixel.x / u_screen.x * 2.0 - 1.0, 1.0 - pixel.y / u_screen.y * 2.0, 0.0, 1.0);
   v_uv = a_corner;
 }
