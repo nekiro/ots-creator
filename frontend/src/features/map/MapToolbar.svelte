@@ -134,14 +134,16 @@
     {#each QUICK as toggle}
       <button class="t-icon-btn" class:on={map.view[toggle.key]} title={toggle.title} onclick={() => (map.view[toggle.key] = !map.view[toggle.key])}><Icon name={toggle.icon} /></button>
     {/each}
-    {#if map.view.lights}
-      <span class="t-label" title="Ambient light: how bright the map is away from lights">Ambient</span>
-      <Slider bind:value={map.view.ambientLight} min={0} max={100} width={70} />
-      <span class="val pct">{map.view.ambientLight}%</span>
-    {/if}
     <button class="t-btn sm" class:on={!!map.settings?.automagic} title="Automatic borders and walls (A)" onclick={mapCommands.toggleAutomagic}>Auto</button>
-    <button class="t-icon-btn" title="Play from here (P): walk the map as the client shows it" onclick={() => mapCommands.play()}><Icon name="play" /></button>
   </div>
+  <span class="t-vsep"></span>
+  <div class="grp" class:off={!map.view.lights} title="Ambient light: how bright the map is away from lights{map.view.lights ? '' : ' (turn the lights on to see it)'}">
+    <span class="t-label">Ambient</span>
+    <Slider bind:value={map.view.ambientLight} min={0} max={100} width={70} />
+    <span class="val pct">{map.view.ambientLight}%</span>
+  </div>
+  <span class="t-vsep"></span>
+  <button class="t-btn sm play" title="Play from here (P): walk the map as the client shows it" onclick={() => mapCommands.play()}><Icon name="play" />Play</button>
 
 </div>
 
@@ -195,6 +197,15 @@
   }
   .n {
     width: 46px;
+  }
+  .off {
+    opacity: 0.55;
+  }
+  .play {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: none;
   }
   .pct {
     min-width: 30px;
