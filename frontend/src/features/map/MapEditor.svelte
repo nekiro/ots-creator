@@ -186,7 +186,7 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 0;
   }
   .left :global(.side) {
     flex: 1;

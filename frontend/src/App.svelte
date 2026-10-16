@@ -212,7 +212,7 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 0;
   }
   .left :global(.things),
   .right :global(.props) {

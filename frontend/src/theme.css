@@ -122,7 +122,7 @@ body {
 }
 .t-window > .t-window-title {
   position: absolute;
-  top: -15px;
+  top: -16px;
   left: 0;
   right: 0;
   height: 14px;
