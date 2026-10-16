@@ -194,6 +194,21 @@ func (c *Chunk) eachPtr(fn func(t *Tile)) {
 	}
 }
 
+// Peek returns the tile at local (x, y), nil when there is none. A packed
+// tile is unpacked into scratch and buf (see unpack): it is only valid
+// until they are reused.
+func (c *Chunk) Peek(x, y int, scratch *Tile, buf []Item) *Tile {
+	v := c.cells[y<<ChunkBits|x]
+	switch {
+	case v == 0:
+		return nil
+	case v&cellPtr != 0:
+		return c.ptrs[v&^cellPtr]
+	default:
+		return c.unpack(c.packed[v-1], scratch, buf)
+	}
+}
+
 // Each calls fn for every tile of the chunk. Packed tiles are passed as a
 // reused copy: t is only valid during the call (Clone it to keep it), and
 // changing it does not change the map.

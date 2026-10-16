@@ -77,15 +77,26 @@ type geoBuilder struct {
 	comp    []byte
 	nComp   int
 	sprites map[uint32]struct{}
+	// chunks are the chunks of the key being built, row by row; scratch
+	// and buf hold the packed tile being drawn.
+	chunks  []*otmap.Chunk
+	scratch otmap.Tile
+	buf     [16]otmap.Item
+	// tileX, tileY: the tile being drawn, from the chunk's corner.
+	tileX, tileY uint16
 }
 
-// One quad, 12 bytes: int16 x, y (world pixels from the chunk's corner),
-// uint32 sprite (see geoRect), rgba8 color.
+// One quad, 16 bytes: int16 x, y (world pixels from the chunk's corner),
+// uint32 sprite (see geoRect), rgba8 color, uint16 x, y of the tile it
+// belongs to (from the chunk's corner; the renderer orders overlapping
+// quads of different chunks by it).
 func (g *geoBuilder) quad(x, y int, sprite uint32, r, gr, b, a float64) {
 	g.b = binary.LittleEndian.AppendUint16(g.b, uint16(int16(x)))
 	g.b = binary.LittleEndian.AppendUint16(g.b, uint16(int16(y)))
 	g.b = binary.LittleEndian.AppendUint32(g.b, sprite)
 	g.b = append(g.b, unit8(r), unit8(gr), unit8(b), unit8(a))
+	g.b = binary.LittleEndian.AppendUint16(g.b, g.tileX)
+	g.b = binary.LittleEndian.AppendUint16(g.b, g.tileY)
 	g.n++
 }
 
@@ -408,21 +419,34 @@ func (g *geoBuilder) chunk(m *otmap.Map, k otmap.ChunkKey, out []byte) []byte {
 	ox, oy := int(cx0)<<otmap.ChunkBits, int(cy0)<<otmap.ChunkBits
 	z := int(z8)
 	n := max(g.o.Block, 1)
-	// Chunks row by row: sprites only reach up and left of their tile, into
-	// tiles drawn before.
+	g.chunks = g.chunks[:0]
+	found := false
 	for dy := 0; dy < n; dy++ {
 		for dx := 0; dx < n; dx++ {
 			c := m.Chunk(otmap.MakeKey(cx0+uint16(dx), cy0+uint16(dy), z8))
+			g.chunks = append(g.chunks, c)
+			found = found || c != nil
+		}
+	}
+	// Tiles diagonal by diagonal from the top-left corner, each diagonal
+	// from its bottom-left end, as the client draws them: a sprite reaches
+	// up and left of its tile, over tiles of earlier diagonals and over
+	// the tile left of it, which the tile below-left of it (on the same
+	// diagonal) reaches too and is drawn before it.
+	size := n << otmap.ChunkBits
+	for d := 0; found && d < 2*size-1; d++ {
+		for lx := max(0, d-size+1); lx <= min(d, size-1); lx++ {
+			ly := d - lx
+			c := g.chunks[(ly>>otmap.ChunkBits)*n+lx>>otmap.ChunkBits]
 			if c == nil {
 				continue
 			}
-			c.Each(func(p otmap.Position, t *otmap.Tile) {
-				if g.o.Opts&geoOnlyModified != 0 && t.State&otmap.StateModified == 0 {
-					return
-				}
-				x, y := int(p.X), int(p.Y)
-				g.tile(t, x, y, z, (x-ox)*g.S, (y-oy)*g.S)
-			})
+			t := c.Peek(lx&(otmap.ChunkSize-1), ly&(otmap.ChunkSize-1), &g.scratch, g.buf[:])
+			if t == nil || g.o.Opts&geoOnlyModified != 0 && t.State&otmap.StateModified == 0 {
+				continue
+			}
+			g.tileX, g.tileY = uint16(lx), uint16(ly)
+			g.tile(t, ox+lx, oy+ly, z, lx*g.S, ly*g.S)
 		}
 	}
 	out = binary.LittleEndian.AppendUint32(out, uint32(k))

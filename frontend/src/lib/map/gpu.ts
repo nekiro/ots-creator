@@ -34,6 +34,9 @@ export function createQuadVao(gl: WebGL2RenderingContext, corners: WebGLBuffer, 
     gl.vertexAttribPointer(1, 2, gl.SHORT, false, QUAD_BYTES, 0);
     gl.vertexAttribIPointer(2, 1, gl.UNSIGNED_INT, QUAD_BYTES, 4);
     gl.vertexAttribPointer(3, 4, gl.UNSIGNED_BYTE, true, QUAD_BYTES, 8);
+    gl.enableVertexAttribArray(4);
+    gl.vertexAttribPointer(4, 2, gl.UNSIGNED_SHORT, false, QUAD_BYTES, 12);
+    gl.vertexAttribDivisor(4, 1);
   } else {
     const stride = GPU.floatsPerQuad * 4;
     gl.vertexAttribPointer(1, 4, gl.FLOAT, false, stride, 0);

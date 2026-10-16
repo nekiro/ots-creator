@@ -29,8 +29,8 @@ export const GEO_COMPOSED = 0x80000000;
 export const GEO_RECT = 0x40000000;
 /** Added to the key of a block's top-left chunk: the key of the block (blocks and chunks share a store). */
 export const GEO_BLOCK = 1 << 28;
-/** Bytes per quad: int16 x, y, uint32 sprite, rgba8 color. */
-export const QUAD_BYTES = 12;
+/** Bytes per quad: int16 x, y, uint32 sprite, rgba8 color, uint16 x, y of its tile (from the chunk's corner). */
+export const QUAD_BYTES = 16;
 
 export interface GeoView {
   pathing: boolean;

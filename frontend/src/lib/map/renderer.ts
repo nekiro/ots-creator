@@ -54,6 +54,9 @@ export class MapRenderer {
     this.batch = new QuadBatch(gl, corners);
     this.chunks = new ChunkBuffers(gl, corners, this.missing);
     this.things = new ThingDrawer(this.batch, this.missing);
+    // Chunk quads of later tiles have greater depth (see chunk.vert).
+    gl.clearDepth(0);
+    gl.depthFunc(gl.GEQUAL);
   }
 
   /** Sprites changed in the client: drop them from the atlas (the cell index follows). */
@@ -126,14 +129,14 @@ export class MapRenderer {
         this.batch.rect(0, 0, scene.width, scene.height, COLORS.lowerFloorsShade);
         this.flushScreen(scene);
       }
-      for (const chunk of plan.underneath.get(z) ?? []) this.chunks.draw(scene, chunk, 1, camera.shift(z), result);
-      for (const chunk of chunksByFloor.get(z)!) this.chunks.draw(scene, chunk, 1, camera.shift(z), result);
+      this.drawChunks(scene, plan.underneath.get(z) ?? [], 1, camera.shift(z), result);
+      this.drawChunks(scene, chunksByFloor.get(z)!, 1, camera.shift(z), result);
       if (isFloorInView && scene.moveOffset) {
         this.things.drawMoved(scene, z, camera.tiles(z, 1, 3), camera, drawItem, drawCreature);
         this.flushScreen(scene);
       }
     }
-    if (ghostFloor >= 0) for (const chunk of chunksByFloor.get(ghostFloor)!) this.chunks.draw(scene, chunk, ALPHA.ghostFloor, camera.shift(ghostFloor), result);
+    if (ghostFloor >= 0) this.drawChunks(scene, chunksByFloor.get(ghostFloor)!, ALPHA.ghostFloor, camera.shift(ghostFloor), result);
     this.things.drawGhosts(scene, camera, drawItem, drawCreature);
     drawOverlays(scene, result, camera, this.batch);
     if (this.missing.size) {
@@ -145,6 +148,17 @@ export class MapRenderer {
     this.flushScreen(scene);
     this.chunks.sweep(scene);
     return result;
+  }
+
+  /** Draws chunks over what is drawn, their tiles in drawing order among
+   * themselves whatever order the chunks come in (see chunk.vert). */
+  private drawChunks(scene: Scene, chunks: GeoChunk[], alpha: number, floorShift: number, result: FrameResult): void {
+    if (!chunks.length) return;
+    const gl = this.gl;
+    gl.clear(gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST);
+    for (const chunk of chunks) this.chunks.draw(scene, chunk, alpha, floorShift, result);
+    gl.disable(gl.DEPTH_TEST);
   }
 
   /** What chunk quads are built for besides the chunk itself. Far out,

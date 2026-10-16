@@ -57,13 +57,24 @@ func TestGeoChunk(t *testing.T) {
 	q := b[20:]
 	x, y := int16(binary.LittleEndian.Uint16(q)), int16(binary.LittleEndian.Uint16(q[2:]))
 	if x != 0 || y != 32 || binary.LittleEndian.Uint32(q[4:]) != ids[0] || q[8] != 255 || q[11] != 255 {
-		t.Fatalf("quad %v", q[:12])
+		t.Fatalf("quad %v", q[:16])
 	}
-	if u32(20+n*12) != ids[0] {
-		t.Fatalf("sprite list %d", u32(20+n*12))
+	// Diagonal by diagonal, each from its bottom-left end, as the client draws.
+	order := [9][2]int16{{0, 1}, {0, 2}, {1, 1}, {0, 3}, {1, 2}, {2, 1}, {1, 3}, {2, 2}, {2, 3}}
+	for i, want := range order {
+		at := q[i*16:]
+		if x, y := int16(binary.LittleEndian.Uint16(at)), int16(binary.LittleEndian.Uint16(at[2:])); x != want[0]*32 || y != want[1]*32 {
+			t.Fatalf("quad %d at %d,%d, want tile %v", i, x, y, want)
+		}
+		if tx, ty := int16(binary.LittleEndian.Uint16(at[12:])), int16(binary.LittleEndian.Uint16(at[14:])); tx != want[0] || ty != want[1] {
+			t.Fatalf("quad %d of tile %d,%d, want %v", i, tx, ty, want)
+		}
+	}
+	if u32(20+n*16) != ids[0] {
+		t.Fatalf("sprite list %d", u32(20+n*16))
 	}
 	// The empty chunk follows.
-	rest := b[20+n*12+4:]
+	rest := b[20+n*16+4:]
 	if len(rest) != 20 || binary.LittleEndian.Uint32(rest[4:]) != 0 {
 		t.Fatalf("empty chunk %v", rest)
 	}

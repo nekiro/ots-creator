@@ -59,7 +59,7 @@ export class ChunkBuffers {
     private missing: Set<number>,
   ) {
     this.program = compileProgram(gl, CHUNK_VERT, SPRITE_FRAG);
-    for (const name of ["u_screen", "u_off", "u_S", "u_scale", "u_half", "u_alpha", "u_perRow", "u_perLayer", "u_uvCell", "u_tex", "u_ind", "u_indC"]) this.uniforms[name] = gl.getUniformLocation(this.program, name);
+    for (const name of ["u_screen", "u_off", "u_tile", "u_S", "u_scale", "u_half", "u_alpha", "u_perRow", "u_perLayer", "u_uvCell", "u_tex", "u_ind", "u_indC"]) this.uniforms[name] = gl.getUniformLocation(this.program, name);
     this.spriteCells = new CellIndex(gl, 2, 2048, 64);
     this.composedCells = new CellIndex(gl, 3, 1024, 4);
   }
@@ -224,6 +224,8 @@ export class ChunkBuffers {
     const [chunkX, chunkY] = splitKey(buffer.source.key % GEO_BLOCK);
     this.bindProgram(scene, alpha);
     gl.uniform2f(this.uniforms.u_off, (chunkX * CHUNK - floorShift) * scene.spriteSize - scene.camX, (chunkY * CHUNK - floorShift) * scene.spriteSize - scene.camY);
+    // Tile ranks from the camera keep the depth values small.
+    gl.uniform2f(this.uniforms.u_tile, chunkX * CHUNK - Math.round(scene.camX / scene.spriteSize), chunkY * CHUNK - Math.round(scene.camY / scene.spriteSize));
     gl.bindVertexArray(buffer.vao);
     gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, buffer.source.n);
     gl.bindVertexArray(null);
