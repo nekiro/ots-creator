@@ -16,6 +16,8 @@
   let rev = $state(0);
   let box = $state<HTMLDivElement>();
   let size = $state(200);
+  // Shown height: below the chosen one when the column has no room for it.
+  let shown = $state(0);
 
   // Height chosen with the splitter below the image; square (null) until dragged.
   const HEIGHT_KEY = "map:minimap-height";
@@ -23,7 +25,7 @@
   let chosen = $state<number | null>(loadHeight());
   const height = $derived(chosen ?? size);
   /** Tiles shown down the minimap: the image keeps square tiles. */
-  const spanY = $derived(Math.max(8, Math.round((span * height) / Math.max(1, size))));
+  const spanY = $derived(Math.max(8, Math.round((span * (shown || height)) / Math.max(1, size))));
 
   function loadHeight(): number | null {
     return readPositive(HEIGHT_KEY);
@@ -31,7 +33,7 @@
 
   function resize(dy: number) {
     const max = Math.max(HEIGHT_MIN, window.innerHeight - 320);
-    chosen = Math.round(clamp(height + dy, HEIGHT_MIN, max));
+    chosen = Math.round(clamp((shown || height) + dy, HEIGHT_MIN, max));
   }
 
   function saveHeight() {
@@ -103,7 +105,7 @@
   {/snippet}
   <div class="wrap" bind:clientWidth={size}>
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="box" bind:this={box} style="height:{height}px" onpointerdown={onpointerdown} onpointermove={(event) => held && event.buttons === 1 && at(event)} onpointerup={release} onpointercancel={release} onlostpointercapture={release}>
+    <div class="box" bind:this={box} style="height:{height}px" bind:clientHeight={shown} onpointerdown={onpointerdown} onpointermove={(event) => held && event.buttons === 1 && at(event)} onpointerup={release} onpointercancel={release} onlostpointercapture={release}>
       {#if src}<img class="pixel" {src} alt="" draggable="false" />{/if}
       <div
         class="view"
@@ -116,10 +118,17 @@
 </MiniWindow>
 
 <style>
+  /* Both shrink so the image stays inside the window when the column is short. */
   .wrap {
+    flex: 0 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
     padding: 2px;
   }
   .box {
+    flex: 0 1 auto;
+    min-height: 40px;
     position: relative;
     background: #000;
     overflow: hidden;
