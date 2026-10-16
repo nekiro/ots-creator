@@ -140,6 +140,7 @@
       <span class="val pct">{map.view.ambientLight}%</span>
     {/if}
     <button class="t-btn sm" class:on={!!map.settings?.automagic} title="Automatic borders and walls (A)" onclick={mapCommands.toggleAutomagic}>Auto</button>
+    <button class="t-icon-btn" title="Play from here (P): walk the map as the client shows it" onclick={() => mapCommands.play()}><Icon name="play" /></button>
   </div>
 
 </div>

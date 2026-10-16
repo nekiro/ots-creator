@@ -56,6 +56,28 @@ export const MAX_BRUSH_SIZE = 15;
 /** Tiles around the view whose item lights are taken in (lights reach as many tiles as their level; item lights go up to about 10). */
 export const LIGHT_REACH = 16;
 
+/** Chunk quads are ranked in depth from -DEPTH_RANGE to DEPTH_RANGE (also in chunk.vert). */
+export const DEPTH_RANGE = 524288;
+
+/** The play view, as the voidcores client shows the game. */
+export const PLAY = {
+  /** Tiles in view (client zoom 13 at a 15:11 aspect: 17 x 13). */
+  tilesWide: 17,
+  tilesHigh: 13,
+  /** Over the floor under the player (client option shadowFloorIntensity 70 %). */
+  lowerFloorShade: [0, 0, 0, 0.3],
+  /** The player's rank among the things of its tile: after items (0), before top items (0.5, chunk.vert). */
+  playerRank: 0.25,
+  /** Most a tile raises the things on it (setup.otml max-elevation). */
+  maxElevation: 24,
+  /** World light below which the player gives its own light, and that light (Creature::draw). */
+  darkWorldLight: 64,
+  playerLight: 2,
+  /** World light of the server by day and by night (TFS LIGHT_LEVEL_DAY / NIGHT). */
+  dayLight: 250,
+  nightLight: 40,
+} as const;
+
 /** Chunks a side of the blocks drawn far out. */
 export const BLOCK_CHUNKS = 4;
 

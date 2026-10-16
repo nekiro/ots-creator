@@ -78,6 +78,16 @@ type MapChange struct {
 	Warnings []string `json:"warnings"`
 }
 
+// EventMapChanged carries a MapChanged after every edit, for the windows
+// that show a map without editing it (the play window).
+const EventMapChanged = "map:changed"
+
+// MapChanged lists the chunks an edit changed on a map.
+type MapChanged struct {
+	ID     int      `json:"id"`
+	Chunks []uint32 `json:"chunks"`
+}
+
 func (ms *MapService) change(m *openMap) MapChange {
 	chunks, meta := m.editor.TakeDirty()
 	keys := make([]uint32, len(chunks))

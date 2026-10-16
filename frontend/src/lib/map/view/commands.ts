@@ -1,13 +1,13 @@
 // User actions of the map editor, shared by menus, toolbars and shortcuts.
 import { Events } from "@wailsio/runtime";
-import { DialogService, encodeBytes, errorMessage } from "../../api";
+import { DialogService, WindowService, encodeBytes, errorMessage } from "../../api";
 import { clamp } from "../../util/math";
 import { ask } from "../../confirm.svelte";
 import { openContextMenu, type MenuEntry } from "../../menu.svelte";
 import { app, toast } from "../../state/app.svelte";
 import { MapService, SpawnFormat, type Position } from "../data/api";
 import { MAX_FLOOR } from "../constants";
-import { tileToWorld } from "./coords";
+import { tileToWorld, worldToTile } from "./coords";
 import { whenRendered } from "../render/rendered";
 import { panTiles, startPosition, stepZoom, zoomAround } from "./camera";
 import { applyChange, edit, loadMapData, map, refreshTile, selectBrush, setCam, warningCount, type Focus } from "../state.svelte";
@@ -43,6 +43,28 @@ export function goTo(position: Position, id = map.activeId): void {
 }
 
 export const mapCommands = {
+  /** Walks the map as a player, from a tile (default: the one under the mouse, or the middle of the view). */
+  play(position?: Position) {
+    if (map.activeId === null || !map.items) return;
+    const cam = map.cam;
+    map.play = position ?? map.hover ?? { ...worldToTile(cam.x, cam.y, cam.floor, spriteSize()), z: cam.floor };
+  },
+
+  /** Back to editing, the view on where the player stands. */
+  exitPlay(position: Position) {
+    map.play = null;
+    goTo(position);
+  },
+
+  /** Moves the play view to its own window; editing goes on here. */
+  popOutPlay(position: Position) {
+    const id = map.activeId;
+    map.play = null;
+    if (id === null) return;
+    goTo(position);
+    void WindowService.OpenPlayWindow(`play=${id}&x=${position.x}&y=${position.y}&z=${position.z}`);
+  },
+
   async setMode(mode: "objects" | "map") {
     map.mode = mode;
     if (mode === "map") await loadMapData();

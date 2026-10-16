@@ -8,13 +8,15 @@ import (
 // ItemTable lists every item type in parallel arrays (compact for the
 // palette, search and drawing).
 type ItemTable struct {
-	IDs      []uint16          `json:"ids"`
-	Clients  []uint16          `json:"clients"`
-	Flags    []uint32          `json:"flags"`
-	Tops     []uint16          `json:"tops"`
-	Minimap  []uint16          `json:"minimap"`
-	Names    []string          `json:"names"`
-	Kinds    []uint16          `json:"kinds"`
+	IDs     []uint16 `json:"ids"`
+	Clients []uint16 `json:"clients"`
+	Flags   []uint32 `json:"flags"`
+	Tops    []uint16 `json:"tops"`
+	Minimap []uint16 `json:"minimap"`
+	Names   []string `json:"names"`
+	Kinds   []uint16 `json:"kinds"`
+	// Speeds are the ground speeds (0: not a ground or no speed).
+	Speeds   []uint16          `json:"speeds"`
 	Mode     string            `json:"mode"`
 	MaxID    uint16            `json:"maxId"`
 	Flagbits map[string]uint32 `json:"flagbits"`
@@ -42,6 +44,7 @@ func itemTable(items *otitems.DB) ItemTable {
 		table.Minimap = append(table.Minimap, item.MinimapColor)
 		table.Names = append(table.Names, item.Name)
 		table.Kinds = append(table.Kinds, uint16(item.Kind))
+		table.Speeds = append(table.Speeds, item.Speed)
 	})
 	return table
 }
@@ -83,6 +86,9 @@ type Appearance struct {
 	Flags      uint32 `json:"fl"`
 	LightLevel uint16 `json:"ll,omitempty"`
 	LightColor uint16 `json:"lc,omitempty"`
+	// Moving is the frame group of a walking outfit (only its size,
+	// patterns, frames and sprites), when the outfit has one.
+	Moving *Appearance `json:"mv,omitempty"`
 }
 
 // Appearances returns render data of client things (missing ids are left
@@ -103,8 +109,8 @@ func (ms *MapService) Appearances(category thing.Category, ids []uint32) ([]Appe
 	return out, nil
 }
 
-func appearanceOf(id uint32, found *thing.Thing) Appearance {
-	group := found.FrameGroups[0]
+// frameGroupAppearance is the size, patterns, frames and sprites of a frame group.
+func frameGroupAppearance(id uint32, group *thing.FrameGroup) Appearance {
 	appearance := Appearance{
 		ID: id, Width: group.Width, Height: group.Height, Layers: group.Layers,
 		PatternX: group.PatternX, PatternY: group.PatternY, PatternZ: group.PatternZ,
@@ -114,6 +120,15 @@ func appearanceOf(id uint32, found *thing.Thing) Appearance {
 		for _, duration := range group.Durations {
 			appearance.Durations = append(appearance.Durations, (duration.Min+duration.Max)/2)
 		}
+	}
+	return appearance
+}
+
+func appearanceOf(id uint32, found *thing.Thing) Appearance {
+	appearance := frameGroupAppearance(id, found.FrameGroups[0])
+	if len(found.FrameGroups) > 1 {
+		moving := frameGroupAppearance(id, found.FrameGroups[1])
+		appearance.Moving = &moving
 	}
 	props := &found.Props
 	if props.HasOffset {

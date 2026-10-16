@@ -9,15 +9,27 @@
 import { Atlas } from "./atlas";
 import { ChunkBuffers } from "./chunkBuffers";
 import { chunkKey } from "../data/chunks";
-import { ALPHA, BLOCK_CHUNKS, COLORS, LIGHT_REACH, LIMITS, ZOOM } from "../constants";
+import { ALPHA, BLOCK_CHUNKS, COLORS, DEPTH_RANGE, GROUND_FLOOR, LIGHT_REACH, LIMITS, PLAY, ZOOM } from "../constants";
 import { GEO, GEO_BLOCK, encodeGeoSignature, geoBits, type GeoChunk } from "./geo";
-import { ambientIntensity, DAYLIGHT_INTENSITY } from "./lightMap";
+import { ambientIntensity, DAYLIGHT_INTENSITY, WHITE_LIGHT_COLOR, type ExtraLight } from "./lightMap";
+import { walkingTileOffset } from "../play/walk";
+import type { DrawCreature } from "../data/things";
 import { LightPass } from "./lightPass";
 import { drawOverlays } from "./overlays";
 import { QuadBatch } from "./quadBatch";
 import type { FrameResult, Scene } from "./scene";
 import { ThingDrawer } from "../data/things";
 import { Camera, floorsToDraw } from "../view/view";
+
+/** Top order of on-top items (ItemIndex.top). */
+const TOP_ORDER_TOP = 3;
+
+/** Floors of the play view, bottom up. */
+function playFloors(play: { firstFloor: number; lastFloor: number }): number[] {
+  const floors: number[] = [];
+  for (let z = Math.max(play.lastFloor, play.firstFloor); z >= play.firstFloor; z--) floors.push(z);
+  return floors;
+}
 
 /** The chunk a tile is in (one coordinate). */
 function chunkOfTile(tile: number): number {
@@ -98,7 +110,7 @@ export class MapRenderer {
     const floor = scene.floor;
     const camera = new Camera(scene);
     const tilePx = camera.tilePx;
-    const floors = floorsToDraw(scene, camera.visibleTiles);
+    const floors = scene.play ? playFloors(scene.play) : floorsToDraw(scene, camera.visibleTiles);
     result.far = tilePx < ZOOM.sprites || camera.visibleTiles > LIMITS.visibleTiles;
     if (result.far) {
       // Overlays only.
@@ -130,19 +142,22 @@ export class MapRenderer {
     // Draw floors from the bottom up.
     for (const z of floors) {
       const isFloorInView = z === floor;
-      if (isFloorInView && floors.length > 1 && scene.opts.shade) {
-        this.batch.rect(0, 0, scene.width, scene.height, COLORS.lowerFloorsShade);
+      // Over the floor right under the one in view and what is under it (client: shadowFloorIntensity).
+      if (isFloorInView && floors.includes(floor + 1) && scene.opts.shade) {
+        this.batch.rect(0, 0, scene.width, scene.height, scene.play ? PLAY.lowerFloorShade : COLORS.lowerFloorsShade);
         this.flushScreen(scene);
       }
       this.drawChunks(scene, plan.underneath.get(z) ?? [], 1, camera.shift(z), result);
       this.drawChunks(scene, chunksByFloor.get(z)!, 1, camera.shift(z), result);
+      if (isFloorInView && scene.play) this.drawPlayer(scene, camera, drawCreature);
       if (isFloorInView && scene.moveOffset) {
         this.things.drawMoved(scene, z, camera.tiles(z, 1, 3), camera, drawItem, drawCreature);
         this.flushScreen(scene);
       }
     }
     if (ghostFloor >= 0) this.drawChunks(scene, chunksByFloor.get(ghostFloor)!, ALPHA.ghostFloor, camera.shift(ghostFloor), result);
-    if (scene.opts.lights && tilePx >= ZOOM.detail) this.drawLights(scene, camera, floors, plan);
+    if (scene.play) this.drawPlayLights(scene, camera, floors, plan);
+    else if (scene.opts.lights && tilePx >= ZOOM.detail) this.drawLights(scene, camera, floors, plan, ambientIntensity(scene.opts.ambientLight), []);
     this.things.drawGhosts(scene, camera, drawItem, drawCreature);
     drawOverlays(scene, result, camera, this.batch);
     if (this.missing.size) {
@@ -156,17 +171,70 @@ export class MapRenderer {
     return result;
   }
 
+  /** The player among the things of its floor: drawn after the items of
+   * the tile it walks over and before that tile's top items, hidden by
+   * what later tiles draw (Tile::drawCreature, Creature::updateWalkingTile). */
+  private drawPlayer(scene: Scene, camera: Camera, drawCreature: DrawCreature): void {
+    const play = scene.play!;
+    const size = scene.spriteSize;
+    this.flushScreen(scene);
+    const look = scene.looks.outfits.get(play.player.lookType);
+    const [dx, dy] = walkingTileOffset(Math.trunc(play.offsetX), Math.trunc(play.offsetY), look?.ox ?? 0, look?.oy ?? 0, size);
+    const walkX = play.x + dx;
+    const walkY = play.y + dy;
+    // A diagonal corner tile takes the elevation of the player's own tile.
+    const elevation = dx && dy ? this.tileElevation(scene, play.x, play.y, play.z) : this.tileElevation(scene, walkX, walkY, play.z);
+    const screenX = camera.tileX(play.x, play.z) + Math.round(play.offsetX * scene.scale) - elevation * scene.scale;
+    const screenY = camera.tileY(play.y, play.z) + Math.round(play.offsetY * scene.scale) - elevation * scene.scale;
+    drawCreature(play.player, screenX, screenY, play.x, play.y, play.z, 1, play.footPhase);
+    // The rank chunk.vert gives the walking tile, between its items and its top items.
+    const tileX = walkX - Math.round(scene.camX / size);
+    const tileY = walkY - Math.round(scene.camY / size);
+    const rank = 8 * (tileX + tileY) + tileX + PLAY.playerRank;
+    const gl = this.gl;
+    gl.enable(gl.DEPTH_TEST);
+    if (this.batch.flush(scene, Math.min(Math.max(rank / DEPTH_RANGE, -1), 1))) this.chunks.unbind();
+    gl.disable(gl.DEPTH_TEST);
+  }
+
+  /** How far things on a tile are raised: the elevation of its items under the top ones (at most 24 pixels). */
+  private tileElevation(scene: Scene, x: number, y: number, z: number): number {
+    const tile = scene.chunks.peekTile(x, y, z);
+    if (!tile) return 0;
+    let elevation = 0;
+    for (const id of tile.ids) {
+      if (scene.items.top[id] === TOP_ORDER_TOP) continue;
+      elevation += scene.looks.items.get(scene.items.client[id])?.el ?? 0;
+    }
+    return Math.min(elevation, PLAY.maxElevation);
+  }
+
+  /** The play view's light: the world light (none under ground), at least
+   * the ambient light option, and the player's own light in the dark
+   * (MapView::updateLight, Creature::draw). */
+  private drawPlayLights(scene: Scene, camera: Camera, floors: number[], plan: ChunkPlan): void {
+    const play = scene.play!;
+    const world = play.z > GROUND_FLOOR ? 0 : play.worldLight;
+    const ambient = Math.max(ambientIntensity(scene.opts.ambientLight), world);
+    const extra: ExtraLight[] = [];
+    if (world < PLAY.darkWorldLight || play.z > GROUND_FLOOR) {
+      const size = scene.spriteSize;
+      extra.push({ x: play.x + 0.5 + play.offsetX / size, y: play.y + 0.5 + play.offsetY / size, intensity: PLAY.playerLight, color: WHITE_LIGHT_COLOR });
+    }
+    this.drawLights(scene, camera, floors, plan, ambient, extra);
+  }
+
   /** Darkens the drawn floors to the ambient light, brightened by the
-   * lights of their items (previews and overlays drawn later stay lit). */
-  private drawLights(scene: Scene, camera: Camera, floors: number[], plan: ChunkPlan): void {
-    const ambient = ambientIntensity(scene.opts.ambientLight);
+   * lights of their items (previews and overlays drawn later stay lit).
+   * extra: lights of the floor in view besides the items'. */
+  private drawLights(scene: Scene, camera: Camera, floors: number[], plan: ChunkPlan, ambient: number, extra: ExtraLight[]): void {
     if (ambient >= DAYLIGHT_INTENSITY) return;
     this.flushScreen(scene);
     const floor = scene.floor;
     const range = camera.tiles(floor, 1, 1);
     const shift = camera.shift(floor);
     const grid = { x: range.x0 - shift, y: range.y0 - shift, width: range.x1 - range.x0 + 1, height: range.y1 - range.y0 + 1 };
-    const lightFloors = floors.map((z) => ({ chunks: this.chunksLighting(scene, camera, z, plan), shift: camera.shift(z) }));
+    const lightFloors = floors.map((z) => ({ chunks: this.chunksLighting(scene, camera, z, plan), shift: camera.shift(z), extra: z === floor ? extra : [] }));
     this.lights.draw(scene.width, scene.height, grid, camera.tileX(range.x0, floor), camera.tileY(range.y0, floor), camera.tilePx, lightFloors, ambient, scene.spriteSize);
     this.chunks.unbind();
   }

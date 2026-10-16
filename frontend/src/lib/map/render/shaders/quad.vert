@@ -14,6 +14,8 @@ uniform vec2 u_half;
 uniform float u_alpha;
 uniform float u_perRow;
 uniform float u_uvCell;
+// Depth of the quads (0: under everything; the play view's player sits among the chunk quads).
+uniform float u_depth;
 out vec3 v_uv;
 out vec4 v_color;
 void main() {
@@ -25,7 +27,7 @@ void main() {
   }
   vec2 w = a_rect.xy + a_corner * a_rect.zw;
   vec2 p = floor((w + u_off) * u_scale + u_half + 0.5);
-  gl_Position = vec4(p.x / u_screen.x * 2.0 - 1.0, 1.0 - p.y / u_screen.y * 2.0, 0.0, 1.0);
+  gl_Position = vec4(p.x / u_screen.x * 2.0 - 1.0, 1.0 - p.y / u_screen.y * 2.0, u_depth, 1.0);
   float layer = a_cell.x;
   float col = mod(a_cell.y, u_perRow);
   float row = floor(a_cell.y / u_perRow);

@@ -24,7 +24,7 @@ export class QuadBatch {
     corners: WebGLBuffer,
   ) {
     this.program = compileProgram(gl, QUAD_VERT, SPRITE_FRAG);
-    for (const name of ["u_screen", "u_off", "u_scale", "u_half", "u_alpha", "u_perRow", "u_uvCell", "u_tex"]) this.uniforms[name] = gl.getUniformLocation(this.program, name);
+    for (const name of ["u_screen", "u_off", "u_scale", "u_half", "u_alpha", "u_perRow", "u_uvCell", "u_tex", "u_depth"]) this.uniforms[name] = gl.getUniformLocation(this.program, name);
     this.instances = gl.createBuffer()!;
     this.vao = createQuadVao(gl, corners, this.instances);
   }
@@ -75,9 +75,9 @@ export class QuadBatch {
     this.rect(x + width - lineWidth, y, lineWidth, height, color);
   }
 
-  /** Draws the quads pushed so far. False when there were none: the
-   * program bound before is still bound. */
-  flush(scene: Scene): boolean {
+  /** Draws the quads pushed so far, at a depth (see quad.vert). False when
+   * there were none: the program bound before is still bound. */
+  flush(scene: Scene, depth = 0): boolean {
     const gl = this.gl;
     if (!this.quadCount) return false;
     this.useSprites(scene);
@@ -85,6 +85,7 @@ export class QuadBatch {
     gl.uniform1f(this.uniforms.u_scale, 1);
     gl.uniform2f(this.uniforms.u_half, 0, 0);
     gl.uniform1f(this.uniforms.u_alpha, 1);
+    gl.uniform1f(this.uniforms.u_depth, depth);
     gl.bindVertexArray(this.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.instances);
     gl.bufferData(gl.ARRAY_BUFFER, this.quads.subarray(0, this.quadCount * GPU.floatsPerQuad), gl.STREAM_DRAW);

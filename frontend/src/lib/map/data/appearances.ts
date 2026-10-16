@@ -19,8 +19,10 @@ export const AF = {
   fullGround: 2048,
 } as const;
 
-export interface Look extends Omit<Appearance, "s" | "ox" | "oy" | "el"> {
+export interface Look extends Omit<Appearance, "s" | "ox" | "oy" | "el" | "mv"> {
   s: number[];
+  /** The walking frame group of an outfit that has one. */
+  mv: Look | null;
   ox: number;
   oy: number;
   el: number;
@@ -37,6 +39,7 @@ function prepare(appearance: Appearance): Look {
   look.el = appearance.el ?? 0;
   look.cum = null;
   look.total = 0;
+  look.mv = appearance.mv ? prepare(appearance.mv) : null;
   if (appearance.f > 1) {
     const durations = appearance.d && appearance.d.length === appearance.f ? appearance.d : new Array(appearance.f).fill(appearance.f > 1 ? 500 : 0);
     let end = 0;

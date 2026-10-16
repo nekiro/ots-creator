@@ -23,6 +23,9 @@ type WindowService struct {
 	// Maps reports unsaved maps.
 	Maps      *MapService
 	close     func()
+	// OpenWindow opens another window of the app at a frontend URL (set by
+	// main).
+	OpenWindow func(url, title string, width, height int)
 	unapplied atomic.Bool
 	force     atomic.Bool
 }
@@ -35,6 +38,14 @@ func NewWindowService(s *Session, close func()) *WindowService {
 // SetUnapplied tells the backend whether the editor holds edits that were
 // not applied to the client yet.
 func (ws *WindowService) SetUnapplied(unapplied bool) { ws.unapplied.Store(unapplied) }
+
+// OpenPlayWindow opens the play view of a map in its own window. query is
+// the URL query the play window starts from (map id, position).
+func (ws *WindowService) OpenPlayWindow(query string) {
+	if ws.OpenWindow != nil {
+		ws.OpenWindow("/?"+query, "OTS Creator - Play", 1100, 860)
+	}
+}
 
 // Quit closes the window without asking.
 func (ws *WindowService) Quit() {

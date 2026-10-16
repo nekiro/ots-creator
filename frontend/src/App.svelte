@@ -48,7 +48,8 @@
   // In the map editor only map shortcuts apply (Ctrl+S saves the map, not the client).
   function onkeydown(event: KeyboardEvent) {
     if (map.mode === "map") {
-      if (!app.dialog && !map.dialog) mapShortcut(event);
+      // The play view takes the keys itself.
+      if (!app.dialog && !map.dialog && !map.play) mapShortcut(event);
       return;
     }
     handleShortcut(event);

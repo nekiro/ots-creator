@@ -156,6 +156,7 @@ export function mapContextMenu(position: Position, tileData: TileData | null, ac
   const out: MenuEntry[] = [
     { label: `Inspect tile ${fmtPos(position)}`, action: () => mapCommands.inspect(position) },
     { label: "Copy position", action: () => copy(fmtPos(position)) },
+    { label: "Play from here", keys: keyLabel("play"), action: () => mapCommands.play(position) },
   ];
   const readable = readableIndex(tileData);
   if (readable >= 0) {

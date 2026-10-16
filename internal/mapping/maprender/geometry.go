@@ -181,6 +181,9 @@ type geometryBuilder struct {
 	scratchItems [16]otmap.Item
 	// tileX, tileY: the tile being drawn, from the chunk's corner.
 	tileX, tileY uint16
+	// onTop is set while the tile's top items are drawn: their quads are
+	// tagged (tileTop) so creatures drawn later can go under them.
+	onTop bool
 }
 
 func newGeometryBuilder(scene *Scene, options GeometryOptions) *geometryBuilder {
@@ -189,17 +192,26 @@ func newGeometryBuilder(scene *Scene, options GeometryOptions) *geometryBuilder 
 
 func (b *geometryBuilder) view(flag uint32) bool { return b.options.ViewFlags&flag != 0 }
 
+// tileTop is set in the tile y of the quads of top items: the renderer
+// draws creatures of the play view between a tile's items and its top
+// items.
+const tileTop = 0x8000
+
 // quad appends one quad, 16 bytes: int16 x, y (world pixels from the
 // chunk's corner), uint32 sprite (see spriteRect), rgba8 color, uint16 x, y
-// of the tile it belongs to (from the chunk's corner; the renderer orders
-// overlapping quads of different chunks by it).
+// of the tile it belongs to (from the chunk's corner, y with tileTop on top
+// items; the renderer orders overlapping quads of different chunks by it).
 func (b *geometryBuilder) quad(x, y int, sprite uint32, color tint) {
 	b.quads = binary.LittleEndian.AppendUint16(b.quads, uint16(int16(x)))
 	b.quads = binary.LittleEndian.AppendUint16(b.quads, uint16(int16(y)))
 	b.quads = binary.LittleEndian.AppendUint32(b.quads, sprite)
 	b.quads = append(b.quads, unitByte(color.red), unitByte(color.green), unitByte(color.blue), unitByte(color.alpha))
+	tileY := b.tileY
+	if b.onTop {
+		tileY |= tileTop
+	}
 	b.quads = binary.LittleEndian.AppendUint16(b.quads, b.tileX)
-	b.quads = binary.LittleEndian.AppendUint16(b.quads, b.tileY)
+	b.quads = binary.LittleEndian.AppendUint16(b.quads, tileY)
 	b.quadCount++
 }
 
@@ -539,12 +551,17 @@ func (b *geometryBuilder) tile(tile *otmap.Tile, p tilePosition, anchorX, anchor
 			b.creature(creature, p, anchorX-elevation, anchorY-elevation)
 		}
 	}
+	// Top items start again from the tile's corner (client: Tile::drawTop).
+	b.onTop = true
+	topElevation := 0
 	for _, item := range topItems {
 		if b.skip(b.scene.Items.Get(item.ID)) {
 			continue
 		}
-		b.item(item, p, anchorX-elevation, anchorY-elevation, white.scaled(selectionDim(item)), hook)
+		topElevation += b.item(item, p, anchorX-topElevation, anchorY-topElevation, white.scaled(selectionDim(item)), hook)
+		topElevation = min(topElevation, maxElevation)
 	}
+	b.onTop = false
 	if things == 0 && b.view(ViewSpecial|ViewHouses) && (tile.Flags&otmap.FlagPZ != 0 || tile.HouseID != 0) {
 		b.rect(anchorX, anchorY, spriteSize, spriteSize, color.withAlpha(emptyZoneAlpha))
 	}

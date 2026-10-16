@@ -11,7 +11,7 @@ import type { ItemIndex } from "../data/items";
 import type { SpriteCache } from "../../render/sprites";
 import { MapRenderer } from "./renderer";
 import { fakeGl } from "./testing/fakeGl";
-import type { Scene, ViewOptions } from "./scene";
+import type { PlayScene, Scene, ViewOptions } from "./scene";
 
 /** A small deterministic hash. */
 function mix(...values: number[]): number {
@@ -215,6 +215,13 @@ const ALL: ViewOptions = {
   ambientLight: 50,
 };
 
+/** What the play view draws with: no editor overlays. */
+const PLAYING: ViewOptions = { ...ALL, grid: false, ghostHigher: false, labels: false, spawns: false, houses: false, special: false, zones: false, pathing: false, highlightItems: false, wallHooks: false, markers: false, tooltips: false, coords: false, ghostItems: false, clientBox: false, lights: true };
+
+function playScene(change: Partial<PlayScene>): PlayScene {
+  return { player: creature(4), x: 1000, y: 1000, z: 7, offsetX: 0, offsetY: 0, footPhase: 0, firstFloor: 5, lastFloor: 7, worldLight: 250, ...change };
+}
+
 describe("MapRenderer", () => {
   let now = 0;
   beforeEach(() => {
@@ -306,6 +313,10 @@ describe("MapRenderer", () => {
       ["hi-dpi", { scale: 2.5, width: 1600, height: 1000 }],
       ["back near", { time: 900 }],
       ["new sprite size", { spriteSize: 64, sprites: fakeSprites() }],
+      ["lights", { ...loaded, opts: { ...ALL, lights: true, ambientLight: 20 } }],
+      ["play view", { ...loaded, opts: PLAYING, ghosts: [], rects: [], markers: [], hover: null, play: playScene({}) }],
+      ["play view, walking at night", { ...loaded, opts: PLAYING, ghosts: [], rects: [], markers: [], hover: null, play: playScene({ offsetX: -12, footPhase: 3, worldLight: 40 }) }],
+      ["play view, under ground", { ...loaded, floor: 9, opts: PLAYING, ghosts: [], rects: [], markers: [], hover: null, play: playScene({ z: 9, firstFloor: 8, lastFloor: 11 }) }],
     ];
     const out: string[] = ["== setup", ...setup];
     for (const [name, change] of frames) {

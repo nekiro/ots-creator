@@ -4,7 +4,7 @@
   import { readJson, saveJson } from "../../lib/state/storage";
   import { commands } from "../../lib/commands";
   import { MapService } from "../../lib/map/data/api";
-  import { mapCommands } from "../../lib/map/view/commands";
+  import { mapCommands, spriteSize } from "../../lib/map/view/commands";
   import { loadMapData, map } from "../../lib/map/state.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import MiniWindow from "../../lib/ui/MiniWindow.svelte";
@@ -15,6 +15,7 @@
   import Inspector from "./Inspector.svelte";
   import Library from "./Library.svelte";
   import MapCanvas from "./MapCanvas.svelte";
+  import PlayView from "./PlayView.svelte";
   import MapToolbar from "./MapToolbar.svelte";
   import LoadingMap from "./LoadingMap.svelte";
   import Minimap from "./Minimap.svelte";
@@ -114,7 +115,13 @@
             </div>
             <MapToolbar />
           </div>
-          <MapCanvas bind:hoverText />
+          {#if map.play && map.items && map.activeId !== null}
+            {#key map.activeId}
+              <PlayView mapId={map.activeId} start={map.play} items={map.items} spriteSize={spriteSize()} onexit={mapCommands.exitPlay} onpopout={mapCommands.popOutPlay} />
+            {/key}
+          {:else}
+            <MapCanvas bind:hoverText />
+          {/if}
         {:else}
           <div class="start">
             <div class="startcard">

@@ -120,6 +120,9 @@ func (ms *MapService) edit(id int, fn func(editor *mapedit.Editor, data *mapData
 	count, err := fn(m.editor, data)
 	change := ms.change(m)
 	change.Count = count
+	if len(change.Chunks) > 0 {
+		ms.session.notify(EventMapChanged, MapChanged{ID: id, Chunks: change.Chunks})
+	}
 	return change, err
 }
 

@@ -3,7 +3,9 @@
 // the cell index (composed outfit pieces in their own index). The depth is
 // the drawing rank of the quad's tile: chunks are drawn whole, so a quad of
 // a later chunk must not cover one of an earlier chunk's tile drawn after
-// it (a sprite reaching up into the chunk above, see map_geo.go).
+// it (a sprite reaching up into the chunk above, see map_geo.go). Top items
+// (tile y + TILE_TOP) rank half a tile later: the play view draws creatures
+// between a tile's items and its top items (see renderer.ts PLAYER_RANK).
 layout(location=0) in vec2 a_corner;
 layout(location=1) in vec2 a_pos;
 layout(location=2) in uint a_sprite;
@@ -27,6 +29,7 @@ out vec4 v_color;
 const uint MISSING = 0xFFFFFFFFu;
 // Ranks from -DEPTH_RANGE to DEPTH_RANGE fit the depth range.
 const float DEPTH_RANGE = 524288.0;
+const float TILE_TOP = 32768.0;
 uint lookup(highp usampler2D t, uint i) {
   ivec2 size = textureSize(t, 0);
   uint w = uint(size.x);
@@ -55,8 +58,14 @@ void main() {
   // Diagonals from the top-left, each from its bottom-left end, as
   // map_geo.go orders tiles; exact for tiles less than 8 apart, the only
   // ones whose sprites overlap.
-  vec2 t = a_tile + u_tile;
-  float rank = 8.0 * (t.x + t.y) + t.x;
+  vec2 tile = a_tile;
+  float top = 0.0;
+  if (tile.y >= TILE_TOP) {
+    tile.y -= TILE_TOP;
+    top = 0.5;
+  }
+  vec2 t = tile + u_tile;
+  float rank = 8.0 * (t.x + t.y) + t.x + top;
   gl_Position = vec4(p.x / u_screen.x * 2.0 - 1.0, 1.0 - p.y / u_screen.y * 2.0, clamp(rank / DEPTH_RANGE, -1.0, 1.0), 1.0);
   uint c = cell % u_perLayer;
   v_uv = vec3((vec2(float(c % u_perRow), float(c / u_perRow)) + a_corner) * u_uvCell, float(cell / u_perLayer));

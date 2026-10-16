@@ -26,10 +26,20 @@ export function ambientIntensity(percent: number): number {
   return Math.trunc((Math.min(Math.max(percent, 0), 100) / 100) * 255);
 }
 
+/** A light that is not in the chunks (the play view's player): at a tile position of its floor, in tiles. */
+export interface ExtraLight {
+  x: number;
+  y: number;
+  intensity: number;
+  color: number;
+}
+
 /** The chunks of one floor and how many tiles it is drawn up and left (see Camera.shift). */
 export interface LightFloor {
   chunks: GeoChunk[];
   shift: number;
+  /** Lights added after the chunks' lights. */
+  extra?: ExtraLight[];
 }
 
 /** A rectangle of tiles on the screen grid (tile positions minus their floor's shift). */
@@ -61,7 +71,7 @@ export function buildLightMap(pixels: Uint8Array, grid: LightGrid, floors: Light
     pixels[offset + 1] = ambientGreen;
     pixels[offset + 2] = ambientBlue;
   };
-  for (const { chunks, shift } of floors) {
+  for (const { chunks, shift, extra } of floors) {
     // Grounds first: the floor's own lights shine over them.
     for (const chunk of chunks) {
       if (!chunk.shades) continue;
@@ -95,6 +105,10 @@ export function buildLightMap(pixels: Uint8Array, grid: LightGrid, floors: Light
         const lightY = originY + chunk.lights.getInt16(offset + 2, true) / spriteSize;
         addLight(pixels, grid, lightX, lightY, intensity, red, green, blue);
       }
+    }
+    for (const light of extra ?? []) {
+      const [red, green, blue] = lightColor(light.color);
+      if (light.intensity && red | green | blue) addLight(pixels, grid, light.x - shift - grid.x, light.y - shift - grid.y, light.intensity, red, green, blue);
     }
   }
 }

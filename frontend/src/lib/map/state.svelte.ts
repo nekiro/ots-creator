@@ -139,6 +139,8 @@ class MapState {
   editBrush = $state<{ name: string; type: string } | null>(null);
   /** The clipboard follows the mouse until a click pastes it. */
   pasting = $state(false);
+  /** The play view shows the map in place of the editor, the player starting here (null: editing). */
+  play = $state<Position | null>(null);
   /** A click on the map picks a position for this callback (teleport destinations). */
   pick = $state<{ label: string; done: (position: Position) => void } | null>(null);
   busy = $state<string | null>(null);

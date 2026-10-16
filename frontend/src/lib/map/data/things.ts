@@ -12,7 +12,8 @@ import type { Camera, TileRange } from "../view/view";
  * with r, g, b, a. subtype: count, fluid or charges; hookSide: wall hook pattern
  * (0: none). Returns the item's elevation: how far things on top move up. */
 export type DrawItem = (itemId: number, subtype: number, x: number, y: number, z: number, screenX: number, screenY: number, r: number, g: number, b: number, a: number, hookSide: number) => number;
-export type DrawCreature = (creature: CreatureData, screenX: number, screenY: number, x: number, y: number, z: number, alpha: number) => void;
+/** footPhase: null draws the first frame (the editor); a number animates as the client does, 0 standing, from 1 walking. */
+export type DrawCreature = (creature: CreatureData, screenX: number, screenY: number, x: number, y: number, z: number, alpha: number, footPhase?: number | null) => void;
 
 /** What drawing found missing in a frame. */
 interface DrawStatus {
@@ -86,7 +87,26 @@ export class ThingDrawer {
       return look.el;
     };
 
-    const drawCreature: DrawCreature = (creature, screenX, screenY, x, y, z, alpha) => {
+    // The frame group and frame a creature is drawn with (client:
+    // Creature::getCurrentAnimationPhase): standing, the idle animation;
+    // walking, the walk phase in the walking group (or after frame 0).
+    // A walk frame whose sprites are not loaded yet shows the standing frame:
+    // the creature must not blink while they load.
+    const animationOf = (look: Look, footPhase: number | null, patternX = 0, patternZ = 0): [Look, number] => {
+      if (footPhase === null) return [look, 0];
+      if (footPhase > 0) {
+        const [frames, frame] = look.mv ? [look.mv, Math.min(footPhase - 1, look.mv.f - 1)] : [look, Math.min(footPhase, look.f - 1)];
+        if (this.frameLoaded(scene, frames, patternX, patternZ, frame)) return [frames, frame];
+        footPhase = 0;
+      }
+      if (look.f > 1 && (look.mv || look.fl & AF.animateAlways)) {
+        status.animated = true;
+        return [look, frameAt(look, time)];
+      }
+      return [look, 0];
+    };
+
+    const drawCreature: DrawCreature = (creature, screenX, screenY, x, y, z, alpha, footPhase = null) => {
       const shade = creature.selected ? ALPHA.selectedShade : 1;
       if (creature.lookItem) {
         drawItem(creature.lookItem, 0, x, y, z, screenX, screenY, shade, shade, shade, alpha, 0);
@@ -110,18 +130,20 @@ export class ThingDrawer {
         const mount = scene.looks.outfits.get(creature.mount);
         if (mount === undefined) status.pending = true;
         else if (mount) {
-          this.drawLook(scene, mount, Math.min(direction, mount.px - 1), 0, 0, 0, screenX - mount.ox * scale, screenY - mount.oy * scale, tilePx, shade, shade, shade, alpha, null);
+          const [mountFrames, mountFrame] = animationOf(mount, footPhase, Math.min(direction, mount.px - 1), 0);
+          this.drawLook(scene, mountFrames, Math.min(direction, mount.px - 1), 0, 0, mountFrame, screenX - mount.ox * scale, screenY - mount.oy * scale, tilePx, shade, shade, shade, alpha, null);
           mounted = 1;
         }
       }
       const colors = look.l > 1 ? creature : null;
       const outfitX = screenX - look.ox * scale;
       const outfitY = screenY - look.oy * scale;
-      this.drawLook(scene, look, direction, 0, mounted, 0, outfitX, outfitY, tilePx, shade, shade, shade, alpha, colors);
+      const [frames, frame] = animationOf(look, footPhase, direction, mounted);
+      this.drawLook(scene, frames, direction, 0, mounted, frame, outfitX, outfitY, tilePx, shade, shade, shade, alpha, colors);
       // Addons are drawn from the next pattern rows: bit 1 row 1, bit 2 row 2.
       for (const addon of [1, 2]) {
         if (creature.addons & addon && look.py > addon) {
-          this.drawLook(scene, look, direction, addon, mounted, 0, outfitX, outfitY, tilePx, shade, shade, shade, alpha, colors);
+          this.drawLook(scene, frames, direction, addon, mounted, frame, outfitX, outfitY, tilePx, shade, shade, shade, alpha, colors);
         }
       }
     };
@@ -166,6 +188,24 @@ export class ThingDrawer {
       }
       for (const creature of ghost.creatures ?? []) drawCreature(creature, screenX - elevation * scene.scale, screenY - elevation * scene.scale, ghost.x, ghost.y, ghost.z, scene.ghostAlpha);
     }
+  }
+
+  /** Every sprite of a frame of a look in a direction (all pattern rows: addons) is loaded. */
+  private frameLoaded(scene: Scene, look: Look, patternX: number, patternZ: number, frame: number): boolean {
+    const animationFrame = frame % Math.max(look.f, 1);
+    for (let patternY = 0; patternY < look.py; patternY++) {
+      for (let layer = 0; layer < look.l; layer++) {
+        for (let piece = 0; piece < look.h * look.w; piece++) {
+          const spriteIndex = ((((animationFrame * look.pz + patternZ) * look.py + patternY) * look.px + patternX) * look.l + layer) * look.h * look.w + piece;
+          const spriteId = look.s[spriteIndex];
+          if (spriteId && !scene.sprites.get(spriteId)) {
+            this.missing.add(spriteId);
+            return false;
+          }
+        }
+      }
+    }
+    return true;
   }
 
   /** Draws the sprites of a look's pattern and frame, its bottom-right

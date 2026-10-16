@@ -9,6 +9,8 @@ export class ItemIndex {
   readonly top: Uint8Array;
   readonly minimap: Uint16Array;
   readonly kind: Uint8Array;
+  /** Ground speed (0: not a ground or no speed). */
+  readonly speed: Uint16Array;
   readonly exists: Uint8Array;
   readonly names: string[];
   readonly ids: number[];
@@ -25,6 +27,7 @@ export class ItemIndex {
     this.top = new Uint8Array(count);
     this.minimap = new Uint16Array(count);
     this.kind = new Uint8Array(count);
+    this.speed = new Uint16Array(count);
     this.exists = new Uint8Array(count);
     this.names = new Array(count);
     this.lower = new Array(count);
@@ -39,6 +42,7 @@ export class ItemIndex {
       this.top[id] = table.tops?.[i] ?? 0;
       this.minimap[id] = table.minimap?.[i] ?? 0;
       this.kind[id] = table.kinds?.[i] ?? 0;
+      this.speed[id] = table.speeds?.[i] ?? 0;
       this.exists[id] = 1;
       const name = table.names?.[i] ?? "";
       this.names[id] = name;

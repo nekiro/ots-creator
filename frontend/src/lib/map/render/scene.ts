@@ -79,6 +79,26 @@ export interface Label {
   top?: boolean;
 }
 
+/** The play view: the player walking on the map as the client shows it. */
+export interface PlayScene {
+  /** The player's outfit; dir is the outfit direction. */
+  player: CreatureData;
+  /** The player's tile (the camera follows it). */
+  x: number;
+  y: number;
+  z: number;
+  /** Walk offset from the tile, in world pixels (also moves the camera). */
+  offsetX: number;
+  offsetY: number;
+  /** Walk phase of the feet: 0 standing, from 1 walking. */
+  footPhase: number;
+  /** Floors drawn: from lastFloor (lowest) up to firstFloor. */
+  firstFloor: number;
+  lastFloor: number;
+  /** Light of the world the server sends (250 day, 40 night). */
+  worldLight: number;
+}
+
 export interface Scene {
   width: number;
   height: number;
@@ -109,6 +129,8 @@ export interface Scene {
   moveOffset: { dx: number; dy: number; dz: number } | null;
   /** Tile under the mouse (labelled with its position when coords is on). */
   hover: { x: number; y: number; z: number } | null;
+  /** Set in the play view. */
+  play?: PlayScene | null;
 }
 
 export interface FrameResult {
