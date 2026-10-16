@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nekiro/ots-creator/internal/client"
-	"github.com/nekiro/ots-creator/internal/mapedit"
-	"github.com/nekiro/ots-creator/internal/materials"
-	"github.com/nekiro/ots-creator/internal/otmap"
-	"github.com/nekiro/ots-creator/internal/project"
-	"github.com/nekiro/ots-creator/internal/thing"
+	"github.com/nekiro/ots-creator/internal/core/client"
+	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
+	"github.com/nekiro/ots-creator/internal/mapping/materials"
+	"github.com/nekiro/ots-creator/internal/mapping/otmap"
+	"github.com/nekiro/ots-creator/internal/core/project"
+	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
 func mapTestService(t testing.TB) (*MapService, *Session) {

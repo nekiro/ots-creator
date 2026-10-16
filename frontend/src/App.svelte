@@ -7,7 +7,7 @@
   import NewDialog from "./features/dialogs/NewDialog.svelte";
   import OpenDialog from "./features/dialogs/OpenDialog.svelte";
   import UpdateDialog from "./features/dialogs/UpdateDialog.svelte";
-  import { initUpdates } from "./lib/updates.svelte";
+  import { initUpdates } from "./lib/state/updates.svelte";
   import MenuBar from "./features/MenuBar.svelte";
   import Preview from "./features/Preview.svelte";
   import Properties from "./features/Properties.svelte";
@@ -25,14 +25,14 @@
   import ExportSpritesDialog from "./features/tools/ExportSpritesDialog.svelte";
   import ItemsOtbDialog from "./features/dialogs/ItemsOtbDialog.svelte";
   import ShareDialog from "./features/market/ShareDialog.svelte";
-  import { listPanelWidth, loadPrefs, prefs, recentDir, removeRecent, shortPath } from "./lib/prefs.svelte";
+  import { listPanelWidth, loadPrefs, prefs, recentDir, removeRecent, shortPath } from "./lib/state/prefs.svelte";
   import { setMinLayoutWidth } from "./lib/pixelscale";
   import SpriteList from "./features/SpriteList.svelte";
   import StatusBar from "./features/StatusBar.svelte";
   import ThingList from "./features/ThingList.svelte";
   import { commands, handlePaste, handleShortcut } from "./lib/commands";
-  import { app, initState } from "./lib/state.svelte";
-  import { readPositive, writeStored } from "./lib/storage";
+  import { app, initState } from "./lib/state/app.svelte";
+  import { readPositive, writeStored } from "./lib/state/storage";
   import Splitter from "./lib/ui/Splitter.svelte";
   import ContextMenu from "./lib/ui/ContextMenu.svelte";
   import ConfirmDialog from "./lib/ui/ConfirmDialog.svelte";
@@ -40,7 +40,7 @@
   import Toasts from "./lib/ui/Toasts.svelte";
   import MapEditor from "./features/map/MapEditor.svelte";
   import { map } from "./lib/map/state.svelte";
-  import { mapShortcut } from "./lib/map/keys";
+  import { mapShortcut } from "./lib/map/view/keys";
 
   let group = $state(0);
   let mapHover = $state("");

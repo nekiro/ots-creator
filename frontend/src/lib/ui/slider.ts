@@ -1,5 +1,5 @@
 // Geometry of an OTClient HorizontalScrollBar used as a value slider.
-import { clamp } from "../math";
+import { clamp } from "../util/math";
 
 export { clamp };
 

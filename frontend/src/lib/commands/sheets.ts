@@ -1,6 +1,6 @@
 // Sprite sheets of the focused object: export, import, copy and paste.
 import { CATEGORY_NAMES, DialogService, ThingService, encodeBytes, errorMessage, res } from "../api";
-import { app, applyDraft, run, toast, versions } from "../state.svelte";
+import { app, applyDraft, run, toast, versions } from "../state/app.svelte";
 import { IMAGE_FILTERS, guard, imageFilters } from "./shared";
 
 async function importSheetWith(load: (id: number) => Promise<void>): Promise<void> {

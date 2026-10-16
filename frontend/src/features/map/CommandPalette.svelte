@@ -2,11 +2,11 @@
   // Ctrl+K: type a position, a place, a brush, an item, a creature or a
   // command, and press Enter.
   import { tick } from "svelte";
-  import { parsePos, fmtPos, type CreatureType, type PaletteBrush } from "../../lib/map/api";
-  import { goTo, mapCommands } from "../../lib/map/commands";
-  import { mapMenus } from "../../lib/map/menus";
+  import { parsePos, fmtPos, type CreatureType, type PaletteBrush } from "../../lib/map/data/api";
+  import { goTo, mapCommands } from "../../lib/map/view/commands";
+  import { mapMenus } from "../../lib/map/view/menus";
   import { map, selectBrush } from "../../lib/map/state.svelte";
-  import { goHouse, houses, towns } from "../../lib/map/world";
+  import { goHouse, houses, towns } from "../../lib/map/editor/world";
   import { backdrop, pop } from "../../lib/ui/motion";
   import ItemIcon from "./ItemIcon.svelte";
 

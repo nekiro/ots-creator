@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nekiro/ots-creator/internal/client"
-	"github.com/nekiro/ots-creator/internal/project"
+	"github.com/nekiro/ots-creator/internal/core/client"
+	"github.com/nekiro/ots-creator/internal/core/project"
 	"github.com/nekiro/ots-creator/internal/settings"
 )
 

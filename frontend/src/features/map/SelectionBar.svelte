@@ -1,8 +1,8 @@
 <script lang="ts">
   // Actions for the selected tiles, shown over the map while something is
   // selected.
-  import { MapService } from "../../lib/map/api";
-  import { mapCommands } from "../../lib/map/commands";
+  import { MapService } from "../../lib/map/data/api";
+  import { mapCommands } from "../../lib/map/view/commands";
   import { edit, map } from "../../lib/map/state.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
 

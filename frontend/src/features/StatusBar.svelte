@@ -1,6 +1,6 @@
 <script lang="ts">
   import { commands } from "../lib/commands";
-  import { app } from "../lib/state.svelte";
+  import { app } from "../lib/state/app.svelte";
   import { map, warningCount } from "../lib/map/state.svelte";
 
   let { mapHover = "" }: { mapHover?: string } = $props();

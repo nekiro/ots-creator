@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/nekiro/ots-creator/internal/imaging"
-	"github.com/nekiro/ots-creator/internal/project"
-	"github.com/nekiro/ots-creator/internal/thing"
+	"github.com/nekiro/ots-creator/internal/core/imaging"
+	"github.com/nekiro/ots-creator/internal/core/project"
+	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
 // ResourcePrefix is the URL prefix served by Resources.

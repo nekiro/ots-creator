@@ -1,6 +1,6 @@
 <script lang="ts">
   // Zoom buttons in the corner of the map.
-  import { mapCommands } from "../../lib/map/commands";
+  import { mapCommands } from "../../lib/map/view/commands";
   import { map } from "../../lib/map/state.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
 

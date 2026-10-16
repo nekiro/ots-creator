@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/nekiro/ots-creator/internal/project"
-	"github.com/nekiro/ots-creator/internal/thing"
+	"github.com/nekiro/ots-creator/internal/core/project"
+	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
 // CompareService opens a second client (B) next to the open one (A),

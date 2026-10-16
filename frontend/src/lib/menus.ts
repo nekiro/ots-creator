@@ -2,8 +2,8 @@
 import { clipboardThing } from "./clipboard";
 import { commands } from "./commands";
 import type { MenuEntry } from "./menu.svelte";
-import { app, toast } from "./state.svelte";
-import { prefs } from "./prefs.svelte";
+import { app, toast } from "./state/app.svelte";
+import { prefs } from "./state/prefs.svelte";
 
 const noProject = () => !app.open;
 const noThing = () => !app.open || app.selection.length === 0;

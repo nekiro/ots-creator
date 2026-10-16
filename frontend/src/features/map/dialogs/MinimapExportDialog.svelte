@@ -1,8 +1,8 @@
 <script lang="ts">
   import { DialogService, errorMessage } from "../../../lib/api";
-  import { MapService } from "../../../lib/map/api";
+  import { MapService } from "../../../lib/map/data/api";
   import { map } from "../../../lib/map/state.svelte";
-  import { toast } from "../../../lib/state.svelte";
+  import { toast } from "../../../lib/state/app.svelte";
   import Dialog from "../../../lib/ui/Dialog.svelte";
 
   let floors = $state<boolean[]>(Array.from({ length: 16 }, (_, z) => z === map.floor));

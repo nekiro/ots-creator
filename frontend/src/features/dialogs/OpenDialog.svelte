@@ -1,13 +1,13 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { CompareService, DialogService, Format, ProjectService, errorMessage, type ClientFiles, type Features, type Version } from "../../lib/api";
-  import { app, run, toast } from "../../lib/state.svelte";
+  import { app, run, toast } from "../../lib/state/app.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Select from "../../lib/ui/Select.svelte";
   import FeaturesEditor from "./FeaturesEditor.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import { commands, openedNote } from "../../lib/commands";
-  import { prefs, recentDir, shortPath } from "../../lib/prefs.svelte";
+  import { prefs, recentDir, shortPath } from "../../lib/state/prefs.svelte";
   import type { Recent } from "../../lib/api";
 
   const recent = $derived((prefs.settings.recent ?? []).slice(0, 5));

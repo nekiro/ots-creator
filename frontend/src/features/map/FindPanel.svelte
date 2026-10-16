@@ -2,9 +2,9 @@
   // Find items on the map, walk through the results, and replace or remove
   // what was found. Stays open while you work on the map.
   import { errorMessage } from "../../lib/api";
-  import { toast } from "../../lib/state.svelte";
-  import { MapService } from "../../lib/map/api";
-  import { goTo, mapCommands } from "../../lib/map/commands";
+  import { toast } from "../../lib/state/app.svelte";
+  import { MapService } from "../../lib/map/data/api";
+  import { goTo, mapCommands } from "../../lib/map/view/commands";
   import { edit, map } from "../../lib/map/state.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import MiniWindow from "../../lib/ui/MiniWindow.svelte";

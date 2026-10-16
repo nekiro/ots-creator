@@ -5,10 +5,10 @@
   // One canvas has no seams between tiles; it is shown at most `max` px a
   // tile, smaller when the panel is narrower.
   import { Category, res } from "../../lib/api";
-  import type { BrushPreview } from "../../lib/map/api";
+  import type { BrushPreview } from "../../lib/map/data/api";
   import { map } from "../../lib/map/state.svelte";
-  import { versions } from "../../lib/state.svelte";
-  import { clamp } from "../../lib/math";
+  import { versions } from "../../lib/state/app.svelte";
+  import { clamp } from "../../lib/util/math";
 
   let {
     preview,

@@ -1,7 +1,7 @@
 <script lang="ts">
   // OTClient SpinBox: TextEdit with up/down buttons (spinbox_up/down).
   // Mouse wheel works while focused; holding a button repeats.
-  import { clamp } from "../math";
+  import { clamp } from "../util/math";
   let {
     label,
     value,

@@ -10,11 +10,11 @@ import (
 	"strings"
 
 	"github.com/nekiro/ots-creator/internal/fsutil"
-	"github.com/nekiro/ots-creator/internal/mapedit"
-	"github.com/nekiro/ots-creator/internal/materials"
-	"github.com/nekiro/ots-creator/internal/otitems"
-	"github.com/nekiro/ots-creator/internal/project"
-	"github.com/nekiro/ots-creator/internal/thing"
+	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
+	"github.com/nekiro/ots-creator/internal/mapping/materials"
+	"github.com/nekiro/ots-creator/internal/core/otitems"
+	"github.com/nekiro/ots-creator/internal/core/project"
+	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
 // Item data sources of MapDataConfig.ItemsMode.

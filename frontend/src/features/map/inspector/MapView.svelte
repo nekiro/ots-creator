@@ -1,7 +1,7 @@
 <script lang="ts">
   // The map itself: properties (saved as they change) and what is on it.
   import { errorMessage } from "../../../lib/api";
-  import { MapService, SpawnFormat, type MapInfo, type Properties, type Statistics } from "../../../lib/map/api";
+  import { MapService, SpawnFormat, type MapInfo, type Properties, type Statistics } from "../../../lib/map/data/api";
   import { edit, map } from "../../../lib/map/state.svelte";
   import Icon from "../../../lib/ui/Icon.svelte";
   import NumberField from "../../../lib/ui/NumberField.svelte";

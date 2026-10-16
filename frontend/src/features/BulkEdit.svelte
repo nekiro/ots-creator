@@ -3,7 +3,7 @@
   // "keep"; clicking cycles keep → on → off.
   import { CATEGORY_NAMES, ThingService, type PropsPatch } from "../lib/api";
   import { buildPatch, FLAG_GROUPS, flagVisible, type Field } from "../lib/flags";
-  import { app, run, toast } from "../lib/state.svelte";
+  import { app, run, toast } from "../lib/state/app.svelte";
   import MiniWindow from "../lib/ui/MiniWindow.svelte";
   import NumberField from "../lib/ui/NumberField.svelte";
   import Select from "../lib/ui/Select.svelte";

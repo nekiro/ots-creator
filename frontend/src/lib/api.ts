@@ -27,11 +27,11 @@ export type {
   TargetPlan,
 } from "../../bindings/github.com/nekiro/ots-creator/internal/app/models";
 export type { Settings, Recent } from "../../bindings/github.com/nekiro/ots-creator/internal/settings/models";
-export type { OptimizeOptions, OptimizeResult, CompileStats, OTBInfo, OTBReport, ConvertResult, PropsPatch, DiffEntry, DiffResult, TransferResult } from "../../bindings/github.com/nekiro/ots-creator/internal/project/models";
-export { Format } from "../../bindings/github.com/nekiro/ots-creator/internal/project/models";
-export type { Version, Features } from "../../bindings/github.com/nekiro/ots-creator/internal/client/models";
-export type { FrameDuration, NpcSale, Properties } from "../../bindings/github.com/nekiro/ots-creator/internal/thing/models";
-export { Category, AnimationMode } from "../../bindings/github.com/nekiro/ots-creator/internal/thing/models";
+export type { OptimizeOptions, OptimizeResult, CompileStats, OTBInfo, OTBReport, ConvertResult, PropsPatch, DiffEntry, DiffResult, TransferResult } from "../../bindings/github.com/nekiro/ots-creator/internal/core/project/models";
+export { Format } from "../../bindings/github.com/nekiro/ots-creator/internal/core/project/models";
+export type { Version, Features } from "../../bindings/github.com/nekiro/ots-creator/internal/core/client/models";
+export type { FrameDuration, NpcSale, Properties } from "../../bindings/github.com/nekiro/ots-creator/internal/core/thing/models";
+export { Category, AnimationMode } from "../../bindings/github.com/nekiro/ots-creator/internal/core/thing/models";
 
 import {
   Category,
@@ -39,7 +39,7 @@ import {
   type FrameGroup as GoFrameGroup,
   type Thing as GoThing,
   type NpcSale,
-} from "../../bindings/github.com/nekiro/ots-creator/internal/thing/models";
+} from "../../bindings/github.com/nekiro/ots-creator/internal/core/thing/models";
 
 /** Object files: the native .otobj and ObjectBuilder .obd. */
 export const OBJECT_EXT = /\.(otobj|obd)$/i;

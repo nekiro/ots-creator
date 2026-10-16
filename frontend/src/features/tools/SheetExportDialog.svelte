@@ -4,8 +4,8 @@
   // rows = frames × pattern Y).
   import { CATEGORY_NAMES, ThingService, normalizeThing, res, type Thing } from "../../lib/api";
   import { commands } from "../../lib/commands";
-  import { IMAGE_FORMATS, prefs } from "../../lib/prefs.svelte";
-  import { app, applyDraft, versions } from "../../lib/state.svelte";
+  import { IMAGE_FORMATS, prefs } from "../../lib/state/prefs.svelte";
+  import { app, applyDraft, versions } from "../../lib/state/app.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import Select from "../../lib/ui/Select.svelte";

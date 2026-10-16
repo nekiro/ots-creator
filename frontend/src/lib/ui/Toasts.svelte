@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { app } from "../state.svelte";
+  import { app } from "../state/app.svelte";
 </script>
 
 <div class="toasts" aria-live="polite">

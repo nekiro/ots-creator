@@ -1,6 +1,6 @@
 <script lang="ts">
   import { CATEGORIES, CATEGORY_LABELS, ThingService } from "../../lib/api";
-  import { app, run, toast } from "../../lib/state.svelte";
+  import { app, run, toast } from "../../lib/state/app.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import NumberField from "../../lib/ui/NumberField.svelte";
 

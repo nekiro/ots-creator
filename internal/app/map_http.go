@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nekiro/ots-creator/internal/imaging"
-	"github.com/nekiro/ots-creator/internal/maprender"
-	"github.com/nekiro/ots-creator/internal/materials"
-	"github.com/nekiro/ots-creator/internal/otmap"
+	"github.com/nekiro/ots-creator/internal/core/imaging"
+	"github.com/nekiro/ots-creator/internal/mapping/maprender"
+	"github.com/nekiro/ots-creator/internal/mapping/materials"
+	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
 // maxMinimapSide bounds the area of one minimap request.

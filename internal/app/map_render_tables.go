@@ -1,8 +1,8 @@
 package app
 
 import (
-	"github.com/nekiro/ots-creator/internal/otitems"
-	"github.com/nekiro/ots-creator/internal/thing"
+	"github.com/nekiro/ots-creator/internal/core/otitems"
+	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
 // ItemTable lists every item type in parallel arrays (compact for the

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/nekiro/ots-creator/internal/fsutil"
-	"github.com/nekiro/ots-creator/internal/materials"
+	"github.com/nekiro/ots-creator/internal/mapping/materials"
 )
 
 // saveMaterials writes the brush file and reindexes brushes.

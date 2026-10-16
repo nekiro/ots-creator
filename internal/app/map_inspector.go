@@ -3,9 +3,9 @@ package app
 import (
 	"fmt"
 
-	"github.com/nekiro/ots-creator/internal/materials"
-	"github.com/nekiro/ots-creator/internal/otitems"
-	"github.com/nekiro/ots-creator/internal/otmap"
+	"github.com/nekiro/ots-creator/internal/mapping/materials"
+	"github.com/nekiro/ots-creator/internal/core/otitems"
+	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
 // TileItem is one item of the tile inspector.

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/nekiro/ots-creator/internal/mapedit"
+	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
 )
 
 // ErrNoMap is returned for an unknown map id.

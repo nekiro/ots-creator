@@ -23,7 +23,7 @@
     type Thing,
     type ViewerEntry,
   } from "../../lib/api";
-  import { app, run, toast } from "../../lib/state.svelte";
+  import { app, run, toast } from "../../lib/state/app.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import Preview, { type PreviewSource } from "../Preview.svelte";
@@ -33,10 +33,10 @@
   import { contentBox } from "../../lib/render/bounds";
   import VirtualGrid from "../../lib/ui/VirtualGrid.svelte";
   import { DEFAULT_COLORS } from "../../lib/render/outfit";
-  import { fileQueue } from "../../lib/queue.svelte";
+  import { fileQueue } from "../../lib/state/queue.svelte";
   import DropPanel from "./DropPanel.svelte";
-  import { formatKb } from "../../lib/format";
-  import { LruCache } from "../../lib/lruCache";
+  import { formatKb } from "../../lib/util/format";
+  import { LruCache } from "../../lib/util/lruCache";
   import { decodeObjectFile } from "../../lib/objectFile";
   import { nextIndex } from "../../lib/ui/listNav";
 

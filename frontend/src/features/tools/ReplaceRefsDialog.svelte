@@ -2,7 +2,7 @@
   // Points every use of the selected sprites at another sprite (or clears
   // them with 0). The sprites themselves stay; Optimize removes unused ones.
   import { CATEGORY_NAMES, SpriteService, res } from "../../lib/api";
-  import { app, run, toast, versions } from "../../lib/state.svelte";
+  import { app, run, toast, versions } from "../../lib/state/app.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import NumberField from "../../lib/ui/NumberField.svelte";
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { mapCommands } from "../../lib/map/commands";
+  import { mapCommands } from "../../lib/map/view/commands";
   import { creatureOutfit, map, selectBrush, type BrushSel } from "../../lib/map/state.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import Select from "../../lib/ui/Select.svelte";

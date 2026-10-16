@@ -1,7 +1,7 @@
 <script lang="ts">
   import { errorMessage } from "../../../lib/api";
-  import { toast } from "../../../lib/state.svelte";
-  import { MapService, type Border, type Brush, type BorderRule, type Chance } from "../../../lib/map/api";
+  import { toast } from "../../../lib/state/app.svelte";
+  import { MapService, type Border, type Brush, type BorderRule, type Chance } from "../../../lib/map/data/api";
   import { loadMapData, map, reloadPalette, selectBrush } from "../../../lib/map/state.svelte";
   import Dialog from "../../../lib/ui/Dialog.svelte";
   import Icon from "../../../lib/ui/Icon.svelte";
@@ -11,8 +11,8 @@
   import ItemPicker from "../ItemPicker.svelte";
   import TagPicker from "../../../lib/ui/TagPicker.svelte";
   import BrushPreview from "../BrushPreview.svelte";
-  import { frameOf, previewOf, type Frame } from "../../../lib/map/brushpreview";
-  import { MAIN_WALLS, MORE_WALLS, chances, collectionsContaining, ensureBrushShape, missingForSave, normalizeBrushForSave, stampOf } from "../../../lib/map/brushEdit";
+  import { frameOf, previewOf, type Frame } from "../../../lib/map/editor/brushpreview";
+  import { MAIN_WALLS, MORE_WALLS, chances, collectionsContaining, ensureBrushShape, missingForSave, normalizeBrushForSave, stampOf } from "../../../lib/map/editor/brushEdit";
 
   // A new brush starts by choosing what it paints; the form then shows only
   // what that kind needs, in order, with the rarely changed parts folded.

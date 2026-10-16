@@ -1,17 +1,17 @@
 <script lang="ts">
   import { Browser, Window } from "@wailsio/runtime";
   import { commands } from "../lib/commands";
-  import { checkForUpdates, REPO_URL, updates } from "../lib/updates.svelte";
+  import { checkForUpdates, REPO_URL, updates } from "../lib/state/updates.svelte";
   import { getMode, SCALE_MODES, setMode } from "../lib/pixelscale";
-  import { app } from "../lib/state.svelte";
+  import { app } from "../lib/state/app.svelte";
   import type { MenuEntry, MenuItem } from "../lib/menu.svelte";
   import { editMenu, objectMenu, spriteMenu, toolsMenu } from "../lib/menus";
-  import { prefs, recentDir, shortPath } from "../lib/prefs.svelte";
+  import { prefs, recentDir, shortPath } from "../lib/state/prefs.svelte";
   import Icon from "../lib/ui/Icon.svelte";
   import MenuEntries from "../lib/ui/MenuEntries.svelte";
   import { map } from "../lib/map/state.svelte";
-  import { mapMenus } from "../lib/map/menus";
-  import { mapCommands } from "../lib/map/commands";
+  import { mapMenus } from "../lib/map/view/menus";
+  import { mapCommands } from "../lib/map/view/commands";
 
   const noProject = () => !app.open;
   // Compiling only makes sense with changes, or for a client never saved.

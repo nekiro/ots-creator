@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { errorMessage } from "../../../lib/api";
-  import { toast } from "../../../lib/state.svelte";
-  import { MapService, fmtPos, type TileItem } from "../../../lib/map/api";
+  import { toast } from "../../../lib/state/app.svelte";
+  import { MapService, fmtPos, type TileItem } from "../../../lib/map/data/api";
   import { edit, map } from "../../../lib/map/state.svelte";
   import Dialog from "../../../lib/ui/Dialog.svelte";
   import ItemIcon from "../ItemIcon.svelte";

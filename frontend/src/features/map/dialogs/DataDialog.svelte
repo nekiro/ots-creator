@@ -1,7 +1,7 @@
 <script lang="ts">
   import { DialogService, errorMessage } from "../../../lib/api";
-  import { toast } from "../../../lib/state.svelte";
-  import { MapService, type MapDataConfig } from "../../../lib/map/api";
+  import { toast } from "../../../lib/state/app.svelte";
+  import { MapService, type MapDataConfig } from "../../../lib/map/data/api";
   import { loadMapData, map } from "../../../lib/map/state.svelte";
   import Dialog from "../../../lib/ui/Dialog.svelte";
   import Select from "../../../lib/ui/Select.svelte";

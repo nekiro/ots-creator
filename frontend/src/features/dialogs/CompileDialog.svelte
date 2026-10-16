@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import { DialogService, Format, ProjectService, type Features, type Version } from "../../lib/api";
   import { offerOptimize, otbNote, sheetsNote } from "../../lib/commands";
-  import { applyDraft, app, run, toast } from "../../lib/state.svelte";
+  import { applyDraft, app, run, toast } from "../../lib/state/app.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Select from "../../lib/ui/Select.svelte";
   import FeaturesEditor from "./FeaturesEditor.svelte";

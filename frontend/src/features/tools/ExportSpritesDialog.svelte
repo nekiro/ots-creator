@@ -4,8 +4,8 @@
   // Closing the window while the export runs leaves it running.
   import { DialogService } from "../../lib/api";
   import { commands } from "../../lib/commands";
-  import { IMAGE_FORMATS, prefs } from "../../lib/prefs.svelte";
-  import { app, toast } from "../../lib/state.svelte";
+  import { IMAGE_FORMATS, prefs } from "../../lib/state/prefs.svelte";
+  import { app, toast } from "../../lib/state/app.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import NumberField from "../../lib/ui/NumberField.svelte";
   import ProgressBar from "../../lib/ui/ProgressBar.svelte";

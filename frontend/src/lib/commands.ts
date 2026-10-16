@@ -1,7 +1,7 @@
 // User actions shared by the menu bar, toolbar, context menus and shortcuts.
 // Each topic lives in lib/commands/; `commands` gathers them.
 import { errorMessage } from "./api";
-import { app, toast } from "./state.svelte";
+import { app, toast } from "./state/app.svelte";
 import { clipboardCommands } from "./commands/objectClipboard";
 import { dropCommands } from "./commands/drop";
 import { objectCommands } from "./commands/objects";

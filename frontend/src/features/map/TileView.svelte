@@ -1,13 +1,13 @@
 <script lang="ts">
   import { ask } from "../../lib/confirm.svelte";
-  import { MapService, TILE_FLAGS, fmtPos, type Attr, type ItemRef, type TileItem, type Position, type ItemPatch } from "../../lib/map/api";
-  import { goTo, mapCommands } from "../../lib/map/commands";
+  import { MapService, TILE_FLAGS, fmtPos, type Attr, type ItemRef, type TileItem, type Position, type ItemPatch } from "../../lib/map/data/api";
+  import { goTo, mapCommands } from "../../lib/map/view/commands";
   import { edit, map, selectBrush, useCreature } from "../../lib/map/state.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import Select from "../../lib/ui/Select.svelte";
   import ItemIcon from "./ItemIcon.svelte";
-  import { ATTR_TYPE_OPTIONS, DIRECTION_OPTIONS, FLUID_OPTIONS, parseCount } from "../../lib/map/itemAttrs";
-  import { clamp } from "../../lib/math";
+  import { ATTR_TYPE_OPTIONS, DIRECTION_OPTIONS, FLUID_OPTIONS, parseCount } from "../../lib/map/editor/itemAttrs";
+  import { clamp } from "../../lib/util/math";
 
   const tile = $derived(map.tile);
   const inspected = $derived(map.inspect);

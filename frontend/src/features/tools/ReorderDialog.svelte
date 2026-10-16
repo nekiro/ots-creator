@@ -4,13 +4,13 @@
   // places with the objects there, or are inserted before the slot and the
   // objects between shift.
   import { CATEGORIES, CATEGORY_LABELS, CATEGORY_NAMES, Category, minId, res, ThingService } from "../../lib/api";
-  import { app, run, toast, versions } from "../../lib/state.svelte";
+  import { app, run, toast, versions } from "../../lib/state/app.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import Select from "../../lib/ui/Select.svelte";
   import VirtualGrid from "../../lib/ui/VirtualGrid.svelte";
   import { loading as imgLoading } from "../../lib/ui/loading";
-  import { clamp } from "../../lib/math";
+  import { clamp } from "../../lib/util/math";
 
   let category = $state<Category>(app.category);
   let insert = $state(false);

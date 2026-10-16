@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/nekiro/ots-creator/internal/assets"
-	"github.com/nekiro/ots-creator/internal/client"
+	"github.com/nekiro/ots-creator/internal/formats/assets"
+	"github.com/nekiro/ots-creator/internal/core/client"
 	"github.com/nekiro/ots-creator/internal/fsutil"
-	"github.com/nekiro/ots-creator/internal/project"
+	"github.com/nekiro/ots-creator/internal/core/project"
 )
 
 // ClientFiles describes a dat/spr pair found on disk before opening it.

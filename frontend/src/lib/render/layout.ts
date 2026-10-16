@@ -1,6 +1,6 @@
 // Frame group geometry shared by the preview and the sprite slot editor.
-// Mirrors internal/thing/thing.go.
-import { clamp } from "../math";
+// Mirrors internal/core/thing/thing.go.
+import { clamp } from "../util/math";
 
 export interface Layout {
   width: number;

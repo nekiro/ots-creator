@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/nekiro/ots-creator/internal/fsutil"
-	"github.com/nekiro/ots-creator/internal/imaging"
-	"github.com/nekiro/ots-creator/internal/project"
+	"github.com/nekiro/ots-creator/internal/core/imaging"
+	"github.com/nekiro/ots-creator/internal/core/project"
 )
 
 // SpriteService edits sprites.

@@ -6,15 +6,15 @@
   import { hasImprovedAnimations } from "../../lib/thing";
   import { CATEGORIES, CATEGORY_LABELS, CATEGORY_NAMES, CompareService, Format, normalizeThing, res, ThingService, type Category, type DiffEntry, type DiffResult } from "../../lib/api";
   import { mergeIds, mergeSummary, type MergeStep } from "../../lib/compare";
-  import { sliceBetween, toggleId } from "../../lib/selection";
+  import { sliceBetween, toggleId } from "../../lib/util/selection";
   import { HoverAnim } from "../../lib/render/hoveranim.svelte";
   import { otherSpriteCache, spriteCache } from "../../lib/render/sprites";
-  import { app, otherVersions, run, toast, versions } from "../../lib/state.svelte";
+  import { app, otherVersions, run, toast, versions } from "../../lib/state/app.svelte";
   import { ask } from "../../lib/confirm.svelte";
   import { commands } from "../../lib/commands";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
-  import { compareQueue } from "../../lib/queue.svelte";
+  import { compareQueue } from "../../lib/state/queue.svelte";
   import DropPanel from "./DropPanel.svelte";
   import { openContextMenu, type MenuEntry } from "../../lib/menu.svelte";
   import ThingCanvas from "../../lib/ui/ThingCanvas.svelte";

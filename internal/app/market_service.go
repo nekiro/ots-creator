@@ -14,11 +14,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nekiro/ots-creator/internal/imaging"
+	"github.com/nekiro/ots-creator/internal/core/imaging"
 	"github.com/nekiro/ots-creator/internal/market"
-	"github.com/nekiro/ots-creator/internal/obd"
+	"github.com/nekiro/ots-creator/internal/formats/obd"
 	"github.com/nekiro/ots-creator/internal/settings"
-	"github.com/nekiro/ots-creator/internal/thing"
+	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
 // Market endpoints. MarketFilesURL serves the public files (index.json and

@@ -1,7 +1,7 @@
 <script lang="ts">
   // Warnings from loading the active map, grouped by what went wrong
   // ("unknown attribute 0") with the places it happened; a place goes there.
-  import { goTo, mapCommands } from "../../../lib/map/commands";
+  import { goTo, mapCommands } from "../../../lib/map/view/commands";
   import { map } from "../../../lib/map/state.svelte";
   import Dialog from "../../../lib/ui/Dialog.svelte";
 

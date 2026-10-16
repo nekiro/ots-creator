@@ -3,7 +3,7 @@
   import { CATEGORY_NAMES, Category, Format, type FrameGroup } from "../lib/api";
   import { clampField, FLAG_GROUPS, flagVisible, getPath, setPath, type Field } from "../lib/flags";
   import { setAllDurations, setLayout, type LayoutKey } from "../lib/render/frameGroups";
-  import { app, applyDraft, revertDraft } from "../lib/state.svelte";
+  import { app, applyDraft, revertDraft } from "../lib/state/app.svelte";
   import MiniWindow from "../lib/ui/MiniWindow.svelte";
   import NumberField from "../lib/ui/NumberField.svelte";
   import Select from "../lib/ui/Select.svelte";

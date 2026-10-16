@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nekiro/ots-creator/internal/client"
-	"github.com/nekiro/ots-creator/internal/project"
-	"github.com/nekiro/ots-creator/internal/thing"
+	"github.com/nekiro/ots-creator/internal/core/client"
+	"github.com/nekiro/ots-creator/internal/core/project"
+	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
 // thingEnv opens a new client with at least the items 100 to 102.

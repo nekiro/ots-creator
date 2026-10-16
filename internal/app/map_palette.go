@@ -4,7 +4,7 @@ import (
 	"math"
 	"slices"
 
-	"github.com/nekiro/ots-creator/internal/materials"
+	"github.com/nekiro/ots-creator/internal/mapping/materials"
 )
 
 // PaletteBrush is a brush shown in the palette.

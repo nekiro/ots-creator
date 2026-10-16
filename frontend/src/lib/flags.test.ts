@@ -25,7 +25,7 @@ describe("flag metadata", () => {
   });
 
   it("covers every property the backend can report", () => {
-    // Names from internal/dat/flags.go attrNames.
+    // Names from internal/formats/dat/flags.go attrNames.
     const backend = [
       "ground", "groundBorder", "onBottom", "onTop", "container", "stackable", "forceUse", "multiUse", "hasCharges",
       "writable", "writableOnce", "fluidContainer", "fluid", "unpassable", "unmoveable", "blockMissile", "blockPathfind",

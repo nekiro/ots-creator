@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { res } from "../../lib/map/api";
-  import { goTo, spriteSize } from "../../lib/map/commands";
-  import { worldToTile } from "../../lib/map/coords";
-  import { clamp } from "../../lib/math";
-  import { readPositive, writeStored } from "../../lib/storage";
+  import { res } from "../../lib/map/data/api";
+  import { goTo, spriteSize } from "../../lib/map/view/commands";
+  import { worldToTile } from "../../lib/map/view/coords";
+  import { clamp } from "../../lib/util/math";
+  import { readPositive, writeStored } from "../../lib/state/storage";
   import { map, onMapChange } from "../../lib/map/state.svelte";
   import MiniWindow from "../../lib/ui/MiniWindow.svelte";
   import Icon from "../../lib/ui/Icon.svelte";

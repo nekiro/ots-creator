@@ -8,11 +8,11 @@
   import { MarketService, errorMessage, type MarketIndex } from "../../lib/api";
   import { commands } from "../../lib/commands";
   import { ask } from "../../lib/confirm.svelte";
-  import { formatDate, formatKb } from "../../lib/format";
+  import { formatDate, formatKb } from "../../lib/util/format";
   import { filterEntries, licenseLabel, sectionCounts, sectionOf, topTags, type MarketEntry, type MarketSort } from "../../lib/market";
   import { decodeObjectFile, type DecodedObject } from "../../lib/objectFile";
   import { nextIndex } from "../../lib/ui/listNav";
-  import { app, run, select, setCategory, toast } from "../../lib/state.svelte";
+  import { app, run, select, setCategory, toast } from "../../lib/state/app.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import Select from "../../lib/ui/Select.svelte";

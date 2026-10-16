@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { app } from "../../lib/state.svelte";
-  import { IMAGE_FORMATS, LIST_COLUMNS, prefs, removeRecent, savePrefs } from "../../lib/prefs.svelte";
+  import { app } from "../../lib/state/app.svelte";
+  import { IMAGE_FORMATS, LIST_COLUMNS, prefs, removeRecent, savePrefs } from "../../lib/state/prefs.svelte";
   import NumberField from "../../lib/ui/NumberField.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Select from "../../lib/ui/Select.svelte";

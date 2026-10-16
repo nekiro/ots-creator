@@ -14,7 +14,7 @@ import (
 
 	"github.com/nekiro/ots-creator/internal/fsutil"
 
-	"github.com/nekiro/ots-creator/internal/client"
+	"github.com/nekiro/ots-creator/internal/core/client"
 )
 
 // MaxRecent is the number of remembered clients.

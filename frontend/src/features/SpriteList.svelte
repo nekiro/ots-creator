@@ -4,8 +4,8 @@
   import { SpriteService, errorMessage, res } from "../lib/api";
   import { commands } from "../lib/commands";
   import { nextIndex } from "../lib/ui/listNav";
-  import { anchoredRange, idRange, sliceBetween, toggleId } from "../lib/selection";
-  import { app, toast, versions } from "../lib/state.svelte";
+  import { anchoredRange, idRange, sliceBetween, toggleId } from "../lib/util/selection";
+  import { app, toast, versions } from "../lib/state/app.svelte";
   import { startSpriteDrag } from "../lib/dragsprites";
   import Icon from "../lib/ui/Icon.svelte";
   import MiniWindow from "../lib/ui/MiniWindow.svelte";

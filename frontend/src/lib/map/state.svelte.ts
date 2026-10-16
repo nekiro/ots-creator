@@ -1,10 +1,10 @@
 // State of the map editor (Svelte 5 runes).
 import { errorMessage } from "../api";
-import { loadJson, saveJson } from "../storage";
-import { toast } from "../state.svelte";
-import { MapService, type DataInfo, type EditorSettings, type MapChange, type MapInfo, type Palette, type Position, type RecentMap, type TileInfo } from "./api";
-import { ItemIndex } from "./items";
-import type { ViewOptions } from "./scene";
+import { loadJson, saveJson } from "../state/storage";
+import { toast } from "../state/app.svelte";
+import { MapService, type DataInfo, type EditorSettings, type MapChange, type MapInfo, type Palette, type Position, type RecentMap, type TileInfo } from "./data/api";
+import { ItemIndex } from "./data/items";
+import type { ViewOptions } from "./render/scene";
 
 export type EditorMode = "objects" | "map";
 export type Tool = "select" | "brush";

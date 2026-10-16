@@ -3,7 +3,7 @@
   // thumbnails.
   import { Category, res } from "../../lib/api";
   import { map } from "../../lib/map/state.svelte";
-  import { versions } from "../../lib/state.svelte";
+  import { versions } from "../../lib/state/app.svelte";
   import { loading } from "../../lib/ui/loading";
 
   let { id = 0, outfit = 0, size = 32 }: { id?: number; outfit?: number; size?: number } = $props();

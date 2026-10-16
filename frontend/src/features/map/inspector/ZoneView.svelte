@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { MapService, type Zone } from "../../../lib/map/api";
+  import { MapService, type Zone } from "../../../lib/map/data/api";
   import { edit, isBrushActive, map, selectBrush } from "../../../lib/map/state.svelte";
-  import { removeZone } from "../../../lib/map/world";
+  import { removeZone } from "../../../lib/map/editor/world";
 
   let { zone: z }: { zone: Zone } = $props();
   const sel = $derived({ kind: "zone", zone: z.id, label: `Zone ${z.name}` });

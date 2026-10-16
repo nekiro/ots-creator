@@ -1,8 +1,8 @@
 // Adding, removing, importing and exporting objects.
 import { CATEGORY_NAMES, DialogService, ThingService, minId } from "../api";
 import { ask } from "../confirm.svelte";
-import { prefs } from "../prefs.svelte";
-import { app, run, select, toast } from "../state.svelte";
+import { prefs } from "../state/prefs.svelte";
+import { app, run, select, toast } from "../state/app.svelte";
 import { OBJECT_FILTERS, confirmDiscard, guard } from "./shared";
 
 type ImportResults = NonNullable<Awaited<ReturnType<typeof ThingService.ImportObjects>>>;

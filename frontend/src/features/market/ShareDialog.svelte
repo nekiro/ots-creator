@@ -20,10 +20,10 @@
     type Thing,
   } from "../../lib/api";
   import { formatIds, groupOptions, LICENSES, MAX_TAGS, parseIds, tagGroups, tagProblem, type TagKind } from "../../lib/market";
-  import { clamp } from "../../lib/math";
+  import { clamp } from "../../lib/util/math";
   import { decodeObjectFile } from "../../lib/objectFile";
-  import { app, applyDraft, run, toast, versions, type ShareTarget } from "../../lib/state.svelte";
-  import { readStored, writeStored } from "../../lib/storage";
+  import { app, applyDraft, run, toast, versions, type ShareTarget } from "../../lib/state/app.svelte";
+  import { readStored, writeStored } from "../../lib/state/storage";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import NumberField from "../../lib/ui/NumberField.svelte";
   import Select from "../../lib/ui/Select.svelte";

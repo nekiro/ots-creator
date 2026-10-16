@@ -1,8 +1,8 @@
 // Importing, replacing, exporting and clearing sprites.
 import { DialogService, ProjectService, SpriteService, errorMessage } from "../api";
 import { ask } from "../confirm.svelte";
-import { prefs } from "../prefs.svelte";
-import { app, run, toast } from "../state.svelte";
+import { prefs } from "../state/prefs.svelte";
+import { app, run, toast } from "../state/app.svelte";
 import { IMAGE_FILTERS, guard } from "./shared";
 
 export interface SpriteExportOptions {

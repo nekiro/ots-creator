@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nekiro/ots-creator/internal/imaging"
-	"github.com/nekiro/ots-creator/internal/obd"
-	"github.com/nekiro/ots-creator/internal/thing"
+	"github.com/nekiro/ots-creator/internal/core/imaging"
+	"github.com/nekiro/ots-creator/internal/formats/obd"
+	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
 func pixels(r, g byte) []byte {

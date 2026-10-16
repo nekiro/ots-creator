@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/nekiro/ots-creator/internal/fsutil"
-	"github.com/nekiro/ots-creator/internal/imaging"
-	"github.com/nekiro/ots-creator/internal/mapedit"
-	"github.com/nekiro/ots-creator/internal/otitems"
-	"github.com/nekiro/ots-creator/internal/otmap"
+	"github.com/nekiro/ots-creator/internal/core/imaging"
+	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
+	"github.com/nekiro/ots-creator/internal/core/otitems"
+	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
 const (

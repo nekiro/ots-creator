@@ -4,12 +4,12 @@
   // object there.
   import { CATEGORY_NAMES, errorMessage, minId, res, ThingService, type Category } from "../../lib/api";
   import { openContextMenu, type MenuEntry } from "../../lib/menu.svelte";
-  import type { DropQueue, QueueItem } from "../../lib/queue.svelte";
-  import { app, toast, versions } from "../../lib/state.svelte";
+  import type { DropQueue, QueueItem } from "../../lib/state/queue.svelte";
+  import { app, toast, versions } from "../../lib/state/app.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import VirtualGrid from "../../lib/ui/VirtualGrid.svelte";
   import { loading as imgLoading } from "../../lib/ui/loading";
-  import { clamp } from "../../lib/math";
+  import { clamp } from "../../lib/util/math";
 
   let {
     queue: q,

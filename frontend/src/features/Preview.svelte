@@ -17,7 +17,7 @@
 
 <script lang="ts">
   import { fitZoom } from "../lib/render/zoom";
-  import { clamp } from "../lib/math";
+  import { clamp } from "../lib/util/math";
   import { defaultDirection, frameGroupAt, hasImprovedAnimations } from "../lib/thing";
   import { untrack } from "svelte";
   import { Category, encodeBytes, errorMessage, Format, normalizeThing, ThingService, type Thing } from "../lib/api";
@@ -30,7 +30,7 @@
   import SheetEditor from "./SheetEditor.svelte";
   import { DEFAULT_COLORS, type OutfitColors } from "../lib/render/outfit";
   import { spriteCache } from "../lib/render/sprites";
-  import { app, toast } from "../lib/state.svelte";
+  import { app, toast } from "../lib/state/app.svelte";
   import { PanView } from "../lib/pan.svelte";
   import { changedSlots, drawLine, getPixel, hexToRGBA, rgbaToHex, type RGBA } from "../lib/render/paint";
   import NumberField from "../lib/ui/NumberField.svelte";

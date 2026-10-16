@@ -1,6 +1,6 @@
 <script lang="ts">
   import { DialogService, ProjectService, type OTBReport } from "../../lib/api";
-  import { app, run, toast } from "../../lib/state.svelte";
+  import { app, run, toast } from "../../lib/state/app.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
 
   const otb = $derived(app.project?.info.itemsOtb ?? null);

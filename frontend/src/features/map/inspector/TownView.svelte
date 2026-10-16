@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { Town } from "../../../lib/map/api";
-  import { mapCommands } from "../../../lib/map/commands";
+  import type { Town } from "../../../lib/map/data/api";
+  import { mapCommands } from "../../../lib/map/view/commands";
   import { map } from "../../../lib/map/state.svelte";
-  import { addHouse, houses, removeTown, saveTown } from "../../../lib/map/world";
+  import { addHouse, houses, removeTown, saveTown } from "../../../lib/map/editor/world";
   import Icon from "../../../lib/ui/Icon.svelte";
   import PosField from "./PosField.svelte";
 

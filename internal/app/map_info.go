@@ -3,8 +3,8 @@ package app
 import (
 	"slices"
 
-	"github.com/nekiro/ots-creator/internal/mapedit"
-	"github.com/nekiro/ots-creator/internal/otmap"
+	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
+	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
 // MapInfo describes an open map.

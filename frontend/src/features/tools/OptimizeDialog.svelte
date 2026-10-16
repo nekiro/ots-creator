@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Format, SpriteService, formatSize, type OptimizeResult } from "../../lib/api";
-  import { app, run } from "../../lib/state.svelte";
+  import { app, run } from "../../lib/state/app.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import ProgressBar from "../../lib/ui/ProgressBar.svelte";
 

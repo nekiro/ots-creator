@@ -1,6 +1,6 @@
 // Property editor metadata: groups, labels and payload fields.
 import type { Properties } from "./api";
-import { clamp } from "./math";
+import { clamp } from "./util/math";
 
 /** mask: a bit set, one checkbox per option (option values are bits). */
 export type FieldKind = "u16" | "i16" | "text" | "select" | "mask";

@@ -11,7 +11,7 @@
   // like the Tibia client. The popup is position:fixed so scrolling
   // containers and dialogs never clip it.
   import { tick } from "svelte";
-  import { clamp } from "../math";
+  import { clamp } from "../util/math";
   import { toCss } from "../pixelscale";
   import { portal } from "./portal";
   import { reveal } from "./reveal";

@@ -4,8 +4,8 @@ import (
 	"errors"
 	"math"
 
-	"github.com/nekiro/ots-creator/internal/mapedit"
-	"github.com/nekiro/ots-creator/internal/otmap"
+	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
+	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
 var errNothingSelected = errors.New("nothing is selected")

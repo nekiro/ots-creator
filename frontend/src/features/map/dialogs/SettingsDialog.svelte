@@ -1,9 +1,9 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import { errorMessage } from "../../../lib/api";
-  import { toast } from "../../../lib/state.svelte";
-  import { MapService, type EditorSettings } from "../../../lib/map/api";
-  import { comboOf, KEY_ACTIONS, KEY_GROUPS, keysOf, type KeyAction } from "../../../lib/map/keys";
+  import { toast } from "../../../lib/state/app.svelte";
+  import { MapService, type EditorSettings } from "../../../lib/map/data/api";
+  import { comboOf, KEY_ACTIONS, KEY_GROUPS, keysOf, type KeyAction } from "../../../lib/map/view/keys";
   import { map } from "../../../lib/map/state.svelte";
   import Dialog from "../../../lib/ui/Dialog.svelte";
   import NumberField from "../../../lib/ui/NumberField.svelte";

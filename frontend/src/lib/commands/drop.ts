@@ -1,6 +1,6 @@
 // Files dropped onto the window.
 import { SpriteService, ThingService } from "../api";
-import { app, applyDraft, run, select, toast } from "../state.svelte";
+import { app, applyDraft, run, select, toast } from "../state/app.svelte";
 import { classifyDrop } from "./classifyDrop";
 import { reportImported } from "./objects";
 import { projectCommands } from "./project";

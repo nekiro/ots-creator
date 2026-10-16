@@ -7,9 +7,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/nekiro/ots-creator/internal/client"
-	"github.com/nekiro/ots-creator/internal/imaging"
-	"github.com/nekiro/ots-creator/internal/thing"
+	"github.com/nekiro/ots-creator/internal/core/client"
+	"github.com/nekiro/ots-creator/internal/core/imaging"
+	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
 func TestParallelCancel(t *testing.T) {

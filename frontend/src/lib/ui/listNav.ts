@@ -1,5 +1,5 @@
 // Arrow key navigation of lists and grids.
-import { clamp } from "../math";
+import { clamp } from "../util/math";
 
 export interface ListLayout {
   /** Items per row: Up and Down move a row. Without it only Left and Right move. */

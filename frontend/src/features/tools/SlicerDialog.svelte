@@ -2,7 +2,7 @@
   import { SpriteService, encodeBytes } from "../../lib/api";
   import { toCss } from "../../lib/pixelscale";
   import { cutCell, fitGrid, isEmpty, type Grid, type Pixels } from "../../lib/slicer";
-  import { app, run, toast } from "../../lib/state.svelte";
+  import { app, run, toast } from "../../lib/state/app.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import NumberField from "../../lib/ui/NumberField.svelte";

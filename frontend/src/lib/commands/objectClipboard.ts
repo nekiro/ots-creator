@@ -1,7 +1,7 @@
 // Copying and pasting objects, and Ctrl+V of images as sprite sheets.
 import { CATEGORY_NAMES, ThingService, errorMessage, type PropsPatch, type Thing } from "../api";
 import { clipboardThing, copyThing, pasteInto, type PasteMode } from "../clipboard";
-import { app, run, toast } from "../state.svelte";
+import { app, run, toast } from "../state/app.svelte";
 import { sheetCommands } from "./sheets";
 import { OBJECT_CLIP, guard, snapshot } from "./shared";
 

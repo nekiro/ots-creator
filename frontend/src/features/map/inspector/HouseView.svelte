@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { HouseInfo } from "../../../lib/map/api";
-  import { mapCommands } from "../../../lib/map/commands";
+  import type { HouseInfo } from "../../../lib/map/data/api";
+  import { mapCommands } from "../../../lib/map/view/commands";
   import { isBrushActive, map, selectBrush } from "../../../lib/map/state.svelte";
-  import { goHouse, paintHouse, removeHouse, saveHouse, selectHouseTiles, towns } from "../../../lib/map/world";
+  import { goHouse, paintHouse, removeHouse, saveHouse, selectHouseTiles, towns } from "../../../lib/map/editor/world";
   import NumberField from "../../../lib/ui/NumberField.svelte";
   import Select from "../../../lib/ui/Select.svelte";
   import PosField from "./PosField.svelte";

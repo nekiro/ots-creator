@@ -1,7 +1,7 @@
 package app
 
 import (
-	"github.com/nekiro/ots-creator/internal/project"
+	"github.com/nekiro/ots-creator/internal/core/project"
 	"github.com/nekiro/ots-creator/internal/settings"
 )
 

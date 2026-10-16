@@ -10,9 +10,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/nekiro/ots-creator/internal/mapedit"
-	"github.com/nekiro/ots-creator/internal/otmap"
-	"github.com/nekiro/ots-creator/internal/thing"
+	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
+	"github.com/nekiro/ots-creator/internal/mapping/otmap"
+	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
 func TestGeoChunk(t *testing.T) {

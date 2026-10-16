@@ -10,7 +10,7 @@ import (
 
 	"github.com/nekiro/ots-creator/internal/fsutil"
 
-	"github.com/nekiro/ots-creator/internal/mapedit"
+	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
 	"github.com/nekiro/ots-creator/internal/settings"
 )
 

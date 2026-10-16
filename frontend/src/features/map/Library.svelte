@@ -4,10 +4,10 @@
   import { errorMessage } from "../../lib/api";
   import { ask, askText } from "../../lib/confirm.svelte";
   import { openContextMenu } from "../../lib/menu.svelte";
-  import { toast } from "../../lib/state.svelte";
-  import { readJson, saveJson } from "../../lib/storage";
-  import { MapService, SpawnFormat, type CreatureType, type PaletteBrush } from "../../lib/map/api";
-  import { mapCommands } from "../../lib/map/commands";
+  import { toast } from "../../lib/state/app.svelte";
+  import { readJson, saveJson } from "../../lib/state/storage";
+  import { MapService, SpawnFormat, type CreatureType, type PaletteBrush } from "../../lib/map/data/api";
+  import { mapCommands } from "../../lib/map/view/commands";
   import { creatureOutfit, isBrushActive, map, reloadPalette, selectBrush, type BrushSel } from "../../lib/map/state.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import SearchField from "../../lib/ui/SearchField.svelte";

@@ -2,7 +2,7 @@
   // Batch tools. They work on the selection when there is one, otherwise on
   // the whole map; everything can be undone.
   import { ask } from "../../../lib/confirm.svelte";
-  import { mapCommands } from "../../../lib/map/commands";
+  import { mapCommands } from "../../../lib/map/view/commands";
   import { map } from "../../../lib/map/state.svelte";
   import Dialog from "../../../lib/ui/Dialog.svelte";
 

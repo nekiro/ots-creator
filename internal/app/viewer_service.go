@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/nekiro/ots-creator/internal/imaging"
+	"github.com/nekiro/ots-creator/internal/core/imaging"
 )
 
 // Kinds of files the viewer lists.

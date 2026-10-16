@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/nekiro/ots-creator/internal/client"
+	"github.com/nekiro/ots-creator/internal/core/client"
 )
 
 func TestWindowCloseGuard(t *testing.T) {

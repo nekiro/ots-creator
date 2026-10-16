@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { FIXED_KEYS, KEY_ACTIONS, KEY_GROUPS, keysOf } from "../../../lib/map/keys";
+  import { FIXED_KEYS, KEY_ACTIONS, KEY_GROUPS, keysOf } from "../../../lib/map/view/keys";
   import { map } from "../../../lib/map/state.svelte";
   import Dialog from "../../../lib/ui/Dialog.svelte";
 

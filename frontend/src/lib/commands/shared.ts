@@ -1,8 +1,8 @@
 // Checks and dialog filters shared by the commands.
 import { formatSize } from "../api";
 import { ask } from "../confirm.svelte";
-import { prefs } from "../prefs.svelte";
-import { app, toast } from "../state.svelte";
+import { prefs } from "../state/prefs.svelte";
+import { app, toast } from "../state/app.svelte";
 
 export const OBJECT_FILTERS = [
   { name: "Object files (*.otobj, *.obd)", pattern: "*.otobj;*.obd" },

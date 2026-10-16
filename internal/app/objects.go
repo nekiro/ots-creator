@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/nekiro/ots-creator/internal/fsutil"
-	"github.com/nekiro/ots-creator/internal/obd"
-	"github.com/nekiro/ots-creator/internal/otobj"
-	"github.com/nekiro/ots-creator/internal/project"
-	"github.com/nekiro/ots-creator/internal/thing"
+	"github.com/nekiro/ots-creator/internal/formats/obd"
+	"github.com/nekiro/ots-creator/internal/formats/otobj"
+	"github.com/nekiro/ots-creator/internal/core/project"
+	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
 // Object file formats for export (settings.Settings.ObjectFormat).

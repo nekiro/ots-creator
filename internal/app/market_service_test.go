@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nekiro/ots-creator/internal/client"
+	"github.com/nekiro/ots-creator/internal/core/client"
 	"github.com/nekiro/ots-creator/internal/market"
 	"github.com/nekiro/ots-creator/internal/market/markettest"
 	"github.com/nekiro/ots-creator/internal/settings"
-	"github.com/nekiro/ots-creator/internal/thing"
+	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
 func marketEnv(t *testing.T, srv *markettest.Server) (*MarketService, *settings.Store) {

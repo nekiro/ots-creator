@@ -1,11 +1,11 @@
 <script lang="ts">
   // What the map contains: towns with their houses, waypoints and areas.
   // A click shows the thing in the inspector, a double click goes there.
-  import { TILE_FLAGS, type HouseInfo, type Town, type Waypoint } from "../../lib/map/api";
-  import { goTo, mapCommands } from "../../lib/map/commands";
+  import { TILE_FLAGS, type HouseInfo, type Town, type Waypoint } from "../../lib/map/data/api";
+  import { goTo, mapCommands } from "../../lib/map/view/commands";
   import { openContextMenu } from "../../lib/menu.svelte";
   import { isBrushActive, map, selectBrush } from "../../lib/map/state.svelte";
-  import { addHouse, addTown, addWaypoint, addZone, goHouse, houses as allHouses, paintHouse, pickPosition, removeTown, saveTown, towns as allTowns } from "../../lib/map/world";
+  import { addHouse, addTown, addWaypoint, addZone, goHouse, houses as allHouses, paintHouse, pickPosition, removeTown, saveTown, towns as allTowns } from "../../lib/map/editor/world";
   import Icon from "../../lib/ui/Icon.svelte";
   import SearchField from "../../lib/ui/SearchField.svelte";
 

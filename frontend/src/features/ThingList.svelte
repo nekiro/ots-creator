@@ -1,7 +1,7 @@
 <script lang="ts">
   import { hasImprovedAnimations } from "../lib/thing";
   import { keyStep } from "../lib/ui/listNav";
-  import { anchoredRange, idRange } from "../lib/selection";
+  import { anchoredRange, idRange } from "../lib/util/selection";
   import { CATEGORIES, CATEGORY_LABELS, Format, errorMessage, minId, normalizeThing, res, ThingService } from "../lib/api";
   import { commands, thingDropId } from "../lib/commands";
   import { FLAG_GROUPS, flagVisible } from "../lib/flags";
@@ -9,15 +9,15 @@
   import { objectListMenu, objectMenu } from "../lib/menus";
   import { HoverAnim } from "../lib/render/hoveranim.svelte";
   import { spriteCache } from "../lib/render/sprites";
-  import { LIST_CELL } from "../lib/prefs.svelte";
-  import { app, select, setCategory, toast, versions } from "../lib/state.svelte";
+  import { LIST_CELL } from "../lib/state/prefs.svelte";
+  import { app, select, setCategory, toast, versions } from "../lib/state/app.svelte";
   import Icon from "../lib/ui/Icon.svelte";
   import MiniWindow from "../lib/ui/MiniWindow.svelte";
   import Select from "../lib/ui/Select.svelte";
   import ThingCanvas from "../lib/ui/ThingCanvas.svelte";
   import VirtualGrid from "../lib/ui/VirtualGrid.svelte";
   import { loading } from "../lib/ui/loading";
-  import { clamp } from "../lib/math";
+  import { clamp } from "../lib/util/math";
 
   const CONTENT_OPTIONS = [
     { value: "", label: "All objects" },

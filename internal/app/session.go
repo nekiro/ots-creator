@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/nekiro/ots-creator/internal/project"
+	"github.com/nekiro/ots-creator/internal/core/project"
 )
 
 // ErrNoProject is returned when an operation needs an open client.

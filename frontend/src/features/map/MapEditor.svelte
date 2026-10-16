@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { app } from "../../lib/state.svelte";
-  import { readJson, saveJson } from "../../lib/storage";
+  import { app } from "../../lib/state/app.svelte";
+  import { readJson, saveJson } from "../../lib/state/storage";
   import { commands } from "../../lib/commands";
-  import { MapService } from "../../lib/map/api";
-  import { mapCommands } from "../../lib/map/commands";
+  import { MapService } from "../../lib/map/data/api";
+  import { mapCommands } from "../../lib/map/view/commands";
   import { loadMapData, map } from "../../lib/map/state.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import MiniWindow from "../../lib/ui/MiniWindow.svelte";

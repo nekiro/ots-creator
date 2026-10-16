@@ -12,9 +12,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/nekiro/ots-creator/internal/client"
-	"github.com/nekiro/ots-creator/internal/project"
-	"github.com/nekiro/ots-creator/internal/thing"
+	"github.com/nekiro/ots-creator/internal/core/client"
+	"github.com/nekiro/ots-creator/internal/core/project"
+	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
 const size = 32

@@ -2,7 +2,7 @@
 import { CompareService, DialogService, Format, ProjectService, WindowService, type Recent } from "../api";
 import { ask } from "../confirm.svelte";
 import { map } from "../map/state.svelte";
-import { app, applyDraft, revertDraft, run, toast } from "../state.svelte";
+import { app, applyDraft, revertDraft, run, toast } from "../state/app.svelte";
 import { offerOptimize, openedNote, otbNote, sheetsNote } from "./compile";
 import { confirmLeave, guard } from "./shared";
 

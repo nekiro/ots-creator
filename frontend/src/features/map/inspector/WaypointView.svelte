@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { MapService, type Waypoint } from "../../../lib/map/api";
+  import { MapService, type Waypoint } from "../../../lib/map/data/api";
   import { edit } from "../../../lib/map/state.svelte";
-  import { removeWaypoint, renameWaypoint } from "../../../lib/map/world";
+  import { removeWaypoint, renameWaypoint } from "../../../lib/map/editor/world";
   import PosField from "./PosField.svelte";
 
   let { waypoint: w, pending = false }: { waypoint: Waypoint; pending?: boolean } = $props();

@@ -1,7 +1,7 @@
 <script lang="ts">
   // Floors 0-15 at the edge of the map: the current floor, floors with
   // tiles, and the ground floor (7).
-  import { mapCommands } from "../../lib/map/commands";
+  import { mapCommands } from "../../lib/map/view/commands";
   import { map } from "../../lib/map/state.svelte";
 
   const used = $derived(map.active?.floors ?? 0);

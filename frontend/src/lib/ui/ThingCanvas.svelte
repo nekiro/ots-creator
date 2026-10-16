@@ -8,7 +8,7 @@
   import { compose, type PixelSource } from "../render/compose";
   import { contentBox, union, type Box } from "../render/bounds";
   import { DEFAULT_COLORS } from "../render/outfit";
-  import { clamp } from "../math";
+  import { clamp } from "../util/math";
 
   let {
     thing,

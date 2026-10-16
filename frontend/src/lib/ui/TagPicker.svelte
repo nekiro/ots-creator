@@ -9,7 +9,7 @@
   import { toCss } from "../pixelscale";
   import { portal } from "./portal";
   import { reveal } from "./reveal";
-  import { clamp } from "../math";
+  import { clamp } from "../util/math";
 
   let {
     value,

@@ -1,8 +1,8 @@
 <script lang="ts">
   // Shows whatever is in focus: a tile, a town, a house, a waypoint, a zone,
   // or the map itself when nothing is.
-  import { fmtPos } from "../../lib/map/api";
-  import { mapCommands } from "../../lib/map/commands";
+  import { fmtPos } from "../../lib/map/data/api";
+  import { mapCommands } from "../../lib/map/view/commands";
   import { map } from "../../lib/map/state.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import MiniWindow from "../../lib/ui/MiniWindow.svelte";

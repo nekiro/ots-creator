@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nekiro/ots-creator/internal/mapedit"
+	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
 )
 
 // mapTool is a whole map or selection tool; it returns the number of

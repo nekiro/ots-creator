@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Browser } from "@wailsio/runtime";
-  import { app } from "../../lib/state.svelte";
-  import { installUpdate, REPO_URL, updates } from "../../lib/updates.svelte";
+  import { app } from "../../lib/state/app.svelte";
+  import { installUpdate, REPO_URL, updates } from "../../lib/state/updates.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import ProgressBar from "../../lib/ui/ProgressBar.svelte";
 

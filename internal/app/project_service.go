@@ -3,8 +3,8 @@ package app
 import (
 	"errors"
 
-	"github.com/nekiro/ots-creator/internal/client"
-	"github.com/nekiro/ots-creator/internal/project"
+	"github.com/nekiro/ots-creator/internal/core/client"
+	"github.com/nekiro/ots-creator/internal/core/project"
 )
 
 // ProjectService opens, creates and compiles clients.

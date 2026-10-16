@@ -3,8 +3,8 @@ package app
 import (
 	"strings"
 
-	"github.com/nekiro/ots-creator/internal/mapedit"
-	"github.com/nekiro/ots-creator/internal/otmap"
+	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
+	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
 // Undo reverts the last action.

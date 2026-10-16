@@ -2,7 +2,7 @@
 // optimization offered before a compile.
 import { SpriteService, formatSize, type CompileStats, type State } from "../api";
 import { choose } from "../confirm.svelte";
-import { app, run, toast } from "../state.svelte";
+import { app, run, toast } from "../state/app.svelte";
 import { savedNote } from "./shared";
 
 /** " Removed 3 unused sheets (1.2 MB freed)." after an asset compilation. */

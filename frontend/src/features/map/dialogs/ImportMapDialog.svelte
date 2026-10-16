@@ -1,8 +1,8 @@
 <script lang="ts">
   import { DialogService } from "../../../lib/api";
-  import { MapService } from "../../../lib/map/api";
+  import { MapService } from "../../../lib/map/data/api";
   import { edit, map } from "../../../lib/map/state.svelte";
-  import { toast } from "../../../lib/state.svelte";
+  import { toast } from "../../../lib/state/app.svelte";
   import Dialog from "../../../lib/ui/Dialog.svelte";
   import NumberField from "../../../lib/ui/NumberField.svelte";
   import Select from "../../../lib/ui/Select.svelte";
