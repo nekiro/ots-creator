@@ -1,6 +1,10 @@
 package app
 
-import "sync/atomic"
+import (
+	"fmt"
+	"sync"
+	"sync/atomic"
+)
 
 // EventCloseRequested is emitted when the user closes the window while
 // there are changes that would be lost or an export runs. The frontend asks for confirmation
@@ -24,10 +28,13 @@ type WindowService struct {
 	Maps  *MapService
 	close func()
 	// OpenWindow opens another window of the app at a frontend URL (set by
-	// main).
-	OpenWindow func(url, title string, width, height int)
-	unapplied  atomic.Bool
-	force      atomic.Bool
+	// main). closed is called when it closes; it returns what focuses it.
+	OpenWindow func(url, title string, width, height int, closed func()) (focus func())
+	// playMu guards focusPlay, set while the play window is open.
+	playMu    sync.Mutex
+	focusPlay func()
+	unapplied atomic.Bool
+	force     atomic.Bool
 }
 
 // NewWindowService returns the guard. closeWindow closes the main window.
@@ -39,12 +46,44 @@ func NewWindowService(session *Session, closeWindow func()) *WindowService {
 // not applied to the client yet.
 func (ws *WindowService) SetUnapplied(unapplied bool) { ws.unapplied.Store(unapplied) }
 
-// OpenPlayWindow opens the play view of a map in its own window. query is
-// the URL query the play window starts from (map id, position).
-func (ws *WindowService) OpenPlayWindow(query string) {
-	if ws.OpenWindow != nil {
-		ws.OpenWindow("/?"+query, "OTS Creator - Play", 1100, 860)
+// EventPlayMove carries a PlayMove to the open play window: the player
+// starts again there.
+const EventPlayMove = "play:move"
+
+// PlayMove is where the play window's player starts again.
+type PlayMove struct {
+	Map int `json:"map"`
+	X   int `json:"x"`
+	Y   int `json:"y"`
+	Z   int `json:"z"`
+}
+
+// OpenPlayWindow shows the play view of a map in its own window, the
+// player at a position. There is one play window: when it is open, its
+// player moves there and it comes to the front.
+func (ws *WindowService) OpenPlayWindow(mapID, x, y, z int) {
+	ws.playMu.Lock()
+	focus := ws.focusPlay
+	if focus == nil && ws.OpenWindow != nil {
+		url := fmt.Sprintf("/?play=%d&x=%d&y=%d&z=%d", mapID, x, y, z)
+		ws.focusPlay = ws.OpenWindow(url, "OTS Creator - Play", 1100, 860, func() {
+			ws.playMu.Lock()
+			ws.focusPlay = nil
+			ws.playMu.Unlock()
+		})
 	}
+	ws.playMu.Unlock()
+	if focus != nil {
+		ws.session.notify(EventPlayMove, PlayMove{Map: mapID, X: x, Y: y, Z: z})
+		focus()
+	}
+}
+
+// PlayWindowOpen reports whether the play window is open.
+func (ws *WindowService) PlayWindowOpen() bool {
+	ws.playMu.Lock()
+	defer ws.playMu.Unlock()
+	return ws.focusPlay != nil
 }
 
 // Quit closes the window without asking.

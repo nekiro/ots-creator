@@ -58,10 +58,17 @@ export function goTo(position: Position, id = map.activeId): void {
 
 export const mapCommands = {
   /** Walks the map as a player, from a tile (default: the one under the mouse, or the middle of the view). */
-  play(position?: Position) {
-    if (map.activeId === null || !map.items) return;
+  /** With the play window open, the player there moves to the tile and the window comes to the front. */
+  async play(position?: Position) {
+    const id = map.activeId;
+    if (id === null || !map.items) return;
     const camera = map.cam;
-    map.play = position ?? map.hover ?? { ...worldToTile(camera.x, camera.y, camera.floor, spriteSize()), z: camera.floor };
+    const start = position ?? map.hover ?? { ...worldToTile(camera.x, camera.y, camera.floor, spriteSize()), z: camera.floor };
+    if (await WindowService.PlayWindowOpen().catch(() => false)) {
+      void WindowService.OpenPlayWindow(id, start.x, start.y, start.z);
+      return;
+    }
+    map.play = start;
   },
 
   /** Back to editing, the view on where the player stands. */
@@ -76,7 +83,7 @@ export const mapCommands = {
     map.play = null;
     if (id === null) return;
     goTo(position);
-    void WindowService.OpenPlayWindow(`play=${id}&x=${position.x}&y=${position.y}&z=${position.z}`);
+    void WindowService.OpenPlayWindow(id, position.x, position.y, position.z);
   },
 
   async setMode(mode: "objects" | "map") {

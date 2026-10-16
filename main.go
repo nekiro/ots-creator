@@ -27,6 +27,7 @@ func init() {
 	application.RegisterEvent[app.Progress](app.EventProgress)
 	application.RegisterEvent[app.Progress](app.EventMapProgress)
 	application.RegisterEvent[app.MapChanged](app.EventMapChanged)
+	application.RegisterEvent[app.PlayMove](app.EventPlayMove)
 }
 
 func main() {
@@ -92,14 +93,22 @@ func main() {
 		}
 	}
 
-	windows.OpenWindow = func(url, title string, width, height int) {
-		wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
+	windows.OpenWindow = func(url, title string, width, height int, closed func()) func() {
+		window := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
 			Title:            title,
 			Width:            width,
 			Height:           height,
 			BackgroundColour: application.NewRGB(0x16, 0x16, 0x16),
 			URL:              url,
-		}).Show()
+		})
+		window.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) { closed() })
+		window.Show()
+		return func() {
+			if window.IsMinimised() {
+				window.UnMinimise()
+			}
+			window.Focus()
+		}
 	}
 	mainWindow = wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "OTS Creator",

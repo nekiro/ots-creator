@@ -11,8 +11,10 @@
   import PlayView from "./PlayView.svelte";
 
   const params = new URLSearchParams(location.search);
-  const mapId = Number(params.get("play"));
-  const start: Position = { x: Number(params.get("x")), y: Number(params.get("y")), z: Number(params.get("z")) };
+  let mapId = $state(Number(params.get("play")));
+  let start = $state<Position>({ x: Number(params.get("x")), y: Number(params.get("y")), z: Number(params.get("z")) });
+  /** Bumped when the editor sends the player somewhere else: the view starts again. */
+  let session = $state(0);
 
   let ready = $state(false);
   const listeners = new Set<(keys: number[]) => void>();
@@ -27,18 +29,31 @@
       if (event.data?.id !== mapId) return;
       for (const changed of listeners) changed(event.data.chunks ?? []);
     });
+    // Play from the editor while this window is open: start again there.
+    const offMove = Events.On("play:move", (event: { data: { map: number; x: number; y: number; z: number } | null }) => {
+      const move = event.data;
+      if (!move) return;
+      mapId = move.map;
+      start = { x: move.x, y: move.y, z: move.z };
+      session++;
+    });
     void (async () => {
       await initState();
       await loadMapData();
       ready = true;
     })();
-    return offChanged;
+    return () => {
+      offChanged();
+      offMove();
+    };
   });
 </script>
 
 <div class="window">
   {#if ready && map.items}
-    <PlayView {mapId} {start} items={map.items} spriteSize={spriteSize()} onexit={() => void Window.Close()} {changes} />
+    {#key session}
+      <PlayView {mapId} {start} items={map.items} spriteSize={spriteSize()} onexit={() => void Window.Close()} {changes} />
+    {/key}
   {:else}
     <div class="loading t-label">Loading the map…</div>
   {/if}
