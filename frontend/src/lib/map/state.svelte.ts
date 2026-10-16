@@ -79,6 +79,7 @@ export const DEFAULT_VIEW: ViewOptions = {
   ghostItems: false,
   clientBox: false,
   lights: false,
+  ambientLight: 50,
 };
 
 class MapState {

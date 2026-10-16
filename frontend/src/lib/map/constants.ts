@@ -53,6 +53,9 @@ export const MAX_FLOOR = 15;
 /** Largest brush size (tiles from the center). */
 export const MAX_BRUSH_SIZE = 15;
 
+/** Tiles around the view whose item lights are taken in (lights reach as many tiles as their level; item lights go up to about 10). */
+export const LIGHT_REACH = 16;
+
 /** Chunks a side of the blocks drawn far out. */
 export const BLOCK_CHUNKS = 4;
 

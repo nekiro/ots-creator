@@ -51,6 +51,7 @@ export const KEY_ACTIONS: KeyAction[] = [
   { id: "grid", group: "View", label: "Grid", keys: ["G"], run: () => (map.view.grid = !map.view.grid) },
   { id: "lowerFloors", group: "View", label: "Lower floors", keys: ["L"], run: () => (map.view.lowerFloors = !map.view.lowerFloors) },
   { id: "ghostHigher", group: "View", label: "Ghost floor above", keys: ["H"], run: () => (map.view.ghostHigher = !map.view.ghostHigher) },
+  { id: "lights", group: "View", label: "Lights", keys: ["I"], run: () => (map.view.lights = !map.view.lights) },
 
   { id: "new", group: "Map", label: "New map", keys: ["Ctrl+N"], run: mapCommands.newMap, always: true },
   { id: "open", group: "Map", label: "Open map", keys: ["Ctrl+O"], run: () => mapCommands.open(), always: true },

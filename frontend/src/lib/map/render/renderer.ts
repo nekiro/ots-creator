@@ -9,8 +9,10 @@
 import { Atlas } from "./atlas";
 import { ChunkBuffers } from "./chunkBuffers";
 import { chunkKey } from "../data/chunks";
-import { ALPHA, BLOCK_CHUNKS, COLORS, LIMITS, ZOOM } from "../constants";
+import { ALPHA, BLOCK_CHUNKS, COLORS, LIGHT_REACH, LIMITS, ZOOM } from "../constants";
 import { GEO, GEO_BLOCK, encodeGeoSignature, geoBits, type GeoChunk } from "./geo";
+import { ambientIntensity, DAYLIGHT_INTENSITY } from "./lightMap";
+import { LightPass } from "./lightPass";
 import { drawOverlays } from "./overlays";
 import { QuadBatch } from "./quadBatch";
 import type { FrameResult, Scene } from "./scene";
@@ -39,6 +41,7 @@ export class MapRenderer {
   private batch: QuadBatch;
   private chunks: ChunkBuffers;
   private things: ThingDrawer;
+  private lights: LightPass;
   atlas: Atlas | null = null;
   /** Sprites drawn this frame that are not loaded yet. */
   private missing = new Set<number>();
@@ -54,6 +57,7 @@ export class MapRenderer {
     this.batch = new QuadBatch(gl, corners);
     this.chunks = new ChunkBuffers(gl, corners, this.missing);
     this.things = new ThingDrawer(this.batch, this.missing);
+    this.lights = new LightPass(gl, corners);
     // Chunk quads of later tiles have greater depth (see chunk.vert).
     gl.clearDepth(0);
     gl.depthFunc(gl.GEQUAL);
@@ -66,6 +70,7 @@ export class MapRenderer {
 
   dispose(): void {
     this.chunks.dispose();
+    this.lights.dispose();
     this.atlas?.dispose();
     this.gl.getExtension("WEBGL_lose_context")?.loseContext();
   }
@@ -137,6 +142,7 @@ export class MapRenderer {
       }
     }
     if (ghostFloor >= 0) this.drawChunks(scene, chunksByFloor.get(ghostFloor)!, ALPHA.ghostFloor, camera.shift(ghostFloor), result);
+    if (scene.opts.lights && tilePx >= ZOOM.detail) this.drawLights(scene, camera, floors, plan);
     this.things.drawGhosts(scene, camera, drawItem, drawCreature);
     drawOverlays(scene, result, camera, this.batch);
     if (this.missing.size) {
@@ -148,6 +154,35 @@ export class MapRenderer {
     this.flushScreen(scene);
     this.chunks.sweep(scene);
     return result;
+  }
+
+  /** Darkens the drawn floors to the ambient light, brightened by the
+   * lights of their items (previews and overlays drawn later stay lit). */
+  private drawLights(scene: Scene, camera: Camera, floors: number[], plan: ChunkPlan): void {
+    const ambient = ambientIntensity(scene.opts.ambientLight);
+    if (ambient >= DAYLIGHT_INTENSITY) return;
+    this.flushScreen(scene);
+    const floor = scene.floor;
+    const range = camera.tiles(floor, 1, 1);
+    const shift = camera.shift(floor);
+    const grid = { x: range.x0 - shift, y: range.y0 - shift, width: range.x1 - range.x0 + 1, height: range.y1 - range.y0 + 1 };
+    const lightFloors = floors.map((z) => ({ chunks: this.chunksLighting(scene, camera, z, plan), shift: camera.shift(z) }));
+    this.lights.draw(scene.width, scene.height, grid, camera.tileX(range.x0, floor), camera.tileY(range.y0, floor), camera.tilePx, lightFloors, ambient, scene.spriteSize);
+    this.chunks.unbind();
+  }
+
+  /** The chunks of floor z whose lights can reach into the view: the
+   * chunks in view and those up to LIGHT_REACH tiles around it. */
+  private chunksLighting(scene: Scene, camera: Camera, z: number, plan: ChunkPlan): GeoChunk[] {
+    const range = camera.tiles(z, LIGHT_REACH, LIGHT_REACH);
+    const out: GeoChunk[] = [...(plan.underneath.get(z) ?? [])];
+    for (let chunkY = chunkOfTile(Math.max(0, range.y0)); chunkY <= chunkOfTile(Math.max(0, range.y1)); chunkY++) {
+      for (let chunkX = chunkOfTile(Math.max(0, range.x0)); chunkX <= chunkOfTile(Math.max(0, range.x1)); chunkX++) {
+        const chunk = scene.geo.get(chunkKey(chunkX, chunkY, z), plan.signature);
+        if (chunk) out.push(chunk);
+      }
+    }
+    return out;
   }
 
   /** Draws chunks over what is drawn, their tiles in drawing order among

@@ -108,7 +108,7 @@ function geoChunk(key: number, sig: string): GeoChunk {
   }
   const anim = key % 3 === 0 ? new Uint32Array([1, 5, 0, 2, 10, 1, 3, 17, 0]) : new Uint32Array(0);
   const comp = key % 4 === 0 ? new Uint32Array([4, 120, 121, 0x01020304, 5, 130, 0, 0x05060708]) : new Uint32Array(0);
-  return { key, quads, n, anim, comp, sprites: Uint32Array.from(sprites), sig };
+  return { key, quads, n, anim, comp, sprites: Uint32Array.from(sprites), lights: new DataView(new ArrayBuffer(0)), lightCount: 0, shades: null, sig };
 }
 
 /** complete: every chunk is built (none still loading). */
@@ -212,6 +212,7 @@ const ALL: ViewOptions = {
   ghostItems: true,
   clientBox: true,
   lights: false,
+  ambientLight: 50,
 };
 
 describe("MapRenderer", () => {

@@ -36,13 +36,15 @@
     map.thickness = density / 100;
   });
 
-  const QUICK: { key: keyof typeof map.view; icon: string; title: string }[] = [
+  type ViewToggle = { [Key in keyof typeof map.view]: (typeof map.view)[Key] extends boolean ? Key : never }[keyof typeof map.view];
+  const QUICK: { key: ViewToggle; icon: string; title: string }[] = [
     { key: "grid", icon: "grid", title: "Grid (G)" },
     { key: "lowerFloors", icon: "sheet", title: "Show lower floors (L)" },
     { key: "ghostHigher", icon: "film", title: "Ghost the floor above (H)" },
+    { key: "lights", icon: "sun", title: "Lights (I)" },
   ];
   // What is drawn over the map, shown or hidden with one click.
-  const LAYERS: { key: keyof typeof map.view; icon: string; title: string }[] = [
+  const LAYERS: { key: ViewToggle; icon: string; title: string }[] = [
     { key: "creatures", icon: "person", title: "Creatures" },
     { key: "spawns", icon: "target", title: "Spawn areas" },
     { key: "houses", icon: "home", title: "Houses" },
@@ -132,6 +134,11 @@
     {#each QUICK as q}
       <button class="t-icon-btn" class:on={map.view[q.key]} title={q.title} onclick={() => (map.view[q.key] = !map.view[q.key])}><Icon name={q.icon} /></button>
     {/each}
+    {#if map.view.lights}
+      <span class="t-label" title="Ambient light: how bright the map is away from lights">Ambient</span>
+      <Slider bind:value={map.view.ambientLight} min={0} max={100} width={70} />
+      <span class="val pct">{map.view.ambientLight}%</span>
+    {/if}
     <button class="t-btn sm" class:on={!!map.settings?.automagic} title="Automatic borders and walls (A)" onclick={mapCommands.toggleAutomagic}>Auto</button>
   </div>
 
@@ -187,6 +194,9 @@
   }
   .n {
     width: 46px;
+  }
+  .pct {
+    min-width: 30px;
   }
   .doors {
     flex: none;

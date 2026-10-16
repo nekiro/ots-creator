@@ -29,6 +29,8 @@ export const GEO_COMPOSED = 0x80000000;
 export const GEO_RECT = 0x40000000;
 /** Added to the key of a block's top-left chunk: the key of the block (blocks and chunks share a store). */
 export const GEO_BLOCK = 1 << 28;
+/** Bytes per light source (see GeoChunk.lights). */
+export const LIGHT_BYTES = 8;
 /** Bytes per quad: int16 x, y, uint32 sprite, rgba8 color, uint16 x, y of its tile (from the chunk's corner). */
 export const QUAD_BYTES = 16;
 
@@ -89,6 +91,12 @@ export interface GeoChunk {
   comp: Uint32Array;
   /** Every plain sprite the quads use. */
   sprites: Uint32Array;
+  /** Light sources, LIGHT_BYTES each: int16 x, y (world pixels from the chunk's corner), uint8 level, uint8 color (8-bit client color). */
+  lights: DataView;
+  /** Light sources in lights. */
+  lightCount: number;
+  /** Tiles with a ground, one bit each row by row (null: none): they hide the light of the floors under them. */
+  shades: Uint8Array | null;
   /** What it was built for. */
   sig: string;
 }
@@ -98,13 +106,14 @@ export function decodeGeo(buf: ArrayBuffer, sig: string): GeoChunk[] {
   const view = new DataView(buf);
   const out: GeoChunk[] = [];
   let offset = 0;
-  while (offset + 20 <= buf.byteLength) {
+  while (offset + 24 <= buf.byteLength) {
     const key = view.getUint32(offset, true);
     const quadCount = view.getUint32(offset + 4, true);
     const animCount = view.getUint32(offset + 8, true);
     const composedCount = view.getUint32(offset + 12, true);
     const spriteCount = view.getUint32(offset + 16, true);
-    offset += 20;
+    const lightCount = view.getUint32(offset + 20, true);
+    offset += 24;
     const quads = new Uint8Array(buf, offset, quadCount * QUAD_BYTES);
     offset += quadCount * QUAD_BYTES;
     // Every part is a multiple of 4 bytes long, so the views stay aligned.
@@ -114,7 +123,13 @@ export function decodeGeo(buf: ArrayBuffer, sig: string): GeoChunk[] {
     offset += composedCount * 16;
     const sprites = new Uint32Array(buf, offset, spriteCount);
     offset += spriteCount * 4;
-    out.push({ key, quads, n: quadCount, anim, comp, sprites, sig });
+    const lights = new DataView(buf, offset, lightCount * LIGHT_BYTES);
+    offset += lightCount * LIGHT_BYTES;
+    const shadeBytes = view.getUint32(offset, true);
+    offset += 4;
+    const shades = shadeBytes ? new Uint8Array(buf, offset, shadeBytes) : null;
+    offset += shadeBytes;
+    out.push({ key, quads, n: quadCount, anim, comp, sprites, lights, lightCount, shades, sig });
   }
   return out;
 }

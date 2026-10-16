@@ -54,7 +54,7 @@ func TestGeoChunk(t *testing.T) {
 	if n != 9 || sprites != 1 {
 		t.Fatalf("%d quads, %d sprites", n, sprites)
 	}
-	q := b[20:]
+	q := b[24:]
 	x, y := int16(binary.LittleEndian.Uint16(q)), int16(binary.LittleEndian.Uint16(q[2:]))
 	if x != 0 || y != 32 || binary.LittleEndian.Uint32(q[4:]) != ids[0] || q[8] != 255 || q[11] != 255 {
 		t.Fatalf("quad %v", q[:16])
@@ -70,12 +70,13 @@ func TestGeoChunk(t *testing.T) {
 			t.Fatalf("quad %d of tile %d,%d, want %v", i, tx, ty, want)
 		}
 	}
-	if u32(20+n*16) != ids[0] {
-		t.Fatalf("sprite list %d", u32(20+n*16))
+	if u32(24+n*16) != ids[0] {
+		t.Fatalf("sprite list %d", u32(24+n*16))
 	}
-	// The empty chunk follows.
-	rest := b[20+n*16+4:]
-	if len(rest) != 20 || binary.LittleEndian.Uint32(rest[4:]) != 0 {
+	// The grounds hide the light under them (128 bytes of shade bits); the empty chunk follows.
+	shadeBytes := int(u32(24 + n*16 + 4))
+	rest := b[24+n*16+4+4+shadeBytes:]
+	if shadeBytes != 128 || len(rest) != 28 || binary.LittleEndian.Uint32(rest[4:]) != 0 {
 		t.Fatalf("empty chunk %v", rest)
 	}
 	// A block of 4x4 chunks from (0, 0) holds the square, placed from the block's corner.
@@ -85,7 +86,7 @@ func TestGeoChunk(t *testing.T) {
 	if n := int(u32(4)); n != 9 {
 		t.Fatalf("block: %d quads", n)
 	}
-	if x, y := int16(binary.LittleEndian.Uint16(b[20:])), int16(binary.LittleEndian.Uint16(b[22:])); x != 32*32 || y != 33*32 {
+	if x, y := int16(binary.LittleEndian.Uint16(b[24:])), int16(binary.LittleEndian.Uint16(b[26:])); x != 32*32 || y != 33*32 {
 		t.Fatalf("block quad at %d,%d", x, y)
 	}
 }

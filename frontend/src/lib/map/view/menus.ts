@@ -20,7 +20,9 @@ function copy(text: string) {
   );
 }
 
-const toggle = (key: keyof ViewOptions, label: string, keys?: string): MenuEntry => ({
+/** View options that are on or off. */
+type ViewToggle = { [Key in keyof ViewOptions]: ViewOptions[Key] extends boolean ? Key : never }[keyof ViewOptions];
+const toggle = (key: ViewToggle, label: string, keys?: string): MenuEntry => ({
   label,
   keys,
   checked: () => !!map.view[key],
@@ -87,6 +89,7 @@ export function mapMenus(): { label: string; items: MenuEntry[] }[] {
         toggle("shade", "Darken lower floors"),
         toggle("grid", "Grid", keyLabel("grid")),
         toggle("clientBox", "What a player sees"),
+        toggle("lights", "Lights", keyLabel("lights")),
         "-",
         toggle("creatures", "Creatures"),
         toggle("labels", "Names on the map"),

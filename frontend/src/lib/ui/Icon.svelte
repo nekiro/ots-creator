@@ -17,6 +17,7 @@
     pause: "M4 3h3v10H4z M9 3h3v10H9z",
     prev: "M11 3L5 8l6 5z M4 3v10",
     next: "M5 3l6 5-6 5z M12 3v10",
+    sun: "M8 5a3 3 0 1 1 0 6a3 3 0 1 1 0-6 M8 1v2 M8 13v2 M1 8h2 M13 8h2 M3 3l1.5 1.5 M11.5 11.5L13 13 M3 13l1.5-1.5 M11.5 4.5L13 3",
     grid: "M2 2h12v12H2z M6 2v12 M10 2v12 M2 6h12 M2 10h12",
     pencil: "M3 13l1-3 7-7 2 2-7 7z M10 4l2 2 M3 13h3",
     eraser: "M6 13l-3-3 6-6 4 4-5 5z M6 6l4 4 M6 13h7",

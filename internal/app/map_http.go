@@ -64,11 +64,12 @@ func (ms *MapService) serveMap(w http.ResponseWriter, r *http.Request, parts []s
 // scene is what maprender draws the map from.
 func (ms *MapService) scene(m *openMap, data *mapData) *maprender.Scene {
 	return &maprender.Scene{
-		Map:        m.editor.Map,
-		Items:      m.editor.Items,
-		Things:     data.project,
-		SpriteSize: data.project.SpriteSize(),
-		IsBlocking: m.editor.IsBlocking,
+		Map:          m.editor.Map,
+		Items:        m.editor.Items,
+		Things:       data.project,
+		SpriteSize:   data.project.SpriteSize(),
+		SpritePixels: data.project.SpritePixels,
+		IsBlocking:   m.editor.IsBlocking,
 		Outfit: func(creature string) materials.Outfit {
 			outfit, _ := data.outfit(creature)
 			return outfit

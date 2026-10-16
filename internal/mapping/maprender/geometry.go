@@ -3,6 +3,7 @@ package maprender
 import (
 	"encoding/binary"
 	"math"
+	"slices"
 
 	"github.com/nekiro/ots-creator/internal/mapping/materials"
 	"github.com/nekiro/ots-creator/internal/core/otitems"
@@ -140,6 +141,14 @@ type thingLook struct {
 	offsetX, offsetY int
 	elevation        int
 	hangable         bool
+	// lightLevel and lightColor: the light the thing gives (level 0: none).
+	lightLevel, lightColor uint8
+	// lightOrigins caches lightOrigin by pattern.
+	lightOrigins map[int]lightOrigin
+	// ground, groundBorder and fullGround are client flags (see canShade).
+	ground, groundBorder, fullGround bool
+	// opacity: opacityUnknown until isOpaque computes it.
+	opacity uint8
 }
 
 // geometryBuilder builds the quads of chunks. It is not safe for
@@ -158,6 +167,12 @@ type geometryBuilder struct {
 	animatedCount int
 	composed      []byte
 	composedCount int
+	lights        []byte
+	lightCount    int
+	// shades marks the tiles that hide the light of the floors under them
+	// (see canShade), row by row, one bit each.
+	shades    []byte
+	hasShades bool
 	sprites       map[uint32]struct{}
 	// chunks are the chunks of the key being built, row by row; scratch
 	// and scratchItems hold the packed tile being drawn.
@@ -210,12 +225,15 @@ func (b *geometryBuilder) lookOf(category thing.Category, id uint32) *thingLook 
 	if found, err := b.scene.Things.Thing(category, id); err == nil && len(found.FrameGroups) > 0 {
 		group := found.FrameGroups[0]
 		if group.PatternX > 0 && group.PatternY > 0 && group.PatternZ > 0 && group.Width > 0 && group.Height > 0 && group.Layers > 0 {
-			look = &thingLook{frameGroup: group, hangable: found.Props.Hangable}
+			look = &thingLook{frameGroup: group, hangable: found.Props.Hangable, ground: found.Props.Ground, groundBorder: found.Props.GroundBorder, fullGround: found.Props.FullGround}
 			if found.Props.HasOffset {
 				look.offsetX, look.offsetY = int(found.Props.OffsetX), int(found.Props.OffsetY)
 			}
 			if found.Props.HasElevation {
 				look.elevation = int(found.Props.Elevation)
+			}
+			if found.Props.HasLight && found.Props.LightLevel > 0 {
+				look.lightLevel, look.lightColor = uint8(min(found.Props.LightLevel, 255)), uint8(found.Props.LightColor)
 			}
 		}
 	}
@@ -303,6 +321,9 @@ func (b *geometryBuilder) item(item otmap.Item, p tilePosition, anchorX, anchorY
 	}
 	at := itemPattern(itemType, look, item.Subtype, p, hook)
 	b.drawLook(look, uint32(itemType.ClientID), at, anchorX, anchorY, color, b.view(ViewAnimation), nil)
+	if look.lightLevel > 0 {
+		b.light(look, at, anchorX, anchorY)
+	}
 	return look.elevation
 }
 
@@ -477,6 +498,9 @@ func (b *geometryBuilder) tile(tile *otmap.Tile, p tilePosition, anchorX, anchor
 	color := b.tileTint(tile, things > 0)
 	hook := b.tileHook(tile)
 	elevation := 0
+	if b.canShade(tile) {
+		b.shade()
+	}
 	if tile.Ground.ID != 0 {
 		elevation += b.item(tile.Ground, p, anchorX, anchorY, color.scaled(selectionDim(tile.Ground)), hook)
 	}
@@ -536,15 +560,18 @@ func (b *geometryBuilder) skip(itemType *otitems.Type) bool {
 
 // chunk appends the geometry of one chunk to out:
 //
-//	u32 key, u32 quads, u32 animated, u32 composed, u32 sprites, then
-//	quads (16 bytes each, see quad), animated pieces (u32 quad, u32 client
-//	item id, u32 frame 0 sprite index), composed pieces (u32 quad, u32
-//	sprite, u32 template sprite, u8 head, body, legs, feet), sprite ids
-//	(u32 each, every plain sprite the quads use).
+//	u32 key, u32 quads, u32 animated, u32 composed, u32 sprites, u32
+//	lights, then quads (16 bytes each, see quad), animated pieces (u32
+//	quad, u32 client item id, u32 frame 0 sprite index), composed pieces
+//	(u32 quad, u32 sprite, u32 template sprite, u8 head, body, legs, feet),
+//	sprite ids (u32 each, every plain sprite the quads use), light sources
+//	(8 bytes each, see light), then u32 shade bytes and the shade bits
+//	(see shades; none when no tile hides the light under it).
 func (b *geometryBuilder) chunk(key otmap.ChunkKey, out []byte) []byte {
 	b.quads, b.quadCount = b.quads[:0], 0
 	b.animated, b.animatedCount = b.animated[:0], 0
 	b.composed, b.composedCount = b.composed[:0], 0
+	b.lights, b.lightCount = b.lights[:0], 0
 	clear(b.sprites)
 	chunkX, chunkY, floor := key.Split()
 	originX, originY := int(chunkX)<<otmap.ChunkBits, int(chunkY)<<otmap.ChunkBits
@@ -564,6 +591,8 @@ func (b *geometryBuilder) chunk(key otmap.ChunkKey, out []byte) []byte {
 	// the tile left of it, which the tile below-left of it (on the same
 	// diagonal) reaches too and is drawn before it.
 	size := block << otmap.ChunkBits
+	b.shades, b.hasShades = slices.Grow(b.shades[:0], size*size/8)[:size*size/8], false
+	clear(b.shades)
 	spriteSize := b.scene.SpriteSize
 	for diagonal := 0; found && diagonal < 2*size-1; diagonal++ {
 		for localX := max(0, diagonal-size+1); localX <= min(diagonal, size-1); localX++ {
@@ -586,11 +615,17 @@ func (b *geometryBuilder) chunk(key otmap.ChunkKey, out []byte) []byte {
 	out = binary.LittleEndian.AppendUint32(out, uint32(b.animatedCount))
 	out = binary.LittleEndian.AppendUint32(out, uint32(b.composedCount))
 	out = binary.LittleEndian.AppendUint32(out, uint32(len(b.sprites)))
+	out = binary.LittleEndian.AppendUint32(out, uint32(b.lightCount))
 	out = append(out, b.quads...)
 	out = append(out, b.animated...)
 	out = append(out, b.composed...)
 	for spriteID := range b.sprites {
 		out = binary.LittleEndian.AppendUint32(out, spriteID)
 	}
-	return out
+	out = append(out, b.lights...)
+	if !b.hasShades {
+		return binary.LittleEndian.AppendUint32(out, 0)
+	}
+	out = binary.LittleEndian.AppendUint32(out, uint32(len(b.shades)))
+	return append(out, b.shades...)
 }

@@ -28,7 +28,10 @@ export interface ViewOptions {
   coords: boolean;
   ghostItems: boolean;
   clientBox: boolean;
+  /** Darken the map to the ambient light and light it with item lights, as the client does. */
   lights: boolean;
+  /** Ambient light with lights on, 0 (dark) to 100 % (client: "Ambient light"). */
+  ambientLight: number;
 }
 
 export interface GhostTile {

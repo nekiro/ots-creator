@@ -23,6 +23,9 @@ type Scene struct {
 	Things ThingSource
 	// SpriteSize is the size in pixels of one sprite (one tile).
 	SpriteSize int
+	// SpritePixels returns the RGBA pixels of a sprite. Optional: without
+	// it lights come from the middle of things and no thing is opaque.
+	SpritePixels func(id uint32) ([]byte, error)
 	// IsBlocking reports whether a tile blocks walking.
 	IsBlocking func(tile *otmap.Tile) bool
 	// Outfit returns the look of a creature by name (zero when unknown).
