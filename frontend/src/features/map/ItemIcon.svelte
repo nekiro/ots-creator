@@ -14,7 +14,7 @@
   );
 </script>
 
-<span class="icon" style="width:{size}px;height:{size}px">
+<span class="icon t-loader" style="width:{size}px;height:{size}px">
   {#if src}
     <img class="pixel" {src} alt="" loading="lazy" decoding="async" draggable="false" use:loading={src} style="max-width:{size}px;max-height:{size}px" />
   {:else if id}

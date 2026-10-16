@@ -425,11 +425,13 @@ input[type="number"].t-input::-webkit-outer-spin-button {
   flex: none;
 }
 /* Tibia-style hourglass (flips every 650ms) while the slot's image loads; delayed so
-   cached images never flash it */
-.t-slot.loading {
+   cached images never flash it. .t-loader marks other image holders (map item icons). */
+.t-slot.loading,
+.t-loader.loading {
   position: relative;
 }
-.t-slot.loading::after {
+.t-slot.loading::after,
+.t-loader.loading::after {
   content: "";
   position: absolute;
   inset: 0;

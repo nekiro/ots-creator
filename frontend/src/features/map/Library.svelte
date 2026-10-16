@@ -55,6 +55,8 @@
   $effect(() => saveJson(PREFS_KEY, { view, collection }));
 
   const palette = $derived(map.palette);
+  /** The item table and palette are on their way (none when the client has no map data). */
+  const loadingData = $derived((map.data === null || map.data.ready) && (!map.items || !map.palette));
   const sets = $derived(palette?.tilesets?.filter((tileset) => !!tileset) ?? []);
   const set = $derived(sets.find((tileset) => tileset.name === collection) ?? null);
   const collections = $derived([{ value: "", label: "All collections" }, ...sets.map((tileset) => ({ value: tileset.name, label: tileset.name }))]);
@@ -279,7 +281,11 @@
     </div>
   {/if}
 
-  {#if view === "terrain"}
+  {#if loadingData}
+    <div class="m-body t-panel">
+      <div class="m-empty" role="status"><span class="busy"><span class="t-spinner"></span>Loading items…</span></div>
+    </div>
+  {:else if view === "terrain"}
     <div class="m-body t-panel m-scroll">
       {#each TERRAIN_GROUPS as group}
         {@const list = terrain.filter((brush) => group.kinds.includes(brush.kind))}
@@ -474,5 +480,10 @@
   .npc {
     background: rgba(90, 160, 255, 0.35);
     border-color: #6af;
+  }
+  .busy {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
   }
 </style>
