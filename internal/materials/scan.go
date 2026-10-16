@@ -9,11 +9,20 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/nekiro/ots-creator/internal/xmltree"
+
 	"github.com/nekiro/ots-creator/internal/otitems"
 )
 
-// maxScanFiles limits how many files a creature scan reads.
-const maxScanFiles = 50000
+const (
+	// maxScanFiles limits how many files a creature scan reads.
+	maxScanFiles = 50000
+	// maxScanFileSize skips bigger files in a creature scan.
+	maxScanFileSize = 2 << 20
+	// xmlSniffBytes is how much of an XML file is checked for a creature
+	// root before parsing it.
+	xmlSniffBytes = 512
+)
 
 var (
 	reMonsterType = regexp.MustCompile(`Game\.createMonsterType\(\s*"([^"]+)"`)
@@ -29,36 +38,36 @@ var (
 func ScanCreatures(dir string) ([]*CreatureType, error) {
 	var out []*CreatureType
 	seen := map[string]bool{}
-	add := func(c *CreatureType) {
-		key := strings.ToLower(c.Name)
-		if c.Name == "" || seen[key] {
+	add := func(creature *CreatureType) {
+		key := strings.ToLower(creature.Name)
+		if creature.Name == "" || seen[key] {
 			return
 		}
 		seen[key] = true
-		out = append(out, c)
+		out = append(out, creature)
 	}
-	files := 0
-	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+	fileCount := 0
+	err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return nil // unreadable entries are skipped
 		}
-		if d.IsDir() {
-			name := strings.ToLower(d.Name())
+		if entry.IsDir() {
+			name := strings.ToLower(entry.Name())
 			if path != dir && (strings.HasPrefix(name, ".") || name == "node_modules" || name == "world" || name == "logs") {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		files++
-		if files > maxScanFiles {
+		fileCount++
+		if fileCount > maxScanFiles {
 			return filepath.SkipAll
 		}
 		ext := strings.ToLower(filepath.Ext(path))
 		if ext != ".xml" && ext != ".lua" {
 			return nil
 		}
-		info, err := d.Info()
-		if err != nil || info.Size() > 2<<20 {
+		info, err := entry.Info()
+		if err != nil || info.Size() > maxScanFileSize {
 			return nil
 		}
 		data, err := os.ReadFile(path)
@@ -66,83 +75,85 @@ func ScanCreatures(dir string) ([]*CreatureType, error) {
 			return nil
 		}
 		if ext == ".xml" {
-			if c := xmlCreature(data); c != nil {
-				add(c)
+			if creature := xmlCreature(data); creature != nil {
+				add(creature)
 			}
 			return nil
 		}
-		for _, c := range luaCreatures(string(data)) {
-			add(c)
+		for _, creature := range luaCreatures(string(data)) {
+			add(creature)
 		}
 		return nil
 	})
-	slices.SortFunc(out, func(a, b *CreatureType) int { return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)) })
+	slices.SortFunc(out, func(left, right *CreatureType) int {
+		return strings.Compare(strings.ToLower(left.Name), strings.ToLower(right.Name))
+	})
 	return out, err
 }
 
 func xmlCreature(data []byte) *CreatureType {
 	// Cheap check before parsing every xml file of a server.
-	head := strings.ToLower(string(data[:min(len(data), 512)]))
+	head := strings.ToLower(string(data[:min(len(data), xmlSniffBytes)]))
 	if !strings.Contains(head, "<monster") && !strings.Contains(head, "<npc") {
 		return nil
 	}
-	root, err := parseXML(data)
-	if err != nil || (root.name != "monster" && root.name != "npc") || root.str("name") == "" {
+	root, err := xmltree.Parse(data)
+	if err != nil || (root.Name != "monster" && root.Name != "npc") || root.Str("name") == "" {
 		return nil
 	}
-	c := &CreatureType{Name: root.str("name"), NPC: root.name == "npc"}
-	for _, n := range root.children {
-		if n.name != "look" {
+	creature := &CreatureType{Name: root.Str("name"), NPC: root.Name == "npc"}
+	for _, node := range root.Children {
+		if node.Name != "look" {
 			continue
 		}
-		c.Outfit = Outfit{
-			LookType: n.u16("type"), Head: uint8(n.num("head")), Body: uint8(n.num("body")),
-			Legs: uint8(n.num("legs")), Feet: uint8(n.num("feet")), Addons: uint8(n.num("addons")),
-			Mount: n.u16("mount"), LookItem: n.u16("typeex"),
+		creature.Outfit = Outfit{
+			LookType: node.U16("type"), Head: uint8(node.Int("head")), Body: uint8(node.Int("body")),
+			Legs: uint8(node.Int("legs")), Feet: uint8(node.Int("feet")), Addons: uint8(node.Int("addons")),
+			Mount: node.U16("mount"), LookItem: node.U16("typeex"),
 		}
 	}
-	return c
+	return creature
 }
 
 func luaCreatures(src string) []*CreatureType {
 	var out []*CreatureType
 	outfit := func() Outfit {
-		var o Outfit
-		m := reOutfit.FindStringSubmatch(src)
-		if m == nil {
-			return o
+		var result Outfit
+		match := reOutfit.FindStringSubmatch(src)
+		if match == nil {
+			return result
 		}
-		for _, kv := range reKeyValue.FindAllStringSubmatch(m[1], -1) {
-			v, _ := strconv.Atoi(kv[2])
-			switch strings.ToLower(kv[1]) {
+		for _, pair := range reKeyValue.FindAllStringSubmatch(match[1], -1) {
+			value, _ := strconv.Atoi(pair[2])
+			switch strings.ToLower(pair[1]) {
 			case "looktype":
-				o.LookType = uint16(v)
+				result.LookType = uint16(value)
 			case "lookhead":
-				o.Head = uint8(v)
+				result.Head = uint8(value)
 			case "lookbody":
-				o.Body = uint8(v)
+				result.Body = uint8(value)
 			case "looklegs":
-				o.Legs = uint8(v)
+				result.Legs = uint8(value)
 			case "lookfeet":
-				o.Feet = uint8(v)
+				result.Feet = uint8(value)
 			case "lookaddons":
-				o.Addons = uint8(v)
+				result.Addons = uint8(value)
 			case "lookmount":
-				o.Mount = uint16(v)
+				result.Mount = uint16(value)
 			case "looktypeex":
-				o.LookItem = uint16(v)
+				result.LookItem = uint16(value)
 			}
 		}
-		return o
+		return result
 	}
-	if m := reMonsterType.FindStringSubmatch(src); m != nil {
-		out = append(out, &CreatureType{Name: m[1], Outfit: outfit()})
+	if match := reMonsterType.FindStringSubmatch(src); match != nil {
+		out = append(out, &CreatureType{Name: match[1], Outfit: outfit()})
 		return out
 	}
 	name := ""
-	for _, re := range []*regexp.Regexp{reNpcType, reNpcVar, reNpcConfig} {
-		if m := re.FindStringSubmatch(src); m != nil {
-			name = m[1]
+	for _, pattern := range []*regexp.Regexp{reNpcType, reNpcVar, reNpcConfig} {
+		if match := pattern.FindStringSubmatch(src); match != nil {
+			name = match[1]
 			break
 		}
 	}
@@ -157,41 +168,43 @@ func luaCreatures(src string) []*CreatureType {
 func AutoTilesets(db *otitems.DB) []*Tileset {
 	groups := []struct {
 		name string
-		test func(t *otitems.Type) bool
+		test func(itemType *otitems.Type) bool
 	}{
-		{"Grounds", func(t *otitems.Type) bool { return t.IsGround() }},
-		{"Borders", func(t *otitems.Type) bool { return t.TopOrder == 1 }},
-		{"Walls", func(t *otitems.Type) bool { return t.TopOrder == 2 && !t.IsDoor() }},
-		{"Doors", func(t *otitems.Type) bool { return t.IsDoor() }},
-		{"Stairs & holes", func(t *otitems.Type) bool { return t.Flags.Has(otitems.FlagFloorChange) || t.IsTeleport() }},
-		{"Containers", func(t *otitems.Type) bool { return t.IsContainer() }},
-		{"Fluids & splashes", func(t *otitems.Type) bool {
-			return t.Flags&(otitems.FlagSplash|otitems.FlagFluidContainer) != 0
+		{"Grounds", func(itemType *otitems.Type) bool { return itemType.IsGround() }},
+		{"Borders", func(itemType *otitems.Type) bool { return itemType.TopOrder == 1 }},
+		{"Walls", func(itemType *otitems.Type) bool { return itemType.TopOrder == 2 && !itemType.IsDoor() }},
+		{"Doors", func(itemType *otitems.Type) bool { return itemType.IsDoor() }},
+		{"Stairs & holes", func(itemType *otitems.Type) bool {
+			return itemType.Flags.Has(otitems.FlagFloorChange) || itemType.IsTeleport()
 		}},
-		{"Top items", func(t *otitems.Type) bool { return t.TopOrder == 3 }},
-		{"Light sources", func(t *otitems.Type) bool {
-			return t.Flags.Has(otitems.FlagLight) && !t.Flags.Has(otitems.FlagPickupable)
+		{"Containers", func(itemType *otitems.Type) bool { return itemType.IsContainer() }},
+		{"Fluids & splashes", func(itemType *otitems.Type) bool {
+			return itemType.Flags&(otitems.FlagSplash|otitems.FlagFluidContainer) != 0
 		}},
-		{"Blocking decoration", func(t *otitems.Type) bool {
-			return t.Flags.Has(otitems.FlagUnpassable) && !t.Flags.Has(otitems.FlagPickupable)
+		{"Top items", func(itemType *otitems.Type) bool { return itemType.TopOrder == 3 }},
+		{"Light sources", func(itemType *otitems.Type) bool {
+			return itemType.Flags.Has(otitems.FlagLight) && !itemType.Flags.Has(otitems.FlagPickupable)
 		}},
-		{"Decoration", func(t *otitems.Type) bool { return !t.Flags.Has(otitems.FlagPickupable) }},
-		{"Pickupable items", func(t *otitems.Type) bool { return t.Flags.Has(otitems.FlagPickupable) }},
+		{"Blocking decoration", func(itemType *otitems.Type) bool {
+			return itemType.Flags.Has(otitems.FlagUnpassable) && !itemType.Flags.Has(otitems.FlagPickupable)
+		}},
+		{"Decoration", func(itemType *otitems.Type) bool { return !itemType.Flags.Has(otitems.FlagPickupable) }},
+		{"Pickupable items", func(itemType *otitems.Type) bool { return itemType.Flags.Has(otitems.FlagPickupable) }},
 	}
 	sets := make([]*Tileset, len(groups))
-	for i, g := range groups {
-		sets[i] = &Tileset{Name: g.name, Auto: true}
+	for i, group := range groups {
+		sets[i] = &Tileset{Name: group.name, Auto: true}
 	}
-	db.Each(func(t *otitems.Type) {
-		if t.Flags.Has(otitems.FlagMeta) || t.ClientID == 0 {
+	db.Each(func(itemType *otitems.Type) {
+		if itemType.Flags.Has(otitems.FlagMeta) || itemType.ClientID == 0 {
 			return
 		}
-		for i, g := range groups {
-			if g.test(t) {
-				sets[i].Raw = append(sets[i].Raw, t.ID)
+		for i, group := range groups {
+			if group.test(itemType) {
+				sets[i].Raw = append(sets[i].Raw, itemType.ID)
 				return
 			}
 		}
 	})
-	return slices.DeleteFunc(sets, func(s *Tileset) bool { return len(s.Raw) == 0 })
+	return slices.DeleteFunc(sets, func(tileset *Tileset) bool { return len(tileset.Raw) == 0 })
 }

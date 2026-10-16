@@ -16,8 +16,8 @@
       const files = await MapService.ExportMinimap(map.activeId, dir, floors.map((on, z) => (on ? z : -1)).filter((z) => z >= 0));
       toast(`Wrote ${files?.length ?? 0} images.`, "success");
       map.dialog = null;
-    } catch (e) {
-      toast(errorMessage(e), "error");
+    } catch (err) {
+      toast(errorMessage(err), "error");
     } finally {
       busy = false;
     }

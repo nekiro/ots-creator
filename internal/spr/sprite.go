@@ -12,9 +12,9 @@ import (
 // Without transparency, colored pixels are stored as opaque RGB.
 // A fully transparent sprite compresses to an empty slice.
 func Compress(rgba []byte, size int, transparent bool) []byte {
-	n := size * size
-	if len(rgba) != n*4 {
-		panic(fmt.Sprintf("spr.Compress: got %d bytes, want %d", len(rgba), n*4))
+	pixelCount := size * size
+	if len(rgba) != pixelCount*4 {
+		panic(fmt.Sprintf("spr.Compress: got %d bytes, want %d", len(rgba), pixelCount*4))
 	}
 	channels := 3
 	if transparent {
@@ -22,22 +22,22 @@ func Compress(rgba []byte, size int, transparent bool) []byte {
 	}
 	out := make([]byte, 0, 64)
 	i := 0
-	for i < n {
+	for i < pixelCount {
 		skip := 0
-		for i < n && rgba[i*4+3] == 0 {
+		for i < pixelCount && rgba[i*4+3] == 0 {
 			skip++
 			i++
 		}
-		if i >= n {
+		if i >= pixelCount {
 			break // trailing transparent pixels are implicit
 		}
 		start := len(out)
 		out = binary.LittleEndian.AppendUint16(out, uint16(skip))
 		out = append(out, 0, 0) // colored count, patched below
 		colored := 0
-		for i < n && rgba[i*4+3] != 0 {
-			p := rgba[i*4 : i*4+4]
-			out = append(out, p[:channels]...)
+		for i < pixelCount && rgba[i*4+3] != 0 {
+			pixel := rgba[i*4 : i*4+4]
+			out = append(out, pixel[:channels]...)
 			colored++
 			i++
 		}
@@ -55,9 +55,9 @@ func Decompress(data []byte, size int, transparent bool) ([]byte, error) {
 // DecompressInto decodes RLE data into dst, which must hold size*size*4
 // bytes. dst is fully overwritten.
 func DecompressInto(dst, data []byte, size int, transparent bool) error {
-	n := size * size
-	if len(dst) != n*4 {
-		return fmt.Errorf("spr: destination has %d bytes, want %d", len(dst), n*4)
+	pixelCount := size * size
+	if len(dst) != pixelCount*4 {
+		return fmt.Errorf("spr: destination has %d bytes, want %d", len(dst), pixelCount*4)
 	}
 	clear(dst)
 	channels := 3
@@ -73,19 +73,19 @@ func DecompressInto(dst, data []byte, size int, transparent bool) error {
 		colored := int(binary.LittleEndian.Uint16(data[pos+2:]))
 		pos += 4
 		pixel += skip
-		if pixel+colored > n {
-			return fmt.Errorf("spr: pixel overflow (%d > %d)", pixel+colored, n)
+		if pixel+colored > pixelCount {
+			return fmt.Errorf("spr: pixel overflow (%d > %d)", pixel+colored, pixelCount)
 		}
 		if pos+colored*channels > len(data) {
 			return fmt.Errorf("spr: truncated pixel data at %d", pos)
 		}
-		for k := 0; k < colored; k++ {
-			d := dst[pixel*4 : pixel*4+4]
-			d[0], d[1], d[2] = data[pos], data[pos+1], data[pos+2]
+		for i := 0; i < colored; i++ {
+			target := dst[pixel*4 : pixel*4+4]
+			target[0], target[1], target[2] = data[pos], data[pos+1], data[pos+2]
 			if transparent {
-				d[3] = data[pos+3]
+				target[3] = data[pos+3]
 			} else {
-				d[3] = 0xFF
+				target[3] = 0xFF
 			}
 			pos += channels
 			pixel++
@@ -100,9 +100,9 @@ func Transcode(data []byte, size int, from, to bool) ([]byte, error) {
 	if from == to || len(data) == 0 {
 		return data, nil
 	}
-	px, err := Decompress(data, size, from)
+	pixels, err := Decompress(data, size, from)
 	if err != nil {
 		return nil, err
 	}
-	return Compress(px, size, to), nil
+	return Compress(pixels, size, to), nil
 }

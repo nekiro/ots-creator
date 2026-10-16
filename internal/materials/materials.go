@@ -10,6 +10,8 @@ import (
 	"os"
 	"slices"
 	"strings"
+
+	"github.com/nekiro/ots-creator/internal/fsutil"
 )
 
 // FormatVersion is the version of the JSON format.
@@ -251,15 +253,15 @@ func Load(path string) (*Materials, error) {
 
 // Parse decodes materials JSON.
 func Parse(data []byte) (*Materials, error) {
-	m := New()
-	if err := json.Unmarshal(data, m); err != nil {
+	materials := New()
+	if err := json.Unmarshal(data, materials); err != nil {
 		return nil, fmt.Errorf("materials: %w", err)
 	}
-	if m.Version > FormatVersion {
-		return nil, fmt.Errorf("materials: version %d is newer than this editor supports", m.Version)
+	if materials.Version > FormatVersion {
+		return nil, fmt.Errorf("materials: version %d is newer than this editor supports", materials.Version)
 	}
-	m.Version = FormatVersion
-	return m, nil
+	materials.Version = FormatVersion
+	return materials, nil
 }
 
 // Save writes materials as indented JSON.
@@ -269,7 +271,7 @@ func (m *Materials) Save(path string) error {
 		return err
 	}
 	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+	if err := os.WriteFile(tmp, data, fsutil.FileMode); err != nil {
 		return err
 	}
 	return os.Rename(tmp, path)
@@ -277,9 +279,9 @@ func (m *Materials) Save(path string) error {
 
 // Brush returns a brush by name (case-insensitive) or nil.
 func (m *Materials) Brush(name string) *Brush {
-	for _, b := range m.Brushes {
-		if strings.EqualFold(b.Name, name) {
-			return b
+	for _, brush := range m.Brushes {
+		if strings.EqualFold(brush.Name, name) {
+			return brush
 		}
 	}
 	return nil
@@ -287,9 +289,9 @@ func (m *Materials) Brush(name string) *Brush {
 
 // Border returns a border by id or nil.
 func (m *Materials) Border(id uint32) *Border {
-	for _, b := range m.Borders {
-		if b.ID == id {
-			return b
+	for _, border := range m.Borders {
+		if border.ID == id {
+			return border
 		}
 	}
 	return nil
@@ -297,9 +299,9 @@ func (m *Materials) Border(id uint32) *Border {
 
 // Tileset returns a tileset by name or nil.
 func (m *Materials) Tileset(name string) *Tileset {
-	for _, t := range m.Tilesets {
-		if strings.EqualFold(t.Name, name) {
-			return t
+	for _, tileset := range m.Tilesets {
+		if strings.EqualFold(tileset.Name, name) {
+			return tileset
 		}
 	}
 	return nil
@@ -307,9 +309,9 @@ func (m *Materials) Tileset(name string) *Tileset {
 
 // Creature returns a creature type by name (case-insensitive) or nil.
 func (m *Materials) Creature(name string) *CreatureType {
-	for _, c := range m.Creatures {
-		if strings.EqualFold(c.Name, name) {
-			return c
+	for _, creature := range m.Creatures {
+		if strings.EqualFold(creature.Name, name) {
+			return creature
 		}
 	}
 	return nil
@@ -318,52 +320,52 @@ func (m *Materials) Creature(name string) *CreatureType {
 // NextBorderID returns an unused border id.
 func (m *Materials) NextBorderID() uint32 {
 	var id uint32
-	for _, b := range m.Borders {
-		id = max(id, b.ID)
+	for _, border := range m.Borders {
+		id = max(id, border.ID)
 	}
 	return id + 1
 }
 
 // RemoveBrush deletes a brush and its tileset entries.
 func (m *Materials) RemoveBrush(name string) {
-	m.Brushes = slices.DeleteFunc(m.Brushes, func(b *Brush) bool { return strings.EqualFold(b.Name, name) })
-	for _, t := range m.Tilesets {
-		del := func(s string) bool { return strings.EqualFold(s, name) }
-		t.Terrain = slices.DeleteFunc(t.Terrain, del)
-		t.Doodads = slices.DeleteFunc(t.Doodads, del)
+	m.Brushes = slices.DeleteFunc(m.Brushes, func(brush *Brush) bool { return strings.EqualFold(brush.Name, name) })
+	for _, tileset := range m.Tilesets {
+		matchesName := func(entry string) bool { return strings.EqualFold(entry, name) }
+		tileset.Terrain = slices.DeleteFunc(tileset.Terrain, matchesName)
+		tileset.Doodads = slices.DeleteFunc(tileset.Doodads, matchesName)
 	}
 }
 
 // RenameBrush renames a brush and every reference to it.
-func (m *Materials) RenameBrush(old, name string) {
-	eq := func(s string) bool { return strings.EqualFold(s, old) }
-	for _, b := range m.Brushes {
-		if eq(b.Name) {
-			b.Name = name
+func (m *Materials) RenameBrush(oldName, name string) {
+	isOld := func(entry string) bool { return strings.EqualFold(entry, oldName) }
+	for _, brush := range m.Brushes {
+		if isOld(brush.Name) {
+			brush.Name = name
 		}
-		for i := range b.Friends {
-			if eq(b.Friends[i]) {
-				b.Friends[i] = name
+		for i := range brush.Friends {
+			if isOld(brush.Friends[i]) {
+				brush.Friends[i] = name
 			}
 		}
-		if eq(b.Redirect) {
-			b.Redirect = name
+		if isOld(brush.Redirect) {
+			brush.Redirect = name
 		}
-		for i := range b.Borders {
-			if eq(b.Borders[i].To) {
-				b.Borders[i].To = name
+		for i := range brush.Borders {
+			if isOld(brush.Borders[i].To) {
+				brush.Borders[i].To = name
 			}
 		}
 	}
-	for _, t := range m.Tilesets {
-		for i := range t.Terrain {
-			if eq(t.Terrain[i]) {
-				t.Terrain[i] = name
+	for _, tileset := range m.Tilesets {
+		for i := range tileset.Terrain {
+			if isOld(tileset.Terrain[i]) {
+				tileset.Terrain[i] = name
 			}
 		}
-		for i := range t.Doodads {
-			if eq(t.Doodads[i]) {
-				t.Doodads[i] = name
+		for i := range tileset.Doodads {
+			if isOld(tileset.Doodads[i]) {
+				tileset.Doodads[i] = name
 			}
 		}
 	}
@@ -373,68 +375,68 @@ func (m *Materials) RenameBrush(old, name string) {
 // tileset name and creature name). Tilesets with the same name get the
 // missing entries.
 func (m *Materials) Merge(other *Materials) {
-	ids := map[uint32]uint32{}
-	for _, b := range other.Borders {
-		if m.Border(b.ID) == nil {
-			m.Borders = append(m.Borders, b)
+	renumbered := map[uint32]uint32{}
+	for _, border := range other.Borders {
+		if m.Border(border.ID) == nil {
+			m.Borders = append(m.Borders, border)
 			continue
 		}
 		// Clashing ids: renumber the imported border.
-		nb := *b
-		nb.ID = m.NextBorderID()
-		ids[b.ID] = nb.ID
-		m.Borders = append(m.Borders, &nb)
+		renumberedBorder := *border
+		renumberedBorder.ID = m.NextBorderID()
+		renumbered[border.ID] = renumberedBorder.ID
+		m.Borders = append(m.Borders, &renumberedBorder)
 	}
 	remap := func(id uint32) uint32 {
-		if n, ok := ids[id]; ok {
-			return n
+		if newID, ok := renumbered[id]; ok {
+			return newID
 		}
 		return id
 	}
-	for _, b := range other.Brushes {
-		if m.Brush(b.Name) != nil {
+	for _, brush := range other.Brushes {
+		if m.Brush(brush.Name) != nil {
 			continue
 		}
-		for i := range b.Borders {
-			b.Borders[i].Border = remap(b.Borders[i].Border)
+		for i := range brush.Borders {
+			brush.Borders[i].Border = remap(brush.Borders[i].Border)
 		}
-		if b.Optional != nil {
-			b.Optional.Border = remap(b.Optional.Border)
+		if brush.Optional != nil {
+			brush.Optional.Border = remap(brush.Optional.Border)
 		}
-		m.Brushes = append(m.Brushes, b)
+		m.Brushes = append(m.Brushes, brush)
 	}
-	for _, t := range other.Tilesets {
-		cur := m.Tileset(t.Name)
-		if cur == nil {
-			m.Tilesets = append(m.Tilesets, t)
+	for _, tileset := range other.Tilesets {
+		existing := m.Tileset(tileset.Name)
+		if existing == nil {
+			m.Tilesets = append(m.Tilesets, tileset)
 			continue
 		}
-		cur.Terrain = appendMissing(cur.Terrain, t.Terrain)
-		cur.Doodads = appendMissing(cur.Doodads, t.Doodads)
-		cur.Items = appendMissingIDs(cur.Items, t.Items)
-		cur.Raw = appendMissingIDs(cur.Raw, t.Raw)
+		existing.Terrain = appendMissing(existing.Terrain, tileset.Terrain)
+		existing.Doodads = appendMissing(existing.Doodads, tileset.Doodads)
+		existing.Items = appendMissingIDs(existing.Items, tileset.Items)
+		existing.Raw = appendMissingIDs(existing.Raw, tileset.Raw)
 	}
-	for _, c := range other.Creatures {
-		if m.Creature(c.Name) == nil {
-			m.Creatures = append(m.Creatures, c)
+	for _, creature := range other.Creatures {
+		if m.Creature(creature.Name) == nil {
+			m.Creatures = append(m.Creatures, creature)
 		}
 	}
 	m.MetaItems = appendMissingIDs(m.MetaItems, other.MetaItems)
 }
 
 func appendMissing(dst, src []string) []string {
-	for _, s := range src {
-		if !slices.ContainsFunc(dst, func(d string) bool { return strings.EqualFold(d, s) }) {
-			dst = append(dst, s)
+	for _, entry := range src {
+		if !slices.ContainsFunc(dst, func(present string) bool { return strings.EqualFold(present, entry) }) {
+			dst = append(dst, entry)
 		}
 	}
 	return dst
 }
 
 func appendMissingIDs(dst, src []uint16) []uint16 {
-	for _, s := range src {
-		if !slices.Contains(dst, s) {
-			dst = append(dst, s)
+	for _, entry := range src {
+		if !slices.Contains(dst, entry) {
+			dst = append(dst, entry)
 		}
 	}
 	return dst

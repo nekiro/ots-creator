@@ -39,26 +39,26 @@
     onchange?.(id);
   }
 
-  function onkeydown(e: KeyboardEvent) {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
+  function onkeydown(event: KeyboardEvent) {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
       if (!open) show();
       active = Math.min(active + 1, results.length - 1);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
       active = Math.max(active - 1, 0);
-    } else if (e.key === "Enter") {
-      e.preventDefault();
+    } else if (event.key === "Enter") {
+      event.preventDefault();
       if (results[active] !== undefined) choose(results[active]);
       else if (map.items?.has(Number(text))) choose(Number(text));
-    } else if (e.key === "Escape" && open) {
-      e.stopPropagation();
+    } else if (event.key === "Escape" && open) {
+      event.stopPropagation();
       open = false;
     }
   }
 </script>
 
-<svelte:window onmousedown={(e) => open && !(e.target as HTMLElement).closest(".ipick-pop") && e.target !== input && (open = false)} />
+<svelte:window onmousedown={(event) => open && !(event.target as HTMLElement).closest(".ipick-pop") && event.target !== input && (open = false)} />
 
 <span class="ipick" style={width ? `width:${width}px` : ""}>
   <span class="t-slot sm"><ItemIcon id={value} size={28} /></span>
@@ -82,7 +82,7 @@
 {#if open && results.length}
   <div class="ipick-pop t-popup" use:portal style="left:{rect.left}px;top:{rect.top}px;width:{rect.width}px">
     {#each results as id, i (id)}
-      <button class="opt" class:active={i === active} onmouseenter={() => (active = i)} onmousedown={(e) => (e.preventDefault(), choose(id))}>
+      <button class="opt" class:active={i === active} onmouseenter={() => (active = i)} onmousedown={(event) => (event.preventDefault(), choose(id))}>
         <ItemIcon {id} size={24} />
         <span class="on">{map.items?.name(id)}</span>
         <span class="oid">{id}</span>

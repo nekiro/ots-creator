@@ -91,9 +91,9 @@ func (fakeMap) Pieces(id uint32) (uint32, int, int, bool) {
 
 func TestAppearanceRoundTrip(t *testing.T) {
 	flags := putBool(nil, 13, true)
-	flags = putBytes(flags, fLight, putUint(putUint(nil, 1, 3), 2, 215))
-	flags = putBytes(flags, fShift, putInt(putInt(nil, 1, -8), 2, -8))
-	flags = putBytes(flags, fMarket, putBytes(putUint(putUint(nil, 1, 4), 5, 2), 7, []byte("bag")))
+	flags = putBytes(flags, flagLight, putUint(putUint(nil, 1, 3), 2, 215))
+	flags = putBytes(flags, flagShift, putInt(putInt(nil, 1, -8), 2, -8))
+	flags = putBytes(flags, flagMarket, putBytes(putUint(putUint(nil, 1, 4), 5, 2), 7, []byte("bag")))
 	flags = putUint(flags, 45, 1) // ammo: unknown to the model
 	anim := putUint(nil, 2, 1)
 	anim = putInt(anim, 4, -1)
@@ -164,12 +164,12 @@ func TestAppearanceRoundTrip(t *testing.T) {
 		t.Fatalf("props %+v", e2.Props)
 	}
 	m, _ := parse(out)
-	am, _ := parse(m[0].b)
+	am, _ := parse(m[0].payload)
 	fl := am.sub(3)
-	if d, _ := am.get(fieldDescription); string(d.b) != "ma\xeetre" {
-		t.Fatalf("description must be Latin-1: %q", d.b)
+	if d, _ := am.get(appearanceDescription); string(d.payload) != "ma\xeetre" {
+		t.Fatalf("description must be Latin-1: %q", d.payload)
 	}
-	if n, _ := am.get(4); string(n.b) != "Bag" || fl.uint(45) != 1 || fl.sub(fMarket).uint(5) != 2 {
+	if n, _ := am.get(4); string(n.payload) != "Bag" || fl.uint(45) != 1 || fl.sub(flagMarket).uint(5) != 2 {
 		t.Fatal("unknown fields lost")
 	}
 	if len(m) != 2 || m[1].num != 5 {
@@ -257,14 +257,14 @@ func TestOfficialAssets(t *testing.T) {
 func TestNewerFlagsRoundTrip(t *testing.T) {
 	npc := putBytes(putBytes(nil, npcName, []byte("Rashid")), npcLocation, []byte("Svargrond"))
 	npc = putUint(putUint(npc, npcSalePrice, 0), npcBuyPrice, 150)
-	flags := putBytes(nil, fNpcSaleData, npc)
-	flags = putBytes(flags, fNpcSaleData, putBytes(putUint(nil, npcSalePrice, 20), npcQuestFlag, []byte("gold token")))
-	flags = putBytes(flags, fChangedExpire, putUint(nil, 1, 3051))
+	flags := putBytes(nil, flagNpcSaleData, npc)
+	flags = putBytes(flags, flagNpcSaleData, putBytes(putUint(nil, npcSalePrice, 20), npcQuestFlag, []byte("gold token")))
+	flags = putBytes(flags, flagChangedToExpire, putUint(nil, 1, 3051))
 	flags = putBool(flags, 42, true) // corpse
-	flags = putBytes(flags, fCyclopedia, putUint(nil, 1, 3))
-	flags = putBytes(flags, fUpgrade, putUint(nil, 1, 4))
-	flags = putBool(flags, 57, true) // wrapkit
-	flags = putBytes(flags, fMarket, putUint(putUint(nil, marketVocation, 10), marketVocation, 1)) // promoted + knight
+	flags = putBytes(flags, flagCyclopedia, putUint(nil, 1, 3))
+	flags = putBytes(flags, flagUpgradeClassification, putUint(nil, 1, 4))
+	flags = putBool(flags, 57, true)                                                                  // wrapkit
+	flags = putBytes(flags, flagMarket, putUint(putUint(nil, marketVocation, 10), marketVocation, 1)) // promoted + knight
 	app := putBytes(putUint(nil, 1, 100), 3, flags)
 
 	m, _ := parse(app)
@@ -286,7 +286,7 @@ func TestNewerFlagsRoundTrip(t *testing.T) {
 
 	// Unchanged vocations keep "promoted"; edited ones are rewritten.
 	out, _ := parse(encodeFlags(&p, sales, m.sub(3)))
-	if v := out.sub(fMarket).uints(marketVocation); len(v) != 2 {
+	if v := out.sub(flagMarket).uints(marketVocation); len(v) != 2 {
 		t.Fatalf("vocations %v", v)
 	}
 	p.Market.RestrictProfession = 1 | 8 // knight, druid
@@ -295,10 +295,10 @@ func TestNewerFlagsRoundTrip(t *testing.T) {
 	out, _ = parse(encodeFlags(&p, sales, m.sub(3)))
 	var p2 thing.Properties
 	decodeFlags(out, &p2)
-	if v := out.sub(fMarket).uints(marketVocation); len(v) != 2 || v[0] != 1 || v[1] != 4 {
+	if v := out.sub(flagMarket).uints(marketVocation); len(v) != 2 || v[0] != 1 || v[1] != 4 {
 		t.Fatalf("vocations %v", v)
 	}
-	if p2.UpgradeClassification != 2 || decodeNpcSales(out)[0].SalePrice != 99 || len(out.all(fNpcSaleData)) != 2 {
+	if p2.UpgradeClassification != 2 || decodeNpcSales(out)[0].SalePrice != 99 || len(out.all(flagNpcSaleData)) != 2 {
 		t.Fatalf("props %+v", p2)
 	}
 }

@@ -2,6 +2,9 @@
   import { onMount } from "svelte";
   import { res } from "../../lib/map/api";
   import { goTo, spriteSize } from "../../lib/map/commands";
+  import { worldToTile } from "../../lib/map/coords";
+  import { clamp } from "../../lib/math";
+  import { readPositive, writeStored } from "../../lib/storage";
   import { map, onMapChange } from "../../lib/map/state.svelte";
   import MiniWindow from "../../lib/ui/MiniWindow.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
@@ -23,33 +26,21 @@
   const spanY = $derived(Math.max(8, Math.round((span * height) / Math.max(1, size))));
 
   function loadHeight(): number | null {
-    try {
-      const v = Number(localStorage.getItem(HEIGHT_KEY));
-      if (v > 0) return v;
-    } catch {
-      /* storage unavailable */
-    }
-    return null;
+    return readPositive(HEIGHT_KEY);
   }
 
   function resize(dy: number) {
     const max = Math.max(HEIGHT_MIN, window.innerHeight - 320);
-    chosen = Math.round(Math.max(HEIGHT_MIN, Math.min(max, height + dy)));
+    chosen = Math.round(clamp(height + dy, HEIGHT_MIN, max));
   }
 
   function saveHeight() {
-    try {
-      localStorage.setItem(HEIGHT_KEY, String(chosen ?? 0));
-    } catch {
-      /* ignore */
-    }
+    writeStored(HEIGHT_KEY, String(chosen ?? 0));
   }
 
   const center = $derived.by(() => {
-    const c = map.cam;
-    const S = spriteSize();
-    const a = c.floor <= 7 ? 7 - c.floor : 0;
-    return { x: Math.floor(c.x / S) + a, y: Math.floor(c.y / S) + a, z: c.floor };
+    const cam = map.cam;
+    return { ...worldToTile(cam.x, cam.y, cam.floor, spriteSize()), z: cam.floor };
   });
   // The image moves in steps so it is not fetched on every pixel of a pan.
   const step = $derived(Math.max(8, span / 8));
@@ -62,11 +53,11 @@
 
   // The view rectangle of the map canvas.
   const view = $derived.by(() => {
-    const c = map.cam;
-    const S = spriteSize();
+    const cam = map.cam;
+    const tileSize = spriteSize();
     const canvas = document.querySelector<HTMLCanvasElement>("canvas.map-gl");
-    const w = canvas ? canvas.clientWidth / c.zoom / S : 40;
-    const h = canvas ? canvas.clientHeight / c.zoom / S : 30;
+    const w = canvas ? canvas.clientWidth / cam.zoom / tileSize : 40;
+    const h = canvas ? canvas.clientHeight / cam.zoom / tileSize : 30;
     return { x: center.x - w / 2 - origin.x, y: center.y - h / 2 - origin.y, w, h };
   });
 
@@ -79,25 +70,25 @@
     }),
   );
 
-  function at(e: PointerEvent) {
-    const r = box!.getBoundingClientRect();
-    let x = origin.x + Math.floor(((e.clientX - r.left) / r.width) * span);
-    let y = origin.y + Math.floor(((e.clientY - r.top) / r.height) * spanY);
+  function at(event: PointerEvent) {
+    const rect = box!.getBoundingClientRect();
+    let x = origin.x + Math.floor(((event.clientX - rect.left) / rect.width) * span);
+    let y = origin.y + Math.floor(((event.clientY - rect.top) / rect.height) * spanY);
     // Stay where the map has tiles; outside it there is only black.
     const info = map.active;
     if (info?.hasBounds) {
       const [x0, y0, x1, y1] = info.bounds;
-      x = Math.min(Math.max(x, x0), x1);
-      y = Math.min(Math.max(y, y0), y1);
+      x = clamp(x, x0, x1);
+      y = clamp(y, y0, y1);
     }
-    goTo({ x: Math.max(0, Math.min(65535, x)), y: Math.max(0, Math.min(65535, y)), z: center.z });
+    goTo({ x: clamp(x, 0, 65535), y: clamp(y, 0, 65535), z: center.z });
   }
 
-  function onpointerdown(e: PointerEvent) {
-    if (e.button !== 0) return;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  function onpointerdown(event: PointerEvent) {
+    if (event.button !== 0) return;
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
     held = { ...live };
-    at(e);
+    at(event);
   }
 
   function release() {
@@ -112,7 +103,7 @@
   {/snippet}
   <div class="wrap" bind:clientWidth={size}>
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="box" bind:this={box} style="height:{height}px" onpointerdown={onpointerdown} onpointermove={(e) => held && e.buttons === 1 && at(e)} onpointerup={release} onpointercancel={release} onlostpointercapture={release}>
+    <div class="box" bind:this={box} style="height:{height}px" onpointerdown={onpointerdown} onpointermove={(event) => held && event.buttons === 1 && at(event)} onpointerup={release} onpointercancel={release} onlostpointercapture={release}>
       {#if src}<img class="pixel" {src} alt="" draggable="false" />{/if}
       <div
         class="view"

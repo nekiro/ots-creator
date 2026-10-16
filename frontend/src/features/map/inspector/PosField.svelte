@@ -15,8 +15,8 @@
     class="t-input grow"
     value={set ? fmtPos(value) : ""}
     placeholder="not set"
-    onchange={(e) => {
-      const p = parsePos(e.currentTarget.value);
+    onchange={(event) => {
+      const p = parsePos(event.currentTarget.value);
       if (p) onchange(p);
     }}
   />

@@ -2,6 +2,7 @@
   // Every texture of a frame group at once (ObjectBuilder sheet layout:
   // columns pattern Z × X × layers, rows frames × pattern Y). Each tile is a
   // drop target; dropping several sprites fills the following slots.
+  import { fitZoom as zoomToFit } from "../lib/render/zoom";
   import type { FrameGroup } from "../lib/api";
   import { compose, type PixelSource } from "../lib/render/compose";
   import { sheetCellPos, sheetGrid, spriteIndex, tileOffset, type TexturePos } from "../lib/render/layout";
@@ -14,7 +15,7 @@
   const PIXEL_GRID_ZOOM = 4;
 
   let {
-    g,
+    frameGroup,
     size,
     loaded,
     selected,
@@ -32,7 +33,7 @@
     get = (id) => spriteCache.get(id)?.pixels,
     readonly = false,
   }: {
-    g: FrameGroup;
+    frameGroup: FrameGroup;
     size: number;
     /** Bumps when sprites arrive. */
     loaded: number;
@@ -69,16 +70,15 @@
   let dropCount = $state(1);
 
   const GAP = 4; // pixels between textures (unscaled)
-  const grid = $derived(sheetGrid(g));
-  const texW = $derived(g.width * size);
-  const texH = $derived(g.height * size);
+  const grid = $derived(sheetGrid(frameGroup));
+  const texW = $derived(frameGroup.width * size);
+  const texH = $derived(frameGroup.height * size);
   const sheetW = $derived(grid.columns * (texW + GAP) - GAP);
   const sheetH = $derived(grid.rows * (texH + GAP) - GAP);
-  const fit = $derived.by(() => {
-    if (!stageSize[0]) return 1;
-    const r = Math.min((stageSize[0] - 24) / sheetW, (stageSize[1] - 24) / sheetH);
-    return Math.min(4, Math.max(1, Math.floor(r))); // like the preview: no huge zoom on big screens
-  });
+  const STAGE_MARGIN = 24;
+  // Like the preview: no huge zoom on big screens.
+  const MAX_FIT_ZOOM = 4;
+  const fit = $derived(stageSize[0] ? zoomToFit(stageSize[0], stageSize[1], sheetW, sheetH, STAGE_MARGIN, MAX_FIT_ZOOM) : 1);
   $effect(() => {
     fitZoom = fit;
   });
@@ -93,9 +93,9 @@
   // Zooming keeps the centered pixel; fitting the window or another object centers.
   let lastZoom = 0;
   $effect(() => {
-    const z = zoom;
-    if (lastZoom && z !== lastZoom) view.rescale(z / lastZoom);
-    lastZoom = z;
+    const current = zoom;
+    if (lastZoom && current !== lastZoom) view.rescale(current / lastZoom);
+    lastZoom = current;
   });
   $effect(() => {
     if (manualZoom === null) view.reset();
@@ -109,13 +109,13 @@
   // Every slot with its position on the (unscaled) sheet.
   const tiles = $derived.by(() => {
     const out: { slot: number; x: number; y: number; pos: TexturePos }[] = [];
-    for (let r = 0; r < grid.rows; r++)
-      for (let c = 0; c < grid.columns; c++) {
-        const pos = sheetCellPos(g, c, r);
-        for (let h = 0; h < g.height; h++)
-          for (let w = 0; w < g.width; w++) {
-            const [ox, oy] = tileOffset(g, w, h, size);
-            out.push({ slot: spriteIndex(g, w, h, pos), x: c * (texW + GAP) + ox, y: r * (texH + GAP) + oy, pos });
+    for (let row = 0; row < grid.rows; row++)
+      for (let column = 0; column < grid.columns; column++) {
+        const pos = sheetCellPos(frameGroup, column, row);
+        for (let tileY = 0; tileY < frameGroup.height; tileY++)
+          for (let tileX = 0; tileX < frameGroup.width; tileX++) {
+            const [offsetX, offsetY] = tileOffset(frameGroup, tileX, tileY, size);
+            out.push({ slot: spriteIndex(frameGroup, tileX, tileY, pos), x: column * (texW + GAP) + offsetX, y: row * (texH + GAP) + offsetY, pos });
           }
       }
     return out;
@@ -128,9 +128,9 @@
 
   $effect(() => {
     if (!stage) return;
-    const ro = new ResizeObserver(() => (stageSize = [stage!.clientWidth, stage!.clientHeight]));
-    ro.observe(stage);
-    return () => ro.disconnect();
+    const resizeObserver = new ResizeObserver(() => (stageSize = [stage!.clientWidth, stage!.clientHeight]));
+    resizeObserver.observe(stage);
+    return () => resizeObserver.disconnect();
   });
 
   // Draw the whole sheet at 1:1; CSS scales it with pixelated rendering.
@@ -141,25 +141,25 @@
     canvas.height = Math.max(1, sheetH);
     const ctx = canvas.getContext("2d")!;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (let r = 0; r < grid.rows; r++)
-      for (let c = 0; c < grid.columns; c++) {
-        const img = compose(g, g.sprites, size, { pos: sheetCellPos(g, c, r), colors }, get);
-        ctx.putImageData(img, c * (texW + GAP), r * (texH + GAP));
+    for (let row = 0; row < grid.rows; row++)
+      for (let column = 0; column < grid.columns; column++) {
+        const image = compose(frameGroup, frameGroup.sprites, size, { pos: sheetCellPos(frameGroup, column, row), colors }, get);
+        ctx.putImageData(image, column * (texW + GAP), row * (texH + GAP));
       }
   });
 
-  function dragOver(e: DragEvent, slot: number) {
+  function dragOver(event: DragEvent, slot: number) {
     if (readonly) return;
-    e.preventDefault();
+    event.preventDefault();
     dropSlot = slot;
     // The ids are only readable on drop; a multi drag is the selection.
-    dropCount = dragsMany(e) ? Math.max(1, selected.length) : 1;
+    dropCount = dragsMany(event) ? Math.max(1, selected.length) : 1;
   }
 
-  function drop(e: DragEvent, slot: number) {
-    e.preventDefault();
+  function drop(event: DragEvent, slot: number) {
+    event.preventDefault();
     dropSlot = null;
-    const ids = droppedSprites(e);
+    const ids = droppedSprites(event);
     if (ids.length) onassign(slot, ids);
   }
 </script>
@@ -178,12 +178,12 @@
       {@const r = Math.floor(i / grid.columns)}
       <div
         class="tex"
-        class:cur={isCurrent(sheetCellPos(g, c, r))}
+        class:cur={isCurrent(sheetCellPos(frameGroup, c, r))}
         style="left:{c * (texW + GAP) * zoom - 1}px;top:{r * (texH + GAP) * zoom - 1}px;width:{texW * zoom + 2}px;height:{texH * zoom + 2}px"
       ></div>
     {/each}
     {#each tiles as t (t.slot)}
-      {@const id = g.sprites[t.slot]}
+      {@const id = frameGroup.sprites[t.slot]}
       <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
       <div
         class="slot"
@@ -194,9 +194,9 @@
         title="Frame {t.pos.frame + 1}, pattern {t.pos.x},{t.pos.y},{t.pos.z}, layer {t.pos.layer}: slot {t.slot} → sprite #{id}{id ? '' : ' (empty)'}"
         onclick={() => onpick(t.slot, t.pos)}
         ondblclick={() => onopen(t.pos)}
-        ondragover={(e) => dragOver(e, t.slot)}
+        ondragover={(event) => dragOver(event, t.slot)}
         ondragleave={() => (dropSlot = null)}
-        ondrop={(e) => drop(e, t.slot)}
+        ondrop={(event) => drop(event, t.slot)}
       ></div>
     {/each}
   </div>

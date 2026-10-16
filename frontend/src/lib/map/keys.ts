@@ -89,38 +89,38 @@ export const FIXED_KEYS: { group: KeyGroup; keys: string; label: string }[] = [
 ];
 
 /** The keys of an action: the user's choice or the defaults. */
-export function keysOf(a: KeyAction, overrides: Record<string, string[]> = map.keys): string[] {
-  return overrides[a.id] ?? a.keys;
+export function keysOf(action: KeyAction, overrides: Record<string, string[]> = map.keys): string[] {
+  return overrides[action.id] ?? action.keys;
 }
 
 /** The first key of an action by id, for menus and tooltips. */
 export function keyLabel(id: string): string | undefined {
-  const a = KEY_ACTIONS.find((x) => x.id === id);
-  return a ? keysOf(a)[0] : undefined;
+  const action = KEY_ACTIONS.find((candidate) => candidate.id === id);
+  return action ? keysOf(action)[0] : undefined;
 }
 
 /** Handles a key press in the map editor. Returns true when handled. */
-export function mapShortcut(e: KeyboardEvent): boolean {
-  const combo = comboOf(e);
+export function mapShortcut(event: KeyboardEvent): boolean {
+  const combo = comboOf(event);
   if (!combo) return false;
-  const typing = (e.target as HTMLElement).closest("input, textarea, select, [contenteditable]") !== null;
+  const typing = (event.target as HTMLElement).closest("input, textarea, select, [contenteditable]") !== null;
   const ready = !typing && map.activeId !== null;
   const run = (fn: () => unknown) => {
-    e.preventDefault();
+    event.preventDefault();
     Promise.resolve(fn()).catch((err) => toast(errorMessage(err), "error"));
     return true;
   };
-  for (const a of KEY_ACTIONS) {
-    if ((a.always || ready) && keysOf(a).includes(combo)) {
-      if (e.repeat && !a.repeat) {
-        e.preventDefault();
+  for (const action of KEY_ACTIONS) {
+    if ((action.always || ready) && keysOf(action).includes(combo)) {
+      if (event.repeat && !action.repeat) {
+        event.preventDefault();
         return true;
       }
-      return run(a.run);
+      return run(action.run);
     }
   }
-  if (!ready || e.ctrlKey || e.metaKey) return false;
-  switch (e.key) {
+  if (!ready || event.ctrlKey || event.metaKey) return false;
+  switch (event.key) {
     case "Escape":
       if (map.pick) return run(() => (map.pick = null));
       if (map.pasting) return run(() => (map.pasting = false));
@@ -133,14 +133,14 @@ export function mapShortcut(e: KeyboardEvent): boolean {
     case "ArrowRight":
     case "ArrowUp":
     case "ArrowDown": {
-      const step = e.shiftKey ? 10 : 2;
-      const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key]!;
-      return run(() => mapCommands.pan(d[0], d[1]));
+      const step = event.shiftKey ? 10 : 2;
+      const move = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[event.key]!;
+      return run(() => mapCommands.pan(move[0], move[1]));
     }
   }
-  if (/^[1-9]$/.test(e.key)) {
-    const b = map.recentBrushes[Number(e.key) - 1];
-    if (b) return run(() => selectBrush(b));
+  if (/^[1-9]$/.test(event.key)) {
+    const brush = map.recentBrushes[Number(event.key) - 1];
+    if (brush) return run(() => selectBrush(brush));
   }
   return false;
 }

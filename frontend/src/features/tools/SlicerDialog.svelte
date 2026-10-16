@@ -63,55 +63,55 @@
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, w, h);
     ctx.drawImage(bitmap, 0, 0, w, h);
-    const s = size * zoom;
-    const ox = grid.offsetX * zoom;
-    const oy = grid.offsetY * zoom;
+    const cell = size * zoom;
+    const originX = grid.offsetX * zoom;
+    const originY = grid.offsetY * zoom;
     ctx.fillStyle = "rgba(80, 140, 255, 0.35)";
-    for (const k of picked) {
-      const [c, r] = k.split(",").map(Number);
-      ctx.fillRect(ox + c * s, oy + r * s, s, s);
+    for (const cellKey of picked) {
+      const [column, row] = cellKey.split(",").map(Number);
+      ctx.fillRect(originX + column * cell, originY + row * cell, cell, cell);
     }
     ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    for (let c = 0; c <= grid.columns; c++) {
-      ctx.moveTo(ox + c * s + 0.5, oy);
-      ctx.lineTo(ox + c * s + 0.5, oy + grid.rows * s);
+    for (let column = 0; column <= grid.columns; column++) {
+      ctx.moveTo(originX + column * cell + 0.5, originY);
+      ctx.lineTo(originX + column * cell + 0.5, originY + grid.rows * cell);
     }
-    for (let r = 0; r <= grid.rows; r++) {
-      ctx.moveTo(ox, oy + r * s + 0.5);
-      ctx.lineTo(ox + grid.columns * s, oy + r * s + 0.5);
+    for (let row = 0; row <= grid.rows; row++) {
+      ctx.moveTo(originX, originY + row * cell + 0.5);
+      ctx.lineTo(originX + grid.columns * cell, originY + row * cell + 0.5);
     }
     ctx.stroke();
   });
 
-  function cellAt(e: MouseEvent): [number, number] | null {
-    const rect = (e.currentTarget as HTMLCanvasElement).getBoundingClientRect();
-    const x = toCss(e.clientX - rect.left) / zoom - grid.offsetX;
-    const y = toCss(e.clientY - rect.top) / zoom - grid.offsetY;
-    const c = Math.floor(x / size);
-    const r = Math.floor(y / size);
-    return c >= 0 && r >= 0 && c < grid.columns && r < grid.rows ? [c, r] : null;
+  function cellAt(event: MouseEvent): [number, number] | null {
+    const rect = (event.currentTarget as HTMLCanvasElement).getBoundingClientRect();
+    const x = toCss(event.clientX - rect.left) / zoom - grid.offsetX;
+    const y = toCss(event.clientY - rect.top) / zoom - grid.offsetY;
+    const column = Math.floor(x / size);
+    const row = Math.floor(y / size);
+    return column >= 0 && row >= 0 && column < grid.columns && row < grid.rows ? [column, row] : null;
   }
 
-  function toggle(e: MouseEvent) {
-    const cell = cellAt(e);
+  function toggle(event: MouseEvent) {
+    const cell = cellAt(event);
     if (!cell) return;
-    const k = key(...cell);
+    const cellKey = key(...cell);
     const next = new Set(picked);
-    if (next.has(k)) next.delete(k);
-    else next.add(k);
+    if (next.has(cellKey)) next.delete(cellKey);
+    else next.add(cellKey);
     picked = next;
   }
 
   function slices(): Uint8ClampedArray[] {
     if (!img) return [];
     const out: Uint8ClampedArray[] = [];
-    for (let r = 0; r < grid.rows; r++)
-      for (let c = 0; c < grid.columns; c++) {
-        if (picked.size && !picked.has(key(c, r))) continue;
-        const px = cutCell(img, grid, c, r, size, magenta);
-        if (!skipEmpty || !isEmpty(px)) out.push(px);
+    for (let row = 0; row < grid.rows; row++)
+      for (let column = 0; column < grid.columns; column++) {
+        if (picked.size && !picked.has(key(column, row))) continue;
+        const pixels = cutCell(img, grid, column, row, size, magenta);
+        if (!skipEmpty || !isEmpty(pixels)) out.push(pixels);
       }
     return out;
   }
@@ -135,7 +135,7 @@
   <div class="layout">
     <div class="stage t-panel">
       {#if img}
-        <PanStage onzoom={(d) => (zoom = Math.min(6, Math.max(1, zoom + d)))} resetKey={name}>
+        <PanStage onzoom={(delta) => (zoom = Math.min(6, Math.max(1, zoom + delta)))} resetKey={name}>
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
           <canvas bind:this={canvas} onclick={toggle} class="pixel"></canvas>
         </PanStage>
@@ -150,11 +150,11 @@
       <button class="t-btn" onclick={() => fileInput.click()}>Open image…</button>
       {#if img}<span class="t-label name" title={name}>{name} · {img.width}×{img.height}</span>{/if}
       <h4>Grid</h4>
-      <NumberField label="Offset X" value={grid.offsetX} min={0} max={size - 1} width={44} disabled={!img} onchange={(v) => setOffset("offsetX", v)} />
-      <NumberField label="Offset Y" value={grid.offsetY} min={0} max={size - 1} width={44} disabled={!img} onchange={(v) => setOffset("offsetY", v)} />
-      <NumberField label="Columns" value={grid.columns} min={1} max={img ? fitGrid(img.width, img.height, size, grid.offsetX).columns : 1} width={44} disabled={!img} onchange={(v) => ((grid.columns = v), (picked = new Set()))} />
-      <NumberField label="Rows" value={grid.rows} min={1} max={img ? fitGrid(img.width, img.height, size, 0, grid.offsetY).rows : 1} width={44} disabled={!img} onchange={(v) => ((grid.rows = v), (picked = new Set()))} />
-      <NumberField label="Zoom" value={zoom} min={1} max={6} width={44} disabled={!img} onchange={(v) => (zoom = v)} />
+      <NumberField label="Offset X" value={grid.offsetX} min={0} max={size - 1} width={44} disabled={!img} onchange={(value) => setOffset("offsetX", value)} />
+      <NumberField label="Offset Y" value={grid.offsetY} min={0} max={size - 1} width={44} disabled={!img} onchange={(value) => setOffset("offsetY", value)} />
+      <NumberField label="Columns" value={grid.columns} min={1} max={img ? fitGrid(img.width, img.height, size, grid.offsetX).columns : 1} width={44} disabled={!img} onchange={(value) => ((grid.columns = value), (picked = new Set()))} />
+      <NumberField label="Rows" value={grid.rows} min={1} max={img ? fitGrid(img.width, img.height, size, 0, grid.offsetY).rows : 1} width={44} disabled={!img} onchange={(value) => ((grid.rows = value), (picked = new Set()))} />
+      <NumberField label="Zoom" value={zoom} min={1} max={6} width={44} disabled={!img} onchange={(value) => (zoom = value)} />
       <h4>Import</h4>
       <label class="row"><input class="t-check" type="checkbox" bind:checked={magenta} />Magenta is transparent</label>
       <label class="row"><input class="t-check" type="checkbox" bind:checked={skipEmpty} />Skip empty cells</label>
@@ -162,7 +162,7 @@
       <button class="t-btn" disabled={!picked.size} onclick={() => (picked = new Set())}>Clear selection</button>
     </div>
   </div>
-  <input bind:this={fileInput} type="file" accept="image/png,image/bmp,image/gif,image/jpeg" hidden onchange={(e) => load(e.currentTarget.files?.[0])} />
+  <input bind:this={fileInput} type="file" accept="image/png,image/bmp,image/gif,image/jpeg" hidden onchange={(event) => load(event.currentTarget.files?.[0])} />
   {#snippet footer()}
     <span class="grow"></span>
     <button class="t-btn primary" disabled={!img || !cells || !app.open || !!app.busy} onclick={importSprites}>Import sprites</button>

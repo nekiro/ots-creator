@@ -26,8 +26,8 @@
       stats = await MapService.Stats(m.id);
       statsRev = m.rev;
       error = "";
-    } catch (e) {
-      error = errorMessage(e);
+    } catch (err) {
+      error = errorMessage(err);
     } finally {
       counting = false;
     }
@@ -64,23 +64,23 @@
 </script>
 
 <div class="m-form">
-  <label class="col"><span class="t-label">Description</span><textarea class="t-input text" value={p.description} placeholder="Shown to players by some servers" onchange={(e) => set({ description: e.currentTarget.value })}></textarea></label>
+  <label class="col"><span class="t-label">Description</span><textarea class="t-input text" value={p.description} placeholder="Shown to players by some servers" onchange={(event) => set({ description: event.currentTarget.value })}></textarea></label>
   <div class="m-field">
     <span class="m-lbl">Spawns</span>
-    <Select grow value={p.spawnFormat} options={[{ value: SpawnFormat.SpawnsSingle, label: "One file (monsters and NPCs)" }, { value: SpawnFormat.SpawnsSeparate, label: "Separate monster and NPC files" }]} onchange={(v) => set({ spawnFormat: v })} />
+    <Select grow value={p.spawnFormat} options={[{ value: SpawnFormat.SpawnsSingle, label: "One file (monsters and NPCs)" }, { value: SpawnFormat.SpawnsSeparate, label: "Separate monster and NPC files" }]} onchange={(value) => set({ spawnFormat: value })} />
   </div>
   <div class="m-field">
     <span class="m-lbl">Size</span>
-    <NumberField value={p.width} min={1} max={65535} width={64} onchange={(v) => set({ width: v })} /><span>×</span><NumberField value={p.height} min={1} max={65535} width={64} onchange={(v) => set({ height: v })} />
+    <NumberField value={p.width} min={1} max={65535} width={64} onchange={(value) => set({ width: value })} /><span>×</span><NumberField value={p.height} min={1} max={65535} width={64} onchange={(value) => set({ height: value })} />
   </div>
 
   <details class="files">
     <summary class="t-label">Files saved with the map</summary>
     <div class="m-form inner">
-      <div class="m-field"><span class="m-lbl">Houses</span><input class="t-input" value={p.houseFile} placeholder="{m.name.replace(/\.otbm$/i, '')}-house.xml" onchange={(e) => set({ houseFile: e.currentTarget.value })} /></div>
-      <div class="m-field"><span class="m-lbl">{separate ? "Monsters" : "Spawns"}</span><input class="t-input" value={p.spawnFile} placeholder="{m.name.replace(/\.otbm$/i, '')}-{separate ? 'monster' : 'spawn'}.xml" onchange={(e) => set({ spawnFile: e.currentTarget.value })} /></div>
-      {#if separate}<div class="m-field"><span class="m-lbl">NPCs</span><input class="t-input" value={p.npcFile} placeholder="{m.name.replace(/\.otbm$/i, '')}-npc.xml" onchange={(e) => set({ npcFile: e.currentTarget.value })} /></div>{/if}
-      <div class="m-field"><span class="m-lbl">Zones</span><input class="t-input" value={p.zoneFile} placeholder="{m.name.replace(/\.otbm$/i, '')}-zones.xml" onchange={(e) => set({ zoneFile: e.currentTarget.value })} /></div>
+      <div class="m-field"><span class="m-lbl">Houses</span><input class="t-input" value={p.houseFile} placeholder="{m.name.replace(/\.otbm$/i, '')}-house.xml" onchange={(event) => set({ houseFile: event.currentTarget.value })} /></div>
+      <div class="m-field"><span class="m-lbl">{separate ? "Monsters" : "Spawns"}</span><input class="t-input" value={p.spawnFile} placeholder="{m.name.replace(/\.otbm$/i, '')}-{separate ? 'monster' : 'spawn'}.xml" onchange={(event) => set({ spawnFile: event.currentTarget.value })} /></div>
+      {#if separate}<div class="m-field"><span class="m-lbl">NPCs</span><input class="t-input" value={p.npcFile} placeholder="{m.name.replace(/\.otbm$/i, '')}-npc.xml" onchange={(event) => set({ npcFile: event.currentTarget.value })} /></div>{/if}
+      <div class="m-field"><span class="m-lbl">Zones</span><input class="t-input" value={p.zoneFile} placeholder="{m.name.replace(/\.otbm$/i, '')}-zones.xml" onchange={(event) => set({ zoneFile: event.currentTarget.value })} /></div>
       <div class="t-label path">{m.path || "Not saved yet"}</div>
     </div>
   </details>

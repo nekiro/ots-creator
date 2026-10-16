@@ -10,48 +10,49 @@ import (
 // field is one encoded protobuf field. raw holds the whole field, tag
 // included, so unknown fields are written back byte for byte.
 type field struct {
-	num protowire.Number
-	typ protowire.Type
-	v   uint64 // varint and fixed values
-	b   []byte // length-delimited payload
-	raw []byte
+	num     protowire.Number
+	typ     protowire.Type
+	value   uint64 // varint and fixed values
+	payload []byte // length-delimited payload
+	raw     []byte
 }
 
 type message []field
 
 var errWire = errors.New("appearances: malformed protobuf data")
 
-func parse(b []byte) (message, error) {
-	var m message
-	for len(b) > 0 {
-		num, typ, n := protowire.ConsumeTag(b)
-		if n < 0 {
+func parse(data []byte) (message, error) {
+	var msg message
+	for len(data) > 0 {
+		num, typ, tagSize := protowire.ConsumeTag(data)
+		if tagSize < 0 {
 			return nil, errWire
 		}
-		f := field{num: num, typ: typ}
-		m0 := n
+		parsed := field{num: num, typ: typ}
+		body := data[tagSize:]
+		var bodySize int
 		switch typ {
 		case protowire.VarintType:
-			f.v, n = protowire.ConsumeVarint(b[m0:])
+			parsed.value, bodySize = protowire.ConsumeVarint(body)
 		case protowire.Fixed32Type:
-			var v uint32
-			v, n = protowire.ConsumeFixed32(b[m0:])
-			f.v = uint64(v)
+			var value uint32
+			value, bodySize = protowire.ConsumeFixed32(body)
+			parsed.value = uint64(value)
 		case protowire.Fixed64Type:
-			f.v, n = protowire.ConsumeFixed64(b[m0:])
+			parsed.value, bodySize = protowire.ConsumeFixed64(body)
 		case protowire.BytesType:
-			f.b, n = protowire.ConsumeBytes(b[m0:])
+			parsed.payload, bodySize = protowire.ConsumeBytes(body)
 		default:
-			n = protowire.ConsumeFieldValue(num, typ, b[m0:])
+			bodySize = protowire.ConsumeFieldValue(num, typ, body)
 		}
-		if n < 0 {
+		if bodySize < 0 {
 			return nil, errWire
 		}
-		f.raw = b[:m0+n]
-		m = append(m, f)
-		b = b[m0+n:]
+		parsed.raw = data[:tagSize+bodySize]
+		msg = append(msg, parsed)
+		data = data[tagSize+bodySize:]
 	}
-	return m, nil
+	return msg, nil
 }
 
 // get returns the last occurrence of a field (proto2 semantics).
@@ -70,39 +71,39 @@ func (m message) has(num protowire.Number) bool {
 }
 
 func (m message) uint(num protowire.Number) uint64 {
-	f, _ := m.get(num)
-	return f.v
+	found, _ := m.get(num)
+	return found.value
 }
 
 func (m message) bool(num protowire.Number) bool { return m.uint(num) != 0 }
 
 func (m message) sub(num protowire.Number) message {
-	f, ok := m.get(num)
-	if !ok || f.typ != protowire.BytesType {
+	found, ok := m.get(num)
+	if !ok || found.typ != protowire.BytesType {
 		return nil
 	}
-	s, _ := parse(f.b)
-	return s
+	nested, _ := parse(found.payload)
+	return nested
 }
 
 // uints returns every value of a repeated varint field, packed or not.
 func (m message) uints(num protowire.Number) []uint64 {
 	var out []uint64
-	for _, f := range m {
-		if f.num != num {
+	for _, entry := range m {
+		if entry.num != num {
 			continue
 		}
-		if f.typ == protowire.VarintType {
-			out = append(out, f.v)
+		if entry.typ == protowire.VarintType {
+			out = append(out, entry.value)
 			continue
 		}
-		for b := f.b; len(b) > 0; {
-			v, n := protowire.ConsumeVarint(b)
-			if n < 0 {
+		for packed := entry.payload; len(packed) > 0; {
+			value, size := protowire.ConsumeVarint(packed)
+			if size < 0 {
 				break
 			}
-			out = append(out, v)
-			b = b[n:]
+			out = append(out, value)
+			packed = packed[size:]
 		}
 	}
 	return out
@@ -110,43 +111,43 @@ func (m message) uints(num protowire.Number) []uint64 {
 
 func (m message) all(num protowire.Number) []message {
 	var out []message
-	for _, f := range m {
-		if f.num == num && f.typ == protowire.BytesType {
-			s, _ := parse(f.b)
-			out = append(out, s)
+	for _, entry := range m {
+		if entry.num == num && entry.typ == protowire.BytesType {
+			nested, _ := parse(entry.payload)
+			out = append(out, nested)
 		}
 	}
 	return out
 }
 
 // appendOthers appends the raw fields whose number is not in known.
-func (m message) appendOthers(b []byte, known ...protowire.Number) []byte {
-	for _, f := range m {
-		if !slices.Contains(known, f.num) {
-			b = append(b, f.raw...)
+func (m message) appendOthers(out []byte, known ...protowire.Number) []byte {
+	for _, entry := range m {
+		if !slices.Contains(known, entry.num) {
+			out = append(out, entry.raw...)
 		}
 	}
-	return b
+	return out
 }
 
-func putUint(b []byte, num protowire.Number, v uint64) []byte {
-	b = protowire.AppendTag(b, num, protowire.VarintType)
-	return protowire.AppendVarint(b, v)
+func putUint(out []byte, num protowire.Number, value uint64) []byte {
+	out = protowire.AppendTag(out, num, protowire.VarintType)
+	return protowire.AppendVarint(out, value)
 }
 
 // putInt writes a proto int32 (negative values are sign extended).
-func putInt(b []byte, num protowire.Number, v int32) []byte {
-	return putUint(b, num, uint64(int64(v)))
+func putInt(out []byte, num protowire.Number, value int32) []byte {
+	return putUint(out, num, uint64(int64(value)))
 }
 
-func putBool(b []byte, num protowire.Number, v bool) []byte {
-	if !v {
-		return b
+func putBool(out []byte, num protowire.Number, value bool) []byte {
+	if !value {
+		return out
 	}
-	return putUint(b, num, 1)
+	return putUint(out, num, 1)
 }
 
-func putBytes(b []byte, num protowire.Number, v []byte) []byte {
-	b = protowire.AppendTag(b, num, protowire.BytesType)
-	return protowire.AppendBytes(b, v)
+func putBytes(out []byte, num protowire.Number, value []byte) []byte {
+	out = protowire.AppendTag(out, num, protowire.BytesType)
+	return protowire.AppendBytes(out, value)
 }

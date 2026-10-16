@@ -1,5 +1,6 @@
 // Property editor metadata: groups, labels and payload fields.
 import type { Properties } from "./api";
+import { clamp } from "./math";
 
 /** mask: a bit set, one checkbox per option (option values are bits). */
 export type FieldKind = "u16" | "i16" | "text" | "select" | "mask";
@@ -170,26 +171,26 @@ export function flagVisible(key: string, category: number, set: boolean): boolea
 }
 
 export function getPath(obj: any, path: string): any {
-  return path.split(".").reduce((o, k) => (o == null ? o : o[k]), obj);
+  return path.split(".").reduce((node, key) => (node == null ? node : node[key]), obj);
 }
 
 export function setPath(obj: any, path: string, value: any): void {
   const keys = path.split(".");
   const last = keys.pop()!;
-  const target = keys.reduce((o, k) => o[k], obj);
+  const target = keys.reduce((node, key) => node[key], obj);
   target[last] = value;
 }
 
-export function clampField(kind: FieldKind, v: number): number {
-  if (!Number.isFinite(v)) return 0;
-  v = Math.trunc(v);
-  if (kind === "i16") return Math.min(Math.max(v, -32768), 32767);
-  return Math.min(Math.max(v, 0), 65535);
+export function clampField(kind: FieldKind, value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  value = Math.trunc(value);
+  if (kind === "i16") return clamp(value, -32768, 32767);
+  return clamp(value, 0, 65535);
 }
 
 /** Field metadata by key, e.g. "lightLevel" or "market.name". */
 export function flagFields(key: string): Field[] {
-  for (const g of FLAG_GROUPS) for (const f of g.flags) if (f.key === key) return f.fields ?? [];
+  for (const group of FLAG_GROUPS) for (const flag of group.flags) if (flag.key === key) return flag.fields ?? [];
   return [];
 }
 
@@ -204,11 +205,11 @@ export function buildPatch(states: Record<string, boolean | undefined>, values: 
     if (on === undefined) continue;
     patch[key] = on;
     if (!on) continue;
-    for (const fd of flagFields(key)) {
-      const v = values[fd.key] ?? (fd.kind === "text" ? "" : 0);
-      const parts = fd.key.split(".");
-      if (parts.length === 1) patch[fd.key] = v;
-      else (patch[parts[0]] ??= {})[parts[1]] = v;
+    for (const field of flagFields(key)) {
+      const value = values[field.key] ?? (field.kind === "text" ? "" : 0);
+      const parts = field.key.split(".");
+      if (parts.length === 1) patch[field.key] = value;
+      else (patch[parts[0]] ??= {})[parts[1]] = value;
     }
   }
   return patch;

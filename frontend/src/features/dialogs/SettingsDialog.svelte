@@ -12,8 +12,8 @@
 <Dialog title="Settings" width={420} onclose={() => (app.dialog = null)}>
   <div class="col">
     <h4>Startup</h4>
-    <label class="row"><input class="t-check" type="checkbox" checked={s.checkUpdates} onchange={(e) => savePrefs({ checkUpdates: e.currentTarget.checked })} />Check for updates on startup</label>
-    <label class="row"><input class="t-check" type="checkbox" checked={s.reopenLast} onchange={(e) => savePrefs({ reopenLast: e.currentTarget.checked })} />Reopen the last client on startup</label>
+    <label class="row"><input class="t-check" type="checkbox" checked={s.checkUpdates} onchange={(event) => savePrefs({ checkUpdates: event.currentTarget.checked })} />Check for updates on startup</label>
+    <label class="row"><input class="t-check" type="checkbox" checked={s.reopenLast} onchange={(event) => savePrefs({ reopenLast: event.currentTarget.checked })} />Reopen the last client on startup</label>
 
     <h4>Layout</h4>
     <div class="row">
@@ -23,7 +23,7 @@
         min={LIST_COLUMNS.min}
         max={LIST_COLUMNS.max}
         width={40}
-        onchange={(v) => savePrefs({ listColumns: v })}
+        onchange={(value) => savePrefs({ listColumns: value })}
       />
       <span class="t-label">({LIST_COLUMNS.min}-{LIST_COLUMNS.max}, the object list resizes to fit)</span>
     </div>
@@ -31,7 +31,7 @@
     <h4>Export</h4>
     <label class="row">
       <span class="t-label lbl">Image format</span>
-      <Select grow value={s.exportFormat} options={IMAGE_FORMATS} onchange={(v) => savePrefs({ exportFormat: v })} />
+      <Select grow value={s.exportFormat} options={IMAGE_FORMATS} onchange={(value) => savePrefs({ exportFormat: value })} />
     </label>
     <label class="row" title="OTOBJ is readable and editable (JSON and PNG); OBD opens in ObjectBuilder">
       <span class="t-label lbl">Object files</span>
@@ -42,7 +42,7 @@
           { value: "otobj", label: "OTOBJ (.otobj)" },
           { value: "obd", label: "ObjectBuilder (.obd)" },
         ]}
-        onchange={(v) => savePrefs({ objectFormat: v })}
+        onchange={(value) => savePrefs({ objectFormat: value })}
       />
     </label>
     <label class="row">
@@ -54,7 +54,7 @@
           { value: "magenta", label: "Magenta (ObjectBuilder)" },
           { value: "transparent", label: "Transparent" },
         ]}
-        onchange={(v) => savePrefs({ sheetBackground: v })}
+        onchange={(value) => savePrefs({ sheetBackground: value })}
       />
     </label>
     <p class="t-label note">BMP and JPG have no transparency; empty pixels become magenta.</p>
@@ -68,7 +68,7 @@
         autocomplete="off"
         placeholder="Only for market moderators"
         value={s.marketAdminToken}
-        onchange={(e) => savePrefs({ marketAdminToken: e.currentTarget.value.trim() })}
+        onchange={(event) => savePrefs({ marketAdminToken: event.currentTarget.value.trim() })}
       />
     </label>
     <p class="t-label note">With the admin token every market entry can be deleted.</p>

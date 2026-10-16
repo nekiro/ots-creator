@@ -18,23 +18,23 @@ const (
 func (p *Project) FindSprites(filter string) ([]uint32, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	n := p.sprites.count()
+	count := p.sprites.count()
 	out := []uint32{}
 	switch filter {
 	case SpritesUnused:
 		used := p.usedSpritesLocked()
-		for id := uint32(1); id <= n; id++ {
+		for id := uint32(1); id <= count; id++ {
 			if !used[id] {
 				out = append(out, id)
 			}
 		}
 	case SpritesEmpty:
-		empty := make([]bool, n+1)
-		err := p.sprites.eachHash(func(id uint32, h spriteHash) { empty[id] = h == spriteHash{} })
+		empty := make([]bool, count+1)
+		err := p.sprites.eachHash(func(id uint32, contentHash spriteHash) { empty[id] = contentHash == spriteHash{} })
 		if err != nil {
 			return nil, err
 		}
-		for id := uint32(1); id <= n; id++ {
+		for id := uint32(1); id <= count; id++ {
 			if empty[id] {
 				out = append(out, id)
 			}
@@ -44,7 +44,7 @@ func (p *Project) FindSprites(filter string) ([]uint32, error) {
 		if err != nil {
 			return nil, err
 		}
-		for id := uint32(1); id <= n; id++ {
+		for id := uint32(1); id <= count; id++ {
 			if dups[id] != 0 {
 				out = append(out, id)
 			}
@@ -58,13 +58,13 @@ func (p *Project) FindSprites(filter string) ([]uint32, error) {
 // usedSpritesLocked marks every sprite id some thing references.
 func (p *Project) usedSpritesLocked() []bool {
 	used := make([]bool, p.sprites.count()+1)
-	for _, c := range thing.Categories {
-		for _, t := range p.things.Things[c] {
-			if t == nil {
+	for _, category := range thing.Categories {
+		for _, object := range p.things.Things[category] {
+			if object == nil {
 				continue
 			}
-			for _, g := range t.FrameGroups {
-				for _, id := range g.Sprites {
+			for _, group := range object.FrameGroups {
+				for _, id := range group.Sprites {
 					if int(id) < len(used) {
 						used[id] = true
 					}
@@ -80,10 +80,10 @@ func (p *Project) SpriteUsers(id uint32) []ThingRef {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	out := []ThingRef{}
-	for _, c := range thing.Categories {
-		for _, t := range p.things.Things[c] {
-			if t != nil && slices.Contains(t.SpriteIDs(), id) {
-				out = append(out, ThingRef{Category: c, ID: t.ID})
+	for _, category := range thing.Categories {
+		for _, object := range p.things.Things[category] {
+			if object != nil && slices.Contains(object.SpriteIDs(), id) {
+				out = append(out, ThingRef{Category: category, ID: object.ID})
 			}
 		}
 	}
@@ -108,31 +108,31 @@ func (p *Project) ReplaceSpriteRefs(from []uint32, to uint32) (int, error) {
 	if len(replace) == 0 {
 		return 0, nil
 	}
-	r := p.record(fmt.Sprintf("Replace %d sprite reference(s) with %d", len(replace), to))
+	edit := p.record(fmt.Sprintf("Replace %d sprite reference(s) with %d", len(replace), to))
 	changed := 0
-	for _, c := range thing.Categories {
-		for _, cur := range p.things.Things[c] {
-			if cur == nil {
+	for _, category := range thing.Categories {
+		for _, current := range p.things.Things[category] {
+			if current == nil {
 				continue
 			}
-			var t *thing.Thing
-			for gi, g := range cur.FrameGroups {
-				for si, id := range g.Sprites {
+			var object *thing.Thing
+			for groupIndex, group := range current.FrameGroups {
+				for slot, id := range group.Sprites {
 					if replace[id] {
-						if t == nil {
-							t = cur.Clone()
+						if object == nil {
+							object = current.Clone()
 						}
-						t.FrameGroups[gi].Sprites[si] = to
+						object.FrameGroups[groupIndex].Sprites[slot] = to
 					}
 				}
 			}
-			if t != nil {
-				r.setThing(c, t.ID, t)
+			if object != nil {
+				edit.setThing(category, object.ID, object)
 				changed++
 			}
 		}
 	}
-	r.commit()
+	edit.commit()
 	return changed, nil
 }
 
@@ -141,22 +141,22 @@ func (p *Project) ReplaceSpriteRefs(from []uint32, to uint32) (int, error) {
 // never duplicates). Sprites are hashed in parallel with a 128-bit hash, so
 // a collision is practically impossible and nothing is read twice.
 func (p *Project) duplicateSprites() ([]uint32, error) {
-	n := p.sprites.count()
-	hashes := make([]spriteHash, n+1)
-	if err := p.sprites.eachHash(func(id uint32, h spriteHash) { hashes[id] = h }); err != nil {
+	count := p.sprites.count()
+	hashes := make([]spriteHash, count+1)
+	if err := p.sprites.eachHash(func(id uint32, contentHash spriteHash) { hashes[id] = contentHash }); err != nil {
 		return nil, err
 	}
-	dups := make([]uint32, n+1)
-	first := make(map[spriteHash]uint32, n)
-	for id := uint32(1); id <= n; id++ {
-		h := hashes[id]
-		if h == (spriteHash{}) {
+	dups := make([]uint32, count+1)
+	first := make(map[spriteHash]uint32, count)
+	for id := uint32(1); id <= count; id++ {
+		contentHash := hashes[id]
+		if contentHash == (spriteHash{}) {
 			continue
 		}
-		if f, ok := first[h]; ok {
-			dups[id] = f
+		if firstID, ok := first[contentHash]; ok {
+			dups[id] = firstID
 		} else {
-			first[h] = id
+			first[contentHash] = id
 		}
 	}
 	return dups, nil

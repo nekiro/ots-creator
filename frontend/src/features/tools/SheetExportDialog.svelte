@@ -72,8 +72,8 @@
     centered++;
   }
 
-  function loaded(e: Event) {
-    const img = e.currentTarget as HTMLImageElement;
+  function loaded(event: Event) {
+    const img = event.currentTarget as HTMLImageElement;
     natural = [img.naturalWidth, img.naturalHeight];
     loading = false;
   }
@@ -121,7 +121,7 @@
       {/if}
       <label class="row">
         <span class="t-label lbl">Format</span>
-        <Select grow value={format} options={IMAGE_FORMATS} onchange={(v) => (format = v)} />
+        <Select grow value={format} options={IMAGE_FORMATS} onchange={(value) => (format = value)} />
       </label>
       <label class="row">
         <span class="t-label lbl">Background</span>
@@ -133,7 +133,7 @@
             { value: "magenta", label: "Magenta" },
             { value: "transparent", label: "Transparent" },
           ]}
-          onchange={(v) => (transparent = v === "transparent")}
+          onchange={(value) => (transparent = value === "transparent")}
         />
       </label>
       {#if format !== "png"}<p class="t-label note">{format.toUpperCase()} has no transparency: empty pixels are magenta.</p>{/if}

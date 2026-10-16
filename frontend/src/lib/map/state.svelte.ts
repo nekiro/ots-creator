@@ -1,5 +1,6 @@
 // State of the map editor (Svelte 5 runes).
 import { errorMessage } from "../api";
+import { loadJson, saveJson } from "../storage";
 import { toast } from "../state.svelte";
 import { MapService, type DataInfo, type EditorSettings, type MapChange, type MapInfo, type Palette, type Position, type RecentMap, type TileInfo } from "./api";
 import { ItemIndex } from "./items";
@@ -80,29 +81,8 @@ export const DEFAULT_VIEW: ViewOptions = {
   lights: false,
 };
 
-function load<T>(key: string, fallback: T): T {
-  try {
-    const v = localStorage.getItem(key);
-    if (v) return { ...fallback, ...JSON.parse(v) } as T;
-  } catch {
-    /* storage unavailable */
-  }
-  return fallback;
-}
-
-function save(key: string, v: unknown): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(v));
-  } catch {
-    /* ignore */
-  }
-}
-
-/** Zoom steps (device pixels per world pixel, before the screen scale). */
-export const ZOOMS = [0.03125, 0.0625, 0.125, 0.1875, 0.25, 0.375, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8];
-
 class MapState {
-  mode = $state<EditorMode>(load<{ mode: EditorMode }>(MODE_KEY, { mode: "objects" }).mode);
+  mode = $state<EditorMode>(loadJson<{ mode: EditorMode }>(MODE_KEY, { mode: "objects" }).mode);
   data = $state<DataInfo | null>(null);
   maps = $state<MapInfo[]>([]);
   recent = $state<RecentMap[]>([]);
@@ -134,7 +114,7 @@ class MapState {
   reroll = $state(0);
   recentBrushes = $state<BrushSel[]>([]);
 
-  view = $state<ViewOptions>(load(VIEW_KEY, DEFAULT_VIEW));
+  view = $state<ViewOptions>(loadJson(VIEW_KEY, DEFAULT_VIEW));
   cams = $state<Record<number, Camera>>({});
   hover = $state<Position | null>(null);
   /** Tile shown in the inspector. */
@@ -157,13 +137,13 @@ class MapState {
   /** The clipboard follows the mouse until a click pastes it. */
   pasting = $state(false);
   /** A click on the map picks a position for this callback (teleport destinations). */
-  pick = $state<{ label: string; done: (p: Position) => void } | null>(null);
+  pick = $state<{ label: string; done: (position: Position) => void } | null>(null);
   busy = $state<string | null>(null);
   /** A map being opened or saved: its file name, the current step and how far the whole job is (0-100). */
   loading = $state<{ name: string; step: string; percent: number; title?: string } | null>(null);
 
   get active(): MapInfo | null {
-    return this.maps.find((m) => m.id === this.activeId) ?? null;
+    return this.maps.find((open) => open.id === this.activeId) ?? null;
   }
 
   get cam(): Camera {
@@ -179,15 +159,15 @@ class MapState {
 export const map = new MapState();
 
 $effect.root(() => {
-  $effect(() => save(VIEW_KEY, map.view));
-  $effect(() => save(MODE_KEY, { mode: map.mode }));
-  $effect(() => save(BRUSH_KEY, { size: map.size, shape: map.shape }));
+  $effect(() => saveJson(VIEW_KEY, map.view));
+  $effect(() => saveJson(MODE_KEY, { mode: map.mode }));
+  $effect(() => saveJson(BRUSH_KEY, { size: map.size, shape: map.shape }));
 });
 
 {
-  const b = load(BRUSH_KEY, { size: 0, shape: "square" as "square" | "circle" });
-  map.size = b.size;
-  map.shape = b.shape;
+  const brush = loadJson(BRUSH_KEY, { size: 0, shape: "square" as "square" | "circle" });
+  map.size = brush.size;
+  map.shape = brush.shape;
 }
 
 /** Listeners of map changes (the canvas redraws touched chunks). */
@@ -200,19 +180,19 @@ export function onMapChange(fn: ChangeListener): () => void {
 }
 
 /** Applies a change from the backend: map info and redraw. */
-export function applyChange(id: number, ch: MapChange | null | undefined): void {
-  if (!ch) return;
-  const info = ch.info;
+export function applyChange(id: number, change: MapChange | null | undefined): void {
+  if (!change) return;
+  const info = change.info;
   if (info) {
-    const i = map.maps.findIndex((m) => m.id === id);
-    if (i >= 0) {
+    const index = map.maps.findIndex((open) => open.id === id);
+    if (index >= 0) {
       // Towns, houses and waypoints are only sent with meta changes.
-      const old = map.maps[i];
-      map.maps[i] = ch.meta ? info : { ...info, towns: old.towns, houses: old.houses, waypoints: old.waypoints, zones: old.zones, bounds: old.bounds, hasBounds: old.hasBounds };
+      const old = map.maps[index];
+      map.maps[index] = change.meta ? info : { ...info, towns: old.towns, houses: old.houses, waypoints: old.waypoints, zones: old.zones, bounds: old.bounds, hasBounds: old.hasBounds };
     }
   }
-  for (const fn of listeners) fn(id, ch);
-  for (const w of ch.warnings ?? []) toast(w, "info", 6000);
+  for (const listener of listeners) listener(id, change);
+  for (const warning of change.warnings ?? []) toast(warning, "info", 6000);
   if (map.inspect && id === map.activeId) void refreshTile();
 }
 
@@ -221,25 +201,25 @@ export async function edit(fn: (id: number) => Promise<MapChange>): Promise<MapC
   const id = map.activeId;
   if (id === null) return null;
   try {
-    const ch = await fn(id);
-    applyChange(id, ch);
-    return ch;
-  } catch (e) {
-    toast(errorMessage(e), "error");
+    const change = await fn(id);
+    applyChange(id, change);
+    return change;
+  } catch (err) {
+    toast(errorMessage(err), "error");
     return null;
   }
 }
 
 export async function refreshTile(): Promise<void> {
   const id = map.activeId;
-  const p = map.inspect;
-  if (id === null || !p) {
+  const position = map.inspect;
+  if (id === null || !position) {
     map.tile = null;
     return;
   }
   try {
-    const t = await MapService.Tile(id, p);
-    if (map.inspect === p) map.tile = t;
+    const tile = await MapService.Tile(id, position);
+    if (map.inspect === position) map.tile = tile;
   } catch {
     map.tile = null;
   }
@@ -248,25 +228,25 @@ export async function refreshTile(): Promise<void> {
 /** Loads status, the item table and the palette. */
 export async function loadMapData(force = false): Promise<void> {
   try {
-    const st = await MapService.Status();
-    map.data = st.data;
-    map.recent = st.recent ?? [];
-    map.settings = st.settings;
-    map.keys = Object.fromEntries(Object.entries(st.keys ?? {}).map(([k, v]) => [k, v ?? []]));
-    map.maps = st.maps ?? [];
-    if (map.activeId === null || !map.maps.some((m) => m.id === map.activeId)) map.activeId = map.maps[0]?.id ?? null;
-    if (st.data?.ready && (force || !map.items)) {
+    const status = await MapService.Status();
+    map.data = status.data;
+    map.recent = status.recent ?? [];
+    map.settings = status.settings;
+    map.keys = Object.fromEntries(Object.entries(status.keys ?? {}).map(([key, keys]) => [key, keys ?? []]));
+    map.maps = status.maps ?? [];
+    if (map.activeId === null || !map.maps.some((open) => open.id === map.activeId)) map.activeId = map.maps[0]?.id ?? null;
+    if (status.data?.ready && (force || !map.items)) {
       const [items, palette] = await Promise.all([MapService.Items(), MapService.Palette()]);
       map.items = new ItemIndex(items);
       map.palette = palette;
       map.dataRev++;
     }
-    if (!st.data?.ready) {
+    if (!status.data?.ready) {
       map.items = null;
       map.palette = null;
     }
-  } catch (e) {
-    toast(errorMessage(e), "error");
+  } catch (err) {
+    toast(errorMessage(err), "error");
   }
 }
 
@@ -275,48 +255,48 @@ export async function reloadPalette(): Promise<void> {
   try {
     map.palette = await MapService.Palette();
     map.dataRev++;
-  } catch (e) {
-    toast(errorMessage(e), "error");
+  } catch (err) {
+    toast(errorMessage(err), "error");
   }
 }
 
 /** Warnings in a load warning list: "N more not listed: …" lines count N. */
 export function warningCount(list: string[] | undefined): number {
-  let n = 0;
-  for (const w of list ?? []) n += Number(w.match(/^(\d+) more not listed: /)?.[1] ?? 1);
-  return n;
+  let count = 0;
+  for (const warning of list ?? []) count += Number(warning.match(/^(\d+) more not listed: /)?.[1] ?? 1);
+  return count;
 }
 
-export function setCam(id: number, c: Partial<Camera>): void {
-  const cur = map.cams[id] ?? { x: 0, y: 0, zoom: 1, floor: 7 };
-  map.cams[id] = { ...cur, ...c };
+export function setCam(id: number, change: Partial<Camera>): void {
+  const current = map.cams[id] ?? { x: 0, y: 0, zoom: 1, floor: 7 };
+  map.cams[id] = { ...current, ...change };
 }
 
-export function selectBrush(b: BrushSel): void {
-  map.brush = b;
+export function selectBrush(brush: BrushSel): void {
+  map.brush = brush;
   map.tool = "brush";
   map.pasting = false;
-  if (b.kind !== "raw" || b.item) {
-    map.recentBrushes = [b, ...map.recentBrushes.filter((r) => brushKey(r) !== brushKey(b))].slice(0, 12);
+  if (brush.kind !== "raw" || brush.item) {
+    map.recentBrushes = [brush, ...map.recentBrushes.filter((recent) => brushKey(recent) !== brushKey(brush))].slice(0, 12);
   }
 }
 
 /** Selects a creature brush (from a creature on the map or the palette). */
-export function useCreature(c: { name: string; npc?: boolean }): void {
-  selectBrush({ kind: "creature", creature: c.name, npc: !!c.npc, label: c.name });
+export function useCreature(creature: { name: string; npc?: boolean }): void {
+  selectBrush({ kind: "creature", creature: creature.name, npc: !!creature.npc, label: creature.name });
 }
 
-function brushKey(x: BrushSel): string {
-  return `${x.kind}:${x.name ?? ""}:${x.item ?? ""}:${x.house ?? ""}:${x.creature ?? ""}:${x.flag ?? ""}:${x.zone ?? ""}:${x.waypoint ?? ""}:${x.doorType ?? ""}`;
+function brushKey(brush: BrushSel): string {
+  return `${brush.kind}:${brush.name ?? ""}:${brush.item ?? ""}:${brush.house ?? ""}:${brush.creature ?? ""}:${brush.flag ?? ""}:${brush.zone ?? ""}:${brush.waypoint ?? ""}:${brush.doorType ?? ""}`;
 }
 
-/** True when b is the brush in use. */
-export function isBrushActive(b: BrushSel): boolean {
-  return !!map.brush && map.tool === "brush" && brushKey(map.brush) === brushKey(b);
+/** True when the brush is the one in use. */
+export function isBrushActive(brush: BrushSel): boolean {
+  return !!map.brush && map.tool === "brush" && brushKey(map.brush) === brushKey(brush);
 }
 
 /** Outfit look type of a creature brush (0 when unknown). */
 export function creatureOutfit(name: string | undefined): number {
   if (!name) return 0;
-  return map.palette?.creatures?.find((c) => c?.name === name)?.outfit.lookType ?? 0;
+  return map.palette?.creatures?.find((creature) => creature?.name === name)?.outfit.lookType ?? 0;
 }

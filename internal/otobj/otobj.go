@@ -91,93 +91,93 @@ type Options struct {
 
 // Encode writes d as an OTOBJ file. Sprite ids in d are only kept as the
 // source of the object.
-func Encode(d *obd.Data, o Options) ([]byte, error) {
-	t := d.Thing
-	if err := t.Validate(); err != nil {
+func Encode(data *obd.Data, options Options) ([]byte, error) {
+	object := data.Thing
+	if err := object.Validate(); err != nil {
 		return nil, err
 	}
-	if len(d.Sprites) != len(t.FrameGroups) {
-		return nil, fmt.Errorf("otobj: %d sprite lists for %d frame groups", len(d.Sprites), len(t.FrameGroups))
+	if len(data.Sprites) != len(object.FrameGroups) {
+		return nil, fmt.Errorf("otobj: %d sprite lists for %d frame groups", len(data.Sprites), len(object.FrameGroups))
 	}
-	flags, err := encodeFlags(&t.Props)
+	flags, err := encodeFlags(&object.Props)
 	if err != nil {
 		return nil, err
 	}
-	m := manifest{
+	meta := manifest{
 		Format:      formatName,
 		Version:     Version,
-		Generator:   o.Generator,
-		Category:    t.Category.String(),
-		SpriteSize:  d.SpriteSize,
-		Name:        t.Name,
-		Description: t.Description,
+		Generator:   options.Generator,
+		Category:    object.Category.String(),
+		SpriteSize:  data.SpriteSize,
+		Name:        object.Name,
+		Description: object.Description,
 		Flags:       flags,
-		NpcSales:    t.NpcSales,
+		NpcSales:    object.NpcSales,
 	}
-	if d.ClientVersion != 0 || t.ID != 0 {
-		m.Source = &source{Client: d.ClientVersion, ID: t.ID}
+	if data.ClientVersion != 0 || object.ID != 0 {
+		meta.Source = &source{Client: data.ClientVersion, ID: object.ID}
 	}
 	var buf bytes.Buffer
-	z := zip.NewWriter(&buf)
-	for gi, g := range t.FrameGroups {
-		name := "sprites/" + groupType(t, gi) + ".png"
-		m.FrameGroups = append(m.FrameGroups, encodeGroup(t, gi, name))
-		if len(d.Sprites[gi]) != len(g.Sprites) {
-			return nil, fmt.Errorf("otobj: frame group %d has %d slots and %d sprites", gi, len(g.Sprites), len(d.Sprites[gi]))
+	archive := zip.NewWriter(&buf)
+	for groupIndex, frameGroup := range object.FrameGroups {
+		name := "sprites/" + groupType(object, groupIndex) + ".png"
+		meta.FrameGroups = append(meta.FrameGroups, encodeGroup(object, groupIndex, name))
+		if len(data.Sprites[groupIndex]) != len(frameGroup.Sprites) {
+			return nil, fmt.Errorf("otobj: frame group %d has %d slots and %d sprites", groupIndex, len(frameGroup.Sprites), len(data.Sprites[groupIndex]))
 		}
-		sprites := d.Sprites[gi]
-		sheet := imaging.Sheet(g, d.SpriteSize, color.NRGBA{}, func(slot int) []byte { return sprites[slot].Pixels })
-		w, err := z.CreateHeader(&zip.FileHeader{Name: name, Method: zip.Store})
+		sprites := data.Sprites[groupIndex]
+		sheet := imaging.Sheet(frameGroup, data.SpriteSize, color.NRGBA{}, func(slot int) []byte { return sprites[slot].Pixels })
+		entry, err := archive.CreateHeader(&zip.FileHeader{Name: name, Method: zip.Store})
 		if err != nil {
 			return nil, err
 		}
-		if err := writePNG(w, sheet); err != nil {
+		if err := writePNG(entry, sheet); err != nil {
 			return nil, err
 		}
 	}
-	data, err := json.MarshalIndent(m, "", "  ")
+	manifestJSON, err := json.MarshalIndent(meta, "", "  ")
 	if err != nil {
 		return nil, err
 	}
-	w, err := z.CreateHeader(&zip.FileHeader{Name: manifestName, Method: zip.Deflate})
+	manifestEntry, err := archive.CreateHeader(&zip.FileHeader{Name: manifestName, Method: zip.Deflate})
 	if err != nil {
 		return nil, err
 	}
-	if _, err := w.Write(data); err != nil {
+	if _, err := manifestEntry.Write(manifestJSON); err != nil {
 		return nil, err
 	}
-	if err := z.Close(); err != nil {
+	if err := archive.Close(); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
 }
 
-func groupType(t *thing.Thing, i int) string {
-	if t.Category == thing.CategoryOutfit && len(t.FrameGroups) > 1 && i == 1 {
+func groupType(object *thing.Thing, groupIndex int) string {
+	if object.Category == thing.CategoryOutfit && len(object.FrameGroups) > 1 && groupIndex == 1 {
 		return "walking"
 	}
 	return "idle"
 }
 
-func encodeGroup(t *thing.Thing, i int, sheet string) group {
-	g := t.FrameGroups[i]
+func encodeGroup(object *thing.Thing, groupIndex int, sheet string) group {
+	frameGroup := object.FrameGroups[groupIndex]
 	out := group{
-		Type: groupType(t, i), Width: g.Width, Height: g.Height, ExactSize: g.ExactSize, Layers: g.Layers,
-		PatternX: g.PatternX, PatternY: g.PatternY, PatternZ: g.PatternZ, Frames: g.Frames, Sheet: sheet,
+		Type: groupType(object, groupIndex), Width: frameGroup.Width, Height: frameGroup.Height, ExactSize: frameGroup.ExactSize, Layers: frameGroup.Layers,
+		PatternX: frameGroup.PatternX, PatternY: frameGroup.PatternY, PatternZ: frameGroup.PatternZ, Frames: frameGroup.Frames, Sheet: sheet,
 	}
-	if g.Frames > 1 {
+	if frameGroup.Frames > 1 {
 		mode := "async"
-		if g.Mode == thing.AnimationSync {
+		if frameGroup.Mode == thing.AnimationSync {
 			mode = "sync"
 		}
-		out.Animation = &animation{Mode: mode, LoopCount: g.LoopCount, StartFrame: g.StartFrame, Durations: g.Durations}
+		out.Animation = &animation{Mode: mode, LoopCount: frameGroup.LoopCount, StartFrame: frameGroup.StartFrame, Durations: frameGroup.Durations}
 	}
 	return out
 }
 
 // encodeFlags writes the properties that differ from their defaults.
-func encodeFlags(p *thing.Properties) (json.RawMessage, error) {
-	raw, err := json.Marshal(p)
+func encodeFlags(props *thing.Properties) (json.RawMessage, error) {
+	raw, err := json.Marshal(props)
 	if err != nil {
 		return nil, err
 	}
@@ -185,15 +185,15 @@ func encodeFlags(p *thing.Properties) (json.RawMessage, error) {
 	if err := json.Unmarshal(raw, &all); err != nil {
 		return nil, err
 	}
-	for k, v := range all {
-		if isZero(v) {
-			delete(all, k)
+	for key, value := range all {
+		if isZero(value) {
+			delete(all, key)
 		}
 	}
-	if !p.IsMarket {
+	if !props.IsMarket {
 		delete(all, "market")
 	}
-	if !p.HasBones {
+	if !props.HasBones {
 		delete(all, "bones")
 	}
 	return json.Marshal(all) // map keys are sorted: stable, diffable output
@@ -201,26 +201,26 @@ func encodeFlags(p *thing.Properties) (json.RawMessage, error) {
 
 // isZero reports whether a decoded JSON value is false, 0, "" or only made
 // of such values.
-func isZero(v any) bool {
-	switch x := v.(type) {
+func isZero(value any) bool {
+	switch typed := value.(type) {
 	case nil:
 		return true
 	case bool:
-		return !x
+		return !typed
 	case float64:
-		return x == 0
+		return typed == 0
 	case string:
-		return x == ""
+		return typed == ""
 	case []any:
-		for _, e := range x {
-			if !isZero(e) {
+		for _, element := range typed {
+			if !isZero(element) {
 				return false
 			}
 		}
 		return true
 	case map[string]any:
-		for _, e := range x {
-			if !isZero(e) {
+		for _, element := range typed {
+			if !isZero(element) {
 				return false
 			}
 		}
@@ -230,39 +230,39 @@ func isZero(v any) bool {
 }
 
 // writePNG writes a sheet, with a palette when it has at most 256 colors.
-func writePNG(w io.Writer, img *image.NRGBA) error {
+func writePNG(dest io.Writer, img *image.NRGBA) error {
 	var out image.Image = img
-	if pal := paletted(img); pal != nil {
-		out = pal
+	if palettedImg := paletted(img); palettedImg != nil {
+		out = palettedImg
 	}
-	return (&png.Encoder{CompressionLevel: png.DefaultCompression}).Encode(w, out)
+	return (&png.Encoder{CompressionLevel: png.DefaultCompression}).Encode(dest, out)
 }
 
 // paletted returns img with a palette, or nil when it has more than 256
 // colors. Fully transparent pixels share one entry.
 func paletted(img *image.NRGBA) *image.Paletted {
 	index := map[[4]byte]uint8{}
-	var pal color.Palette
-	pix := img.Pix
+	var palette color.Palette
+	pixels := img.Pix
 	key := func(i int) [4]byte {
-		if pix[i+3] == 0 {
+		if pixels[i+3] == 0 {
 			return [4]byte{}
 		}
-		return [4]byte{pix[i], pix[i+1], pix[i+2], pix[i+3]}
+		return [4]byte{pixels[i], pixels[i+1], pixels[i+2], pixels[i+3]}
 	}
-	for i := 0; i < len(pix); i += 4 {
-		k := key(i)
-		if _, ok := index[k]; ok {
+	for i := 0; i < len(pixels); i += 4 {
+		pixelKey := key(i)
+		if _, ok := index[pixelKey]; ok {
 			continue
 		}
-		if len(pal) == 256 {
+		if len(palette) == 256 {
 			return nil
 		}
-		index[k] = uint8(len(pal))
-		pal = append(pal, color.NRGBA{k[0], k[1], k[2], k[3]})
+		index[pixelKey] = uint8(len(palette))
+		palette = append(palette, color.NRGBA{pixelKey[0], pixelKey[1], pixelKey[2], pixelKey[3]})
 	}
-	out := image.NewPaletted(img.Rect, pal)
-	for i, j := 0, 0; i < len(pix); i, j = i+4, j+1 {
+	out := image.NewPaletted(img.Rect, palette)
+	for i, j := 0, 0; i < len(pixels); i, j = i+4, j+1 {
 		out.Pix[j] = index[key(i)]
 	}
 	return out
@@ -270,116 +270,116 @@ func paletted(img *image.NRGBA) *image.Paletted {
 
 // Decode reads an OTOBJ file. Sprite ids of the returned thing are 0.
 func Decode(file []byte) (*obd.Data, error) {
-	z, err := zip.NewReader(bytes.NewReader(file), int64(len(file)))
+	archive, err := zip.NewReader(bytes.NewReader(file), int64(len(file)))
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrNotOTOBJ, err)
 	}
-	data, err := readEntry(z, manifestName)
+	manifestJSON, err := readEntry(archive, manifestName)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrNotOTOBJ, err)
 	}
-	var m manifest
-	if err := json.Unmarshal(data, &m); err != nil {
+	var meta manifest
+	if err := json.Unmarshal(manifestJSON, &meta); err != nil {
 		return nil, fmt.Errorf("otobj: manifest: %w", err)
 	}
-	if m.Format != formatName {
+	if meta.Format != formatName {
 		return nil, ErrNotOTOBJ
 	}
-	if m.Version < 1 || m.Version > Version {
-		return nil, fmt.Errorf("otobj: version %d is not supported (up to %d), update OTS Creator", m.Version, Version)
+	if meta.Version < 1 || meta.Version > Version {
+		return nil, fmt.Errorf("otobj: version %d is not supported (up to %d), update OTS Creator", meta.Version, Version)
 	}
-	c, err := thing.ParseCategory(m.Category)
+	category, err := thing.ParseCategory(meta.Category)
 	if err != nil {
 		return nil, fmt.Errorf("otobj: %w", err)
 	}
-	if m.SpriteSize != 32 && m.SpriteSize != 64 {
-		return nil, fmt.Errorf("otobj: sprite size %d is not supported", m.SpriteSize)
+	if meta.SpriteSize != 32 && meta.SpriteSize != 64 {
+		return nil, fmt.Errorf("otobj: sprite size %d is not supported", meta.SpriteSize)
 	}
-	t := &thing.Thing{Category: c, Name: m.Name, Description: m.Description, NpcSales: m.NpcSales}
-	if len(m.Flags) > 0 && string(m.Flags) != "null" {
-		if err := json.Unmarshal(m.Flags, &t.Props); err != nil {
+	object := &thing.Thing{Category: category, Name: meta.Name, Description: meta.Description, NpcSales: meta.NpcSales}
+	if len(meta.Flags) > 0 && string(meta.Flags) != "null" {
+		if err := json.Unmarshal(meta.Flags, &object.Props); err != nil {
 			return nil, fmt.Errorf("otobj: flags: %w", err)
 		}
 	}
-	d := &obd.Data{Version: Version, Thing: t, SpriteSize: m.SpriteSize}
-	if m.Source != nil {
-		d.ClientVersion, t.ID = m.Source.Client, m.Source.ID
+	data := &obd.Data{Version: Version, Thing: object, SpriteSize: meta.SpriteSize}
+	if meta.Source != nil {
+		data.ClientVersion, object.ID = meta.Source.Client, meta.Source.ID
 	}
-	for gi, mg := range m.FrameGroups {
-		g, err := decodeGroup(mg, gi, c.DefaultDuration())
+	for groupIndex, groupManifest := range meta.FrameGroups {
+		frameGroup, err := decodeGroup(groupManifest, groupIndex, category.DefaultDuration())
 		if err != nil {
 			return nil, err
 		}
-		w, h := g.SheetSize(m.SpriteSize)
-		sheet, err := readSheet(z, mg.Sheet, w, h)
+		width, height := frameGroup.SheetSize(meta.SpriteSize)
+		sheet, err := readSheet(archive, groupManifest.Sheet, width, height)
 		if err != nil {
 			return nil, err
 		}
-		pixels, err := imaging.SliceSheetExact(sheet, g, m.SpriteSize)
+		pixels, err := imaging.SliceSheetExact(sheet, frameGroup, meta.SpriteSize)
 		if err != nil {
-			return nil, fmt.Errorf("otobj: %s: %w", mg.Sheet, err)
+			return nil, fmt.Errorf("otobj: %s: %w", groupManifest.Sheet, err)
 		}
 		sprites := make([]obd.Sprite, len(pixels))
-		for i, px := range pixels {
-			sprites[i] = obd.Sprite{Pixels: px}
+		for i, spritePixels := range pixels {
+			sprites[i] = obd.Sprite{Pixels: spritePixels}
 		}
-		g.Sprites = make([]uint32, len(pixels))
-		t.FrameGroups = append(t.FrameGroups, g)
-		d.Sprites = append(d.Sprites, sprites)
+		frameGroup.Sprites = make([]uint32, len(pixels))
+		object.FrameGroups = append(object.FrameGroups, frameGroup)
+		data.Sprites = append(data.Sprites, sprites)
 	}
-	if err := t.Validate(); err != nil {
+	if err := object.Validate(); err != nil {
 		return nil, fmt.Errorf("otobj: %w", err)
 	}
-	return d, nil
+	return data, nil
 }
 
-func decodeGroup(mg group, i int, defDuration uint32) (*thing.FrameGroup, error) {
-	g := &thing.FrameGroup{
-		Width: mg.Width, Height: mg.Height, ExactSize: mg.ExactSize, Layers: mg.Layers,
-		PatternX: mg.PatternX, PatternY: mg.PatternY, PatternZ: mg.PatternZ, Frames: mg.Frames,
+func decodeGroup(groupManifest group, groupIndex int, defaultDuration uint32) (*thing.FrameGroup, error) {
+	frameGroup := &thing.FrameGroup{
+		Width: groupManifest.Width, Height: groupManifest.Height, ExactSize: groupManifest.ExactSize, Layers: groupManifest.Layers,
+		PatternX: groupManifest.PatternX, PatternY: groupManifest.PatternY, PatternZ: groupManifest.PatternZ, Frames: groupManifest.Frames,
 	}
-	switch mg.Type {
+	switch groupManifest.Type {
 	case "idle", "":
 	case "walking":
-		g.Type = thing.FrameGroupWalking
+		frameGroup.Type = thing.FrameGroupWalking
 	default:
-		return nil, fmt.Errorf("otobj: frame group %d: unknown type %q", i, mg.Type)
+		return nil, fmt.Errorf("otobj: frame group %d: unknown type %q", groupIndex, groupManifest.Type)
 	}
-	if g.Width < 1 || g.Height < 1 || g.Width > 8 || g.Height > 8 || g.Layers < 1 || g.PatternX < 1 || g.PatternY < 1 || g.PatternZ < 1 || g.Frames < 1 {
-		return nil, fmt.Errorf("otobj: frame group %d has an invalid layout", i)
+	if frameGroup.Width < 1 || frameGroup.Height < 1 || frameGroup.Width > 8 || frameGroup.Height > 8 || frameGroup.Layers < 1 || frameGroup.PatternX < 1 || frameGroup.PatternY < 1 || frameGroup.PatternZ < 1 || frameGroup.Frames < 1 {
+		return nil, fmt.Errorf("otobj: frame group %d has an invalid layout", groupIndex)
 	}
-	if n := g.TotalSprites(); n > maxSprites {
-		return nil, fmt.Errorf("otobj: frame group %d has %d sprites (at most %d)", i, n, maxSprites)
+	if total := frameGroup.TotalSprites(); total > maxSprites {
+		return nil, fmt.Errorf("otobj: frame group %d has %d sprites (at most %d)", groupIndex, total, maxSprites)
 	}
-	if a := mg.Animation; a != nil && g.Frames > 1 {
-		if a.Mode == "sync" {
-			g.Mode = thing.AnimationSync
+	if anim := groupManifest.Animation; anim != nil && frameGroup.Frames > 1 {
+		if anim.Mode == "sync" {
+			frameGroup.Mode = thing.AnimationSync
 		}
-		g.LoopCount, g.StartFrame, g.Durations = a.LoopCount, a.StartFrame, a.Durations
+		frameGroup.LoopCount, frameGroup.StartFrame, frameGroup.Durations = anim.LoopCount, anim.StartFrame, anim.Durations
 	}
-	if g.Frames > 1 && len(g.Durations) != int(g.Frames) {
-		g.Durations = nil
-		g.EnsureDurations(defDuration)
+	if frameGroup.Frames > 1 && len(frameGroup.Durations) != int(frameGroup.Frames) {
+		frameGroup.Durations = nil
+		frameGroup.EnsureDurations(defaultDuration)
 	}
-	return g, nil
+	return frameGroup, nil
 }
 
 // readSheet reads a PNG sheet that must be w x h pixels. The size is checked
 // before decoding, so a bad file cannot make it allocate a huge image.
-func readSheet(z *zip.Reader, name string, w, h int) (*image.NRGBA, error) {
+func readSheet(archive *zip.Reader, name string, width, height int) (*image.NRGBA, error) {
 	if !strings.HasSuffix(strings.ToLower(name), ".png") || path.Clean(name) != name || strings.HasPrefix(name, "/") {
 		return nil, fmt.Errorf("otobj: bad sheet name %q", name)
 	}
-	data, err := readEntry(z, name)
+	data, err := readEntry(archive, name)
 	if err != nil {
 		return nil, fmt.Errorf("otobj: %w", err)
 	}
-	cfg, err := png.DecodeConfig(bytes.NewReader(data))
+	config, err := png.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("otobj: %s: %w", name, err)
 	}
-	if cfg.Width != w || cfg.Height != h {
-		return nil, fmt.Errorf("otobj: %s is %dx%d, its frame group needs %dx%d", name, cfg.Width, cfg.Height, w, h)
+	if config.Width != width || config.Height != height {
+		return nil, fmt.Errorf("otobj: %s is %dx%d, its frame group needs %dx%d", name, config.Width, config.Height, width, height)
 	}
 	img, err := imaging.Decode(bytes.NewReader(data))
 	if err != nil {
@@ -388,13 +388,13 @@ func readSheet(z *zip.Reader, name string, w, h int) (*image.NRGBA, error) {
 	return img, nil
 }
 
-func readEntry(z *zip.Reader, name string) ([]byte, error) {
-	f, err := z.Open(name)
+func readEntry(archive *zip.Reader, name string) ([]byte, error) {
+	entry, err := archive.Open(name)
 	if err != nil {
 		return nil, fmt.Errorf("missing %s", name)
 	}
-	defer f.Close()
-	data, err := io.ReadAll(io.LimitReader(f, maxEntry+1))
+	defer entry.Close()
+	data, err := io.ReadAll(io.LimitReader(entry, maxEntry+1))
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", name, err)
 	}

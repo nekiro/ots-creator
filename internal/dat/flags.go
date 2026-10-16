@@ -2,7 +2,6 @@ package dat
 
 import (
 	"fmt"
-	"slices"
 
 	"github.com/nekiro/ots-creator/internal/binio"
 	"github.com/nekiro/ots-creator/internal/thing"
@@ -12,49 +11,49 @@ import (
 type attr uint8
 
 const (
-	aGround attr = iota + 1
-	aGroundBorder
-	aOnBottom
-	aOnTop
-	aContainer
-	aStackable
-	aForceUse
-	aMultiUse
-	aHasCharges
-	aWritable
-	aWritableOnce
-	aFluidContainer
-	aFluid
-	aUnpassable
-	aUnmoveable
-	aBlockMissile
-	aBlockPathfind
-	aNoMoveAnimation
-	aPickupable
-	aHangable
-	aHookSouth
-	aHookEast
-	aRotatable
-	aLight
-	aDontHide
-	aTranslucent
-	aFloorChange
-	aOffset
-	aElevation
-	aLyingObject
-	aAnimateAlways
-	aMiniMap
-	aLensHelp
-	aFullGround
-	aIgnoreLook
-	aCloth
-	aMarket
-	aDefaultAction
-	aWrappable
-	aUnwrappable
-	aTopEffect
-	aUsable
-	aBones
+	attrGround attr = iota + 1
+	attrGroundBorder
+	attrOnBottom
+	attrOnTop
+	attrContainer
+	attrStackable
+	attrForceUse
+	attrMultiUse
+	attrHasCharges
+	attrWritable
+	attrWritableOnce
+	attrFluidContainer
+	attrFluid
+	attrUnpassable
+	attrUnmoveable
+	attrBlockMissile
+	attrBlockPathfind
+	attrNoMoveAnimation
+	attrPickupable
+	attrHangable
+	attrHookSouth
+	attrHookEast
+	attrRotatable
+	attrLight
+	attrDontHide
+	attrTranslucent
+	attrFloorChange
+	attrOffset
+	attrElevation
+	attrLyingObject
+	attrAnimateAlways
+	attrMiniMap
+	attrLensHelp
+	attrFullGround
+	attrIgnoreLook
+	attrCloth
+	attrMarket
+	attrDefaultAction
+	attrWrappable
+	attrUnwrappable
+	attrTopEffect
+	attrUsable
+	attrBones
 )
 
 // LastFlag terminates a flag list.
@@ -70,431 +69,239 @@ type FlagTable struct {
 	order            []byte // flag bytes in ascending order, used for writing
 }
 
-func newTable(name string, offsetPayload bool, m map[byte]attr) *FlagTable {
-	t := &FlagTable{name: name, offsetHasPayload: offsetPayload, byByte: m, byAttr: map[attr]byte{}}
-	for b, a := range m {
-		t.byAttr[a] = b
-		t.order = append(t.order, b)
-	}
-	slices.Sort(t.order)
-	return t
-}
-
-var table1 = newTable("7.10-7.30", false, map[byte]attr{
-	0x00: aGround, 0x01: aOnBottom, 0x02: aOnTop, 0x03: aContainer, 0x04: aStackable,
-	0x05: aMultiUse, 0x06: aForceUse, 0x07: aWritable, 0x08: aWritableOnce,
-	0x09: aFluidContainer, 0x0A: aFluid, 0x0B: aUnpassable, 0x0C: aUnmoveable,
-	0x0D: aBlockMissile, 0x0E: aBlockPathfind, 0x0F: aPickupable, 0x10: aLight,
-	0x11: aFloorChange, 0x12: aFullGround, 0x13: aElevation, 0x14: aOffset,
-	0x16: aMiniMap, 0x17: aRotatable, 0x18: aLyingObject, 0x19: aAnimateAlways,
-	0x1A: aLensHelp, 0x24: aWrappable, 0x25: aUnwrappable, 0x26: aTopEffect,
-})
-
-var table2 = newTable("7.40-7.50", false, map[byte]attr{
-	0x00: aGround, 0x01: aOnBottom, 0x02: aOnTop, 0x03: aContainer, 0x04: aStackable,
-	0x05: aMultiUse, 0x06: aForceUse, 0x07: aWritable, 0x08: aWritableOnce,
-	0x09: aFluidContainer, 0x0A: aFluid, 0x0B: aUnpassable, 0x0C: aUnmoveable,
-	0x0D: aBlockMissile, 0x0E: aBlockPathfind, 0x0F: aPickupable, 0x10: aLight,
-	0x11: aFloorChange, 0x12: aFullGround, 0x13: aElevation, 0x14: aOffset,
-	0x16: aMiniMap, 0x17: aRotatable, 0x18: aLyingObject, 0x19: aHangable,
-	0x1A: aHookSouth, 0x1B: aHookEast, 0x1C: aAnimateAlways, 0x1D: aLensHelp,
-	0x24: aWrappable, 0x25: aUnwrappable, 0x26: aTopEffect,
-})
-
-var table3 = newTable("7.55-7.72", true, map[byte]attr{
-	0x00: aGround, 0x01: aGroundBorder, 0x02: aOnBottom, 0x03: aOnTop, 0x04: aContainer,
-	0x05: aStackable, 0x06: aForceUse, 0x07: aMultiUse, 0x08: aWritable, 0x09: aWritableOnce,
-	0x0A: aFluidContainer, 0x0B: aFluid, 0x0C: aUnpassable, 0x0D: aUnmoveable,
-	0x0E: aBlockMissile, 0x0F: aBlockPathfind, 0x10: aPickupable, 0x11: aHangable,
-	0x12: aHookSouth, 0x13: aHookEast, 0x14: aRotatable, 0x15: aLight, 0x17: aFloorChange,
-	0x18: aOffset, 0x19: aElevation, 0x1A: aLyingObject, 0x1B: aAnimateAlways,
-	0x1C: aMiniMap, 0x1D: aLensHelp, 0x1E: aFullGround,
-})
-
-var table4 = newTable("7.80-8.54", true, map[byte]attr{
-	0x00: aGround, 0x01: aGroundBorder, 0x02: aOnBottom, 0x03: aOnTop, 0x04: aContainer,
-	0x05: aStackable, 0x06: aForceUse, 0x07: aMultiUse, 0x08: aHasCharges, 0x09: aWritable,
-	0x0A: aWritableOnce, 0x0B: aFluidContainer, 0x0C: aFluid, 0x0D: aUnpassable,
-	0x0E: aUnmoveable, 0x0F: aBlockMissile, 0x10: aBlockPathfind, 0x11: aPickupable,
-	0x12: aHangable, 0x13: aHookSouth, 0x14: aHookEast, 0x15: aRotatable, 0x16: aLight,
-	0x17: aDontHide, 0x18: aFloorChange, 0x19: aOffset, 0x1A: aElevation, 0x1B: aLyingObject,
-	0x1C: aAnimateAlways, 0x1D: aMiniMap, 0x1E: aLensHelp, 0x1F: aFullGround, 0x20: aIgnoreLook,
-	0x24: aWrappable, 0x25: aUnwrappable, 0x27: aBones,
-})
-
-var table5 = newTable("8.60-9.86", true, map[byte]attr{
-	0x00: aGround, 0x01: aGroundBorder, 0x02: aOnBottom, 0x03: aOnTop, 0x04: aContainer,
-	0x05: aStackable, 0x06: aForceUse, 0x07: aMultiUse, 0x08: aWritable, 0x09: aWritableOnce,
-	0x0A: aFluidContainer, 0x0B: aFluid, 0x0C: aUnpassable, 0x0D: aUnmoveable,
-	0x0E: aBlockMissile, 0x0F: aBlockPathfind, 0x10: aPickupable, 0x11: aHangable,
-	0x12: aHookSouth, 0x13: aHookEast, 0x14: aRotatable, 0x15: aLight, 0x16: aDontHide,
-	0x17: aTranslucent, 0x18: aOffset, 0x19: aElevation, 0x1A: aLyingObject,
-	0x1B: aAnimateAlways, 0x1C: aMiniMap, 0x1D: aLensHelp, 0x1E: aFullGround,
-	0x1F: aIgnoreLook, 0x20: aCloth, 0x21: aMarket, 0x27: aBones,
-})
-
-var table6 = newTable("10.10+", true, map[byte]attr{
-	0x00: aGround, 0x01: aGroundBorder, 0x02: aOnBottom, 0x03: aOnTop, 0x04: aContainer,
-	0x05: aStackable, 0x06: aForceUse, 0x07: aMultiUse, 0x08: aWritable, 0x09: aWritableOnce,
-	0x0A: aFluidContainer, 0x0B: aFluid, 0x0C: aUnpassable, 0x0D: aUnmoveable,
-	0x0E: aBlockMissile, 0x0F: aBlockPathfind, 0x10: aNoMoveAnimation, 0x11: aPickupable,
-	0x12: aHangable, 0x13: aHookSouth, 0x14: aHookEast, 0x15: aRotatable, 0x16: aLight,
-	0x17: aDontHide, 0x18: aTranslucent, 0x19: aOffset, 0x1A: aElevation, 0x1B: aLyingObject,
-	0x1C: aAnimateAlways, 0x1D: aMiniMap, 0x1E: aLensHelp, 0x1F: aFullGround, 0x20: aIgnoreLook,
-	0x21: aCloth, 0x22: aMarket, 0x23: aDefaultAction, 0x24: aWrappable, 0x25: aUnwrappable,
-	0x26: aTopEffect, 0x27: aBones, 0xFE: aUsable,
-})
-
-// OBDTable is the flag table of OBD v2/v3 files. It is the 10.10+ table
-// plus three private flags, without bones.
-var OBDTable = newTable("obd", true, map[byte]attr{
-	0x00: aGround, 0x01: aGroundBorder, 0x02: aOnBottom, 0x03: aOnTop, 0x04: aContainer,
-	0x05: aStackable, 0x06: aForceUse, 0x07: aMultiUse, 0x08: aWritable, 0x09: aWritableOnce,
-	0x0A: aFluidContainer, 0x0B: aFluid, 0x0C: aUnpassable, 0x0D: aUnmoveable,
-	0x0E: aBlockMissile, 0x0F: aBlockPathfind, 0x10: aNoMoveAnimation, 0x11: aPickupable,
-	0x12: aHangable, 0x13: aHookSouth, 0x14: aHookEast, 0x15: aRotatable, 0x16: aLight,
-	0x17: aDontHide, 0x18: aTranslucent, 0x19: aOffset, 0x1A: aElevation, 0x1B: aLyingObject,
-	0x1C: aAnimateAlways, 0x1D: aMiniMap, 0x1E: aLensHelp, 0x1F: aFullGround, 0x20: aIgnoreLook,
-	0x21: aCloth, 0x22: aMarket, 0x23: aDefaultAction, 0x24: aWrappable, 0x25: aUnwrappable,
-	0x26: aTopEffect, 0xFC: aHasCharges, 0xFD: aFloorChange, 0xFE: aUsable,
-})
-
-// Table returns the flag table for a metadata format (1..6, see
-// client.MetadataFormat).
-func Table(format int) *FlagTable {
-	switch format {
-	case 1:
-		return table1
-	case 2:
-		return table2
-	case 3:
-		return table3
-	case 4:
-		return table4
-	case 5:
-		return table5
-	}
-	return table6
-}
-
 // Name returns a human readable name of the table.
 func (t *FlagTable) Name() string { return t.name }
 
-// ReadProperties reads flags until LastFlag into p.
-func (t *FlagTable) ReadProperties(r *binio.Reader, p *thing.Properties) error {
-	prev := -1
+// ReadProperties reads flags until LastFlag into props.
+func (t *FlagTable) ReadProperties(r *binio.Reader, props *thing.Properties) error {
+	previous := -1
 	for {
-		b := r.U8()
+		flagByte := r.U8()
 		if r.Err() != nil {
 			return r.Err()
 		}
-		if b == LastFlag {
+		if flagByte == LastFlag {
 			return nil
 		}
-		a, ok := t.byByte[b]
+		attribute, ok := t.byByte[flagByte]
 		if !ok {
-			return fmt.Errorf("unknown flag 0x%02X (previous 0x%02X) for format %s at offset %d", b, prev, t.name, r.Pos()-1)
+			return fmt.Errorf("unknown flag 0x%02X (previous 0x%02X) for format %s at offset %d", flagByte, previous, t.name, r.Pos()-1)
 		}
-		t.readAttr(r, a, p)
-		prev = int(b)
-	}
-}
-
-func (t *FlagTable) readAttr(r *binio.Reader, a attr, p *thing.Properties) {
-	switch a {
-	case aGround:
-		p.Ground, p.GroundSpeed = true, r.U16()
-	case aGroundBorder:
-		p.GroundBorder = true
-	case aOnBottom:
-		p.OnBottom = true
-	case aOnTop:
-		p.OnTop = true
-	case aContainer:
-		p.Container = true
-	case aStackable:
-		p.Stackable = true
-	case aForceUse:
-		p.ForceUse = true
-	case aMultiUse:
-		p.MultiUse = true
-	case aHasCharges:
-		p.HasCharges = true
-	case aWritable:
-		p.Writable, p.MaxTextLength = true, r.U16()
-	case aWritableOnce:
-		p.WritableOnce, p.MaxReadLength = true, r.U16()
-	case aFluidContainer:
-		p.FluidContainer = true
-	case aFluid:
-		p.Fluid = true
-	case aUnpassable:
-		p.Unpassable = true
-	case aUnmoveable:
-		p.Unmoveable = true
-	case aBlockMissile:
-		p.BlockMissile = true
-	case aBlockPathfind:
-		p.BlockPathfind = true
-	case aNoMoveAnimation:
-		p.NoMoveAnimation = true
-	case aPickupable:
-		p.Pickupable = true
-	case aHangable:
-		p.Hangable = true
-	case aHookSouth:
-		p.HookSouth = true
-	case aHookEast:
-		p.HookEast = true
-	case aRotatable:
-		p.Rotatable = true
-	case aLight:
-		p.HasLight = true
-		p.LightLevel = r.U16()
-		p.LightColor = r.U16()
-	case aDontHide:
-		p.DontHide = true
-	case aTranslucent:
-		p.Translucent = true
-	case aFloorChange:
-		p.FloorChange = true
-	case aOffset:
-		p.HasOffset = true
-		if t.offsetHasPayload {
-			p.OffsetX = r.I16()
-			p.OffsetY = r.I16()
-		} else {
-			p.OffsetX, p.OffsetY = 8, 8
+		spec := attrSpecs[attribute]
+		*spec.flag(props) = true
+		if spec.read != nil {
+			spec.read(t, r, props)
 		}
-	case aElevation:
-		p.HasElevation, p.Elevation = true, r.U16()
-	case aLyingObject:
-		p.LyingObject = true
-	case aAnimateAlways:
-		p.AnimateAlways = true
-	case aMiniMap:
-		p.MiniMap, p.MiniMapColor = true, r.U16()
-	case aLensHelp:
-		p.LensHelp, p.LensHelpValue = true, r.U16()
-	case aFullGround:
-		p.FullGround = true
-	case aIgnoreLook:
-		p.IgnoreLook = true
-	case aCloth:
-		p.Cloth, p.ClothSlot = true, r.U16()
-	case aMarket:
-		p.IsMarket = true
-		p.Market.Category = r.U16()
-		p.Market.TradeAs = r.U16()
-		p.Market.ShowAs = r.U16()
-		p.Market.Name = r.Latin1(int(r.U16()))
-		p.Market.RestrictProfession = r.U16()
-		p.Market.RestrictLevel = r.U16()
-	case aDefaultAction:
-		p.HasDefaultAction, p.DefaultAction = true, r.U16()
-	case aWrappable:
-		p.Wrappable = true
-	case aUnwrappable:
-		p.Unwrappable = true
-	case aTopEffect:
-		p.TopEffect = true
-	case aUsable:
-		p.Usable = true
-	case aBones:
-		p.HasBones = true
-		// File order is north, south, east, west.
-		for _, d := range []thing.Direction{thing.North, thing.South, thing.East, thing.West} {
-			p.Bones[d].X = r.I16()
-			p.Bones[d].Y = r.I16()
-		}
+		previous = int(flagByte)
 	}
-}
-
-// has reports whether the attribute is set in p.
-func has(a attr, p *thing.Properties) bool {
-	switch a {
-	case aGround:
-		return p.Ground
-	case aGroundBorder:
-		return p.GroundBorder
-	case aOnBottom:
-		return p.OnBottom
-	case aOnTop:
-		return p.OnTop
-	case aContainer:
-		return p.Container
-	case aStackable:
-		return p.Stackable
-	case aForceUse:
-		return p.ForceUse
-	case aMultiUse:
-		return p.MultiUse
-	case aHasCharges:
-		return p.HasCharges
-	case aWritable:
-		return p.Writable
-	case aWritableOnce:
-		return p.WritableOnce
-	case aFluidContainer:
-		return p.FluidContainer
-	case aFluid:
-		return p.Fluid
-	case aUnpassable:
-		return p.Unpassable
-	case aUnmoveable:
-		return p.Unmoveable
-	case aBlockMissile:
-		return p.BlockMissile
-	case aBlockPathfind:
-		return p.BlockPathfind
-	case aNoMoveAnimation:
-		return p.NoMoveAnimation
-	case aPickupable:
-		return p.Pickupable
-	case aHangable:
-		return p.Hangable
-	case aHookSouth:
-		return p.HookSouth
-	case aHookEast:
-		return p.HookEast
-	case aRotatable:
-		return p.Rotatable
-	case aLight:
-		return p.HasLight
-	case aDontHide:
-		return p.DontHide
-	case aTranslucent:
-		return p.Translucent
-	case aFloorChange:
-		return p.FloorChange
-	case aOffset:
-		return p.HasOffset
-	case aElevation:
-		return p.HasElevation
-	case aLyingObject:
-		return p.LyingObject
-	case aAnimateAlways:
-		return p.AnimateAlways
-	case aMiniMap:
-		return p.MiniMap
-	case aLensHelp:
-		return p.LensHelp
-	case aFullGround:
-		return p.FullGround
-	case aIgnoreLook:
-		return p.IgnoreLook
-	case aCloth:
-		return p.Cloth
-	case aMarket:
-		return p.IsMarket
-	case aDefaultAction:
-		return p.HasDefaultAction
-	case aWrappable:
-		return p.Wrappable
-	case aUnwrappable:
-		return p.Unwrappable
-	case aTopEffect:
-		return p.TopEffect
-	case aUsable:
-		return p.Usable
-	case aBones:
-		return p.HasBones
-	}
-	return false
 }
 
 // WriteProperties writes every set flag that the table supports, in
 // ascending flag order, followed by LastFlag.
-func (t *FlagTable) WriteProperties(w *binio.Writer, p *thing.Properties) {
-	for _, b := range t.order {
-		a := t.byByte[b]
-		if !has(a, p) {
+func (t *FlagTable) WriteProperties(w *binio.Writer, props *thing.Properties) {
+	for _, flagByte := range t.order {
+		attribute := t.byByte[flagByte]
+		if !attribute.isSet(props) {
 			continue
 		}
-		w.U8(b)
-		t.writePayload(w, a, p)
+		w.U8(flagByte)
+		if write := attrSpecs[attribute].write; write != nil {
+			write(t, w, props)
+		}
 	}
 	w.U8(LastFlag)
-}
-
-func (t *FlagTable) writePayload(w *binio.Writer, a attr, p *thing.Properties) {
-	switch a {
-	case aGround:
-		w.U16(p.GroundSpeed)
-	case aWritable:
-		w.U16(p.MaxTextLength)
-	case aWritableOnce:
-		w.U16(p.MaxReadLength)
-	case aLight:
-		w.U16(p.LightLevel)
-		w.U16(p.LightColor)
-	case aOffset:
-		if t.offsetHasPayload {
-			w.I16(p.OffsetX)
-			w.I16(p.OffsetY)
-		}
-	case aElevation:
-		w.U16(p.Elevation)
-	case aMiniMap:
-		w.U16(p.MiniMapColor)
-	case aLensHelp:
-		w.U16(p.LensHelpValue)
-	case aCloth:
-		w.U16(p.ClothSlot)
-	case aMarket:
-		name := binio.EncodeLatin1(p.Market.Name)
-		w.U16(p.Market.Category)
-		w.U16(p.Market.TradeAs)
-		w.U16(p.Market.ShowAs)
-		w.U16(uint16(len(name)))
-		w.Write(name)
-		w.U16(p.Market.RestrictProfession)
-		w.U16(p.Market.RestrictLevel)
-	case aDefaultAction:
-		w.U16(p.DefaultAction)
-	case aBones:
-		for _, d := range []thing.Direction{thing.North, thing.South, thing.East, thing.West} {
-			w.I16(p.Bones[d].X)
-			w.I16(p.Bones[d].Y)
-		}
-	}
 }
 
 // Supported lists json names of properties the table can store.
 func (t *FlagTable) Supported() []string {
 	out := make([]string, 0, len(t.byAttr))
-	for a := aGround; a <= aBones; a++ {
-		if _, ok := t.byAttr[a]; ok {
-			out = append(out, attrNames[a])
+	for attribute := attrGround; attribute <= attrBones; attribute++ {
+		if _, ok := t.byAttr[attribute]; ok {
+			out = append(out, attribute.name())
 		}
 	}
 	return out
 }
 
-// Unsupported lists json names of properties set in p that the table cannot
-// store. Callers show them as warnings before compiling to an older format.
-func (t *FlagTable) Unsupported(p *thing.Properties) []string {
+// Unsupported lists json names of properties set in props that the table
+// cannot store. Callers show them as warnings before compiling to an older
+// format.
+func (t *FlagTable) Unsupported(props *thing.Properties) []string {
 	var out []string
-	for a := aGround; a <= aBones; a++ {
-		if _, ok := t.byAttr[a]; !ok && has(a, p) {
-			out = append(out, attrNames[a])
+	for attribute := attrGround; attribute <= attrBones; attribute++ {
+		if _, ok := t.byAttr[attribute]; !ok && attribute.isSet(props) {
+			out = append(out, attribute.name())
 		}
 	}
-	return append(out, p.AssetOnly()...)
+	return append(out, props.AssetOnly()...)
 }
 
-var attrNames = map[attr]string{
-	aGround: "ground", aGroundBorder: "groundBorder", aOnBottom: "onBottom", aOnTop: "onTop",
-	aContainer: "container", aStackable: "stackable", aForceUse: "forceUse", aMultiUse: "multiUse",
-	aHasCharges: "hasCharges", aWritable: "writable", aWritableOnce: "writableOnce",
-	aFluidContainer: "fluidContainer", aFluid: "fluid", aUnpassable: "unpassable",
-	aUnmoveable: "unmoveable", aBlockMissile: "blockMissile", aBlockPathfind: "blockPathfind",
-	aNoMoveAnimation: "noMoveAnimation", aPickupable: "pickupable", aHangable: "hangable",
-	aHookSouth: "hookSouth", aHookEast: "hookEast", aRotatable: "rotatable", aLight: "hasLight",
-	aDontHide: "dontHide", aTranslucent: "translucent", aFloorChange: "floorChange",
-	aOffset: "hasOffset", aElevation: "hasElevation", aLyingObject: "lyingObject",
-	aAnimateAlways: "animateAlways", aMiniMap: "miniMap", aLensHelp: "lensHelp",
-	aFullGround: "fullGround", aIgnoreLook: "ignoreLook", aCloth: "cloth", aMarket: "isMarket",
-	aDefaultAction: "hasDefaultAction", aWrappable: "wrappable", aUnwrappable: "unwrappable",
-	aTopEffect: "topEffect", aUsable: "usable", aBones: "hasBones",
+// isSet reports whether the attribute is set in props.
+func (a attr) isSet(props *thing.Properties) bool { return *attrSpecs[a].flag(props) }
+
+// name returns the json name of the property behind the attribute.
+func (a attr) name() string { return attrSpecs[a].name }
+
+// attrSpec describes how an attribute maps to thing.Properties.
+type attrSpec struct {
+	name string // json name of the property
+	// flag returns the property that tells whether the attribute is set.
+	flag func(*thing.Properties) *bool
+	// read and write handle the payload after the flag byte; nil when the
+	// attribute has none.
+	read  func(*FlagTable, *binio.Reader, *thing.Properties)
+	write func(*FlagTable, *binio.Writer, *thing.Properties)
+}
+
+// boolAttr is an attribute without payload.
+func boolAttr(name string, flag func(*thing.Properties) *bool) attrSpec {
+	return attrSpec{name: name, flag: flag}
+}
+
+// valueAttr is an attribute with one uint16 payload.
+func valueAttr(name string, fields func(*thing.Properties) (set *bool, value *uint16)) attrSpec {
+	return attrSpec{
+		name: name,
+		flag: func(props *thing.Properties) *bool {
+			set, _ := fields(props)
+			return set
+		},
+		read: func(_ *FlagTable, r *binio.Reader, props *thing.Properties) {
+			_, value := fields(props)
+			*value = r.U16()
+		},
+		write: func(_ *FlagTable, w *binio.Writer, props *thing.Properties) {
+			_, value := fields(props)
+			w.U16(*value)
+		},
+	}
+}
+
+// boneOrder is the order of the bone offsets in the file.
+var boneOrder = []thing.Direction{thing.North, thing.South, thing.East, thing.West}
+
+var attrSpecs = [...]attrSpec{
+	attrGround: valueAttr("ground", func(props *thing.Properties) (*bool, *uint16) {
+		return &props.Ground, &props.GroundSpeed
+	}),
+	attrGroundBorder: boolAttr("groundBorder", func(props *thing.Properties) *bool { return &props.GroundBorder }),
+	attrOnBottom:     boolAttr("onBottom", func(props *thing.Properties) *bool { return &props.OnBottom }),
+	attrOnTop:        boolAttr("onTop", func(props *thing.Properties) *bool { return &props.OnTop }),
+	attrContainer:    boolAttr("container", func(props *thing.Properties) *bool { return &props.Container }),
+	attrStackable:    boolAttr("stackable", func(props *thing.Properties) *bool { return &props.Stackable }),
+	attrForceUse:     boolAttr("forceUse", func(props *thing.Properties) *bool { return &props.ForceUse }),
+	attrMultiUse:     boolAttr("multiUse", func(props *thing.Properties) *bool { return &props.MultiUse }),
+	attrHasCharges:   boolAttr("hasCharges", func(props *thing.Properties) *bool { return &props.HasCharges }),
+	attrWritable: valueAttr("writable", func(props *thing.Properties) (*bool, *uint16) {
+		return &props.Writable, &props.MaxTextLength
+	}),
+	attrWritableOnce: valueAttr("writableOnce", func(props *thing.Properties) (*bool, *uint16) {
+		return &props.WritableOnce, &props.MaxReadLength
+	}),
+	attrFluidContainer:  boolAttr("fluidContainer", func(props *thing.Properties) *bool { return &props.FluidContainer }),
+	attrFluid:           boolAttr("fluid", func(props *thing.Properties) *bool { return &props.Fluid }),
+	attrUnpassable:      boolAttr("unpassable", func(props *thing.Properties) *bool { return &props.Unpassable }),
+	attrUnmoveable:      boolAttr("unmoveable", func(props *thing.Properties) *bool { return &props.Unmoveable }),
+	attrBlockMissile:    boolAttr("blockMissile", func(props *thing.Properties) *bool { return &props.BlockMissile }),
+	attrBlockPathfind:   boolAttr("blockPathfind", func(props *thing.Properties) *bool { return &props.BlockPathfind }),
+	attrNoMoveAnimation: boolAttr("noMoveAnimation", func(props *thing.Properties) *bool { return &props.NoMoveAnimation }),
+	attrPickupable:      boolAttr("pickupable", func(props *thing.Properties) *bool { return &props.Pickupable }),
+	attrHangable:        boolAttr("hangable", func(props *thing.Properties) *bool { return &props.Hangable }),
+	attrHookSouth:       boolAttr("hookSouth", func(props *thing.Properties) *bool { return &props.HookSouth }),
+	attrHookEast:        boolAttr("hookEast", func(props *thing.Properties) *bool { return &props.HookEast }),
+	attrRotatable:       boolAttr("rotatable", func(props *thing.Properties) *bool { return &props.Rotatable }),
+	attrLight: {
+		name: "hasLight",
+		flag: func(props *thing.Properties) *bool { return &props.HasLight },
+		read: func(_ *FlagTable, r *binio.Reader, props *thing.Properties) {
+			props.LightLevel = r.U16()
+			props.LightColor = r.U16()
+		},
+		write: func(_ *FlagTable, w *binio.Writer, props *thing.Properties) {
+			w.U16(props.LightLevel)
+			w.U16(props.LightColor)
+		},
+	},
+	attrDontHide:    boolAttr("dontHide", func(props *thing.Properties) *bool { return &props.DontHide }),
+	attrTranslucent: boolAttr("translucent", func(props *thing.Properties) *bool { return &props.Translucent }),
+	attrFloorChange: boolAttr("floorChange", func(props *thing.Properties) *bool { return &props.FloorChange }),
+	attrOffset: {
+		name: "hasOffset",
+		flag: func(props *thing.Properties) *bool { return &props.HasOffset },
+		read: func(table *FlagTable, r *binio.Reader, props *thing.Properties) {
+			if table.offsetHasPayload {
+				props.OffsetX = r.I16()
+				props.OffsetY = r.I16()
+			} else {
+				props.OffsetX, props.OffsetY = 8, 8
+			}
+		},
+		write: func(table *FlagTable, w *binio.Writer, props *thing.Properties) {
+			if table.offsetHasPayload {
+				w.I16(props.OffsetX)
+				w.I16(props.OffsetY)
+			}
+		},
+	},
+	attrElevation: valueAttr("hasElevation", func(props *thing.Properties) (*bool, *uint16) {
+		return &props.HasElevation, &props.Elevation
+	}),
+	attrLyingObject:   boolAttr("lyingObject", func(props *thing.Properties) *bool { return &props.LyingObject }),
+	attrAnimateAlways: boolAttr("animateAlways", func(props *thing.Properties) *bool { return &props.AnimateAlways }),
+	attrMiniMap: valueAttr("miniMap", func(props *thing.Properties) (*bool, *uint16) {
+		return &props.MiniMap, &props.MiniMapColor
+	}),
+	attrLensHelp: valueAttr("lensHelp", func(props *thing.Properties) (*bool, *uint16) {
+		return &props.LensHelp, &props.LensHelpValue
+	}),
+	attrFullGround: boolAttr("fullGround", func(props *thing.Properties) *bool { return &props.FullGround }),
+	attrIgnoreLook: boolAttr("ignoreLook", func(props *thing.Properties) *bool { return &props.IgnoreLook }),
+	attrCloth: valueAttr("cloth", func(props *thing.Properties) (*bool, *uint16) {
+		return &props.Cloth, &props.ClothSlot
+	}),
+	attrMarket: {
+		name: "isMarket",
+		flag: func(props *thing.Properties) *bool { return &props.IsMarket },
+		read: func(_ *FlagTable, r *binio.Reader, props *thing.Properties) {
+			props.Market.Category = r.U16()
+			props.Market.TradeAs = r.U16()
+			props.Market.ShowAs = r.U16()
+			props.Market.Name = r.Latin1(int(r.U16()))
+			props.Market.RestrictProfession = r.U16()
+			props.Market.RestrictLevel = r.U16()
+		},
+		write: func(_ *FlagTable, w *binio.Writer, props *thing.Properties) {
+			name := binio.EncodeLatin1(props.Market.Name)
+			w.U16(props.Market.Category)
+			w.U16(props.Market.TradeAs)
+			w.U16(props.Market.ShowAs)
+			w.U16(uint16(len(name)))
+			w.Write(name)
+			w.U16(props.Market.RestrictProfession)
+			w.U16(props.Market.RestrictLevel)
+		},
+	},
+	attrDefaultAction: valueAttr("hasDefaultAction", func(props *thing.Properties) (*bool, *uint16) {
+		return &props.HasDefaultAction, &props.DefaultAction
+	}),
+	attrWrappable:   boolAttr("wrappable", func(props *thing.Properties) *bool { return &props.Wrappable }),
+	attrUnwrappable: boolAttr("unwrappable", func(props *thing.Properties) *bool { return &props.Unwrappable }),
+	attrTopEffect:   boolAttr("topEffect", func(props *thing.Properties) *bool { return &props.TopEffect }),
+	attrUsable:      boolAttr("usable", func(props *thing.Properties) *bool { return &props.Usable }),
+	attrBones: {
+		name: "hasBones",
+		flag: func(props *thing.Properties) *bool { return &props.HasBones },
+		read: func(_ *FlagTable, r *binio.Reader, props *thing.Properties) {
+			for _, direction := range boneOrder {
+				props.Bones[direction].X = r.I16()
+				props.Bones[direction].Y = r.I16()
+			}
+		},
+		write: func(_ *FlagTable, w *binio.Writer, props *thing.Properties) {
+			for _, direction := range boneOrder {
+				w.I16(props.Bones[direction].X)
+				w.I16(props.Bones[direction].Y)
+			}
+		},
+	},
 }

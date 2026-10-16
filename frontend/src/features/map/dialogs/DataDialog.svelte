@@ -39,8 +39,8 @@
       await loadMapData(true);
       toast(`${info.items.toLocaleString()} items, ${info.brushes} brushes.`, "success");
       if (!warnings.length) map.dialog = null;
-    } catch (e) {
-      toast(errorMessage(e), "error");
+    } catch (err) {
+      toast(errorMessage(err), "error");
     } finally {
       busy = null;
     }
@@ -55,8 +55,8 @@
       warnings = r.warnings ?? [];
       await loadMapData(true);
       toast(`Brushes: ${r.data.brushes}, tilesets: ${r.data.tilesets}, creatures: ${r.data.creatures}.`, "success");
-    } catch (e) {
-      toast(errorMessage(e), "error");
+    } catch (err) {
+      toast(errorMessage(err), "error");
     } finally {
       busy = null;
     }
@@ -69,8 +69,8 @@
       await MapService.ImportMaterials(p[0]);
       await loadMapData(true);
       toast("Brushes added.", "success");
-    } catch (e) {
-      toast(errorMessage(e), "error");
+    } catch (err) {
+      toast(errorMessage(err), "error");
     }
   }
 
@@ -80,8 +80,8 @@
     try {
       await MapService.ExportMaterials(p);
       toast("Brushes saved.", "success");
-    } catch (e) {
-      toast(errorMessage(e), "error");
+    } catch (err) {
+      toast(errorMessage(err), "error");
     }
   }
 
@@ -91,8 +91,8 @@
       await MapService.Reload();
       await loadMapData(true);
       toast("Items reloaded from the client.", "success");
-    } catch (e) {
-      toast(errorMessage(e), "error");
+    } catch (err) {
+      toast(errorMessage(err), "error");
     } finally {
       busy = null;
     }
@@ -106,7 +106,7 @@
       <p class="t-label hint">Server ids are translated to the client with items.otb. Client ids are used as they are, without items.otb. Names and types come from items.xml.</p>
       <div class="row">
         <span class="t-label lbl">Item ids</span>
-        <Select grow value={cfg.itemsMode} options={[{ value: "auto", label: "Automatic: items.otb when set" }, { value: "otb", label: "Server ids (items.otb)" }, { value: "client", label: "Client ids (no items.otb)" }]} onchange={(v) => (cfg.itemsMode = v)} />
+        <Select grow value={cfg.itemsMode} options={[{ value: "auto", label: "Automatic: items.otb when set" }, { value: "otb", label: "Server ids (items.otb)" }, { value: "client", label: "Client ids (no items.otb)" }]} onchange={(value) => (cfg.itemsMode = value)} />
       </div>
       <div class="row"><span class="t-label lbl">items.otb</span><input class="t-input grow" bind:value={cfg.otbPath} placeholder="not used" /><button class="t-btn" onclick={() => file("otbPath", "items.otb", "*.otb")}>…</button></div>
       <div class="row"><span class="t-label lbl">items.xml</span><input class="t-input grow" bind:value={cfg.xmlPath} placeholder="names from the client" /><button class="t-btn" onclick={() => file("xmlPath", "items.xml", "*.xml")}>…</button></div>

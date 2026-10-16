@@ -47,7 +47,7 @@ export class Animator {
     this.startFrame = startFrame;
     this.random = random;
     // Duration of a frame is picked once, between min and max.
-    this.durations = durations.map((d) => (d.max > d.min ? d.min + Math.floor(random() * (d.max - d.min + 1)) : d.min));
+    this.durations = durations.map((duration) => (duration.max > duration.min ? duration.min + Math.floor(random() * (duration.max - duration.min + 1)) : duration.min));
     this.reset(now);
   }
 
@@ -60,7 +60,7 @@ export class Animator {
   }
 
   get totalDuration(): number {
-    return this.durations.reduce((a, b) => a + b, 0);
+    return this.durations.reduce((sum, duration) => sum + duration, 0);
   }
 
   reset(now: number): void {
@@ -186,22 +186,22 @@ const fixed = (frames: number, ms: number): Duration[] => Array.from({ length: f
  *   unless it animates always: then a whole cycle takes one second;
  * - everything else uses the stored durations, or 100 ms without them.
  */
-export function previewDurations(g: { frames: number; durations: Duration[] | null; type: number }, ctx: PreviewContext): Duration[] {
-  if (ctx.outfit && g.type === 1) return fixed(g.frames, footDelay(g.frames));
+export function previewDurations(group: { frames: number; durations: Duration[] | null; type: number }, ctx: PreviewContext): Duration[] {
+  if (ctx.outfit && group.type === 1) return fixed(group.frames, footDelay(group.frames));
   if (ctx.outfit && ctx.groups === 1 && !ctx.improved) {
-    if (ctx.animateAlways) return fixed(g.frames, Math.round(1000 / g.frames));
-    if (g.frames > 2) return [{ min: 0, max: 0 }, ...fixed(g.frames - 1, footDelay(g.frames - 1))];
-    return fixed(g.frames, footDelay(g.frames));
+    if (ctx.animateAlways) return fixed(group.frames, Math.round(1000 / group.frames));
+    if (group.frames > 2) return [{ min: 0, max: 0 }, ...fixed(group.frames - 1, footDelay(group.frames - 1))];
+    return fixed(group.frames, footDelay(group.frames));
   }
-  if (g.durations?.length === g.frames) return g.durations;
-  return fixed(g.frames, 100);
+  if (group.durations?.length === group.frames) return group.durations;
+  return fixed(group.frames, 100);
 }
 
 /**
  * Things from files without a client (market, OBD): frame groups or
  * durations other than the 300 ms placeholder mean stored durations.
  */
-export function guessImproved(t: { frameGroups: { durations: Duration[] | null }[] }): boolean {
-  if (t.frameGroups.length > 1) return true;
-  return t.frameGroups.some((fg) => (fg.durations ?? []).some((d) => d.min !== 300 || d.max !== 300));
+export function guessImproved(thing: { frameGroups: { durations: Duration[] | null }[] }): boolean {
+  if (thing.frameGroups.length > 1) return true;
+  return thing.frameGroups.some((group) => (group.durations ?? []).some((duration) => duration.min !== 300 || duration.max !== 300));
 }

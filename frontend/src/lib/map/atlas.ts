@@ -65,8 +65,8 @@ export class Atlas {
   /** Marks cells used this frame without looking them up (cached geometry). */
   touch(cells: Int32Array): void {
     const used = this.used;
-    const f = this.frame;
-    for (let i = 0; i < cells.length; i++) used[cells[i]] = f;
+    const frame = this.frame;
+    for (let i = 0; i < cells.length; i++) used[cells[i]] = frame;
   }
 
   /** Marks one cell used this frame. */
@@ -77,26 +77,26 @@ export class Atlas {
   /** Cell of a key, uploading its pixels when needed; -1 when the pixels
    * are not available yet or the upload budget is spent. */
   cellOf(key: AtlasKey, pixels: () => Uint8ClampedArray | undefined | null): number {
-    const s = this.slots.get(key);
-    if (s !== undefined) {
-      this.used[s] = this.frame;
-      return s;
+    const cached = this.slots.get(key);
+    if (cached !== undefined) {
+      this.used[cached] = this.frame;
+      return cached;
     }
     if (this.uploads >= ATLAS.uploadsPerFrame) {
       this.pending = true;
       return -1;
     }
-    const px = pixels();
-    if (!px) return -1;
+    const data = pixels();
+    if (!data) return -1;
     const slot = this.alloc();
     if (slot < 0) return -1;
     this.uploads++;
     const layer = Math.floor(slot / this.perLayer);
-    const i = slot % this.perLayer;
+    const inLayer = slot % this.perLayer;
     const gl = this.gl;
     gl.texSubImage3D(
-      gl.TEXTURE_2D_ARRAY, 0, (i % this.perRow) * this.cell, Math.floor(i / this.perRow) * this.cell, layer,
-      this.cell, this.cell, 1, gl.RGBA, gl.UNSIGNED_BYTE, px,
+      gl.TEXTURE_2D_ARRAY, 0, (inLayer % this.perRow) * this.cell, Math.floor(inLayer / this.perRow) * this.cell, layer,
+      this.cell, this.cell, 1, gl.RGBA, gl.UNSIGNED_BYTE, data,
     );
     this.slots.set(key, slot);
     this.keys[slot] = key;
@@ -105,8 +105,8 @@ export class Atlas {
   }
 
   private alloc(): number {
-    const f = this.free.pop();
-    if (f !== undefined) return f;
+    const freed = this.free.pop();
+    if (freed !== undefined) return freed;
     if (this.next < this.layers * this.perLayer) return this.next++;
     if (this.layers < ATLAS.maxLayers) {
       this.grow(Math.min(this.layers * 2, ATLAS.maxLayers));
@@ -120,14 +120,14 @@ export class Atlas {
     const gl = this.gl;
     const old = this.tex;
     const tex = this.create(layers);
-    const fb = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, fb);
-    for (let l = 0; l < this.layers; l++) {
-      gl.framebufferTextureLayer(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, old, 0, l);
-      gl.copyTexSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, l, 0, 0, ATLAS.size, ATLAS.size);
+    const framebuffer = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, framebuffer);
+    for (let layer = 0; layer < this.layers; layer++) {
+      gl.framebufferTextureLayer(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, old, 0, layer);
+      gl.copyTexSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, layer, 0, 0, ATLAS.size, ATLAS.size);
     }
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
-    gl.deleteFramebuffer(fb);
+    gl.deleteFramebuffer(framebuffer);
     gl.deleteTexture(old);
     this.tex = tex;
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex);
@@ -141,16 +141,16 @@ export class Atlas {
   private evict(): void {
     const total = this.layers * this.perLayer;
     const ages: number[] = [];
-    for (let s = 1; s < total; s++) if (this.used[s] < this.frame && this.keys[s] !== undefined) ages.push(s);
-    ages.sort((a, b) => this.used[a] - this.used[b]);
-    for (const s of ages.slice(0, Math.max(1, Math.floor(total / 8)))) this.release(s);
+    for (let slot = 1; slot < total; slot++) if (this.used[slot] < this.frame && this.keys[slot] !== undefined) ages.push(slot);
+    ages.sort((first, second) => this.used[first] - this.used[second]);
+    for (const slot of ages.slice(0, Math.max(1, Math.floor(total / 8)))) this.release(slot);
   }
 
   private release(slot: number): void {
-    const k = this.keys[slot];
-    if (k !== undefined) {
-      this.slots.delete(k);
-      this.onRelease(k);
+    const key = this.keys[slot];
+    if (key !== undefined) {
+      this.slots.delete(key);
+      this.onRelease(key);
     }
     this.keys[slot] = undefined;
     this.free.push(slot);
@@ -161,19 +161,19 @@ export class Atlas {
    * depend on a sprite are dropped by prefix match on "id:". */
   invalidate(ids: number[] | null): void {
     if (ids === null) {
-      for (const [k, s] of this.slots) {
-        this.keys[s] = undefined;
-        this.free.push(s);
-        this.onRelease(k);
+      for (const [key, slot] of this.slots) {
+        this.keys[slot] = undefined;
+        this.free.push(slot);
+        this.onRelease(key);
       }
       this.slots.clear();
       this.epoch++;
       return;
     }
     const set = new Set(ids);
-    for (const [k, s] of [...this.slots]) {
-      const hit = typeof k === "number" ? set.has(k) : k.split(":").some((part) => set.has(Number(part)));
-      if (hit) this.release(s);
+    for (const [key, slot] of [...this.slots]) {
+      const hit = typeof key === "number" ? set.has(key) : key.split(":").some((part) => set.has(Number(part)));
+      if (hit) this.release(slot);
     }
   }
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   // OTClient SpinBox: TextEdit with up/down buttons (spinbox_up/down).
   // Mouse wheel works while focused; holding a button repeats.
+  import { clamp } from "../math";
   let {
     label,
     value,
@@ -28,7 +29,7 @@
 
   function commit(v: number) {
     if (!Number.isFinite(v)) v = min;
-    v = Math.min(Math.max(Math.trunc(v), min), max);
+    v = clamp(Math.trunc(v), min, max);
     current = v;
     if (v !== value) onchange(v);
   }
@@ -51,18 +52,18 @@
     clearTimeout(timer);
   }
 
-  function onwheel(e: WheelEvent) {
-    if (disabled || document.activeElement !== e.currentTarget) return;
-    e.preventDefault();
-    commit(current + (e.deltaY < 0 ? 1 : -1) * (e.shiftKey ? 10 : 1));
+  function onwheel(event: WheelEvent) {
+    if (disabled || document.activeElement !== event.currentTarget) return;
+    event.preventDefault();
+    commit(current + (event.deltaY < 0 ? 1 : -1) * (event.shiftKey ? 10 : 1));
   }
 
-  function onkeydown(e: KeyboardEvent) {
-    const input = e.currentTarget as HTMLInputElement;
-    if (e.key === "Enter") commit(Number(input.value));
-    else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-      e.preventDefault();
-      commit(current + (e.key === "ArrowUp" ? 1 : -1) * (e.shiftKey ? 10 : 1));
+  function onkeydown(event: KeyboardEvent) {
+    const input = event.currentTarget as HTMLInputElement;
+    if (event.key === "Enter") commit(Number(input.value));
+    else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      event.preventDefault();
+      commit(current + (event.key === "ArrowUp" ? 1 : -1) * (event.shiftKey ? 10 : 1));
     }
   }
 </script>
@@ -77,12 +78,12 @@
       inputmode="numeric"
       {disabled}
       value={current}
-      onchange={(e) => commit(Number(e.currentTarget.value))}
+      onchange={(event) => commit(Number(event.currentTarget.value))}
       {onkeydown}
       {onwheel}
     />
-    <button type="button" class="up" tabindex="-1" aria-label="Increase" {disabled} onpointerdown={(e) => hold(1, e)}></button>
-    <button type="button" class="down" tabindex="-1" aria-label="Decrease" {disabled} onpointerdown={(e) => hold(-1, e)}></button>
+    <button type="button" class="up" tabindex="-1" aria-label="Increase" {disabled} onpointerdown={(event) => hold(1, event)}></button>
+    <button type="button" class="down" tabindex="-1" aria-label="Decrease" {disabled} onpointerdown={(event) => hold(-1, event)}></button>
   </span>
 </label>
 

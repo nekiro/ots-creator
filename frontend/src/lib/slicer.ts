@@ -33,25 +33,25 @@ export function cutCell(img: Pixels, grid: Grid, column: number, row: number, si
   const x0 = grid.offsetX + column * size;
   const y0 = grid.offsetY + row * size;
   for (let y = 0; y < size; y++) {
-    const sy = y0 + y;
-    if (sy < 0 || sy >= img.height) continue;
+    const srcY = y0 + y;
+    if (srcY < 0 || srcY >= img.height) continue;
     for (let x = 0; x < size; x++) {
-      const sx = x0 + x;
-      if (sx < 0 || sx >= img.width) continue;
-      const s = (sy * img.width + sx) * 4;
-      const d = (y * size + x) * 4;
-      const [r, g, b, a] = [img.data[s], img.data[s + 1], img.data[s + 2], img.data[s + 3]];
+      const srcX = x0 + x;
+      if (srcX < 0 || srcX >= img.width) continue;
+      const srcOffset = (srcY * img.width + srcX) * 4;
+      const dstOffset = (y * size + x) * 4;
+      const [r, g, b, a] = [img.data[srcOffset], img.data[srcOffset + 1], img.data[srcOffset + 2], img.data[srcOffset + 3]];
       if (a === 0 || (magenta && r === 255 && g === 0 && b === 255 && a === 255)) continue;
-      out[d] = r;
-      out[d + 1] = g;
-      out[d + 2] = b;
-      out[d + 3] = a;
+      out[dstOffset] = r;
+      out[dstOffset + 1] = g;
+      out[dstOffset + 2] = b;
+      out[dstOffset + 3] = a;
     }
   }
   return out;
 }
 
-export function isEmpty(px: Uint8ClampedArray): boolean {
-  for (let i = 3; i < px.length; i += 4) if (px[i] !== 0) return false;
+export function isEmpty(pixels: Uint8ClampedArray): boolean {
+  for (let i = 3; i < pixels.length; i += 4) if (pixels[i] !== 0) return false;
   return true;
 }

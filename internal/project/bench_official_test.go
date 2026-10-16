@@ -23,30 +23,33 @@ func TestProfileOfficialAssets(t *testing.T) {
 		}
 		t.Logf("%-28s %v", name, time.Since(start).Round(time.Millisecond))
 	}
-	var p, q *Project
-	step("OpenAssets", func() (err error) { p, err = OpenAssets(src); return })
-	t.Logf("counts %+v", p.Info().Counts)
+	var project, q *Project
+	step("OpenAssets", func() (err error) { project, err = OpenAssets(src); return })
+	t.Logf("counts %+v", project.Info().Counts)
 	step("OpenAssets (second)", func() (err error) { q, err = OpenAssets(src); return })
 	step("Thumbnails 2000 items", func() error {
 		for id := uint32(100); id < 2100; id++ {
-			if t, err := p.Thing(thing.CategoryItem, id); err == nil {
-				p.Render(thing.CategoryItem, id, ThumbnailPos(t))
+			if object, err := project.Thing(thing.CategoryItem, id); err == nil {
+				project.Render(thing.CategoryItem, id, ThumbnailPos(object))
 			}
 		}
 		return nil
 	})
-	step("FindThings used", func() error { _, err := p.FindThings(thing.CategoryItem, Filter{Content: ContentUsed}); return err })
-	step("Diff items (same client)", func() error { _, err := Diff(p, q, thing.CategoryItem); return err })
-	step("Diff outfits", func() error { _, err := Diff(p, q, thing.CategoryOutfit); return err })
+	step("FindThings used", func() error {
+		_, err := project.FindThings(thing.CategoryItem, Filter{Content: ContentUsed})
+		return err
+	})
+	step("Diff items (same client)", func() error { _, err := Diff(project, q, thing.CategoryItem); return err })
+	step("Diff outfits", func() error { _, err := Diff(project, q, thing.CategoryOutfit); return err })
 	all := OptimizeOptions{Duplicates: true, Empty: true, Unused: true}
-	step("AnalyzeSprites (cold)", func() error { _, err := p.AnalyzeSprites(all, nil); return err })
-	step("AnalyzeSprites (cached)", func() error { _, err := p.AnalyzeSprites(all, nil); return err })
-	step("FindSprites empty", func() error { _, err := p.FindSprites(SpritesEmpty); return err })
-	step("FindSprites duplicate", func() error { _, err := p.FindSprites(SpritesDuplicate); return err })
-	step("FindSprites unused", func() error { _, err := p.FindSprites(SpritesUnused); return err })
+	step("AnalyzeSprites (cold)", func() error { _, err := project.AnalyzeSprites(all, nil); return err })
+	step("AnalyzeSprites (cached)", func() error { _, err := project.AnalyzeSprites(all, nil); return err })
+	step("FindSprites empty", func() error { _, err := project.FindSprites(SpritesEmpty); return err })
+	step("FindSprites duplicate", func() error { _, err := project.FindSprites(SpritesDuplicate); return err })
+	step("FindSprites unused", func() error { _, err := project.FindSprites(SpritesUnused); return err })
 	step("Optimize (dry: undo)", func() error {
-		_, err := p.OptimizeSprites(OptimizeOptions{Duplicates: true, Empty: true}, nil)
-		p.Undo()
+		_, err := project.OptimizeSprites(OptimizeOptions{Duplicates: true, Empty: true}, nil)
+		project.Undo()
 		return err
 	})
 	out := t.TempDir()
@@ -68,28 +71,28 @@ func TestProfileOfficialAssets(t *testing.T) {
 			if id == 0 {
 				return spriteHash{}
 			}
-			h, err := x.sprites.hash(id)
+			contentHash, err := x.sprites.hash(id)
 			if err != nil {
 				t.Fatal(err)
 			}
-			return h
+			return contentHash
 		}
-		for _, c := range thing.Categories {
-			for i, a := range p.things.Things[c] {
-				b := r.things.Things[c][i]
-				if a == nil {
+		for _, category := range thing.Categories {
+			for i, objectA := range project.things.Things[category] {
+				objectB := r.things.Things[category][i]
+				if objectA == nil {
 					continue
 				}
-				for gi, g := range a.FrameGroups {
-					for si, id := range g.Sprites {
+				for groupIndex, group := range objectA.FrameGroups {
+					for slot, id := range group.Sprites {
 						// Hashes use per-store seeds: compare pixels on mismatch.
-						pa, _ := p.sprites.pixels(id)
-						if hashOf(p, id) == (spriteHash{}) && hashOf(r, b.FrameGroups[gi].Sprites[si]) == (spriteHash{}) {
+						pixelsA, _ := project.sprites.pixels(id)
+						if hashOf(project, id) == (spriteHash{}) && hashOf(r, objectB.FrameGroups[groupIndex].Sprites[slot]) == (spriteHash{}) {
 							continue
 						}
-						pb, _ := r.sprites.pixels(b.FrameGroups[gi].Sprites[si])
-						if string(pa) != string(pb) {
-							t.Fatalf("%v %d group %d sprite %d differs", c, a.ID, gi, si)
+						pixelsB, _ := r.sprites.pixels(objectB.FrameGroups[groupIndex].Sprites[slot])
+						if string(pixelsA) != string(pixelsB) {
+							t.Fatalf("%v %d group %d sprite %d differs", category, objectA.ID, groupIndex, slot)
 						}
 					}
 				}
@@ -98,12 +101,12 @@ func TestProfileOfficialAssets(t *testing.T) {
 		return nil
 	})
 	step("Edit + Compile", func() error {
-		it, _ := p.Thing(thing.CategoryItem, 3031)
+		it, _ := project.Thing(thing.CategoryItem, 3031)
 		it.Props.Rotatable = !it.Props.Rotatable
-		if err := p.UpdateThing(it); err != nil {
+		if err := project.UpdateThing(it); err != nil {
 			return err
 		}
-		return p.Compile(CompileOptions{Format: FormatAssets, DatPath: t.TempDir()})
+		return project.Compile(CompileOptions{Format: FormatAssets, DatPath: t.TempDir()})
 	})
 }
 

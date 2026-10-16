@@ -42,12 +42,23 @@ type State struct {
 	OTBError string `json:"otbError,omitempty"`
 }
 
+// clientSlot is one open client of the session: the main one or the
+// second one it is compared with.
+type clientSlot struct {
+	project *project.Project
+	// missing is the error when no client is open in the slot.
+	missing error
+	// event is emitted with the State of the slot when it changes.
+	event string
+}
+
 // Session owns the currently open project and an optional second client
 // it is compared with.
 type Session struct {
-	mu     sync.RWMutex
-	p      *project.Project
-	other  *project.Project
+	mu    sync.RWMutex
+	main  clientSlot
+	other clientSlot
+	// rev is shared by both clients, so resource URLs of both stay unique.
 	rev    atomic.Uint64
 	notify Notifier
 	// canceled stops the running parallel operation (see Cancel).
@@ -71,7 +82,11 @@ func NewSession(notify Notifier) *Session {
 	if notify == nil {
 		notify = func(string, any) {}
 	}
-	s := &Session{notify: notify}
+	s := &Session{
+		notify: notify,
+		main:   clientSlot{missing: ErrNoProject, event: EventProjectChanged},
+		other:  clientSlot{missing: ErrNoOther, event: EventOtherChanged},
+	}
 	// Resource URLs carry the revision and are cached as immutable, also on
 	// disk by the webview; starting from the launch time keeps URLs of one
 	// run from matching cached images of an earlier run. Milliseconds stay
@@ -84,42 +99,77 @@ func NewSession(notify Notifier) *Session {
 // that are being written.
 func (s *Session) Cancel() { s.canceled.Store(true) }
 
-// Project returns the open project.
-func (s *Session) Project() (*project.Project, error) {
+func (s *Session) client(slot *clientSlot) (*project.Project, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if s.p == nil {
-		return nil, ErrNoProject
+	if slot.project == nil {
+		return nil, slot.missing
 	}
-	return s.p, nil
+	return slot.project, nil
 }
 
-// Set replaces the open project (nil closes it).
-func (s *Session) Set(p *project.Project) {
+// setClient replaces the client of a slot (nil closes it).
+func (s *Session) setClient(slot *clientSlot, p *project.Project) {
 	s.mu.Lock()
-	s.p = p
+	slot.project = p
 	s.mu.Unlock()
 	if p != nil {
-		p.TakeDelta() // a new project replaces everything anyway
+		p.TakeDelta() // a new client replaces everything anyway
 	}
 	s.rev.Add(1)
-	st := s.State()
-	st.Delta = &project.Delta{All: true}
-	s.notify(EventProjectChanged, st)
+	state := s.state(slot)
+	state.Delta = &project.Delta{All: true}
+	s.notify(slot.event, state)
 }
 
-// State returns the current snapshot.
-func (s *Session) State() State {
+func (s *Session) state(slot *clientSlot) State {
 	s.mu.RLock()
-	p := s.p
+	p := slot.project
 	s.mu.RUnlock()
-	st := State{Rev: s.rev.Load()}
+	state := State{Rev: s.rev.Load()}
 	if p != nil {
-		st.Open = true
-		st.Info = p.Info()
+		state.Open = true
+		state.Info = p.Info()
 	}
-	return st
+	return state
 }
+
+// changed bumps the revision and notifies the frontend about a slot.
+func (s *Session) changed(slot *clientSlot) {
+	s.rev.Add(1)
+	state := s.state(slot)
+	delta := project.Delta{All: true}
+	if p, err := s.client(slot); err == nil {
+		delta = p.TakeDelta()
+	}
+	state.Delta = &delta
+	s.notify(slot.event, state)
+}
+
+// Project returns the open project.
+func (s *Session) Project() (*project.Project, error) { return s.client(&s.main) }
+
+// Set replaces the open project (nil closes it).
+func (s *Session) Set(p *project.Project) { s.setClient(&s.main, p) }
+
+// State returns the current snapshot.
+func (s *Session) State() State { return s.state(&s.main) }
+
+// Changed bumps the revision and notifies the frontend.
+func (s *Session) Changed() { s.changed(&s.main) }
+
+// Other returns the second client.
+func (s *Session) Other() (*project.Project, error) { return s.client(&s.other) }
+
+// SetOther replaces the second client (nil closes it).
+func (s *Session) SetOther(p *project.Project) { s.setClient(&s.other, p) }
+
+// OtherState returns the snapshot of the second client.
+func (s *Session) OtherState() State { return s.state(&s.other) }
+
+// OtherChanged bumps the revision and notifies the frontend about the
+// second client.
+func (s *Session) OtherChanged() { s.changed(&s.other) }
 
 // saved reports that the open client now lives at its dat/spr paths.
 func (s *Session) saved() {
@@ -130,67 +180,4 @@ func (s *Session) saved() {
 	if info := p.Info(); info.DatPath != "" {
 		s.onSaved(info)
 	}
-}
-
-// Changed bumps the revision and notifies the frontend.
-func (s *Session) Changed() {
-	s.rev.Add(1)
-	st := s.State()
-	d := project.Delta{All: true}
-	if p, err := s.Project(); err == nil {
-		d = p.TakeDelta()
-	}
-	st.Delta = &d
-	s.notify(EventProjectChanged, st)
-}
-
-// Other returns the second client.
-func (s *Session) Other() (*project.Project, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if s.other == nil {
-		return nil, ErrNoOther
-	}
-	return s.other, nil
-}
-
-// SetOther replaces the second client (nil closes it).
-func (s *Session) SetOther(p *project.Project) {
-	s.mu.Lock()
-	s.other = p
-	s.mu.Unlock()
-	if p != nil {
-		p.TakeDelta() // a new client replaces everything anyway
-	}
-	s.rev.Add(1)
-	st := s.OtherState()
-	st.Delta = &project.Delta{All: true}
-	s.notify(EventOtherChanged, st)
-}
-
-// OtherState returns the snapshot of the second client. Rev is shared with
-// the main project, so resource URLs of both stay unique.
-func (s *Session) OtherState() State {
-	s.mu.RLock()
-	p := s.other
-	s.mu.RUnlock()
-	st := State{Rev: s.rev.Load()}
-	if p != nil {
-		st.Open = true
-		st.Info = p.Info()
-	}
-	return st
-}
-
-// OtherChanged bumps the revision and notifies the frontend about the
-// second client.
-func (s *Session) OtherChanged() {
-	s.rev.Add(1)
-	st := s.OtherState()
-	d := project.Delta{All: true}
-	if p, err := s.Other(); err == nil {
-		d = p.TakeDelta()
-	}
-	st.Delta = &d
-	s.notify(EventOtherChanged, st)
 }

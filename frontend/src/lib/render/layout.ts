@@ -1,5 +1,6 @@
 // Frame group geometry shared by the preview and the sprite slot editor.
 // Mirrors internal/thing/thing.go.
+import { clamp } from "../math";
 
 export interface Layout {
   width: number;
@@ -19,35 +20,41 @@ export interface TexturePos {
   frame: number;
 }
 
-export function totalSprites(g: Layout): number {
-  return g.width * g.height * g.layers * g.patternX * g.patternY * g.patternZ * g.frames;
+export function totalSprites(layout: Layout): number {
+  return layout.width * layout.height * layout.layers * layout.patternX * layout.patternY * layout.patternZ * layout.frames;
 }
 
-export function spriteIndex(g: Layout, w: number, h: number, p: TexturePos): number {
-  const frame = p.frame % Math.max(g.frames, 1);
-  return ((((((frame * g.patternZ + p.z) * g.patternY + p.y) * g.patternX + p.x) * g.layers + p.layer) * g.height + h) * g.width) + w;
+export function spriteIndex(layout: Layout, w: number, h: number, pos: TexturePos): number {
+  const frame = pos.frame % Math.max(layout.frames, 1);
+  return ((((((frame * layout.patternZ + pos.z) * layout.patternY + pos.y) * layout.patternX + pos.x) * layout.layers + pos.layer) * layout.height + h) * layout.width) + w;
 }
 
 /** Pixel offset of tile (w, h) inside a texture; tile (0,0) is bottom-right. */
-export function tileOffset(g: Layout, w: number, h: number, size: number): [number, number] {
-  return [(g.width - 1 - w) * size, (g.height - 1 - h) * size];
+export function tileOffset(layout: Layout, w: number, h: number, size: number): [number, number] {
+  return [(layout.width - 1 - w) * size, (layout.height - 1 - h) * size];
 }
 
 /** All sprite slot indices of one texture with their pixel offsets. */
-export function textureSlots(g: Layout, p: TexturePos, size: number): { slot: number; x: number; y: number }[] {
+export function textureSlots(layout: Layout, pos: TexturePos, size: number): { slot: number; x: number; y: number }[] {
   const out: { slot: number; x: number; y: number }[] = [];
-  for (let h = 0; h < g.height; h++) {
-    for (let w = 0; w < g.width; w++) {
-      const [x, y] = tileOffset(g, w, h, size);
-      out.push({ slot: spriteIndex(g, w, h, p), x, y });
+  for (let h = 0; h < layout.height; h++) {
+    for (let w = 0; w < layout.width; w++) {
+      const [x, y] = tileOffset(layout, w, h, size);
+      out.push({ slot: spriteIndex(layout, w, h, pos), x, y });
     }
   }
   return out;
 }
 
-export function clampPos(g: Layout, p: TexturePos): TexturePos {
-  const c = (v: number, n: number) => Math.min(Math.max(v, 0), Math.max(n - 1, 0));
-  return { layer: c(p.layer, g.layers), x: c(p.x, g.patternX), y: c(p.y, g.patternY), z: c(p.z, g.patternZ), frame: c(p.frame, g.frames) };
+export function clampPos(layout: Layout, pos: TexturePos): TexturePos {
+  const inRange = (value: number, count: number) => clamp(value, 0, Math.max(count - 1, 0));
+  return {
+    layer: inRange(pos.layer, layout.layers),
+    x: inRange(pos.x, layout.patternX),
+    y: inRange(pos.y, layout.patternY),
+    z: inRange(pos.z, layout.patternZ),
+    frame: inRange(pos.frame, layout.frames),
+  };
 }
 
 /**
@@ -56,34 +63,34 @@ export function clampPos(g: Layout, p: TexturePos): TexturePos {
  */
 export function resizeSprites(old: Layout, sprites: number[], next: Layout): number[] {
   const out = new Array<number>(totalSprites(next)).fill(0);
-  const m = (a: number, b: number) => Math.min(a, b);
-  for (let f = 0; f < m(old.frames, next.frames); f++)
-    for (let z = 0; z < m(old.patternZ, next.patternZ); z++)
-      for (let y = 0; y < m(old.patternY, next.patternY); y++)
-        for (let x = 0; x < m(old.patternX, next.patternX); x++)
-          for (let l = 0; l < m(old.layers, next.layers); l++)
-            for (let h = 0; h < m(old.height, next.height); h++)
-              for (let w = 0; w < m(old.width, next.width); w++) {
-                const p = { layer: l, x, y, z, frame: f };
-                out[spriteIndex(next, w, h, p)] = sprites[spriteIndex(old, w, h, p)] ?? 0;
+  const kept = (key: keyof Layout) => Math.min(old[key], next[key]);
+  for (let frame = 0; frame < kept("frames"); frame++)
+    for (let z = 0; z < kept("patternZ"); z++)
+      for (let y = 0; y < kept("patternY"); y++)
+        for (let x = 0; x < kept("patternX"); x++)
+          for (let layer = 0; layer < kept("layers"); layer++)
+            for (let h = 0; h < kept("height"); h++)
+              for (let w = 0; w < kept("width"); w++) {
+                const pos = { layer, x, y, z, frame };
+                out[spriteIndex(next, w, h, pos)] = sprites[spriteIndex(old, w, h, pos)] ?? 0;
               }
   return out;
 }
 
 /** Sheet grid of a frame group, ObjectBuilder layout: columns are
  * pattern Z × pattern X × layers, rows are frames × pattern Y. */
-export function sheetGrid(g: Layout): { columns: number; rows: number } {
-  return { columns: g.patternZ * g.patternX * g.layers, rows: g.frames * g.patternY };
+export function sheetGrid(layout: Layout): { columns: number; rows: number } {
+  return { columns: layout.patternZ * layout.patternX * layout.layers, rows: layout.frames * layout.patternY };
 }
 
 /** Texture shown at a sheet cell. */
-export function sheetCellPos(g: Layout, column: number, row: number): TexturePos {
+export function sheetCellPos(layout: Layout, column: number, row: number): TexturePos {
   return {
-    layer: column % g.layers,
-    x: Math.floor(column / g.layers) % g.patternX,
-    z: Math.floor(column / (g.layers * g.patternX)),
-    y: row % g.patternY,
-    frame: Math.floor(row / g.patternY),
+    layer: column % layout.layers,
+    x: Math.floor(column / layout.layers) % layout.patternX,
+    z: Math.floor(column / (layout.layers * layout.patternX)),
+    y: row % layout.patternY,
+    frame: Math.floor(row / layout.patternY),
   };
 }
 

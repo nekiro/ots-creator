@@ -36,9 +36,9 @@
   const focus = $derived(map.focus);
   const on = (kind: string, id: number | string) => !!focus && focus.kind === kind && ("id" in focus ? focus.id === id : "name" in focus && focus.name === id);
 
-  function townMenu(e: MouseEvent, t: Town) {
+  function townMenu(event: MouseEvent, t: Town) {
     const hasTemple = !!(t.temple.x || t.temple.y);
-    openContextMenu(e, [
+    openContextMenu(event, [
       { label: "Go to the temple", action: () => goTo(t.temple), disabled: () => !hasTemple },
       { label: "Set the temple…", action: () => pickPosition(`Click the temple of ${t.name}`, (p) => saveTown({ ...t, temple: p })) },
       "-",
@@ -82,7 +82,7 @@
           {@const expanded = !!f || open[t.id]}
           <div class="town">
             <button class="chev" title={expanded ? "Hide houses" : "Show houses"} onclick={() => (open[t.id] = !open[t.id])}>{expanded ? "▾" : "▸"}</button>
-            <button class="m-row" class:on={on("town", t.id)} title="Double-click to go to the temple · right-click for more" oncontextmenu={(e) => townMenu(e, t)} onclick={() => mapCommands.focus({ kind: "town", id: t.id })} ondblclick={() => t.temple.x && goTo(t.temple)}>
+            <button class="m-row" class:on={on("town", t.id)} title="Double-click to go to the temple · right-click for more" oncontextmenu={(event) => townMenu(event, t)} onclick={() => mapCommands.focus({ kind: "town", id: t.id })} ondblclick={() => t.temple.x && goTo(t.temple)}>
               <span class="m-name">{t.name}</span>
               <span class="m-meta">{houses.filter((h) => h.townId === t.id).length} houses</span>
             </button>

@@ -76,19 +76,19 @@ export const res = {
 
 export const pos = (x: number, y: number, z: number): Position => ({ x, y, z });
 
-export function samePos(a: Position | null | undefined, b: Position | null | undefined): boolean {
-  return !!a && !!b && a.x === b.x && a.y === b.y && a.z === b.z;
+export function samePos(first: Position | null | undefined, second: Position | null | undefined): boolean {
+  return !!first && !!second && first.x === second.x && first.y === second.y && first.z === second.z;
 }
 
-export function fmtPos(p: Position | null | undefined): string {
-  return p ? `${p.x}, ${p.y}, ${p.z}` : "–";
+export function fmtPos(position: Position | null | undefined): string {
+  return position ? `${position.x}, ${position.y}, ${position.z}` : "–";
 }
 
 /** Parses "x, y, z" (any separators); null when it is not a position. */
-export function parsePos(s: string): Position | null {
-  const m = s.match(/(\d+)\D+(\d+)\D+(\d+)/);
-  if (!m) return null;
-  const [x, y, z] = [Number(m[1]), Number(m[2]), Number(m[3])];
+export function parsePos(text: string): Position | null {
+  const match = text.match(/(\d+)\D+(\d+)\D+(\d+)/);
+  if (!match) return null;
+  const [x, y, z] = [Number(match[1]), Number(match[2]), Number(match[3])];
   if (x > 65535 || y > 65535 || z > 15) return null;
   return { x, y, z };
 }

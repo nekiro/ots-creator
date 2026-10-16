@@ -13,7 +13,7 @@
 
   onMount(async () => {
     versions = ((await ProjectService.Versions()) ?? []).slice().reverse();
-    const i = versions.findIndex((v) => v.value === 1098);
+    const i = versions.findIndex((value) => value.value === 1098);
     index = i >= 0 ? i : 0;
   });
 
@@ -31,7 +31,7 @@
   <div class="col">
     <label class="row">
       <span class="t-label">Version</span>
-      <Select grow value={index} options={versions.map((v, i) => ({ value: i, label: v.name }))} onchange={(v) => (index = v)} />
+      <Select grow value={index} options={versions.map((value, i) => ({ value: i, label: value.name }))} onchange={(value) => (index = value)} />
     </label>
     {#if version}<FeaturesEditor bind:features version={version.value} />{/if}
   </div>

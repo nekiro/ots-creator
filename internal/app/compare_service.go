@@ -12,7 +12,7 @@ import (
 // CompareService opens a second client (B) next to the open one (A),
 // compares them and copies things in both directions.
 type CompareService struct {
-	s *Session
+	session *Session
 
 	mu sync.Mutex
 	// before holds the state of copied things in their target from before
@@ -21,14 +21,16 @@ type CompareService struct {
 }
 
 type copyKey struct {
-	p  *project.Project
-	c  thing.Category
-	id uint32
+	target   *project.Project
+	category thing.Category
+	id       uint32
 }
 
+var errNothingToCopy = errors.New("nothing to copy")
+
 // NewCompareService returns the service.
-func NewCompareService(s *Session) *CompareService {
-	return &CompareService{s: s, before: map[copyKey]*thing.Thing{}}
+func NewCompareService(session *Session) *CompareService {
+	return &CompareService{session: session, before: map[copyKey]*thing.Thing{}}
 }
 
 func (cs *CompareService) forget() {
@@ -38,95 +40,108 @@ func (cs *CompareService) forget() {
 }
 
 // State returns the state of the second client.
-func (cs *CompareService) State() State { return cs.s.OtherState() }
+func (cs *CompareService) State() State { return cs.session.OtherState() }
 
 // Open loads the second client.
 func (cs *CompareService) Open(req OpenRequest) (State, error) {
-	var p *project.Project
-	var err error
-	if req.Format == project.FormatAssets {
-		p, err = project.OpenAssets(req.DatPath)
-	} else {
-		p, err = project.Open(project.OpenOptions{DatPath: req.DatPath, SprPath: req.SprPath, Version: req.Version, Features: req.Features})
-	}
+	p, err := openProject(req)
 	if err != nil {
-		return cs.s.OtherState(), err
+		return cs.session.OtherState(), err
 	}
 	cs.forget()
-	cs.s.SetOther(p)
-	return cs.s.OtherState(), nil
+	cs.session.SetOther(p)
+	return cs.session.OtherState(), nil
 }
 
 // Thing returns one thing of the second client.
-func (cs *CompareService) Thing(c thing.Category, id uint32) (*thing.Thing, error) {
-	p, err := cs.s.Other()
+func (cs *CompareService) Thing(category thing.Category, id uint32) (*thing.Thing, error) {
+	other, err := cs.session.Other()
 	if err != nil {
 		return nil, err
 	}
-	return p.Thing(c, id)
+	return other.Thing(category, id)
 }
 
 // Close closes the second client.
 func (cs *CompareService) Close() {
 	cs.forget()
-	cs.s.SetOther(nil)
+	cs.session.SetOther(nil)
 }
 
-func (cs *CompareService) both() (a, b *project.Project, err error) {
-	if a, err = cs.s.Project(); err != nil {
+// clients returns the client things are copied into and the one they come
+// from: B into A, or A into B with toOther.
+func (cs *CompareService) clients(toOther bool) (target, source *project.Project, err error) {
+	clientA, err := cs.session.Project()
+	if err != nil {
 		return nil, nil, err
 	}
-	if b, err = cs.s.Other(); err != nil {
+	clientB, err := cs.session.Other()
+	if err != nil {
 		return nil, nil, err
 	}
-	return a, b, nil
+	if toOther {
+		return clientB, clientA, nil
+	}
+	return clientA, clientB, nil
+}
+
+// changed tells the frontend that A, or B with toOther, changed.
+func (cs *CompareService) changed(toOther bool) {
+	if toOther {
+		cs.session.OtherChanged()
+	} else {
+		cs.session.Changed()
+	}
 }
 
 // Diff compares one category of the open client (A) with the second (B).
-func (cs *CompareService) Diff(c thing.Category) (project.DiffResult, error) {
-	a, b, err := cs.both()
+func (cs *CompareService) Diff(category thing.Category) (project.DiffResult, error) {
+	clientA, clientB, err := cs.clients(false)
 	if err != nil {
 		return project.DiffResult{}, err
 	}
-	return project.Diff(a, b, c)
+	return project.Diff(clientA, clientB, category)
 }
 
 // Transfer copies things between the clients: from B into A, or from A
 // into B with toOther. See project.Transfer for appendNew.
-func (cs *CompareService) Transfer(toOther bool, c thing.Category, ids []uint32, appendNew bool) (project.TransferResult, error) {
-	a, b, err := cs.both()
-	if err != nil {
-		return project.TransferResult{}, err
-	}
-	if len(ids) == 0 {
-		return project.TransferResult{}, errors.New("nothing to copy")
-	}
-	dst, src := a, b
-	if toOther {
-		dst, src = b, a
-	}
-	return cs.transfer(toOther, dst, c, func() (project.TransferResult, error) {
-		return project.Transfer(dst, src, c, ids, appendNew)
+func (cs *CompareService) Transfer(toOther bool, category thing.Category, ids []uint32, appendNew bool) (project.TransferResult, error) {
+	return cs.transfer(toOther, category, ids, func(target, source *project.Project) (project.TransferResult, error) {
+		return project.Transfer(target, source, category, ids, appendNew)
 	})
 }
 
 // TransferTo copies things between the clients like Transfer, ids[i] to
 // targets[i] in the target client.
-func (cs *CompareService) TransferTo(toOther bool, c thing.Category, ids, targets []uint32) (project.TransferResult, error) {
-	a, b, err := cs.both()
+func (cs *CompareService) TransferTo(toOther bool, category thing.Category, ids, targets []uint32) (project.TransferResult, error) {
+	return cs.transfer(toOther, category, ids, func(target, source *project.Project) (project.TransferResult, error) {
+		return project.TransferTo(target, source, category, ids, targets)
+	})
+}
+
+// transfer runs a copy and remembers the things it replaced for Revert.
+func (cs *CompareService) transfer(toOther bool, category thing.Category, ids []uint32, copyThings func(target, source *project.Project) (project.TransferResult, error)) (project.TransferResult, error) {
+	target, source, err := cs.clients(toOther)
 	if err != nil {
 		return project.TransferResult{}, err
 	}
 	if len(ids) == 0 {
-		return project.TransferResult{}, errors.New("nothing to copy")
+		return project.TransferResult{}, errNothingToCopy
 	}
-	dst, src := a, b
-	if toOther {
-		dst, src = b, a
+	result, err := copyThings(target, source)
+	if err != nil {
+		return result, err
 	}
-	return cs.transfer(toOther, dst, c, func() (project.TransferResult, error) {
-		return project.TransferTo(dst, src, c, ids, targets)
-	})
+	cs.mu.Lock()
+	for id, previous := range result.Before {
+		key := copyKey{target, category, id}
+		if _, ok := cs.before[key]; !ok {
+			cs.before[key] = previous
+		}
+	}
+	cs.mu.Unlock()
+	cs.changed(toOther)
+	return result, nil
 }
 
 // TargetPlan is where TransferTo would put things.
@@ -136,104 +151,78 @@ type TargetPlan struct {
 	Taken []uint32 `json:"taken"`
 }
 
-// planTargets returns n target ids in p from id from on: free ids only
+// planTargets returns count target ids in p from id from on: free ids only
 // (see project.FreeIDs), or consecutive ids.
-func planTargets(p *project.Project, c thing.Category, from uint32, n int, freeOnly bool) (TargetPlan, error) {
-	if n <= 0 {
+func planTargets(p *project.Project, category thing.Category, from uint32, count int, freeOnly bool) (TargetPlan, error) {
+	if count <= 0 {
 		return TargetPlan{IDs: []uint32{}, Taken: []uint32{}}, nil
 	}
-	if !c.Valid() {
-		return TargetPlan{}, fmt.Errorf("invalid category %d", c)
+	if !category.Valid() {
+		return TargetPlan{}, fmt.Errorf("invalid category %d", category)
 	}
-	from = max(from, c.MinID())
+	from = max(from, category.MinID())
 	if freeOnly {
-		ids, err := p.FreeIDs(c, from, n)
+		ids, err := p.FreeIDs(category, from, count)
 		return TargetPlan{IDs: ids, Taken: []uint32{}}, err
 	}
-	ids := make([]uint32, n)
+	ids := make([]uint32, count)
 	for i := range ids {
 		ids[i] = from + uint32(i)
 	}
-	return TargetPlan{IDs: ids, Taken: p.TakenIDs(c, ids)}, nil
-}
-
-func (cs *CompareService) transfer(toOther bool, dst *project.Project, c thing.Category, run func() (project.TransferResult, error)) (project.TransferResult, error) {
-	res, err := run()
-	if err != nil {
-		return res, err
-	}
-	cs.mu.Lock()
-	for id, t := range res.Before {
-		k := copyKey{dst, c, id}
-		if _, ok := cs.before[k]; !ok {
-			cs.before[k] = t
-		}
-	}
-	cs.mu.Unlock()
-	if toOther {
-		cs.s.OtherChanged()
-	} else {
-		cs.s.Changed()
-	}
-	return res, nil
+	return TargetPlan{IDs: ids, Taken: p.TakenIDs(category, ids)}, nil
 }
 
 // Revert puts copied things back as they were before they were copied, in
 // A, or in B with toOther. It is one undoable edit in that client.
-func (cs *CompareService) Revert(toOther bool, c thing.Category, ids []uint32) error {
-	a, b, err := cs.both()
+func (cs *CompareService) Revert(toOther bool, category thing.Category, ids []uint32) error {
+	target, _, err := cs.clients(toOther)
 	if err != nil {
 		return err
-	}
-	dst := a
-	if toOther {
-		dst = b
 	}
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 	before := map[uint32]*thing.Thing{}
 	for _, id := range ids {
-		t, ok := cs.before[copyKey{dst, c, id}]
+		previous, ok := cs.before[copyKey{target, category, id}]
 		if !ok {
-			return fmt.Errorf("%s %d was not copied", c, id)
+			return fmt.Errorf("%s %d was not copied", category, id)
 		}
-		before[id] = t
+		before[id] = previous
 	}
-	if err := dst.RestoreThings(c, before); err != nil {
+	if err := target.RestoreThings(category, before); err != nil {
 		return err
 	}
 	for _, id := range ids {
-		delete(cs.before, copyKey{dst, c, id})
+		delete(cs.before, copyKey{target, category, id})
 	}
-	if toOther {
-		cs.s.OtherChanged()
-	} else {
-		cs.s.Changed()
-	}
+	cs.changed(toOther)
 	return nil
 }
 
 // Undo reverts the last edit of the second client and returns its label.
 func (cs *CompareService) Undo() (string, error) {
-	p, err := cs.s.Other()
+	other, err := cs.session.Other()
 	if err != nil {
 		return "", err
 	}
-	label := p.Undo()
+	label := other.Undo()
 	if label != "" {
-		cs.s.OtherChanged()
+		cs.session.OtherChanged()
 	}
 	return label, nil
 }
 
 // Compile saves the second client to its files with its settings.
 func (cs *CompareService) Compile() error {
-	p, err := cs.s.Other()
+	other, err := cs.session.Other()
 	if err != nil {
 		return err
 	}
-	info := p.Info()
-	err = p.Compile(project.CompileOptions{Format: info.Format, DatPath: info.DatPath, SprPath: info.SprPath, Version: info.Version, Features: info.Features, Progress: cs.s.reporter("Compiling B")})
-	cs.s.OtherChanged()
+	info := other.Info()
+	err = other.Compile(project.CompileOptions{
+		Format: info.Format, DatPath: info.DatPath, SprPath: info.SprPath, Version: info.Version,
+		Features: info.Features, Progress: cs.session.reporter("Compiling B"),
+	})
+	cs.session.OtherChanged()
 	return err
 }

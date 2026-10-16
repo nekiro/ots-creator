@@ -104,33 +104,42 @@ func main() {
 	})
 	// Closing with uncompiled or unapplied changes asks first (in the UI).
 	blockClose := app.BlockClose(windows)
-	mainWindow.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
+	mainWindow.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
 		if blockClose() {
-			e.Cancel()
+			event.Cancel()
 		}
 	})
 
 	// Dropped files are handled by the frontend (open, import OBD/images).
-	mainWindow.OnWindowEvent(events.Common.WindowFilesDropped, func(e *application.WindowEvent) {
+	mainWindow.OnWindowEvent(events.Common.WindowFilesDropped, func(event *application.WindowEvent) {
 		target := ""
-		if d := e.Context().DropTargetDetails(); d != nil {
-			target = d.ElementID
+		if details := event.Context().DropTargetDetails(); details != nil {
+			target = details.ElementID
 		}
-		emit(app.EventFilesDropped, app.FilesDropped{Paths: e.Context().DroppedFiles(), Target: target})
+		emit(app.EventFilesDropped, app.FilesDropped{Paths: event.Context().DroppedFiles(), Target: target})
 	})
 
 	// Open a client passed on the command line (file association, dev runs).
 	if len(os.Args) > 1 {
-		ps := app.NewProjectService(session)
-		if cf, err := ps.Inspect(os.Args[1]); err != nil {
-			log.Printf("open %s: %v", os.Args[1], err)
-		} else if _, err := ps.Open(app.OpenRequest{DatPath: cf.DatPath, SprPath: cf.SprPath, Version: cf.Detected, Features: cf.Features}); err != nil {
-			log.Printf("open %s: %v", os.Args[1], err)
-		}
+		openClient(app.NewProjectService(session), os.Args[1])
 	}
 
 	if err := wailsApp.Run(); err != nil {
 		log.Fatal(err)
+	}
+}
+
+// openClient opens the client of a dat, spr, otfi or folder path.
+func openClient(projects *app.ProjectService, path string) {
+	files, err := projects.Inspect(path)
+	if err == nil {
+		_, err = projects.Open(app.OpenRequest{
+			Format: files.Format, DatPath: files.DatPath, SprPath: files.SprPath,
+			Version: files.Detected, Features: files.Features,
+		})
+	}
+	if err != nil {
+		log.Printf("open %s: %v", path, err)
 	}
 }
 
@@ -141,21 +150,21 @@ func openSettings() *settings.Store {
 	if err != nil {
 		log.Printf("settings: %v", err)
 	}
-	st, err := settings.Open(path)
+	store, err := settings.Open(path)
 	if err != nil {
 		log.Printf("settings: %v", err)
 	}
-	return st
+	return store
 }
 
-func initUpdater(a *application.App) error {
-	gh, err := github.New(github.Config{Repository: app.UpdateRepository, ChecksumAsset: app.UpdateChecksums})
+func initUpdater(wailsApp *application.App) error {
+	releases, err := github.New(github.Config{Repository: app.UpdateRepository, ChecksumAsset: app.UpdateChecksums})
 	if err != nil {
 		return err
 	}
-	return a.Updater.Init(updater.Config{
+	return wailsApp.Updater.Init(updater.Config{
 		CurrentVersion: version,
-		Providers:      []updater.Provider{gh},
+		Providers:      []updater.Provider{releases},
 		Window:         updater.WindowNone,
 	})
 }

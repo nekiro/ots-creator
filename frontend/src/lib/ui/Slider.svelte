@@ -23,30 +23,30 @@
   }
 
   let trackEl: HTMLDivElement;
-  function drag(e: PointerEvent) {
-    if (disabled || e.button !== 0) return;
-    e.preventDefault();
-    const el = e.currentTarget as HTMLElement;
-    el.setPointerCapture(e.pointerId);
-    const move = (ev: PointerEvent) => set(valueAt(toCss(ev.clientX - trackEl.getBoundingClientRect().left), track, min, max));
-    move(e);
+  function drag(event: PointerEvent) {
+    if (disabled || event.button !== 0) return;
+    event.preventDefault();
+    const el = event.currentTarget as HTMLElement;
+    el.setPointerCapture(event.pointerId);
+    const move = (event: PointerEvent) => set(valueAt(toCss(event.clientX - trackEl.getBoundingClientRect().left), track, min, max));
+    move(event);
     el.onpointermove = move;
     el.onpointerup = el.onpointercancel = () => (el.onpointermove = el.onpointerup = el.onpointercancel = null);
   }
 
-  function onwheel(e: WheelEvent) {
+  function onwheel(event: WheelEvent) {
     if (disabled) return;
-    e.preventDefault();
-    set(value + (e.deltaY < 0 ? 1 : -1));
+    event.preventDefault();
+    set(value + (event.deltaY < 0 ? 1 : -1));
   }
 
-  function onkeydown(e: KeyboardEvent) {
+  function onkeydown(event: KeyboardEvent) {
     const d: Record<string, number> = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1 };
-    if (e.key in d) set(value + d[e.key]);
-    else if (e.key === "Home") set(min);
-    else if (e.key === "End") set(max);
+    if (event.key in d) set(value + d[event.key]);
+    else if (event.key === "Home") set(min);
+    else if (event.key === "End") set(max);
     else return;
-    e.preventDefault();
+    event.preventDefault();
   }
 </script>
 

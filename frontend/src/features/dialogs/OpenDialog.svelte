@@ -19,7 +19,7 @@
     await inspect(r.datPath);
     if (!files) return;
     features = { ...r.features };
-    if (!isAssets && versions.some((v) => keyOf(v) === keyOf(r.version))) {
+    if (!isAssets && versions.some((value) => keyOf(value) === keyOf(r.version))) {
       versionKey = keyOf(r.version);
       error = "";
     }
@@ -54,7 +54,7 @@
 
   const keyOf = (v: Version) => `${v.value}|${v.name}|${v.datSignature}|${v.sprSignature}`;
   const isAssets = $derived(files?.format === Format.FormatAssets);
-  const version = $derived(isAssets ? files!.detected : (versions.find((v) => keyOf(v) === versionKey) ?? null));
+  const version = $derived(isAssets ? files!.detected : (versions.find((value) => keyOf(value) === versionKey) ?? null));
   const hex = (n: number) => "0x" + n.toString(16).toUpperCase();
 
   onMount(async () => {
@@ -91,9 +91,9 @@
       if (!otbChosen) otbPath = files.otbPath;
       if (files.detected) versionKey = keyOf(files.detected);
       else error = `Unknown signatures (dat ${hex(files.datSignature)}, spr ${hex(files.sprSignature)}). Choose the version manually.`;
-    } catch (e) {
+    } catch (err) {
       files = null;
-      error = errorMessage(e);
+      error = errorMessage(err);
     }
   }
 
@@ -160,7 +160,7 @@ Click to choose features, double click to open as before`} onclick={() => pickRe
       </div>
       <label class="row">
         <span class="t-label">Version</span>
-        <Select grow value={versionKey} options={versions.map((v) => ({ value: keyOf(v), label: v.name }))} onchange={(v) => (versionKey = v)} />
+        <Select grow value={versionKey} options={versions.map((value) => ({ value: keyOf(value), label: value.name }))} onchange={(value) => (versionKey = value)} />
         {#if files.detected}<span class="ok">detected</span>{/if}
       </label>
       <div class="t-label">Features</div>

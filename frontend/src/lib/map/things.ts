@@ -1,7 +1,7 @@
 // Items and creatures drawn as screen quads: brush previews, pasted
 // things and dragged selections (chunk quads are built by the backend).
 import { AF, frameAt, type Look } from "./appearances";
-import { IF, TF, type CreatureData } from "./chunks";
+import { ItemFlags, TileFlags, type CreatureData } from "./chunks";
 import { composedKey, composeOutfit, packColors } from "./composed";
 import { ALPHA, COLORS } from "./constants";
 import type { QuadBatch } from "./quadBatch";
@@ -135,14 +135,14 @@ export class ThingDrawer {
     for (let y = Math.max(0, range.y0 - offset.dy); y <= range.y1 - offset.dy; y++) {
       for (let x = Math.max(0, range.x0 - offset.dx); x <= range.x1 - offset.dx; x++) {
         const tile = scene.chunks.peekTile(x, y, z);
-        if (!tile || !(tile.flags & TF.selected)) continue;
+        if (!tile || !(tile.flags & TileFlags.selected)) continue;
         const movedX = x + offset.dx;
         const movedY = y + offset.dy;
         const screenX = camera.tileX(movedX, z);
         const screenY = camera.tileY(movedY, z);
         let elevation = 0;
         for (let i = 0; i < tile.ids.length; i++) {
-          if (!(tile.iflags[i] & IF.selected)) continue;
+          if (!(tile.iflags[i] & ItemFlags.selected)) continue;
           elevation += drawItem(tile.ids[i], tile.subs[i], movedX, movedY, z, screenX - elevation * scene.scale, screenY - elevation * scene.scale, 1, 1, 1, ALPHA.moved, 0);
         }
         for (const creature of tile.creatures ?? []) if (creature.selected) drawCreature(creature, screenX, screenY, movedX, movedY, z, ALPHA.moved);

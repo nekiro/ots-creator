@@ -1,34 +1,22 @@
 package app
 
 import (
-	"errors"
 	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
 	"os"
 	"path/filepath"
-	"runtime"
-	"sync"
 	"sync/atomic"
-	"time"
 
+	"github.com/nekiro/ots-creator/internal/fsutil"
 	"github.com/nekiro/ots-creator/internal/imaging"
 	"github.com/nekiro/ots-creator/internal/project"
 	"github.com/nekiro/ots-creator/internal/thing"
 )
 
-// EventProgress carries a Progress while a long operation runs.
-const EventProgress = "app:progress"
-
-// Progress reports how far a long operation is.
-type Progress struct {
-	Label string `json:"label"`
-	Done  int    `json:"done"`
-	Total int    `json:"total"`
-	// Percent shows the progress as a percentage instead of done/total.
-	Percent bool `json:"percent"`
-}
+// maxSheetSprites is the most sprites ExportAllSheets puts in one sheet.
+const maxSheetSprites = 64 * 64
 
 // ExportSummary reports an export of a whole client.
 type ExportSummary struct {
@@ -37,89 +25,12 @@ type ExportSummary struct {
 	Skipped int `json:"skipped"`
 }
 
-// ErrCanceled is returned by a long operation stopped with Cancel.
-var ErrCanceled = errors.New("canceled")
-
-// progressEvery is the minimum time between progress events.
-const progressEvery = 150 * time.Millisecond
-
-// reporter returns a progress callback for label that sends at most one
-// event per progressEvery. It is safe for concurrent use.
-func (s *Session) reporter(label string) func(done, total int) {
-	var mu sync.Mutex
-	var last time.Time
-	return func(done, total int) {
-		mu.Lock()
-		defer mu.Unlock()
-		if time.Since(last) < progressEvery {
-			return
-		}
-		last = time.Now()
-		s.notify(EventProgress, Progress{Label: label, Done: done, Total: total, Percent: true})
-	}
-}
-
-// parallel runs fn for 0..n-1 on all cores and reports progress. It stops
-// at the first error and returns it, or ErrCanceled after Session.Cancel.
-func (s *Session) parallel(label string, n int, fn func(i int) error) error {
-	s.canceled.Store(false)
-	s.exporting.Add(1)
-	defer s.exporting.Add(-1)
-	var next, done atomic.Int64
-	var failed atomic.Bool
-	var firstErr error
-	var errOnce sync.Once
-	stop, stopped := make(chan struct{}), make(chan struct{})
-	ticker := time.NewTicker(progressEvery)
-	defer ticker.Stop()
-	go func() {
-		defer close(stopped)
-		for {
-			select {
-			case <-stop:
-				return
-			case <-ticker.C:
-				s.notify(EventProgress, Progress{Label: label, Done: int(done.Load()), Total: n})
-			}
-		}
-	}()
-	var wg sync.WaitGroup
-	for range min(n, runtime.GOMAXPROCS(0)) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for !failed.Load() {
-				if s.canceled.Load() {
-					errOnce.Do(func() { firstErr = ErrCanceled })
-					failed.Store(true)
-					return
-				}
-				i := int(next.Add(1) - 1)
-				if i >= n {
-					return
-				}
-				if err := fn(i); err != nil {
-					errOnce.Do(func() { firstErr = err })
-					failed.Store(true)
-					return
-				}
-				done.Add(1)
-			}
-		}()
-	}
-	wg.Wait()
-	close(stop)
-	<-stopped // events are never sent concurrently
-	s.notify(EventProgress, Progress{Label: label, Done: n, Total: n})
-	return firstErr
-}
-
 // ExportAll writes every object of every category into subfolders of dir
 // (items, outfits, effects, missiles), named like ExportObjects, in format
 // (ObjectOTOBJ or ObjectOBD). With skipEmpty objects without visible
 // sprites are left out.
 func (ts *ThingService) ExportAll(dir string, skipEmpty bool, format string) (ExportSummary, error) {
-	p, err := ts.s.Project()
+	p, err := ts.session.Project()
 	if err != nil {
 		return ExportSummary{}, err
 	}
@@ -128,50 +39,50 @@ func (ts *ThingService) ExportAll(dir string, skipEmpty bool, format string) (Ex
 		content = project.ContentUsed
 	}
 	type job struct {
-		c  thing.Category
-		id uint32
+		category thing.Category
+		id       uint32
 	}
 	var jobs []job
 	total := 0
-	for _, c := range thing.Categories {
-		ids, err := p.FindThings(c, project.Filter{Content: content})
+	for _, category := range thing.Categories {
+		ids, err := p.FindThings(category, project.Filter{Content: content})
 		if err != nil {
 			return ExportSummary{}, err
 		}
-		all, _ := p.FindThings(c, project.Filter{})
+		all, _ := p.FindThings(category, project.Filter{})
 		total += len(all)
 		if len(ids) == 0 {
 			continue
 		}
-		if err := os.MkdirAll(filepath.Join(dir, categoryFolder(c)), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(dir, categoryFolder(category)), fsutil.DirMode); err != nil {
 			return ExportSummary{}, err
 		}
 		for _, id := range ids {
-			jobs = append(jobs, job{c, id})
+			jobs = append(jobs, job{category, id})
 		}
 	}
-	err = ts.s.parallel("Exporting objects", len(jobs), func(i int) error {
-		j := jobs[i]
-		_, err := exportObject(p, j.c, j.id, filepath.Join(dir, categoryFolder(j.c)), format)
+	err = ts.session.parallel("Exporting objects", len(jobs), func(i int) error {
+		next := jobs[i]
+		_, err := exportObject(p, next.category, next.id, filepath.Join(dir, categoryFolder(next.category)), format)
 		return err
 	})
 	return ExportSummary{Files: len(jobs), Skipped: total - len(jobs)}, err
 }
 
-func categoryFolder(c thing.Category) string { return c.String() + "s" }
+func categoryFolder(category thing.Category) string { return category.String() + "s" }
 
 // ExportAll writes every sprite as {id}.{format} into dir (see Export).
 // With skipEmpty fully transparent sprites are left out.
 func (ss *SpriteService) ExportAll(dir, format string, skipEmpty bool) (ExportSummary, error) {
 	format = imaging.FormatOf("x." + format)
-	p, err := ss.s.Project()
+	p, err := ss.session.Project()
 	if err != nil {
 		return ExportSummary{}, err
 	}
-	n := int(p.Info().Counts.Sprites)
+	spriteCount := int(p.Info().Counts.Sprites)
 	size := p.SpriteSize()
 	var skipped atomic.Int64
-	err = ss.s.parallel("Exporting sprites", n, func(i int) error {
+	err = ss.session.parallel("Exporting sprites", spriteCount, func(i int) error {
 		id := uint32(i + 1)
 		if skipEmpty {
 			if empty, err := p.IsSpriteEmpty(id); err != nil || empty {
@@ -179,17 +90,17 @@ func (ss *SpriteService) ExportAll(dir, format string, skipEmpty bool) (ExportSu
 				return err
 			}
 		}
-		px, err := p.SpritePixels(id)
+		pixels, err := p.SpritePixels(id)
 		if err != nil {
 			return err
 		}
-		data, err := imaging.Encode(imagingNRGBA(px, size), format, imaging.Magenta)
+		data, err := imaging.Encode(spriteImage(pixels, size), format, imaging.Magenta)
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(filepath.Join(dir, fmt.Sprintf("%d.%s", id, format)), data, 0o644)
+		return os.WriteFile(filepath.Join(dir, fmt.Sprintf("%d.%s", id, format)), data, fsutil.FileMode)
 	})
-	return ExportSummary{Files: n - int(skipped.Load()), Skipped: int(skipped.Load())}, err
+	return ExportSummary{Files: spriteCount - int(skipped.Load()), Skipped: int(skipped.Load())}, err
 }
 
 // ExportAllSheets writes every sprite into sprite sheets of columns x rows
@@ -199,41 +110,41 @@ func (ss *SpriteService) ExportAll(dir, format string, skipEmpty bool) (ExportSu
 // background, like ExportSheet; transparent keeps alpha in png.
 func (ss *SpriteService) ExportAllSheets(dir, format string, columns, rows int, transparent bool) (ExportSummary, error) {
 	format = imaging.FormatOf("x." + format)
-	if columns < 1 || rows < 1 || columns*rows > 64*64 {
-		return ExportSummary{}, fmt.Errorf("a sheet holds 1 to 4096 sprites, not %d x %d", columns, rows)
+	if columns < 1 || rows < 1 || columns*rows > maxSheetSprites {
+		return ExportSummary{}, fmt.Errorf("a sheet holds 1 to %d sprites, not %d x %d", maxSheetSprites, columns, rows)
 	}
-	p, err := ss.s.Project()
+	p, err := ss.session.Project()
 	if err != nil {
 		return ExportSummary{}, err
 	}
-	n := int(p.Info().Counts.Sprites)
+	spriteCount := int(p.Info().Counts.Sprites)
 	size := p.SpriteSize()
-	per := columns * rows
-	sheets := (n + per - 1) / per
-	bg := imaging.Magenta
+	perSheet := columns * rows
+	sheets := (spriteCount + perSheet - 1) / perSheet
+	background := imaging.Magenta
 	if transparent && format == "png" {
-		bg = color.NRGBA{}
+		background = color.NRGBA{}
 	}
-	err = ss.s.parallel("Exporting sprite sheets", sheets, func(i int) error {
-		first := i*per + 1
-		last := min(first+per-1, n)
+	err = ss.session.parallel("Exporting sprite sheets", sheets, func(i int) error {
+		first := i*perSheet + 1
+		last := min(first+perSheet-1, spriteCount)
 		// The last sheet only gets the rows it needs.
-		h := (last - first + columns) / columns
-		img := image.NewNRGBA(image.Rect(0, 0, columns*size, h*size))
-		draw.Draw(img, img.Rect, &image.Uniform{C: bg}, image.Point{}, draw.Src)
+		usedRows := (last - first + columns) / columns
+		img := image.NewNRGBA(image.Rect(0, 0, columns*size, usedRows*size))
+		draw.Draw(img, img.Rect, &image.Uniform{C: background}, image.Point{}, draw.Src)
 		for id := first; id <= last; id++ {
-			px, err := p.SpritePixels(uint32(id))
+			pixels, err := p.SpritePixels(uint32(id))
 			if err != nil {
 				return err
 			}
-			k := id - first
-			imaging.DrawOver(img, (k%columns)*size, (k/columns)*size, size, px)
+			slot := id - first
+			imaging.DrawOver(img, (slot%columns)*size, (slot/columns)*size, size, pixels)
 		}
 		data, err := imaging.Encode(img, format, imaging.Magenta)
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(filepath.Join(dir, fmt.Sprintf("sprites_%d-%d.%s", first, last, format)), data, 0o644)
+		return os.WriteFile(filepath.Join(dir, fmt.Sprintf("sprites_%d-%d.%s", first, last, format)), data, fsutil.FileMode)
 	})
 	return ExportSummary{Files: sheets}, err
 }

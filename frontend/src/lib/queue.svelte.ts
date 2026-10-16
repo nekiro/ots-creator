@@ -5,6 +5,7 @@
 
 import { CATEGORY_NAMES, CompareService, res, ThingService, type Category } from "./api";
 import { ask } from "./confirm.svelte";
+import { formatIdList } from "./format";
 import { app, hasToast, otherVersions, run, toast } from "./state.svelte";
 
 export interface QueueItem<K extends number | string = number | string> {
@@ -29,72 +30,72 @@ export interface QueueSource<K extends number | string> {
   hint: string;
   items: () => QueueItem<K>[];
   setItems: (items: QueueItem<K>[]) => void;
-  thumb?: (c: Category, key: K) => string;
+  thumb?: (category: Category, key: K) => string;
   /** Puts keys into A at targets, or at the end of A when targets is null. */
-  put: (c: Category, keys: K[], targets: number[] | null) => Promise<DropResult>;
+  put: (category: Category, keys: K[], targets: number[] | null) => Promise<DropResult>;
 }
 
 export class DropQueue<K extends number | string = number | string> {
   constructor(readonly src: QueueSource<K>) {}
 
-  /** Queued items of category c, in queue order. */
-  list(c: Category): QueueItem<K>[] {
-    return this.src.items().filter((q) => q.category === c);
+  /** Queued items of category category, in queue order. */
+  list(category: Category): QueueItem<K>[] {
+    return this.src.items().filter((item) => item.category === category);
   }
 
-  /** Queued keys of category c, in queue order. */
-  queued(c: Category): K[] {
-    return this.list(c).map((q) => q.key);
+  /** Queued keys of category category, in queue order. */
+  queued(category: Category): K[] {
+    return this.list(category).map((item) => item.key);
   }
 
   /** Total number of queued items per category. */
   counts(): Map<Category, number> {
-    const m = new Map<Category, number>();
-    for (const q of this.src.items()) m.set(q.category, (m.get(q.category) ?? 0) + 1);
-    return m;
+    const counts = new Map<Category, number>();
+    for (const item of this.src.items()) counts.set(item.category, (counts.get(item.category) ?? 0) + 1);
+    return counts;
   }
 
-  label(q: QueueItem<K>): string {
-    return q.label ?? `#${q.key}`;
+  label(item: QueueItem<K>): string {
+    return item.label ?? `#${item.key}`;
   }
 
-  thumb(q: QueueItem<K>): string {
-    return q.thumb ?? this.src.thumb?.(q.category, q.key) ?? "";
+  thumb(item: QueueItem<K>): string {
+    return item.thumb ?? this.src.thumb?.(item.category, item.key) ?? "";
   }
 
   /** Adds items to the end of the queue (each one once). */
-  enqueue(c: Category, items: (K | Omit<QueueItem<K>, "category">)[]): void {
-    const have = new Set(this.queued(c));
+  enqueue(category: Category, items: (K | Omit<QueueItem<K>, "category">)[]): void {
+    const have = new Set(this.queued(category));
     const add = items
-      .map((it) => (typeof it === "object" ? { ...it, category: c } : { category: c, key: it }))
-      .filter((q) => !have.has(q.key) && (have.add(q.key), true));
+      .map((entry) => (typeof entry === "object" ? { ...entry, category } : { category, key: entry }))
+      .filter((item) => !have.has(item.key) && (have.add(item.key), true));
     this.src.setItems([...this.src.items(), ...add]);
   }
 
-  dequeue(c: Category, keys: K[]): void {
-    this.src.setItems(this.src.items().filter((q) => q.category !== c || !keys.includes(q.key)));
+  dequeue(category: Category, keys: K[]): void {
+    this.src.setItems(this.src.items().filter((item) => item.category !== category || !keys.includes(item.key)));
   }
 
-  clear(c: Category): void {
-    this.src.setItems(this.src.items().filter((q) => q.category !== c));
+  clear(category: Category): void {
+    this.src.setItems(this.src.items().filter((item) => item.category !== category));
   }
 
   /** Moves a queued item to the front, so it is dropped next. */
-  toFront(c: Category, key: K): void {
+  toFront(category: Category, key: K): void {
     const all = this.src.items();
-    const i = all.findIndex((q) => q.category === c && q.key === key);
-    if (i < 0) return;
-    this.src.setItems([all[i], ...all.slice(0, i), ...all.slice(i + 1)]);
+    const index = all.findIndex((item) => item.category === category && item.key === key);
+    if (index < 0) return;
+    this.src.setItems([all[index], ...all.slice(0, index), ...all.slice(index + 1)]);
   }
 
   /**
-   * Drops queued items of c into A from id at: the first n (all when n is
+   * Drops queued items of category into A from id at: the first n (all when n is
    * 0), into free ids from at, or into the ids in a row. at 0 appends them
    * to the end of A. Objects of A that would be replaced are confirmed
    * first. Returns the ids they got.
    */
-  async drop(c: Category, at: number, n = 1, free = false): Promise<number[]> {
-    const all = this.queued(c);
+  async drop(category: Category, at: number, n = 1, free = false): Promise<number[]> {
+    const all = this.queued(category);
     const keys = n > 0 ? all.slice(0, n) : all;
     if (!keys.length) {
       toast(`The queue is empty. ${this.src.hint}`);
@@ -102,7 +103,7 @@ export class DropQueue<K extends number | string = number | string> {
     }
     let targets: number[] | null = null;
     if (at !== 0) {
-      const plan = await run("Dropping", () => ThingService.PlanTargets(c, at, keys.length, free));
+      const plan = await run("Dropping", () => ThingService.PlanTargets(category, at, keys.length, free));
       if (!plan) return [];
       const taken = plan.taken ?? [];
       if (taken.length) {
@@ -111,40 +112,32 @@ export class DropQueue<K extends number | string = number | string> {
       }
       targets = plan.ids ?? [];
     }
-    const r = await run("Dropping", () => this.src.put(c, keys, targets));
-    if (!r) return [];
-    this.dequeue(c, keys);
+    const result = await run("Dropping", () => this.src.put(category, keys, targets));
+    if (!result) return [];
+    this.dequeue(category, keys);
     // Drops in a row add up in one toast while it is shown.
-    if (!hasToast(DROP_TOAST) || streak.c !== c || streak.q !== this) streak = { q: this, c, ids: [], sprites: 0 };
-    streak.ids.push(...r.ids);
-    streak.sprites += r.sprites ?? 0;
-    const sprites = r.sprites === undefined ? "" : `, ${streak.sprites} new sprite(s)`;
-    toast(`Dropped ${streak.ids.length} ${CATEGORY_NAMES[c]}(s) at ${idRange(streak.ids)}${sprites}.`, "success", 3500, DROP_TOAST);
-    return r.ids;
+    if (!hasToast(DROP_TOAST) || streak.category !== category || streak.queue !== this) streak = { queue: this, category, ids: [], sprites: 0 };
+    streak.ids.push(...result.ids);
+    streak.sprites += result.sprites ?? 0;
+    const sprites = result.sprites === undefined ? "" : `, ${streak.sprites} new sprite(s)`;
+    toast(`Dropped ${streak.ids.length} ${CATEGORY_NAMES[category]}(s) at ${formatIdList(streak.ids)}${sprites}.`, "success", 3500, DROP_TOAST);
+    return result.ids;
   }
 }
 
 const DROP_TOAST = "queue-drop";
-let streak: { q: unknown; c: Category; ids: number[]; sprites: number } = { q: null, c: 0 as Category, ids: [], sprites: 0 };
-
-/** Short text of ids: "#5", "#5-#8" or "#5, #9, #12 (+3)". */
-function idRange(ids: number[]): string {
-  const sorted = [...ids].sort((a, b) => a - b);
-  if (sorted.every((id, i) => id === sorted[0] + i)) return sorted.length === 1 ? `#${sorted[0]}` : `#${sorted[0]}-#${sorted.at(-1)}`;
-  const head = sorted.slice(0, 3).map((id) => `#${id}`).join(", ");
-  return sorted.length > 3 ? `${head} (+${sorted.length - 3})` : head;
-}
+let streak: { queue: unknown; category: Category; ids: number[]; sprites: number } = { queue: null, category: 0 as Category, ids: [], sprites: 0 };
 
 /** Objects of B queued in the compare window. */
 export const compareQueue = new DropQueue<number>({
   from: "from B",
   hint: "Queue objects of B first (double click a row).",
   items: () => app.queue,
-  setItems: (q) => (app.queue = q),
-  thumb: (c, id) => res.otherThumb(c, id, otherVersions.thing(c, id)),
-  put: async (c, ids, targets) => {
-    const r = targets ? await CompareService.TransferTo(false, c, ids, targets) : await CompareService.Transfer(false, c, ids, true);
-    return { ids: r.ids ?? [], sprites: r.sprites };
+  setItems: (items) => (app.queue = items),
+  thumb: (category, id) => res.otherThumb(category, id, otherVersions.thing(category, id)),
+  put: async (category, ids, targets) => {
+    const result = targets ? await CompareService.TransferTo(false, category, ids, targets) : await CompareService.Transfer(false, category, ids, true);
+    return { ids: result.ids ?? [], sprites: result.sprites };
   },
 });
 
@@ -153,10 +146,10 @@ export const fileQueue = new DropQueue<string>({
   from: "files",
   hint: "Queue object files first (double click a file).",
   items: () => app.fileQueue,
-  setItems: (q) => (app.fileQueue = q),
-  put: async (c, paths, targets) => {
-    const end = app.maxId(c) + 1;
-    const ids = await ThingService.ImportObjectsTo(c, paths, targets ?? paths.map((_, i) => end + i));
+  setItems: (items) => (app.fileQueue = items),
+  put: async (category, paths, targets) => {
+    const end = app.maxId(category) + 1;
+    const ids = await ThingService.ImportObjectsTo(category, paths, targets ?? paths.map((_, i) => end + i));
     return { ids: ids ?? [] };
   },
 });

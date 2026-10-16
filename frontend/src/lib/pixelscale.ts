@@ -30,10 +30,10 @@ export function zoomFor(systemScale: number, mode: ScaleMode): number {
 
 export function loadMode(): ScaleMode {
   try {
-    const v = localStorage.getItem(KEY);
-    if (v === "system" || v === "auto") return v;
-    const n = Number(v);
-    if (n === 1 || n === 2 || n === 3) return n;
+    const stored = localStorage.getItem(KEY);
+    if (stored === "system" || stored === "auto") return stored;
+    const scale = Number(stored);
+    if (scale === 1 || scale === 2 || scale === 3) return scale;
   } catch {
     /* storage unavailable */
   }
@@ -50,13 +50,13 @@ export function cssZoom(): number {
 }
 
 /** Converts a distance in viewport pixels (mouse events, getBoundingClientRect) to CSS pixels. */
-export function toCss(v: number): number {
-  return v / rootZoom;
+export function toCss(distance: number): number {
+  return distance / rootZoom;
 }
 
 /** Splits a zoom into the webview part (>= 1) and the CSS part (<= 1). */
-export function splitZoom(z: number): { webview: number; css: number } {
-  return z >= 1 ? { webview: z, css: 1 } : { webview: 1, css: z };
+export function splitZoom(zoom: number): { webview: number; css: number } {
+  return zoom >= 1 ? { webview: zoom, css: 1 } : { webview: 1, css: zoom };
 }
 
 /** Smallest layout (CSS pixels) where every panel still fits; App.svelte
@@ -121,12 +121,12 @@ export async function initPixelScale(): Promise<void> {
   await apply();
 
   const watch = () => {
-    const mq = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
-    mq.addEventListener(
+    const media = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+    media.addEventListener(
       "change",
       async () => {
-        const z = splitZoom(zoomFor(systemScale, current)).webview;
-        const next = window.devicePixelRatio / z;
+        const webviewZoom = splitZoom(zoomFor(systemScale, current)).webview;
+        const next = window.devicePixelRatio / webviewZoom;
         if (Math.abs(next - systemScale) > 0.01) {
           systemScale = next;
           await apply();

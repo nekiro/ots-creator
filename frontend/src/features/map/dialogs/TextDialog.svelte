@@ -21,8 +21,8 @@
       if (!item) return close();
       text = item.ext?.text ?? "";
       queueMicrotask(() => area?.focus());
-    } catch (e) {
-      toast(errorMessage(e), "error");
+    } catch (err) {
+      toast(errorMessage(err), "error");
       close();
     }
   });
@@ -41,9 +41,9 @@
     close();
   }
 
-  function onkeydown(e: KeyboardEvent) {
-    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
+  function onkeydown(event: KeyboardEvent) {
+    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
       save();
     }
   }

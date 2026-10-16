@@ -19,21 +19,28 @@ type Features struct {
 
 // DefaultFeatures returns the features forced by a client version.
 func DefaultFeatures(version uint16) Features {
-	f := Features{SpriteSize: DefaultSpriteSize}
-	f.ApplyVersionDefaults(version)
-	return f
+	features := Features{SpriteSize: DefaultSpriteSize}
+	features.ApplyVersionDefaults(version)
+	return features
 }
+
+// First client versions whose files require a feature.
+const (
+	extendedVersion           = 960
+	improvedAnimationsVersion = 1050
+	frameGroupsVersion        = 1057
+)
 
 // ApplyVersionDefaults turns on the features that are mandatory for a version.
 // It never turns a feature off.
 func (f *Features) ApplyVersionDefaults(version uint16) {
-	if version >= 960 {
+	if version >= extendedVersion {
 		f.Extended = true
 	}
-	if version >= 1050 {
+	if version >= improvedAnimationsVersion {
 		f.ImprovedAnimations = true
 	}
-	if version >= 1057 {
+	if version >= frameGroupsVersion {
 		f.FrameGroups = true
 	}
 	if f.SpriteSize == 0 {

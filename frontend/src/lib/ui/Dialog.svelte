@@ -17,16 +17,16 @@
     first?.focus();
   });
 
-  function onkeydown(e: KeyboardEvent) {
-    if (e.key === "Escape") {
-      e.stopPropagation();
+  function onkeydown(event: KeyboardEvent) {
+    if (event.key === "Escape") {
+      event.stopPropagation();
       onclose();
     }
   }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="overlay" transition:backdrop|global onkeydown={onkeydown} onmousedown={(e) => e.target === e.currentTarget && onclose()}>
+<div class="overlay" transition:backdrop|global onkeydown={onkeydown} onmousedown={(event) => event.target === event.currentTarget && onclose()}>
   <div class="t-window dialog" transition:pop|global style="width:{width}px" bind:this={box} role="dialog" aria-modal="true" aria-label={title}>
     <div class="t-window-title">{title}</div>
     <div class="content">

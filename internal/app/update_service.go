@@ -50,12 +50,18 @@ func (s *UpdateService) updater() (Updater, error) {
 	if s.get == nil {
 		return nil, ErrUpdatesDisabled
 	}
-	u := s.get()
-	if u == nil {
+	updater := s.get()
+	if updater == nil {
 		return nil, ErrUpdatesDisabled
 	}
-	return u, nil
+	return updater, nil
 }
+
+// Update timeouts: checking asks one API, installing downloads the release.
+const (
+	updateCheckTimeout   = 30 * time.Second
+	updateInstallTimeout = 30 * time.Minute
+)
 
 // Version returns the running version ("dev" for local builds).
 func (s *UpdateService) Version() string { return s.version }
@@ -63,32 +69,32 @@ func (s *UpdateService) Version() string { return s.version }
 // Check asks GitHub for a newer release.
 func (s *UpdateService) Check() (UpdateInfo, error) {
 	info := UpdateInfo{Current: s.version}
-	u, err := s.updater()
+	updater, err := s.updater()
 	if err != nil {
 		return info, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), updateCheckTimeout)
 	defer cancel()
-	r, err := u.Check(ctx)
+	release, err := updater.Check(ctx)
 	if err != nil {
 		return info, err
 	}
-	info.Release = r
-	info.Available = r != nil
+	info.Release = release
+	info.Available = release != nil
 	return info, nil
 }
 
 // Install downloads and verifies the release found by Check, swaps the
 // executable and restarts into the new version.
 func (s *UpdateService) Install() error {
-	u, err := s.updater()
+	updater, err := s.updater()
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), updateInstallTimeout)
 	defer cancel()
-	if err := u.DownloadAndInstall(ctx); err != nil {
+	if err := updater.DownloadAndInstall(ctx); err != nil {
 		return err
 	}
-	return u.Restart(ctx)
+	return updater.Restart(ctx)
 }

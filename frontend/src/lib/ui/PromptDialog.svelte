@@ -14,7 +14,7 @@
   <Dialog title={q.title} width={360} onclose={() => answerText(null)}>
     <label class="col">
       <span class="t-label">{q.label}</span>
-      <input class="t-input" bind:value onkeydown={(e) => e.key === "Enter" && ok()} />
+      <input class="t-input" bind:value onkeydown={(event) => event.key === "Enter" && ok()} />
     </label>
     {#snippet footer()}
       <span class="grow"></span>

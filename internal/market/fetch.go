@@ -40,18 +40,18 @@ func (s *Source) get(ctx context.Context, bases []string, name string, limit int
 			if name == IndexFile {
 				req.Header.Set("Cache-Control", "no-cache") // a refresh shows new entries
 			}
-			res, err := client.Do(req)
+			response, err := client.Do(req)
 			if err != nil {
 				return nil, err
 			}
-			defer res.Body.Close()
-			if res.StatusCode == http.StatusNotFound {
+			defer response.Body.Close()
+			if response.StatusCode == http.StatusNotFound {
 				return nil, fmt.Errorf("%s: %w", base+name, errNotFound)
 			}
-			if res.StatusCode != http.StatusOK {
-				return nil, fmt.Errorf("%s: %s", base+name, res.Status)
+			if response.StatusCode != http.StatusOK {
+				return nil, fmt.Errorf("%s: %s", base+name, response.Status)
 			}
-			data, err := io.ReadAll(io.LimitReader(res.Body, limit+1))
+			data, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
 			if err == nil && int64(len(data)) > limit {
 				err = fmt.Errorf("%s is larger than %d bytes", name, limit)
 			}
@@ -82,23 +82,23 @@ func (s *Source) Index(ctx context.Context) (*Index, error) {
 	if err != nil {
 		return nil, err
 	}
-	var idx Index
-	if err := json.Unmarshal(data, &idx); err != nil {
+	var index Index
+	if err := json.Unmarshal(data, &index); err != nil {
 		return nil, fmt.Errorf("%s: %w", IndexFile, err)
 	}
-	if idx.Version > IndexVersion {
+	if index.Version > IndexVersion {
 		return nil, errors.New("the market needs a newer OTS Creator")
 	}
-	if idx.Entries == nil {
-		idx.Entries = []Entry{}
+	if index.Entries == nil {
+		index.Entries = []Entry{}
 	}
-	return &idx, nil
+	return &index, nil
 }
 
 // File downloads the file of an entry (thing.obd or sprites.png).
-func (s *Source) File(ctx context.Context, e *Entry) ([]byte, error) {
-	if !ValidID(e.ID) || !strings.HasPrefix(e.File, EntriesDir+"/"+e.ID+"/") {
-		return nil, fmt.Errorf("bad entry %q", e.ID)
+func (s *Source) File(ctx context.Context, entry *Entry) ([]byte, error) {
+	if !ValidID(entry.ID) || !strings.HasPrefix(entry.File, EntriesDir+"/"+entry.ID+"/") {
+		return nil, fmt.Errorf("bad entry %q", entry.ID)
 	}
-	return s.get(ctx, s.Bases, e.File, MaxPackBytes)
+	return s.get(ctx, s.Bases, entry.File, MaxPackBytes)
 }

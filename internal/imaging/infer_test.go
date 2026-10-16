@@ -29,8 +29,8 @@ var body = color.NRGBA{120, 60, 30, 255}
 
 func full(int, int) (color.NRGBA, int) { return body, 60 }
 
-func layoutOf(g *thing.FrameGroup) [7]int {
-	return [7]int{int(g.Width), int(g.Height), int(g.Layers), int(g.PatternX), int(g.PatternY), int(g.PatternZ), int(g.Frames)}
+func layoutOf(group *thing.FrameGroup) [7]int {
+	return [7]int{int(group.Width), int(group.Height), int(group.Layers), int(group.PatternX), int(group.PatternY), int(group.PatternZ), int(group.Frames)}
 }
 
 func TestInferOutfit(t *testing.T) {
@@ -60,14 +60,14 @@ func TestInferOutfit(t *testing.T) {
 		{"addons", sheet(4, 9, 64, addons), [7]int{2, 2, 1, 4, 3, 1, 3}},
 	}
 	for _, tc := range cases {
-		g, err := InferLayout(tc.img, thing.CategoryOutfit, blank, 32)
+		group, err := InferLayout(tc.img, thing.CategoryOutfit, blank, 32)
 		if err != nil {
 			t.Fatalf("%s: %v", tc.name, err)
 		}
-		if got := layoutOf(g); got != tc.want {
+		if got := layoutOf(group); got != tc.want {
 			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
 		}
-		if w, h := g.SheetSize(32); w != tc.img.Rect.Dx() || h != tc.img.Rect.Dy() {
+		if w, h := group.SheetSize(32); w != tc.img.Rect.Dx() || h != tc.img.Rect.Dy() {
 			t.Errorf("%s: layout sheet is %dx%d", tc.name, w, h)
 		}
 	}
@@ -84,29 +84,29 @@ func TestInferKeepsCurrentLayout(t *testing.T) {
 	walk.Type = thing.FrameGroupWalking
 	walk.Resize(1, 1, 1, 4, 1, 1, 4, 300)
 	cur.FrameGroups = append(cur.FrameGroups, walk)
-	g, err := InferLayout(sheet(4, 6, 32, full), thing.CategoryOutfit, cur, 32)
+	group, err := InferLayout(sheet(4, 6, 32, full), thing.CategoryOutfit, cur, 32)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := layoutOf(g); got != [7]int{1, 1, 1, 4, 1, 1, 6} {
+	if got := layoutOf(group); got != [7]int{1, 1, 1, 4, 1, 1, 6} {
 		t.Fatalf("got %v", got)
 	}
 }
 
 func TestInferPlain(t *testing.T) {
 	item := thing.New(100, thing.CategoryItem)
-	g, err := InferLayout(sheet(4, 2, 32, full), thing.CategoryItem, item, 32)
+	group, err := InferLayout(sheet(4, 2, 32, full), thing.CategoryItem, item, 32)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := layoutOf(g); got != [7]int{1, 1, 1, 4, 1, 1, 2} {
+	if got := layoutOf(group); got != [7]int{1, 1, 1, 4, 1, 1, 2} {
 		t.Fatalf("item got %v", got)
 	}
-	g, err = InferLayout(sheet(3, 3, 32, full), thing.CategoryMissile, thing.New(1, thing.CategoryMissile), 32)
+	group, err = InferLayout(sheet(3, 3, 32, full), thing.CategoryMissile, thing.New(1, thing.CategoryMissile), 32)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := layoutOf(g); got != [7]int{1, 1, 1, 3, 3, 1, 1} {
+	if got := layoutOf(group); got != [7]int{1, 1, 1, 3, 3, 1, 1} {
 		t.Fatalf("missile got %v", got)
 	}
 	if _, err := InferLayout(image.NewNRGBA(image.Rect(0, 0, 40, 32)), thing.CategoryItem, item, 32); err == nil {

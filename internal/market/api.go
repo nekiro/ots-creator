@@ -47,24 +47,27 @@ type Shared struct {
 	DeleteToken string `json:"deleteToken"`
 }
 
+// maxReplyBytes bounds a reply of the API.
+const maxReplyBytes = 1 << 20
+
 func (a *API) do(req *http.Request, out any) error {
-	res, err := a.client().Do(req)
+	response, err := a.client().Do(req)
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(res.Body, 1<<20))
+	defer response.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(response.Body, maxReplyBytes))
 	if err != nil {
 		return err
 	}
-	if res.StatusCode >= 300 {
-		var e struct {
+	if response.StatusCode >= 300 {
+		var reply struct {
 			Error string `json:"error"`
 		}
-		if json.Unmarshal(data, &e) != nil || e.Error == "" {
-			e.Error = res.Status
+		if json.Unmarshal(data, &reply) != nil || reply.Error == "" {
+			reply.Error = response.Status
 		}
-		return fmt.Errorf("market: %s", e.Error)
+		return fmt.Errorf("market: %s", reply.Error)
 	}
 	if out == nil {
 		return nil
@@ -73,43 +76,43 @@ func (a *API) do(req *http.Request, out any) error {
 }
 
 // Submit publishes an entry.
-func (a *API) Submit(ctx context.Context, s Submission) (*Shared, error) {
-	if err := s.Meta.Validate(); err != nil {
+func (a *API) Submit(ctx context.Context, submission Submission) (*Shared, error) {
+	if err := submission.Meta.Validate(); err != nil {
 		return nil, err
 	}
 	meta, err := json.Marshal(struct {
 		Meta
 		Info
-	}{s.Meta, s.Info})
+	}{submission.Meta, submission.Info})
 	if err != nil {
 		return nil, err
 	}
 	var body bytes.Buffer
-	w := multipart.NewWriter(&body)
-	w.WriteField("meta", string(meta))
-	w.WriteField("captcha", s.Captcha)
+	form := multipart.NewWriter(&body)
+	form.WriteField("meta", string(meta))
+	form.WriteField("captcha", submission.Captcha)
 	files := []struct {
 		field string
 		data  []byte
-	}{{"file", s.File}, {"preview", s.Preview}}
-	for _, f := range files {
-		if f.data == nil {
+	}{{"file", submission.File}, {"preview", submission.Preview}}
+	for _, file := range files {
+		if file.data == nil {
 			continue
 		}
-		part, err := w.CreateFormFile(f.field, f.field)
+		part, err := form.CreateFormFile(file.field, file.field)
 		if err != nil {
 			return nil, err
 		}
-		part.Write(f.data)
+		part.Write(file.data)
 	}
-	if err := w.Close(); err != nil {
+	if err := form.Close(); err != nil {
 		return nil, err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.Base+"api/entries", &body)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.Header.Set("Content-Type", form.FormDataContentType())
 	var out Shared
 	if err := a.do(req, &out); err != nil {
 		return nil, err

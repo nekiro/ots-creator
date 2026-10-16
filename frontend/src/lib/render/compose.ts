@@ -15,53 +15,52 @@ export interface ComposeOptions {
 
 export type PixelSource = (spriteId: number) => Uint8ClampedArray | undefined;
 
-/** Alpha-blends src over dst (straight alpha). */
-export function blendOver(dst: Uint8ClampedArray, dOff: number, src: Uint8ClampedArray, sOff: number): void {
-  const sa = src[sOff + 3];
-  if (sa === 0) return;
-  if (sa === 255) {
-    dst[dOff] = src[sOff];
-    dst[dOff + 1] = src[sOff + 1];
-    dst[dOff + 2] = src[sOff + 2];
-    dst[dOff + 3] = 255;
+/** Alpha-blends the source pixel over the destination pixel (straight alpha). */
+export function blendOver(dst: Uint8ClampedArray, dstOffset: number, src: Uint8ClampedArray, srcOffset: number): void {
+  const srcAlpha8 = src[srcOffset + 3];
+  if (srcAlpha8 === 0) return;
+  if (srcAlpha8 === 255) {
+    dst[dstOffset] = src[srcOffset];
+    dst[dstOffset + 1] = src[srcOffset + 1];
+    dst[dstOffset + 2] = src[srcOffset + 2];
+    dst[dstOffset + 3] = 255;
     return;
   }
-  const a = sa / 255;
-  const da = dst[dOff + 3] / 255;
-  const oa = a + da * (1 - a);
-  for (let k = 0; k < 3; k++) {
-    dst[dOff + k] = (src[sOff + k] * a + dst[dOff + k] * da * (1 - a)) / oa;
+  const srcAlpha = srcAlpha8 / 255;
+  const dstAlpha = dst[dstOffset + 3] / 255;
+  const outAlpha = srcAlpha + dstAlpha * (1 - srcAlpha);
+  for (let channel = 0; channel < 3; channel++) {
+    dst[dstOffset + channel] = (src[srcOffset + channel] * srcAlpha + dst[dstOffset + channel] * dstAlpha * (1 - srcAlpha)) / outAlpha;
   }
-  dst[dOff + 3] = oa * 255;
+  dst[dstOffset + 3] = outAlpha * 255;
 }
 
-export function compose(g: Layout, sprites: number[], size: number, opts: ComposeOptions, get: PixelSource): ImageData {
-  const w = g.width * size;
-  const h = g.height * size;
-  const out = new ImageData(w, h);
-  const ys = [opts.pos.y, ...(opts.addons ?? []).filter((y) => y !== opts.pos.y && y < g.patternY)];
-  const useColors = !!opts.colors && g.layers > 1 && opts.pos.layer === 0;
-  const tmp = new Uint8ClampedArray(size * size * 4);
-  for (const py of ys) {
-    for (let th = 0; th < g.height; th++) {
-      for (let tw = 0; tw < g.width; tw++) {
-        const p = { ...opts.pos, y: py };
-        const base = get(sprites[spriteIndex(g, tw, th, p)] ?? 0);
+export function compose(layout: Layout, sprites: number[], size: number, opts: ComposeOptions, get: PixelSource): ImageData {
+  const outWidth = layout.width * size;
+  const out = new ImageData(outWidth, layout.height * size);
+  const patternYs = [opts.pos.y, ...(opts.addons ?? []).filter((y) => y !== opts.pos.y && y < layout.patternY)];
+  const useColors = !!opts.colors && layout.layers > 1 && opts.pos.layer === 0;
+  const colored = new Uint8ClampedArray(size * size * 4);
+  for (const patternY of patternYs) {
+    for (let tileY = 0; tileY < layout.height; tileY++) {
+      for (let tileX = 0; tileX < layout.width; tileX++) {
+        const texturePos = { ...opts.pos, y: patternY };
+        const base = get(sprites[spriteIndex(layout, tileX, tileY, texturePos)] ?? 0);
         if (!base) continue;
-        let px = base;
+        let pixels = base;
         if (useColors) {
-          const tpl = get(sprites[spriteIndex(g, tw, th, { ...p, layer: 1 })] ?? 0);
-          if (tpl) {
-            tmp.set(base);
-            colorize(tmp, tpl, opts.colors!);
-            px = tmp;
+          const template = get(sprites[spriteIndex(layout, tileX, tileY, { ...texturePos, layer: 1 })] ?? 0);
+          if (template) {
+            colored.set(base);
+            colorize(colored, template, opts.colors!);
+            pixels = colored;
           }
         }
-        const [ox, oy] = tileOffset(g, tw, th, size);
+        const [offsetX, offsetY] = tileOffset(layout, tileX, tileY, size);
         for (let row = 0; row < size; row++) {
-          let d = ((oy + row) * w + ox) * 4;
-          let s = row * size * 4;
-          for (let col = 0; col < size; col++, d += 4, s += 4) blendOver(out.data, d, px, s);
+          let dstOffset = ((offsetY + row) * outWidth + offsetX) * 4;
+          let srcOffset = row * size * 4;
+          for (let col = 0; col < size; col++, dstOffset += 4, srcOffset += 4) blendOver(out.data, dstOffset, pixels, srcOffset);
         }
       }
     }
@@ -72,18 +71,18 @@ export function compose(g: Layout, sprites: number[], size: number, opts: Compos
 /** Stacks images bottom-right aligned (how the client anchors textures),
  * first image at the bottom. Returns the result and each image's offset. */
 export function stackBottomRight(images: ImageData[]): { image: ImageData; offsets: [number, number][] } {
-  const w = Math.max(0, ...images.map((i) => i.width));
-  const h = Math.max(0, ...images.map((i) => i.height));
-  const out = new ImageData(Math.max(1, w), Math.max(1, h));
+  const width = Math.max(0, ...images.map((image) => image.width));
+  const height = Math.max(0, ...images.map((image) => image.height));
+  const out = new ImageData(Math.max(1, width), Math.max(1, height));
   const offsets: [number, number][] = [];
-  for (const img of images) {
-    const ox = w - img.width;
-    const oy = h - img.height;
-    offsets.push([ox, oy]);
-    for (let row = 0; row < img.height; row++) {
-      let d = ((oy + row) * out.width + ox) * 4;
-      let s = row * img.width * 4;
-      for (let col = 0; col < img.width; col++, d += 4, s += 4) blendOver(out.data, d, img.data, s);
+  for (const image of images) {
+    const offsetX = width - image.width;
+    const offsetY = height - image.height;
+    offsets.push([offsetX, offsetY]);
+    for (let row = 0; row < image.height; row++) {
+      let dstOffset = ((offsetY + row) * out.width + offsetX) * 4;
+      let srcOffset = row * image.width * 4;
+      for (let col = 0; col < image.width; col++, dstOffset += 4, srcOffset += 4) blendOver(out.data, dstOffset, image.data, srcOffset);
     }
   }
   return { image: out, offsets };

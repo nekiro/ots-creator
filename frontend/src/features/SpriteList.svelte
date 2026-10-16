@@ -3,6 +3,8 @@
   import { spriteListMenu, spriteMenu } from "../lib/menus";
   import { SpriteService, errorMessage, res } from "../lib/api";
   import { commands } from "../lib/commands";
+  import { nextIndex } from "../lib/ui/listNav";
+  import { anchoredRange, idRange, sliceBetween, toggleId } from "../lib/selection";
   import { app, toast, versions } from "../lib/state.svelte";
   import { startSpriteDrag } from "../lib/dragsprites";
   import Icon from "../lib/ui/Icon.svelte";
@@ -33,17 +35,17 @@
     let stale = false;
     SpriteService.Find(f).then(
       (ids) => !stale && (found = ids ?? []),
-      (e) => toast(errorMessage(e), "error"),
+      (err) => toast(errorMessage(err), "error"),
     );
     return () => (stale = true);
   });
 
   const total = $derived(app.project?.info.counts.sprites ?? 0);
   const objectIds = $derived.by(() => {
-    const t = app.draft;
-    if (!t) return [] as number[];
+    const draft = app.draft;
+    if (!draft) return [] as number[];
     const seen = new Set<number>();
-    for (const g of t.frameGroups) for (const id of g?.sprites ?? []) if (id) seen.add(id);
+    for (const frameGroup of draft.frameGroups) for (const id of frameGroup?.sprites ?? []) if (id) seen.add(id);
     return [...seen];
   });
   const ids = $derived(mode === "object" ? objectIds : filter ? (found ?? []) : null);
@@ -55,24 +57,23 @@
     return ids ? ids.indexOf(id) : id - 1;
   });
 
-  function pick(id: number, e: MouseEvent) {
-    if (e.ctrlKey || e.metaKey) {
-      app.selectedSprites = app.selectedSprites.includes(id) ? app.selectedSprites.filter((x) => x !== id) : [...app.selectedSprites, id];
-    } else if (e.shiftKey && app.selectedSprites.length && ids) {
-      const a = app.selectedSprites[0];
-      const [i, j] = [ids.indexOf(a), ids.indexOf(id)];
-      if (i >= 0 && j >= 0) app.selectedSprites = [a, ...ids.slice(Math.min(i, j), Math.max(i, j) + 1).filter((x) => x !== a)];
-    } else if (e.shiftKey && app.selectedSprites.length && !ids) {
-      const a = app.selectedSprites[0];
-      const [lo, hi] = a < id ? [a, id] : [id, a];
-      app.selectedSprites = [a, ...Array.from({ length: hi - lo + 1 }, (_, k) => lo + k).filter((x) => x !== a)];
+  function pick(id: number, event: MouseEvent) {
+    if (event.ctrlKey || event.metaKey) {
+      app.selectedSprites = toggleId(app.selectedSprites, id);
+    } else if (event.shiftKey && app.selectedSprites.length && ids) {
+      const anchor = app.selectedSprites[0];
+      const [anchorIndex, clickedIndex] = [ids.indexOf(anchor), ids.indexOf(id)];
+      if (anchorIndex >= 0 && clickedIndex >= 0) app.selectedSprites = anchoredRange(anchor, sliceBetween(ids, anchorIndex, clickedIndex));
+    } else if (event.shiftKey && app.selectedSprites.length && !ids) {
+      const anchor = app.selectedSprites[0];
+      app.selectedSprites = anchoredRange(anchor, idRange(anchor, id));
     } else {
       app.selectedSprites = [id];
     }
   }
 
-  function onJump(e: KeyboardEvent) {
-    if (e.key !== "Enter") return;
+  function onJump(event: KeyboardEvent) {
+    if (event.key !== "Enter") return;
     const n = parseInt(jump, 10);
     if (Number.isFinite(n) && n >= 1 && n <= total) {
       mode = "all";
@@ -81,21 +82,19 @@
     }
   }
 
-  function onkeydown(e: KeyboardEvent, columns: number) {
-    const cur = focusIndex ?? 0;
-    const step: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -columns, ArrowDown: columns };
-    if (e.key in step) {
-      e.preventDefault();
-      const i = Math.min(Math.max(cur + step[e.key], 0), count - 1);
-      if (count) app.selectedSprites = [idAt(i)];
-    } else if (e.key === "Delete") {
-      e.preventDefault();
+  function onkeydown(event: KeyboardEvent, columns: number) {
+    const next = nextIndex(event.key, focusIndex ?? 0, count, { columns });
+    if (next !== null) {
+      event.preventDefault();
+      if (count) app.selectedSprites = [idAt(next)];
+    } else if (event.key === "Delete") {
+      event.preventDefault();
       void commands.removeSprites();
     }
   }
 
-  function ondragstart(e: DragEvent, id: number) {
-    startSpriteDrag(e, id, app.selectedSprites);
+  function ondragstart(event: DragEvent, id: number) {
+    startSpriteDrag(event, id, app.selectedSprites);
   }
 </script>
 
@@ -112,7 +111,7 @@
   </div>
   {#if mode === "all"}
     <div class="row filter">
-      <Select grow value={filter} options={FILTERS} disabled={!app.open} onchange={(v) => ((filter = v), (app.selectedSprites = []))} />
+      <Select grow value={filter} options={FILTERS} disabled={!app.open} onchange={(value) => ((filter = value), (app.selectedSprites = []))} />
       {#if filter && found}
         <span class="t-label">{found.length.toLocaleString()}</span>
         <button class="t-btn" title="Select every sprite in the list" disabled={!found.length} onclick={() => (app.selectedSprites = [...found!])}>All</button>
@@ -120,7 +119,7 @@
     </div>
   {/if}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="list t-panel" oncontextmenu={(e) => !(e.target as HTMLElement).closest(".spr") && openContextMenu(e, spriteListMenu())}>
+  <div class="list t-panel" oncontextmenu={(event) => !(event.target as HTMLElement).closest(".spr") && openContextMenu(event, spriteListMenu())}>
     {#if app.open && count > 0}
       <VirtualGrid {count} cellWidth={36} cellHeight={48} gap={2} scrollTo={focusIndex} {onkeydown}>
         {#snippet cell(i)}
@@ -130,11 +129,11 @@
             class="spr"
             class:sel={app.selectedSprites.includes(id)}
             draggable="true"
-            ondragstart={(e) => ondragstart(e, id)}
-            onclick={(e) => pick(id, e)}
-            oncontextmenu={(e) => {
+            ondragstart={(event) => ondragstart(event, id)}
+            onclick={(event) => pick(id, event)}
+            oncontextmenu={(event) => {
               if (!app.selectedSprites.includes(id)) app.selectedSprites = [id];
-              openContextMenu(e, spriteMenu(true));
+              openContextMenu(event, spriteMenu(true));
             }}
             title="Sprite #{id}: drag onto a preview tile (a multi-selection fills the following slots)"
           >

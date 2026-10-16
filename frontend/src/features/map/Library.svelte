@@ -5,6 +5,7 @@
   import { ask, askText } from "../../lib/confirm.svelte";
   import { openContextMenu } from "../../lib/menu.svelte";
   import { toast } from "../../lib/state.svelte";
+  import { readJson, saveJson } from "../../lib/storage";
   import { MapService, SpawnFormat, type CreatureType, type PaletteBrush } from "../../lib/map/api";
   import { mapCommands } from "../../lib/map/commands";
   import { creatureOutfit, isBrushActive, map, reloadPalette, selectBrush, type BrushSel } from "../../lib/map/state.svelte";
@@ -47,35 +48,25 @@
   let query = $state("");
 
   function loadPrefs(): { view: View; collection: string } {
-    try {
-      const v = JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}");
-      return { view: VIEWS.some((x) => x.id === v.view) ? v.view : "terrain", collection: typeof v.collection === "string" ? v.collection : "" };
-    } catch {
-      return { view: "terrain", collection: "" };
-    }
+    const stored = (readJson(PREFS_KEY) ?? {}) as { view?: View; collection?: unknown };
+    return { view: VIEWS.some((x) => x.id === stored.view) ? stored.view! : "terrain", collection: typeof stored.collection === "string" ? stored.collection : "" };
   }
-  $effect(() => {
-    try {
-      localStorage.setItem(PREFS_KEY, JSON.stringify({ view, collection }));
-    } catch {
-      /* ignore */
-    }
-  });
+  $effect(() => saveJson(PREFS_KEY, { view, collection }));
 
-  const pal = $derived(map.palette);
-  const sets = $derived(pal?.tilesets?.filter((t) => !!t) ?? []);
-  const set = $derived(sets.find((s) => s.name === collection) ?? null);
-  const collections = $derived([{ value: "", label: "All collections" }, ...sets.map((s) => ({ value: s.name, label: s.name }))]);
-  const allBrushes = $derived((pal?.brushes ?? []).filter((b): b is PaletteBrush => !!b));
-  const creatures = $derived((pal?.creatures ?? []).filter((c): c is CreatureType => !!c));
+  const palette = $derived(map.palette);
+  const sets = $derived(palette?.tilesets?.filter((tileset) => !!tileset) ?? []);
+  const set = $derived(sets.find((tileset) => tileset.name === collection) ?? null);
+  const collections = $derived([{ value: "", label: "All collections" }, ...sets.map((tileset) => ({ value: tileset.name, label: tileset.name }))]);
+  const allBrushes = $derived((palette?.brushes ?? []).filter((brush): brush is PaletteBrush => !!brush));
+  const creatures = $derived((palette?.creatures ?? []).filter((creature): creature is CreatureType => !!creature));
 
   // ----- search -----
-  const q = $derived(query.trim().toLowerCase());
-  const named = <T extends { name: string }>(list: T[]) => (q ? list.filter((x) => x.name.toLowerCase().includes(q)) : list);
+  const search = $derived(query.trim().toLowerCase());
+  const named = <T extends { name: string }>(list: T[]) => (search ? list.filter((entry) => entry.name.toLowerCase().includes(search)) : list);
 
   // ----- terrain and decor -----
-  const terrainAll = $derived(set ? ((set.terrain ?? []) as PaletteBrush[]) : allBrushes.filter((b) => b.kind !== "doodad"));
-  const decorAll = $derived(set ? ((set.doodads ?? []) as PaletteBrush[]) : allBrushes.filter((b) => b.kind === "doodad"));
+  const terrainAll = $derived(set ? ((set.terrain ?? []) as PaletteBrush[]) : allBrushes.filter((brush) => brush.kind !== "doodad"));
+  const decorAll = $derived(set ? ((set.doodads ?? []) as PaletteBrush[]) : allBrushes.filter((brush) => brush.kind === "doodad"));
   const terrain = $derived(named(terrainAll));
   const decor = $derived(named(decorAll));
 
@@ -86,76 +77,76 @@
   });
   // Names, ids and id ranges ("100-200") match, as in the item search.
   const baseItems = $derived.by<number[]>(() => {
-    if (!q || !map.items) return collectionItems;
-    const hits = map.items.search(q, Infinity);
+    if (!search || !map.items) return collectionItems;
+    const hits = map.items.search(search, Infinity);
     if (!set) return hits;
     const hit = new Set(hits);
     return collectionItems.filter((id) => hit.has(id));
   });
   const items = $derived.by<number[]>(() => {
-    const ix = map.items;
-    if (!ix || itemKind === "all") return baseItems;
+    const itemIndex = map.items;
+    if (!itemIndex || itemKind === "all") return baseItems;
     return baseItems.filter((id) => {
-      const ground = ix.is(id, "ground");
-      const edge = !ground && ix.top[id] > 0;
+      const ground = itemIndex.is(id, "ground");
+      const edge = !ground && itemIndex.top[id] > 0;
       switch (itemKind) {
         case "ground":
           return ground;
         case "edge":
           return edge;
         case "container":
-          return ix.is(id, "container");
+          return itemIndex.is(id, "container");
         case "pickup":
-          return ix.is(id, "pickupable") && !ix.is(id, "container");
+          return itemIndex.is(id, "pickupable") && !itemIndex.is(id, "container");
         default:
-          return !ground && !edge && !ix.is(id, "pickupable") && !ix.is(id, "container");
+          return !ground && !edge && !itemIndex.is(id, "pickupable") && !itemIndex.is(id, "container");
       }
     });
   });
 
   // ----- creatures -----
   const matchedCreatures = $derived(named(creatures));
-  const shownCreatures = $derived(matchedCreatures.filter((c) => who === "all" || (who === "npc") === !!c.npc));
+  const shownCreatures = $derived(matchedCreatures.filter((creature) => who === "all" || (who === "npc") === !!creature.npc));
   const separate = $derived(map.active?.props.spawnFormat === SpawnFormat.SpawnsSeparate);
 
   // Matches per tab while searching.
   const counts = $derived<Record<View, number>>({ terrain: terrain.length, decor: decor.length, items: baseItems.length, creatures: matchedCreatures.length });
 
-  function brushSel(b: PaletteBrush): BrushSel {
-    const kind = b.kind === "decoration" ? "wall" : b.kind;
-    return { kind, name: b.name, look: b.look, label: b.name };
+  function brushSel(brush: PaletteBrush): BrushSel {
+    const kind = brush.kind === "decoration" ? "wall" : brush.kind;
+    return { kind, name: brush.name, look: brush.look, label: brush.name };
   }
   function itemSel(id: number): BrushSel {
     return { kind: "raw", item: id, look: id, label: map.items?.name(id) ?? `item ${id}` };
   }
-  function creatureSel(c: CreatureType): BrushSel {
-    return { kind: "creature", creature: c.name, npc: !!c.npc, label: c.name };
+  function creatureSel(creature: CreatureType): BrushSel {
+    return { kind: "creature", creature: creature.name, npc: !!creature.npc, label: creature.name };
   }
 
-  function editBrush(b: PaletteBrush) {
-    map.editBrush = { name: b.name, type: b.kind };
+  function editBrush(brush: PaletteBrush) {
+    map.editBrush = { name: brush.name, type: brush.kind };
     map.dialog = "brush";
   }
 
-  async function removeBrush(b: PaletteBrush) {
-    if (!(await ask({ title: "Remove brush", message: `Remove the brush "${b.name}"? Maps keep their items.`, ok: "Remove" }))) return;
+  async function removeBrush(brush: PaletteBrush) {
+    if (!(await ask({ title: "Remove brush", message: `Remove the brush "${brush.name}"? Maps keep their items.`, ok: "Remove" }))) return;
     try {
-      await MapService.RemoveBrush(b.name);
+      await MapService.RemoveBrush(brush.name);
       await reloadPalette();
-    } catch (e) {
-      toast(errorMessage(e), "error");
+    } catch (err) {
+      toast(errorMessage(err), "error");
     }
   }
 
-  function brushMenu(e: MouseEvent, b: PaletteBrush) {
-    openContextMenu(e, [
-      { label: "Edit brush…", action: () => editBrush(b) },
-      { label: "Remove brush", action: () => removeBrush(b) },
+  function brushMenu(event: MouseEvent, brush: PaletteBrush) {
+    openContextMenu(event, [
+      { label: "Edit brush…", action: () => editBrush(brush) },
+      { label: "Remove brush", action: () => removeBrush(brush) },
     ]);
   }
 
-  function itemMenu(e: MouseEvent, id: number) {
-    openContextMenu(e, [
+  function itemMenu(event: MouseEvent, id: number) {
+    openContextMenu(event, [
       { label: "Find on the map", action: () => mapCommands.find({ ids: [id] }) },
       { label: "Replace on the map…", action: () => mapCommands.find({ ids: [id], replace: true }) },
       "-",
@@ -171,8 +162,8 @@
       await MapService.AddToTileset(name, [id]);
       await reloadPalette();
       toast(`Added to ${name}.`, "success");
-    } catch (e) {
-      toast(errorMessage(e), "error");
+    } catch (err) {
+      toast(errorMessage(err), "error");
     }
   }
 
@@ -186,7 +177,7 @@
 
 {#snippet brushRow(b: PaletteBrush)}
   {@const sel = brushSel(b)}
-  <button class="m-row" class:on={isBrushActive(sel)} title="{b.name} · double-click to edit" onclick={() => selectBrush(sel)} ondblclick={() => editBrush(b)} oncontextmenu={(e) => brushMenu(e, b)}>
+  <button class="m-row" class:on={isBrushActive(sel)} title="{b.name} · double-click to edit" onclick={() => selectBrush(sel)} ondblclick={() => editBrush(b)} oncontextmenu={(event) => brushMenu(event, b)}>
     <span class="t-slot"><ItemIcon id={b.look} size={24} /></span>
     <span class="m-name">{b.name}</span>
   </button>
@@ -199,7 +190,7 @@
     <div class="stamps">
       {#each list as b (b.name)}
         {@const sel = brushSel(b)}
-        <button class="stamp" class:on={isBrushActive(sel)} title="{b.name} · {b.preview?.w}×{b.preview?.h} tiles · double-click to edit" onclick={() => selectBrush(sel)} ondblclick={() => editBrush(b)} oncontextmenu={(e) => brushMenu(e, b)}>
+        <button class="stamp" class:on={isBrushActive(sel)} title="{b.name} · {b.preview?.w}×{b.preview?.h} tiles · double-click to edit" onclick={() => selectBrush(sel)} ondblclick={() => editBrush(b)} oncontextmenu={(event) => brushMenu(event, b)}>
           {#if b.preview}<BrushPreview preview={b.preview} />{/if}
           <span class="m-name">{b.name}</span>
         </button>
@@ -210,7 +201,7 @@
 
 {#snippet itemCell(id: number)}
   {@const sel = itemSel(id)}
-  <button class="m-cell" class:on={isBrushActive(sel)} title="{map.items?.name(id)} · {id}" onclick={() => selectBrush(sel)} oncontextmenu={(e) => itemMenu(e, id)}>
+  <button class="m-cell" class:on={isBrushActive(sel)} title="{map.items?.name(id)} · {id}" onclick={() => selectBrush(sel)} oncontextmenu={(event) => itemMenu(event, id)}>
     <span class="t-slot"><ItemIcon {id} /></span>
   </button>
 {/snippet}
@@ -244,14 +235,14 @@
 
   <div class="t-tabs views" role="tablist">
     {#each VIEWS as v}
-      <button class="t-tab" role="tab" class:on={view === v.id} aria-selected={view === v.id} title={v.title} onclick={() => (view = v.id)}>{v.label}{#if q}<span class="count" class:none={!counts[v.id]}>{counts[v.id]}</span>{/if}</button>
+      <button class="t-tab" role="tab" class:on={view === v.id} aria-selected={view === v.id} title={v.title} onclick={() => (view = v.id)}>{v.label}{#if search}<span class="count" class:none={!counts[v.id]}>{counts[v.id]}</span>{/if}</button>
     {/each}
   </div>
 
   {#if view !== "creatures" && sets.length}
     <div class="bar" title="Collections are the tilesets of your brush data; the tabs below filter items by kind">
       <span class="t-label dim">Collection</span>
-      <Select grow value={collection} options={collections} maxItems={16} onchange={(v) => (collection = v)} />
+      <Select grow value={collection} options={collections} maxItems={16} onchange={(value) => (collection = value)} />
       {#if view !== "items"}<button class="t-icon-btn" title="New brush" onclick={newBrush}><Icon name="plus" /></button>{/if}
     </div>
   {/if}
@@ -266,8 +257,8 @@
         {/if}
       {/each}
       {#if !terrain.length}
-        {#if q}{@render noMatch()}{:else if allBrushes.length}<div class="m-empty">No terrain in this collection.</div>{:else}{@render noBrushes()}{/if}
-      {:else if !q}
+        {#if search}{@render noMatch()}{:else if allBrushes.length}<div class="m-empty">No terrain in this collection.</div>{:else}{@render noBrushes()}{/if}
+      {:else if !search}
         {@const opt = { kind: "optionalBorder", label: "Optional border" }}
         <div class="m-sect">Tools</div>
         <button class="m-row" class:on={isBrushActive(opt)} title="Adds the optional border of a ground (like the gravel around mountains) where you paint" onclick={() => selectBrush(opt)}>
@@ -280,7 +271,7 @@
       {#each decor.filter((b) => !b.preview) as b (b.name)}{@render brushRow(b)}{/each}
       {@render stampCards(decor.filter((b) => !!b.preview))}
       {#if !decor.length}
-        {#if q}{@render noMatch()}{:else if allBrushes.length}<div class="m-empty">No decoration in this collection.</div>{:else}{@render noBrushes()}{/if}
+        {#if search}{@render noMatch()}{:else if allBrushes.length}<div class="m-empty">No decoration in this collection.</div>{:else}{@render noBrushes()}{/if}
       {/if}
     </div>
   {:else if view === "items"}
@@ -294,7 +285,7 @@
         <VirtualGrid count={items.length} cellWidth={ITEM_CELL} cellHeight={ITEM_CELL} gap={2}>
           {#snippet cell(i)}{@render itemCell(items[i])}{/snippet}
         </VirtualGrid>
-      {:else if q}
+      {:else if search}
         {@render noMatch()}
       {:else}
         <div class="m-empty">No items of this kind here.</div>
@@ -307,7 +298,7 @@
       <button class="t-tab" role="tab" class:on={who === "npc"} aria-selected={who === "npc"} onclick={() => (who = "npc")}>NPCs</button>
     </div>
     <div class="m-body t-panel m-scroll">
-      {#if !q}
+      {#if !search}
         <div class="m-sect">Spawn areas</div>
         <button class="m-row" class:on={isBrushActive({ kind: "spawn", label: "" })} title="Drag on the map: the brush size is the radius" onclick={() => selectBrush({ kind: "spawn", label: "Spawn area" })}>
           <span class="m-swatch spawn"></span><span class="m-name">{separate ? "Monster spawn area" : "Spawn area"}</span>
@@ -321,7 +312,7 @@
       {#if shownCreatures.length}
         <div class="m-sect">{who === "npc" ? "NPCs" : who === "monster" ? "Monsters" : "Creatures"}<span class="grow"></span>{shownCreatures.length}</div>
         {#each shownCreatures as c (c.name)}{@render creatureRow(c)}{/each}
-      {:else if q}
+      {:else if search}
         {@render noMatch()}
       {:else}
         <div class="m-empty">

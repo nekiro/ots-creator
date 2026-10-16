@@ -24,10 +24,10 @@ func TestOpenAssetsMemory(t *testing.T) {
 	}
 	base := heap()
 	start := time.Now()
-	p, err := OpenAssets(dir)
+	project, err := OpenAssets(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("open %v, heap retained %.0f MB", time.Since(start), float64(heap()-base)/1e6)
-	runtime.KeepAlive(p)
+	runtime.KeepAlive(project)
 }

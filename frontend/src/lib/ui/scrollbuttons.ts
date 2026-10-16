@@ -54,15 +54,15 @@ export function initScrollButtons(): void {
 
   window.addEventListener(
     "mousedown",
-    (e) => {
+    (event) => {
       stop();
-      const el = e.target;
-      if (e.button !== 0 || !(el instanceof HTMLElement)) return;
-      const rect = el.getBoundingClientRect();
-      const step = arrowAt(el, toCss(e.clientX - rect.left), toCss(e.clientY - rect.top));
+      const target = event.target;
+      if (event.button !== 0 || !(target instanceof HTMLElement)) return;
+      const rect = target.getBoundingClientRect();
+      const step = arrowAt(target, toCss(event.clientX - rect.left), toCss(event.clientY - rect.top));
       if (!step) return;
-      e.preventDefault();
-      const scroll = () => el.scrollBy(step.dx, step.dy);
+      event.preventDefault();
+      const scroll = () => target.scrollBy(step.dx, step.dy);
       scroll();
       timer = window.setTimeout(() => {
         timer = window.setInterval(scroll, REPEAT_INTERVAL);

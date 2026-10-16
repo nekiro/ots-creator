@@ -27,8 +27,8 @@ export function listPanelWidth(columns: number): number {
 
 export async function loadPrefs(): Promise<void> {
   try {
-    const s = await SettingsService.Get();
-    prefs.settings = { ...s, recent: s.recent ?? [] };
+    const settings = await SettingsService.Get();
+    prefs.settings = { ...settings, recent: settings.recent ?? [] };
   } catch {
     /* not running inside Wails: keep defaults */
   }
@@ -40,14 +40,14 @@ export async function savePrefs(change: Partial<Omit<Settings, "recent">>): Prom
   try {
     await SettingsService.Update(next);
     prefs.settings = next;
-  } catch (e) {
-    toast(errorMessage(e), "error");
+  } catch (err) {
+    toast(errorMessage(err), "error");
   }
 }
 
-export async function removeRecent(r: Recent | null): Promise<void> {
+export async function removeRecent(recent: Recent | null): Promise<void> {
   try {
-    await SettingsService.RemoveRecent(r?.datPath ?? "");
+    await SettingsService.RemoveRecent(recent?.datPath ?? "");
   } finally {
     await loadPrefs();
   }
@@ -59,7 +59,7 @@ export function shortPath(path: string, max: number): string {
 }
 
 /** Folder of a recent client, for display (an asset folder is its own path). */
-export function recentDir(r: Recent): string {
-  if (r.format === Format.FormatAssets) return r.datPath;
-  return r.datPath.replace(/[\\/][^\\/]*$/, "");
+export function recentDir(recent: Recent): string {
+  if (recent.format === Format.FormatAssets) return recent.datPath;
+  return recent.datPath.replace(/[\\/][^\\/]*$/, "");
 }

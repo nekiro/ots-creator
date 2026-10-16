@@ -12,9 +12,9 @@
     {placeholder}
     spellcheck="false"
     bind:value
-    onkeydown={(e) => {
-      if (e.key === "Escape" && value) {
-        e.stopPropagation();
+    onkeydown={(event) => {
+      if (event.key === "Escape" && value) {
+        event.stopPropagation();
         value = "";
       }
     }}

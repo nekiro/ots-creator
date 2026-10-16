@@ -11,8 +11,8 @@ class FakeImageData {
 }
 (globalThis as any).ImageData ??= FakeImageData;
 
-const S = 2; // tiny sprites keep the test readable
-const solid = (r: number, g: number, b: number, a = 255) => new Uint8ClampedArray(Array.from({ length: S * S }, () => [r, g, b, a]).flat());
+const SPRITE = 2; // tiny sprites keep the test readable
+const solid = (r: number, g: number, b: number, a = 255) => new Uint8ClampedArray(Array.from({ length: SPRITE * SPRITE }, () => [r, g, b, a]).flat());
 
 describe("blendOver", () => {
   it("copies opaque, skips transparent, mixes partial", () => {
@@ -40,19 +40,19 @@ describe("compose", () => {
   const get = (id: number) => pix[id];
 
   it("places tile 0 on the right", () => {
-    const img = compose(g, sprites, S, { pos: { layer: 0, x: 0, y: 0, z: 0, frame: 0 } }, get);
+    const img = compose(g, sprites, SPRITE, { pos: { layer: 0, x: 0, y: 0, z: 0, frame: 0 } }, get);
     expect(img.width).toBe(4);
     expect(img.data[0]).toBe(50); // left pixel from sprite 2
     expect(img.data[2 * 4]).toBe(100); // right half from sprite 1
   });
 
   it("draws addons on top", () => {
-    const img = compose(g, sprites, S, { pos: { layer: 0, x: 0, y: 0, z: 0, frame: 0 }, addons: [1] }, get);
+    const img = compose(g, sprites, SPRITE, { pos: { layer: 0, x: 0, y: 0, z: 0, frame: 0 }, addons: [1] }, get);
     expect(Array.from(img.data.slice(8, 12))).toEqual([1, 2, 3, 255]);
   });
 
   it("colorizes only template areas", () => {
-    const img = compose(g, sprites, S, { pos: { layer: 0, x: 0, y: 0, z: 0, frame: 0 }, colors: { head: 0, body: 132, legs: 0, feet: 0 } }, get);
+    const img = compose(g, sprites, SPRITE, { pos: { layer: 0, x: 0, y: 0, z: 0, frame: 0 }, colors: { head: 0, body: 132, legs: 0, feet: 0 } }, get);
     expect(img.data[8]).toBeLessThan(100); // right tile tinted
     expect(img.data[0]).toBe(50); // left tile untouched
   });

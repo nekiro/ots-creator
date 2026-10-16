@@ -14,20 +14,20 @@ import (
 // deprecated item (server id 1200).
 func otbProject(t *testing.T) (*Project, string) {
 	t.Helper()
-	p := reorderProject(t)
+	project := reorderProject(t)
 	dir := t.TempDir()
-	if err := p.Compile(CompileOptions{DatPath: filepath.Join(dir, "Tibia.dat"), SprPath: filepath.Join(dir, "Tibia.spr"), Version: v1098(), Features: p.Info().Features}); err != nil {
+	if err := project.Compile(CompileOptions{DatPath: filepath.Join(dir, "Tibia.dat"), SprPath: filepath.Join(dir, "Tibia.spr"), Version: v1098(), Features: project.Info().Features}); err != nil {
 		t.Fatal(err)
 	}
-	f := itemsotb.New(3, 57, 1)
+	otbFile := itemsotb.New(3, 57, 1)
 	for id := uint16(100); id <= 105; id++ {
-		it := itemsotb.NewItem(id+1000, id)
-		th, _ := p.Thing(thing.CategoryItem, uint32(id))
-		it.Reload(th, nil)
-		f.Items = append(f.Items, it)
+		item := itemsotb.NewItem(id+1000, id)
+		th, _ := project.Thing(thing.CategoryItem, uint32(id))
+		item.Reload(th, nil)
+		otbFile.Items = append(otbFile.Items, item)
 	}
-	f.Items = append(f.Items, &itemsotb.Item{Group: itemsotb.GroupDeprecated, Attrs: []itemsotb.Attr{{Type: itemsotb.AttrServerID, Data: []byte{0xB0, 0x04}}}})
-	data, err := f.Encode()
+	otbFile.Items = append(otbFile.Items, &itemsotb.Item{Group: itemsotb.GroupDeprecated, Attrs: []itemsotb.Attr{{Type: itemsotb.AttrServerID, Data: []byte{0xB0, 0x04}}}})
+	data, err := otbFile.Encode()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,10 +35,10 @@ func otbProject(t *testing.T) (*Project, string) {
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := p.AttachOTB(path); err != nil {
+	if _, err := project.AttachOTB(path); err != nil {
 		t.Fatal(err)
 	}
-	return p, path
+	return project, path
 }
 
 func readOTB(t *testing.T, path string) map[uint16]*itemsotb.Item {
@@ -47,13 +47,13 @@ func readOTB(t *testing.T, path string) map[uint16]*itemsotb.Item {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f, err := itemsotb.Parse(data)
+	otbFile, err := itemsotb.Parse(data)
 	if err != nil {
 		t.Fatal(err)
 	}
 	out := map[uint16]*itemsotb.Item{}
-	for _, it := range f.Items {
-		out[it.ServerID()] = it
+	for _, item := range otbFile.Items {
+		out[item.ServerID()] = item
 	}
 	return out
 }
@@ -75,27 +75,27 @@ func (p *Project) compileHere(t *testing.T) *OTBReport {
 }
 
 func TestOTBSync(t *testing.T) {
-	p, path := otbProject(t)
+	project, path := otbProject(t)
 	before, _ := os.ReadFile(path)
 
 	// Nothing changed: the file stays as it is.
-	if rep := p.compileHere(t); rep.Written || rep.Changed() {
+	if rep := project.compileHere(t); rep.Written || rep.Changed() {
 		t.Fatalf("unchanged client rewrote items.otb: %+v", rep)
 	}
 
 	// 101 <-> 104 swap places, 102 becomes pickupable, 100 is duplicated.
-	if _, err := p.MoveThings(thing.CategoryItem, []uint32{101}, 104, MoveOptions{}); err != nil {
+	if _, err := project.MoveThings(thing.CategoryItem, []uint32{101}, 104, MoveOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	setItem(t, p, 102, true, 3)
-	if _, err := p.DuplicateThings(thing.CategoryItem, []uint32{100}); err != nil {
+	setItem(t, project, 102, true, 3)
+	if _, err := project.DuplicateThings(thing.CategoryItem, []uint32{100}); err != nil {
 		t.Fatal(err)
 	}
-	prev, err := p.OTBPreview()
+	prev, err := project.OTBPreview()
 	if err != nil {
 		t.Fatal(err)
 	}
-	rep := p.compileHere(t)
+	rep := project.compileHere(t)
 	if !rep.Written || rep.Remapped != 2 || rep.Updated != 1 || rep.Added != 1 || rep.Missing != 0 {
 		t.Fatalf("report %+v", rep)
 	}
@@ -118,26 +118,26 @@ func TestOTBSync(t *testing.T) {
 	if !items[1100].Equal(mustParse(t, before)[0]) {
 		t.Fatal("untouched item changed")
 	}
-	if p.OTB().Items != 8 || p.OTB().MaxServerID != 1201 {
-		t.Fatalf("info %+v", p.OTB())
+	if project.OTB().Items != 8 || project.OTB().MaxServerID != 1201 {
+		t.Fatalf("info %+v", project.OTB())
 	}
 
 	// After saving, the new state is the base: nothing more to do.
-	if rep := p.compileHere(t); rep.Written {
+	if rep := project.compileHere(t); rep.Written {
 		t.Fatalf("second compile rewrote items.otb: %+v", rep)
 	}
 }
 
 func TestOTBUndoneMove(t *testing.T) {
-	p, path := otbProject(t)
+	project, path := otbProject(t)
 	before, _ := os.ReadFile(path)
-	if _, err := p.MoveThings(thing.CategoryItem, []uint32{101, 102}, 104, MoveOptions{Insert: true}); err != nil {
+	if _, err := project.MoveThings(thing.CategoryItem, []uint32{101, 102}, 104, MoveOptions{Insert: true}); err != nil {
 		t.Fatal(err)
 	}
-	p.Undo()
-	p.Redo()
-	p.Undo()
-	if rep := p.compileHere(t); rep.Written {
+	project.Undo()
+	project.Redo()
+	project.Undo()
+	if rep := project.compileHere(t); rep.Written {
 		t.Fatalf("undone move rewrote items.otb: %+v", rep)
 	}
 	after, _ := os.ReadFile(path)
@@ -147,11 +147,11 @@ func TestOTBUndoneMove(t *testing.T) {
 }
 
 func TestOTBRemovedItem(t *testing.T) {
-	p, path := otbProject(t)
-	if err := p.RemoveThings(thing.CategoryItem, []uint32{105}); err != nil {
+	project, path := otbProject(t)
+	if err := project.RemoveThings(thing.CategoryItem, []uint32{105}); err != nil {
 		t.Fatal(err)
 	}
-	if rep := p.compileHere(t); rep.Missing != 1 || rep.Written {
+	if rep := project.compileHere(t); rep.Missing != 1 || rep.Written {
 		t.Fatalf("report %+v", rep)
 	}
 	if readOTB(t, path)[1105].ClientID() != 105 {
@@ -161,9 +161,23 @@ func TestOTBRemovedItem(t *testing.T) {
 
 func mustParse(t *testing.T, data []byte) []*itemsotb.Item {
 	t.Helper()
-	f, err := itemsotb.Parse(data)
+	otbFile, err := itemsotb.Parse(data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return f.Items
+	return otbFile.Items
+}
+
+func TestDetachOTB(t *testing.T) {
+	project, _ := otbProject(t)
+	if project.OTB() == nil {
+		t.Fatal("items.otb should be attached")
+	}
+	project.DetachOTB()
+	if project.OTB() != nil {
+		t.Fatal("items.otb should be detached")
+	}
+	if _, err := project.OTBPreview(); err == nil {
+		t.Fatal("preview without items.otb must fail")
+	}
 }

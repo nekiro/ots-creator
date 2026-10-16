@@ -11,7 +11,7 @@
   {#if pending}
     <p class="t-label hint">Click the map to place “{w.name}”.</p>
   {:else}
-    <div class="m-field"><span class="m-lbl">Name</span><input class="t-input" value={w.name} onchange={(e) => renameWaypoint(w.name, e.currentTarget.value.trim())} /></div>
+    <div class="m-field"><span class="m-lbl">Name</span><input class="t-input" value={w.name} onchange={(event) => renameWaypoint(w.name, event.currentTarget.value.trim())} /></div>
     <div class="m-field">
       <span class="m-lbl">Position</span>
       <PosField value={w.pos} pickLabel="Click the new place of {w.name}" onchange={(p) => edit((id) => MapService.SaveWaypoint(id, w.name, { name: w.name, pos: p }))} />

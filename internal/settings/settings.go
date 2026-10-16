@@ -9,10 +9,10 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
-	"runtime"
-	"strings"
 	"sync"
 	"time"
+
+	"github.com/nekiro/ots-creator/internal/fsutil"
 
 	"github.com/nekiro/ots-creator/internal/client"
 )
@@ -118,9 +118,9 @@ func (s *Settings) normalize() {
 
 // Store loads and saves settings. It is safe for concurrent use.
 type Store struct {
-	mu   sync.Mutex
-	path string
-	s    Settings
+	mu       sync.Mutex
+	path     string
+	settings Settings
 }
 
 // DefaultPath returns the settings file in the user's config directory.
@@ -135,67 +135,67 @@ func DefaultPath() (string, error) {
 // Open loads settings from path. A missing or unreadable file gives the
 // defaults; the error reports a corrupt file but the store still works.
 func Open(path string) (*Store, error) {
-	st := &Store{path: path, s: Defaults()}
+	store := &Store{path: path, settings: Defaults()}
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return st, nil
+		return store, nil
 	}
 	if err != nil {
-		return st, err
+		return store, err
 	}
-	s := Defaults()
-	if err := json.Unmarshal(data, &s); err != nil {
-		return st, err
+	loaded := Defaults()
+	if err := json.Unmarshal(data, &loaded); err != nil {
+		return store, err
 	}
-	s.normalize()
-	st.s = s
-	return st, nil
+	loaded.normalize()
+	store.settings = loaded
+	return store, nil
 }
 
 // Get returns a copy of the settings.
 func (st *Store) Get() Settings {
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	s := st.s
-	s.Recent = append([]Recent{}, st.s.Recent...)
-	s.MarketShared = maps.Clone(st.s.MarketShared)
-	s.LastDirs = maps.Clone(st.s.LastDirs)
-	s.ItemsOTB = maps.Clone(st.s.ItemsOTB)
-	return s
+	snapshot := st.settings
+	snapshot.Recent = append([]Recent{}, st.settings.Recent...)
+	snapshot.MarketShared = maps.Clone(st.settings.MarketShared)
+	snapshot.LastDirs = maps.Clone(st.settings.LastDirs)
+	snapshot.ItemsOTB = maps.Clone(st.settings.ItemsOTB)
+	return snapshot
 }
 
 // Update changes the preferences. The recent list, shared market entries
 // and dialog folders are kept as stored.
-func (st *Store) Update(s Settings) error {
+func (st *Store) Update(updated Settings) error {
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	s.Recent = st.s.Recent
-	s.MarketShared = st.s.MarketShared
-	s.LastDirs = st.s.LastDirs
-	s.ItemsOTB = st.s.ItemsOTB
-	s.normalize()
-	st.s = s
+	updated.Recent = st.settings.Recent
+	updated.MarketShared = st.settings.MarketShared
+	updated.LastDirs = st.settings.LastDirs
+	updated.ItemsOTB = st.settings.ItemsOTB
+	updated.normalize()
+	st.settings = updated
 	return st.saveLocked()
 }
 
 // AddRecent moves a client to the top of the recent list.
-func (st *Store) AddRecent(r Recent) error {
-	if r.DatPath == "" {
+func (st *Store) AddRecent(recent Recent) error {
+	if recent.DatPath == "" {
 		return nil
 	}
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	if r.OpenedAt.IsZero() {
-		r.OpenedAt = time.Now()
+	if recent.OpenedAt.IsZero() {
+		recent.OpenedAt = time.Now()
 	}
-	list := []Recent{r}
-	for _, x := range st.s.Recent {
-		if !samePath(x.DatPath, r.DatPath) {
-			list = append(list, x)
+	list := []Recent{recent}
+	for _, entry := range st.settings.Recent {
+		if !fsutil.SamePath(entry.DatPath, recent.DatPath) {
+			list = append(list, entry)
 		}
 	}
-	st.s.Recent = list
-	st.s.normalize()
+	st.settings.Recent = list
+	st.settings.normalize()
 	return st.saveLocked()
 }
 
@@ -205,9 +205,9 @@ func (st *Store) SetMarketShared(id, token string) error {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	if token == "" {
-		delete(st.s.MarketShared, id)
+		delete(st.settings.MarketShared, id)
 	} else {
-		st.s.MarketShared[id] = token
+		st.settings.MarketShared[id] = token
 	}
 	return st.saveLocked()
 }
@@ -216,10 +216,10 @@ func (st *Store) SetMarketShared(id, token string) error {
 func (st *Store) SetMarketAuthor(name string) error {
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	if st.s.MarketAuthor == name {
+	if st.settings.MarketAuthor == name {
 		return nil
 	}
-	st.s.MarketAuthor = name
+	st.settings.MarketAuthor = name
 	return st.saveLocked()
 }
 
@@ -227,7 +227,7 @@ func (st *Store) SetMarketAuthor(name string) error {
 func (st *Store) LastDir(key string) string {
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	return st.s.LastDirs[key]
+	return st.settings.LastDirs[key]
 }
 
 // SetLastDir remembers the folder confirmed in the dialog key.
@@ -237,10 +237,10 @@ func (st *Store) SetLastDir(key, dir string) error {
 	}
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	if st.s.LastDirs[key] == dir {
+	if st.settings.LastDirs[key] == dir {
 		return nil
 	}
-	st.s.LastDirs[key] = dir
+	st.settings.LastDirs[key] = dir
 	return st.saveLocked()
 }
 
@@ -249,71 +249,50 @@ func (st *Store) RemoveRecent(datPath string) error {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	list := []Recent{}
-	for _, x := range st.s.Recent {
-		if datPath != "" && !samePath(x.DatPath, datPath) {
-			list = append(list, x)
+	for _, entry := range st.settings.Recent {
+		if datPath != "" && !fsutil.SamePath(entry.DatPath, datPath) {
+			list = append(list, entry)
 		}
 	}
-	st.s.Recent = list
+	st.settings.Recent = list
 	return st.saveLocked()
 }
 
 // ItemsOTB returns the items.otb kept in sync with a client, or "".
-func (st *Store) ItemsOTB(client string) string {
+func (st *Store) ItemsOTB(clientPath string) string {
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	return st.s.ItemsOTB[pathKey(client)]
+	return st.settings.ItemsOTB[fsutil.PathKey(clientPath)]
 }
 
 // SetItemsOTB remembers the items.otb of a client; "" forgets it.
-func (st *Store) SetItemsOTB(client, otb string) error {
-	if client == "" {
+func (st *Store) SetItemsOTB(clientPath, otbPath string) error {
+	if clientPath == "" {
 		return nil
 	}
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	if st.s.ItemsOTB == nil {
-		st.s.ItemsOTB = map[string]string{}
+	if st.settings.ItemsOTB == nil {
+		st.settings.ItemsOTB = map[string]string{}
 	}
-	if otb == "" {
-		delete(st.s.ItemsOTB, pathKey(client))
+	if otbPath == "" {
+		delete(st.settings.ItemsOTB, fsutil.PathKey(clientPath))
 	} else {
-		st.s.ItemsOTB[pathKey(client)] = otb
+		st.settings.ItemsOTB[fsutil.PathKey(clientPath)] = otbPath
 	}
 	return st.saveLocked()
-}
-
-// pathKey is a map key that is the same for paths samePath matches.
-func pathKey(p string) string {
-	p = filepath.Clean(p)
-	if runtime.GOOS == "windows" {
-		return strings.ToLower(p)
-	}
-	return p
-}
-
-func samePath(a, b string) bool {
-	a, b = filepath.Clean(a), filepath.Clean(b)
-	if runtime.GOOS == "windows" {
-		return strings.EqualFold(a, b)
-	}
-	return a == b
 }
 
 func (st *Store) saveLocked() error {
 	if st.path == "" {
 		return nil
 	}
-	data, err := json.MarshalIndent(st.s, "", "  ")
+	data, err := json.MarshalIndent(st.settings, "", "  ")
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(st.path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(st.path), fsutil.DirMode); err != nil {
 		return err
 	}
-	tmp := st.path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
-		return err
-	}
-	return os.Rename(tmp, st.path)
+	return fsutil.WriteAtomic(st.path, data)
 }

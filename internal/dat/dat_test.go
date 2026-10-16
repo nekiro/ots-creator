@@ -50,22 +50,22 @@ func TestFlagTablesRoundTrip(t *testing.T) {
 				t.Fatalf("%d bytes left", r.Remaining())
 			}
 			for a := range tb.byAttr {
-				if !has(a, &got) {
-					t.Errorf("attr %s lost", attrNames[a])
+				if !a.isSet(&got) {
+					t.Errorf("attr %s lost", a.name())
 				}
 			}
 			if u := tb.Unsupported(&got); len(u) != 0 {
 				t.Errorf("decoded props contain unsupported attrs %v", u)
 			}
-			if tb.byAttr[aLight] != 0 || tb == table1 { // every table has light
+			if tb.byAttr[attrLight] != 0 || tb == table1 { // every table has light
 				if got.LightLevel != 7 || got.LightColor != 215 {
 					t.Errorf("light = %d/%d", got.LightLevel, got.LightColor)
 				}
 			}
-			if _, ok := tb.byAttr[aMarket]; ok && got.Market != src.Market {
+			if _, ok := tb.byAttr[attrMarket]; ok && got.Market != src.Market {
 				t.Errorf("market = %+v", got.Market)
 			}
-			if _, ok := tb.byAttr[aBones]; ok && got.Bones != src.Bones {
+			if _, ok := tb.byAttr[attrBones]; ok && got.Bones != src.Bones {
 				t.Errorf("bones = %+v", got.Bones)
 			}
 			if tb.offsetHasPayload {
@@ -94,20 +94,20 @@ func TestFlagBytesMatchObjectBuilder(t *testing.T) {
 		a    attr
 		want byte
 	}{
-		{table1, aMiniMap, 0x16}, {table1, aLensHelp, 0x1A},
-		{table2, aHangable, 0x19}, {table2, aLensHelp, 0x1D},
-		{table3, aFloorChange, 0x17}, {table3, aFullGround, 0x1E},
-		{table4, aHasCharges, 0x08}, {table4, aBones, 0x27}, {table4, aIgnoreLook, 0x20},
-		{table5, aCloth, 0x20}, {table5, aMarket, 0x21}, {table5, aTranslucent, 0x17},
-		{table6, aNoMoveAnimation, 0x10}, {table6, aMarket, 0x22}, {table6, aUsable, 0xFE},
-		{OBDTable, aHasCharges, 0xFC}, {OBDTable, aFloorChange, 0xFD},
+		{table1, attrMiniMap, 0x16}, {table1, attrLensHelp, 0x1A},
+		{table2, attrHangable, 0x19}, {table2, attrLensHelp, 0x1D},
+		{table3, attrFloorChange, 0x17}, {table3, attrFullGround, 0x1E},
+		{table4, attrHasCharges, 0x08}, {table4, attrBones, 0x27}, {table4, attrIgnoreLook, 0x20},
+		{table5, attrCloth, 0x20}, {table5, attrMarket, 0x21}, {table5, attrTranslucent, 0x17},
+		{table6, attrNoMoveAnimation, 0x10}, {table6, attrMarket, 0x22}, {table6, attrUsable, 0xFE},
+		{OBDTable, attrHasCharges, 0xFC}, {OBDTable, attrFloorChange, 0xFD},
 	}
 	for _, c := range checks {
 		if got := c.tb.byAttr[c.a]; got != c.want {
-			t.Errorf("%s %s = 0x%02X, want 0x%02X", c.tb.Name(), attrNames[c.a], got, c.want)
+			t.Errorf("%s %s = 0x%02X, want 0x%02X", c.tb.Name(), c.a.name(), got, c.want)
 		}
 	}
-	if _, ok := OBDTable.byAttr[aBones]; ok {
+	if _, ok := OBDTable.byAttr[attrBones]; ok {
 		t.Error("OBD must not store bones")
 	}
 }

@@ -2,7 +2,7 @@
 import { app, toast } from "../state.svelte";
 import type { MenuEntry } from "../menu.svelte";
 import { MapService, fmtPos, type Position } from "./api";
-import { IF, TF, type TileData } from "./chunks";
+import { ItemFlags, TileFlags, type TileData } from "./chunks";
 import { goTo, mapCommands } from "./commands";
 import { edit, map, selectBrush, useCreature, warningCount } from "./state.svelte";
 import { addHouse, addTown, addWaypoint } from "./world";
@@ -28,9 +28,9 @@ const toggle = (key: keyof ViewOptions, label: string, keys?: string): MenuEntry
 });
 
 export function mapMenus(): { label: string; items: MenuEntry[] }[] {
-  const recent: MenuEntry[] = (map.recent ?? []).slice(0, 6).map((r) => ({
-    label: r.path.length > 60 ? "…" + r.path.slice(-58) : r.path,
-    action: () => mapCommands.open(r.path),
+  const recent: MenuEntry[] = (map.recent ?? []).slice(0, 6).map((recentMap) => ({
+    label: recentMap.path.length > 60 ? "…" + recentMap.path.slice(-58) : recentMap.path,
+    action: () => mapCommands.open(recentMap.path),
   }));
   const undo = map.active?.undoLabel;
   const redo = map.active?.redoLabel;
@@ -128,13 +128,13 @@ export function mapMenus(): { label: string; items: MenuEntry[] }[] {
 
 /** Index (among tile items, ground excluded) of the topmost item with
  * text to read or write, or -1. */
-export function readableIndex(t: TileData | null | undefined): number {
+export function readableIndex(tile: TileData | null | undefined): number {
   const items = map.items;
-  if (!t || !items) return -1;
-  const ground = t.flags & TF.ground ? 1 : 0;
-  for (let i = t.ids.length - 1; i >= ground; i--) {
-    const id = t.ids[i];
-    if (t.iflags[i] & IF.text || items.is(id, "readable") || items.is(id, "writable")) return i - ground;
+  if (!tile || !items) return -1;
+  const ground = tile.flags & TileFlags.ground ? 1 : 0;
+  for (let i = tile.ids.length - 1; i >= ground; i--) {
+    const id = tile.ids[i];
+    if (tile.iflags[i] & ItemFlags.text || items.is(id, "readable") || items.is(id, "writable")) return i - ground;
   }
   return -1;
 }
@@ -146,20 +146,20 @@ export function openText(pos: Position, index: number): void {
 }
 
 /** Context menu of a map tile. */
-export function mapContextMenu(p: Position, t: TileData | null, actions: { pick: () => void }): MenuEntry[] {
+export function mapContextMenu(position: Position, tileData: TileData | null, actions: { pick: () => void }): MenuEntry[] {
   const items = map.items;
-  const top = t && t.ids.length ? t.ids[t.ids.length - 1] : 0;
-  const topIndex = t ? t.ids.length - 1 - (t.flags & TF.ground ? 1 : 0) : -1;
+  const top = tileData && tileData.ids.length ? tileData.ids[tileData.ids.length - 1] : 0;
+  const topIndex = tileData ? tileData.ids.length - 1 - (tileData.flags & TileFlags.ground ? 1 : 0) : -1;
   const out: MenuEntry[] = [
-    { label: `Inspect tile ${fmtPos(p)}`, action: () => mapCommands.inspect(p) },
-    { label: "Copy position", action: () => copy(fmtPos(p)) },
+    { label: `Inspect tile ${fmtPos(position)}`, action: () => mapCommands.inspect(position) },
+    { label: "Copy position", action: () => copy(fmtPos(position)) },
   ];
-  const readable = readableIndex(t);
+  const readable = readableIndex(tileData);
   if (readable >= 0) {
-    out.push("-", { label: "Read and edit text…", keys: "Double click", action: () => openText(p, readable) });
+    out.push("-", { label: "Read and edit text…", keys: "Double click", action: () => openText(position, readable) });
   }
-  if (t?.creatures?.length) {
-    out.push("-", ...t.creatures.map((c): MenuEntry => ({ label: `Use creature: ${c.name}`, action: () => useCreature(c) })));
+  if (tileData?.creatures?.length) {
+    out.push("-", ...tileData.creatures.map((creature): MenuEntry => ({ label: `Use creature: ${creature.name}`, action: () => useCreature(creature) })));
   }
   if (top && items) {
     out.push(
@@ -170,32 +170,32 @@ export function mapContextMenu(p: Position, t: TileData | null, actions: { pick:
     );
     if (topIndex >= 0) {
       out.push(
-        { label: "Rotate item", action: () => edit((id) => MapService.RotateItem(id, { pos: p, index: topIndex, path: [] })) },
-        { label: "Open or close door", action: () => edit((id) => MapService.SwitchDoor(id, p, topIndex)) },
+        { label: "Rotate item", action: () => edit((id) => MapService.RotateItem(id, { pos: position, index: topIndex, path: [] })) },
+        { label: "Open or close door", action: () => edit((id) => MapService.SwitchDoor(id, position, topIndex)) },
       );
     }
-    if (t && t.iflags[t.ids.length - 1] & IF.teleport) {
+    if (tileData && tileData.iflags[tileData.ids.length - 1] & ItemFlags.teleport) {
       out.push({
         label: "Go to teleport destination",
         action: async () => {
-          const tile = await MapService.Tile(map.activeId!, p);
-          const it = tile.items?.[tile.items.length - 1];
-          if (it?.ext?.dest) goTo(it.ext.dest);
+          const tile = await MapService.Tile(map.activeId!, position);
+          const topItem = tile.items?.[tile.items.length - 1];
+          if (topItem?.ext?.dest) goTo(topItem.ext.dest);
         },
       });
     }
   }
   out.push(
     "-",
-    { label: "Select tile", action: () => edit((id) => MapService.SelectTiles(id, [p], false)) },
+    { label: "Select tile", action: () => edit((id) => MapService.SelectTiles(id, [position], false)) },
     { label: "Copy", keys: keyLabel("copy"), action: mapCommands.copy, disabled: noSel },
     { label: "Cut", keys: keyLabel("cut"), action: mapCommands.cut, disabled: noSel },
-    { label: "Paste here", action: () => edit((id) => MapService.Paste(id, p)) },
+    { label: "Paste here", action: () => edit((id) => MapService.Paste(id, position)) },
     { label: "Delete selection", keys: keyLabel("delete"), action: mapCommands.remove, disabled: noSel },
   );
-  const house = t?.house;
+  const house = tileData?.house;
   if (house) {
-    const name = map.active?.houses?.find((h) => h?.id === house)?.name ?? `House ${house}`;
+    const name = map.active?.houses?.find((candidate) => candidate?.id === house)?.name ?? `House ${house}`;
     out.push("-", { label: `Show ${name}`, action: () => mapCommands.focus({ kind: "house", id: house }) }, { label: `Paint tiles of ${name}`, action: () => selectBrush({ kind: "house", house, label: name }) });
   }
   return out;

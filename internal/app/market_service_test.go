@@ -36,14 +36,14 @@ func TestMarketShareImportDelete(t *testing.T) {
 	if c := m.Config(); !c.Browse || !c.Share || c.CaptchaURL != srv.URL+"/captcha" || c.CaptchaOrigin != srv.URL {
 		t.Fatalf("config %+v", c)
 	}
-	p, _ := m.s.Project()
+	p, _ := m.session.Project()
 	img := filepath.Join(t.TempDir(), "tiles.png")
 	writePNG(t, img, 64, 32, [4]byte{200, 10, 10, 255})
-	ids, err := NewSpriteService(m.s).ImportImages([]string{img})
+	ids, err := NewSpriteService(m.session).ImportImages([]string{img})
 	if err != nil {
 		t.Fatal(err)
 	}
-	ts := NewThingService(m.s)
+	ts := NewThingService(m.session)
 	it, _ := ts.Get(thing.CategoryItem, 100)
 	it.FrameGroups[0].Sprites[0] = ids[0]
 	if err := ts.Update(it); err != nil {
@@ -95,7 +95,7 @@ func TestMarketShareImportDelete(t *testing.T) {
 		}
 		switch e.Kind {
 		case market.KindObject:
-			th, _ := NewThingService(srv2.s).Get(res.Category, res.ID)
+			th, _ := NewThingService(srv2.session).Get(res.Category, res.ID)
 			if res.Category != thing.CategoryItem || th == nil || th.FrameGroups[0].Sprites[0] == 0 {
 				t.Fatalf("object %+v", res)
 			}
@@ -171,7 +171,7 @@ func TestMarketShareFile(t *testing.T) {
 	defer srv.Close()
 	m, _ := marketEnv(t, srv)
 	dir := t.TempDir()
-	files, err := NewThingService(m.s).ExportObjects(thing.CategoryOutfit, []uint32{1}, dir, ObjectOTOBJ)
+	files, err := NewThingService(m.session).ExportObjects(thing.CategoryOutfit, []uint32{1}, dir, ObjectOTOBJ)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestMarketShareFile(t *testing.T) {
 
 	// A new session: nothing is open.
 	s, _, _, _, _ := newEnv(t)
-	m.s = s
+	m.session = s
 	req := ShareRequest{Name: "Outfit", Author: "nekiro", License: "CC0-1.0", Captcha: "ok"}
 	if _, err := m.ShareFile(files[0], 0, req); err != nil {
 		t.Fatal(err)

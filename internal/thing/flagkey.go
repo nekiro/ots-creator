@@ -16,13 +16,13 @@ var (
 func (p *Properties) FlagByKey(key string) (value, ok bool) {
 	flagFieldsOnce.Do(func() {
 		flagFields = map[string]int{}
-		t := reflect.TypeOf(Properties{})
-		for i := range t.NumField() {
-			f := t.Field(i)
-			if f.Type.Kind() != reflect.Bool {
+		propertiesType := reflect.TypeOf(Properties{})
+		for i := range propertiesType.NumField() {
+			field := propertiesType.Field(i)
+			if field.Type.Kind() != reflect.Bool {
 				continue
 			}
-			name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+			name, _, _ := strings.Cut(field.Tag.Get("json"), ",")
 			if name != "" {
 				flagFields[name] = i
 			}

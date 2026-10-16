@@ -11,17 +11,17 @@ import (
 )
 
 func pixels(seed byte) []byte {
-	px := make([]byte, 32*32*4)
-	for i := 0; i < len(px); i += 4 {
-		px[i], px[i+1], px[i+2], px[i+3] = seed, byte(i), byte(i>>8), 255
+	pixelData := make([]byte, 32*32*4)
+	for i := 0; i < len(pixelData); i += 4 {
+		pixelData[i], pixelData[i+1], pixelData[i+2], pixelData[i+3] = seed, byte(i), byte(i>>8), 255
 	}
-	return px
+	return pixelData
 }
 
 func sampleOutfit() *Data {
-	t := thing.New(0, thing.CategoryOutfit)
-	t.Props.HasLight, t.Props.LightLevel, t.Props.LightColor = true, 3, 200
-	t.Props.AnimateAlways = true
+	outfit := thing.New(0, thing.CategoryOutfit)
+	outfit.Props.HasLight, outfit.Props.LightLevel, outfit.Props.LightColor = true, 3, 200
+	outfit.Props.AnimateAlways = true
 	idle := thing.NewFrameGroup()
 	idle.PatternX = 4
 	idle.Sprites = []uint32{1, 2, 3, 4}
@@ -31,16 +31,16 @@ func sampleOutfit() *Data {
 	walk.Sprites = []uint32{5, 6, 7, 8, 9, 10, 11, 12}
 	walk.Durations = []thing.FrameDuration{{Min: 100, Max: 150}, {Min: 200, Max: 250}}
 	walk.LoopCount, walk.StartFrame, walk.Mode = 0, 0, thing.AnimationSync
-	t.FrameGroups = []*thing.FrameGroup{idle, walk}
-	d := &Data{Version: Version3, ClientVersion: 1098, Thing: t, SpriteSize: 32}
-	for _, g := range t.FrameGroups {
-		var s []Sprite
-		for _, id := range g.Sprites {
-			s = append(s, Sprite{ID: id, Pixels: pixels(byte(id))})
+	outfit.FrameGroups = []*thing.FrameGroup{idle, walk}
+	data := &Data{Version: Version3, ClientVersion: 1098, Thing: outfit, SpriteSize: 32}
+	for _, group := range outfit.FrameGroups {
+		var sprites []Sprite
+		for _, id := range group.Sprites {
+			sprites = append(sprites, Sprite{ID: id, Pixels: pixels(byte(id))})
 		}
-		d.Sprites = append(d.Sprites, s)
+		data.Sprites = append(data.Sprites, sprites)
 	}
-	return d
+	return data
 }
 
 func TestV3RoundTripOutfitGroups(t *testing.T) {
@@ -88,14 +88,14 @@ func TestV2RoundTripKeepsFirstGroup(t *testing.T) {
 }
 
 func TestV1RoundTrip(t *testing.T) {
-	it := thing.New(0, thing.CategoryItem)
-	it.Props.Pickupable, it.Props.Stackable = true, true
-	g := it.FrameGroups[0]
-	g.Frames = 3
-	g.Sprites = []uint32{10, 11, 12}
-	g.EnsureDurations(500)
-	d := &Data{Version: Version1, ClientVersion: 860, Thing: it, Sprites: [][]Sprite{{{10, pixels(1)}, {11, pixels(2)}, {12, pixels(3)}}}}
-	file, err := Encode(d)
+	item := thing.New(0, thing.CategoryItem)
+	item.Props.Pickupable, item.Props.Stackable = true, true
+	group := item.FrameGroups[0]
+	group.Frames = 3
+	group.Sprites = []uint32{10, 11, 12}
+	group.EnsureDurations(500)
+	data := &Data{Version: Version1, ClientVersion: 860, Thing: item, Sprites: [][]Sprite{{{10, pixels(1)}, {11, pixels(2)}, {12, pixels(3)}}}}
+	file, err := Encode(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,18 +106,18 @@ func TestV1RoundTrip(t *testing.T) {
 	if got.Version != Version1 || got.ClientVersion != 860 || got.Thing.Category != thing.CategoryItem {
 		t.Fatalf("header %+v", got)
 	}
-	if !reflect.DeepEqual(got.Thing.FrameGroups[0], g) {
+	if !reflect.DeepEqual(got.Thing.FrameGroups[0], group) {
 		t.Fatalf("group %+v", got.Thing.FrameGroups[0])
 	}
-	if !reflect.DeepEqual(got.Sprites, d.Sprites) {
+	if !reflect.DeepEqual(got.Sprites, data.Sprites) {
 		t.Fatal("pixels differ")
 	}
 }
 
 func TestRawLayoutV2(t *testing.T) {
-	it := thing.New(0, thing.CategoryEffect)
-	d := &Data{Version: Version2, ClientVersion: 1098, Thing: it, Sprites: [][]Sprite{{{0, pixels(9)}}}}
-	raw, err := EncodeRaw(d)
+	effect := thing.New(0, thing.CategoryEffect)
+	data := &Data{Version: Version2, ClientVersion: 1098, Thing: effect, Sprites: [][]Sprite{{{0, pixels(9)}}}}
+	raw, err := EncodeRaw(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,14 +173,14 @@ func TestDecodeErrors(t *testing.T) {
 }
 
 func TestEncodeValidates(t *testing.T) {
-	d := sampleOutfit()
-	d.Sprites[1] = d.Sprites[1][:3]
-	if _, err := Encode(d); err == nil {
+	data := sampleOutfit()
+	data.Sprites[1] = data.Sprites[1][:3]
+	if _, err := Encode(data); err == nil {
 		t.Fatal("sprite count mismatch must fail")
 	}
-	d = sampleOutfit()
-	d.Sprites[0][0].Pixels = d.Sprites[0][0].Pixels[:10]
-	if _, err := Encode(d); err == nil {
+	data = sampleOutfit()
+	data.Sprites[0][0].Pixels = data.Sprites[0][0].Pixels[:10]
+	if _, err := Encode(data); err == nil {
 		t.Fatal("pixel size mismatch must fail")
 	}
 }

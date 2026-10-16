@@ -14,7 +14,7 @@ type PropsPatch map[string]any
 
 // PatchThings applies the same property changes to many things in one undo
 // step and returns how many things changed.
-func (p *Project) PatchThings(c thing.Category, ids []uint32, patch PropsPatch) (int, error) {
+func (p *Project) PatchThings(category thing.Category, ids []uint32, patch PropsPatch) (int, error) {
 	if len(patch) == 0 {
 		return 0, nil
 	}
@@ -23,25 +23,25 @@ func (p *Project) PatchThings(c thing.Category, ids []uint32, patch PropsPatch) 
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	r := p.record(fmt.Sprintf("Edit %d %s(s)", len(ids), c))
-	n := 0
+	edit := p.record(fmt.Sprintf("Edit %d %s(s)", len(ids), category))
+	changed := 0
 	for _, id := range ids {
-		cur := p.things.Get(c, id)
-		if cur == nil {
-			return 0, fmt.Errorf("%s %d does not exist", c, id)
+		current := p.things.Get(category, id)
+		if current == nil {
+			return 0, fmt.Errorf("%s %d does not exist", category, id)
 		}
-		t := cur.Clone()
-		if err := applyPatch(&t.Props, patch); err != nil {
+		object := current.Clone()
+		if err := applyPatch(&object.Props, patch); err != nil {
 			return 0, err
 		}
-		if t.Props == cur.Props {
+		if object.Props == current.Props {
 			continue
 		}
-		r.setThing(c, id, t)
-		n++
+		edit.setThing(category, id, object)
+		changed++
 	}
-	r.commit()
-	return n, nil
+	edit.commit()
+	return changed, nil
 }
 
 func checkPatchKeys(patch PropsPatch) error {
@@ -49,9 +49,9 @@ func checkPatchKeys(patch PropsPatch) error {
 	if err != nil {
 		return err
 	}
-	for k := range patch {
-		if _, ok := known[k]; !ok {
-			return fmt.Errorf("unknown property %q", k)
+	for key := range patch {
+		if _, ok := known[key]; !ok {
+			return fmt.Errorf("unknown property %q", key)
 		}
 	}
 	return nil
@@ -62,26 +62,26 @@ func propsMap(props *thing.Properties) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	var m map[string]any
-	return m, json.Unmarshal(data, &m)
+	var values map[string]any
+	return values, json.Unmarshal(data, &values)
 }
 
 func applyPatch(props *thing.Properties, patch PropsPatch) error {
-	m, err := propsMap(props)
+	values, err := propsMap(props)
 	if err != nil {
 		return err
 	}
-	for k, v := range patch {
-		if sub, ok := v.(map[string]any); ok {
-			if cur, ok := m[k].(map[string]any); ok {
-				merged := maps.Clone(cur)
-				maps.Copy(merged, sub)
-				v = merged
+	for key, value := range patch {
+		if nested, ok := value.(map[string]any); ok {
+			if current, ok := values[key].(map[string]any); ok {
+				merged := maps.Clone(current)
+				maps.Copy(merged, nested)
+				value = merged
 			}
 		}
-		m[k] = v
+		values[key] = value
 	}
-	data, err := json.Marshal(m)
+	data, err := json.Marshal(values)
 	if err != nil {
 		return err
 	}
@@ -94,64 +94,64 @@ func applyPatch(props *thing.Properties, patch PropsPatch) error {
 }
 
 // UpdateThings replaces several things in one undo step.
-func (p *Project) UpdateThings(ts []*thing.Thing) error {
-	for _, t := range ts {
-		if err := t.Validate(); err != nil {
+func (p *Project) UpdateThings(objects []*thing.Thing) error {
+	for _, object := range objects {
+		if err := object.Validate(); err != nil {
 			return err
 		}
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	for _, t := range ts {
-		if p.things.Get(t.Category, t.ID) == nil {
-			return fmt.Errorf("%s %d does not exist", t.Category, t.ID)
+	for _, object := range objects {
+		if p.things.Get(object.Category, object.ID) == nil {
+			return fmt.Errorf("%s %d does not exist", object.Category, object.ID)
 		}
-		if err := p.checkSpriteIDs(t); err != nil {
+		if err := p.checkSpriteIDs(object); err != nil {
 			return err
 		}
 	}
-	r := p.record(fmt.Sprintf("Edit %d object(s)", len(ts)))
-	for _, t := range ts {
-		r.setThing(t.Category, t.ID, keepExtra(t.Clone(), p.things.Get(t.Category, t.ID)))
+	edit := p.record(fmt.Sprintf("Edit %d object(s)", len(objects)))
+	for _, object := range objects {
+		edit.setThing(object.Category, object.ID, keepExtra(object.Clone(), p.things.Get(object.Category, object.ID)))
 	}
-	r.commit()
+	edit.commit()
 	return nil
 }
 
 // SetDurations gives every frame of every animated thing in the given
 // categories the same duration range. It returns how many things changed.
-func (p *Project) SetDurations(cats []thing.Category, minMs, maxMs uint32) (int, error) {
+func (p *Project) SetDurations(categories []thing.Category, minMs, maxMs uint32) (int, error) {
 	if maxMs < minMs {
 		return 0, fmt.Errorf("maximum duration %d is below minimum %d", maxMs, minMs)
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	r := p.record("Set frame durations")
-	n := 0
+	edit := p.record("Set frame durations")
+	changed := 0
 	want := thing.FrameDuration{Min: minMs, Max: maxMs}
-	for _, c := range cats {
-		for _, cur := range p.things.Things[c] {
-			if cur == nil || !needsDurations(cur, want) {
+	for _, category := range categories {
+		for _, current := range p.things.Things[category] {
+			if current == nil || !needsDurations(current, want) {
 				continue
 			}
-			t := cur.Clone()
-			for _, g := range t.FrameGroups {
-				for i := range g.Durations {
-					g.Durations[i] = want
+			object := current.Clone()
+			for _, group := range object.FrameGroups {
+				for i := range group.Durations {
+					group.Durations[i] = want
 				}
 			}
-			r.setThing(c, t.ID, t)
-			n++
+			edit.setThing(category, object.ID, object)
+			changed++
 		}
 	}
-	r.commit()
-	return n, nil
+	edit.commit()
+	return changed, nil
 }
 
-func needsDurations(t *thing.Thing, want thing.FrameDuration) bool {
-	for _, g := range t.FrameGroups {
-		for _, d := range g.Durations {
-			if d != want {
+func needsDurations(object *thing.Thing, want thing.FrameDuration) bool {
+	for _, group := range object.FrameGroups {
+		for _, duration := range group.Durations {
+			if duration != want {
 				return true
 			}
 		}
@@ -177,91 +177,91 @@ func (p *Project) ConvertFrameGroups(toGroups bool) ConvertResult {
 	if !toGroups {
 		label = "Merge outfit frame groups"
 	}
-	r := p.record(label)
+	edit := p.record(label)
 	var res ConvertResult
-	for _, cur := range p.things.Things[thing.CategoryOutfit] {
-		if cur == nil {
+	for _, current := range p.things.Things[thing.CategoryOutfit] {
+		if current == nil {
 			continue
 		}
-		var t *thing.Thing
-		if toGroups && len(cur.FrameGroups) == 1 {
-			t = splitGroups(cur)
-		} else if !toGroups && len(cur.FrameGroups) > 1 {
-			if t = mergeGroups(cur); t == nil {
+		var object *thing.Thing
+		if toGroups && len(current.FrameGroups) == 1 {
+			object = splitGroups(current)
+		} else if !toGroups && len(current.FrameGroups) > 1 {
+			if object = mergeGroups(current); object == nil {
 				res.Skipped++
 				continue
 			}
 		}
-		if t != nil {
-			r.setThing(thing.CategoryOutfit, t.ID, t)
+		if object != nil {
+			edit.setThing(thing.CategoryOutfit, object.ID, object)
 			res.Converted++
 		}
 	}
-	r.commit()
+	edit.commit()
 	return res
 }
 
-// frameBlock returns the sprites of frames [from, to) of g.
-func frameBlock(g *thing.FrameGroup, from, to int) []uint32 {
-	per := g.TotalSprites() / max(int(g.Frames), 1)
-	return append([]uint32(nil), g.Sprites[from*per:to*per]...)
+// frameBlock returns the sprites of frames [from, to) of group.
+func frameBlock(group *thing.FrameGroup, from, to int) []uint32 {
+	spritesPerFrame := group.TotalSprites() / max(int(group.Frames), 1)
+	return append([]uint32(nil), group.Sprites[from*spritesPerFrame:to*spritesPerFrame]...)
 }
 
-func splitGroups(cur *thing.Thing) *thing.Thing {
-	t := cur.Clone()
-	g := t.FrameGroups[0]
-	def := thing.CategoryOutfit.DefaultDuration()
+func splitGroups(current *thing.Thing) *thing.Thing {
+	object := current.Clone()
+	group := object.FrameGroups[0]
+	defaultDuration := thing.CategoryOutfit.DefaultDuration()
 
-	idle := g.Clone()
+	idle := group.Clone()
 	idle.Type = thing.FrameGroupDefault
 	idle.Frames = 1
-	idle.Sprites = frameBlock(g, 0, 1)
+	idle.Sprites = frameBlock(group, 0, 1)
 	idle.StartFrame = 0
-	idle.EnsureDurations(def)
+	idle.EnsureDurations(defaultDuration)
 
-	walk := idle.Clone()
-	walk.Type = thing.FrameGroupWalking
-	if g.Frames > 1 {
-		walk = g.Clone()
-		walk.Type = thing.FrameGroupWalking
-		walk.Frames = g.Frames - 1
-		walk.Sprites = frameBlock(g, 1, int(g.Frames))
-		if len(g.Durations) == int(g.Frames) {
-			walk.Durations = append([]thing.FrameDuration(nil), g.Durations[1:]...)
+	walking := idle.Clone()
+	walking.Type = thing.FrameGroupWalking
+	if group.Frames > 1 {
+		walking = group.Clone()
+		walking.Type = thing.FrameGroupWalking
+		walking.Frames = group.Frames - 1
+		walking.Sprites = frameBlock(group, 1, int(group.Frames))
+		if len(group.Durations) == int(group.Frames) {
+			walking.Durations = append([]thing.FrameDuration(nil), group.Durations[1:]...)
 		}
-		walk.StartFrame = 0
-		walk.EnsureDurations(def)
+		walking.StartFrame = 0
+		walking.EnsureDurations(defaultDuration)
 	}
-	t.FrameGroups = []*thing.FrameGroup{idle, walk}
-	return t
+	object.FrameGroups = []*thing.FrameGroup{idle, walking}
+	return object
 }
 
-func mergeGroups(cur *thing.Thing) *thing.Thing {
-	idle, walk := cur.FrameGroups[0], cur.FrameGroups[1]
-	if idle.Width != walk.Width || idle.Height != walk.Height || idle.Layers != walk.Layers ||
-		idle.PatternX != walk.PatternX || idle.PatternY != walk.PatternY || idle.PatternZ != walk.PatternZ ||
-		int(walk.Frames)+1 > 255 {
+func mergeGroups(current *thing.Thing) *thing.Thing {
+	idle, walking := current.FrameGroups[0], current.FrameGroups[1]
+	if idle.Width != walking.Width || idle.Height != walking.Height || idle.Layers != walking.Layers ||
+		idle.PatternX != walking.PatternX || idle.PatternY != walking.PatternY || idle.PatternZ != walking.PatternZ ||
+		int(walking.Frames)+1 > 255 {
 		return nil
 	}
-	def := thing.CategoryOutfit.DefaultDuration()
-	g := walk.Clone()
-	g.Type = thing.FrameGroupDefault
-	g.Frames = walk.Frames + 1
-	g.Sprites = append(frameBlock(idle, 0, 1), walk.Sprites...)
-	first := thing.FrameDuration{Min: def, Max: def}
+	defaultDuration := thing.CategoryOutfit.DefaultDuration()
+	group := walking.Clone()
+	group.Type = thing.FrameGroupDefault
+	group.Frames = walking.Frames + 1
+	group.Sprites = append(frameBlock(idle, 0, 1), walking.Sprites...)
+	first := thing.FrameDuration{Min: defaultDuration, Max: defaultDuration}
 	if len(idle.Durations) > 0 {
 		first = idle.Durations[0]
 	}
-	rest := walk.Durations
-	if len(rest) != int(walk.Frames) {
+	rest := walking.Durations
+	if len(rest) != int(walking.Frames) {
 		rest = nil
-		for range walk.Frames {
-			rest = append(rest, thing.FrameDuration{Min: def, Max: def})
+		for range walking.Frames {
+			rest = append(rest, thing.FrameDuration{Min: defaultDuration, Max: defaultDuration})
 		}
 	}
-	g.Durations = append([]thing.FrameDuration{first}, rest...)
-	g.StartFrame = 0
-	t := cur.Clone()
-	t.FrameGroups = []*thing.FrameGroup{g}
-	return t
+	group.Durations = append([]thing.FrameDuration{first}, rest...)
+	group.StartFrame = 0
+	object := current.Clone()
+	object.FrameGroups = []*thing.FrameGroup{group}
+	return object
 }

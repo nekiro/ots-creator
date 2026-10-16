@@ -46,38 +46,38 @@ func ParseCatalog(data []byte) (*Catalog, error) {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("%s: %w", CatalogFile, err)
 	}
-	c := &Catalog{}
-	for _, r := range raw {
-		var h entryHead
-		if err := json.Unmarshal(r, &h); err != nil {
+	catalog := &Catalog{}
+	for _, entry := range raw {
+		var head entryHead
+		if err := json.Unmarshal(entry, &head); err != nil {
 			return nil, fmt.Errorf("%s: %w", CatalogFile, err)
 		}
-		switch h.Type {
+		switch head.Type {
 		case "appearances":
-			c.Appearances = h.File
+			catalog.Appearances = head.File
 		case "sprite":
-			var s Sheet
-			if err := json.Unmarshal(r, &s); err != nil {
+			var sheet Sheet
+			if err := json.Unmarshal(entry, &sheet); err != nil {
 				return nil, fmt.Errorf("%s: %w", CatalogFile, err)
 			}
-			if _, _, ok := SpriteDims(s.SpriteType); !ok || s.Last < s.First || s.Count() > SheetCapacity(s.SpriteType) {
-				return nil, fmt.Errorf("%s: bad sprite sheet entry %s", CatalogFile, s.File)
+			if _, _, ok := SpriteDims(sheet.SpriteType); !ok || sheet.Last < sheet.First || sheet.Count() > SheetCapacity(sheet.SpriteType) {
+				return nil, fmt.Errorf("%s: bad sprite sheet entry %s", CatalogFile, sheet.File)
 			}
-			c.Sheets = append(c.Sheets, s)
+			catalog.Sheets = append(catalog.Sheets, sheet)
 		default:
-			c.others = append(c.others, r)
+			catalog.others = append(catalog.others, entry)
 		}
 	}
-	if c.Appearances == "" {
+	if catalog.Appearances == "" {
 		return nil, fmt.Errorf("%s: no appearances file", CatalogFile)
 	}
-	slices.SortFunc(c.Sheets, func(a, b Sheet) int { return int(a.First) - int(b.First) })
-	for i := 1; i < len(c.Sheets); i++ {
-		if c.Sheets[i].First <= c.Sheets[i-1].Last {
-			return nil, fmt.Errorf("%s: sprite sheets %s and %s overlap", CatalogFile, c.Sheets[i-1].File, c.Sheets[i].File)
+	slices.SortFunc(catalog.Sheets, func(left, right Sheet) int { return int(left.First) - int(right.First) })
+	for i := 1; i < len(catalog.Sheets); i++ {
+		if catalog.Sheets[i].First <= catalog.Sheets[i-1].Last {
+			return nil, fmt.Errorf("%s: sprite sheets %s and %s overlap", CatalogFile, catalog.Sheets[i-1].File, catalog.Sheets[i].File)
 		}
 	}
-	return c, nil
+	return catalog, nil
 }
 
 // ReadCatalog reads the catalog of an asset folder.
@@ -91,11 +91,11 @@ func ReadCatalog(dir string) (*Catalog, error) {
 
 // Find returns the index of the sheet holding a sprite id.
 func (c *Catalog) Find(id uint32) (int, bool) {
-	i, _ := slices.BinarySearchFunc(c.Sheets, id, func(s Sheet, id uint32) int {
+	i, _ := slices.BinarySearchFunc(c.Sheets, id, func(sheet Sheet, id uint32) int {
 		switch {
-		case s.Last < id:
+		case sheet.Last < id:
 			return -1
-		case s.First > id:
+		case sheet.First > id:
 			return 1
 		}
 		return 0
@@ -118,14 +118,14 @@ func (c *Catalog) NextSpriteID() uint32 {
 // Files lists every file the catalog references.
 func (c *Catalog) Files() []string {
 	out := []string{c.Appearances}
-	for _, r := range c.others {
-		var h entryHead
-		if json.Unmarshal(r, &h) == nil && h.File != "" {
-			out = append(out, h.File)
+	for _, entry := range c.others {
+		var head entryHead
+		if json.Unmarshal(entry, &head) == nil && head.File != "" {
+			out = append(out, head.File)
 		}
 	}
-	for _, s := range c.Sheets {
-		out = append(out, s.File)
+	for _, sheet := range c.Sheets {
+		out = append(out, sheet.File)
 	}
 	return out
 }
@@ -133,54 +133,54 @@ func (c *Catalog) Files() []string {
 // Marshal encodes the catalog in the layout of the official file: the
 // appearances entry, the other entries, then the sprite sheets.
 func (c *Catalog) Marshal() ([]byte, error) {
-	var b bytes.Buffer
-	b.WriteString("[\n")
-	write := func(v any) error {
-		data, err := json.MarshalIndent(v, "", "  ")
+	var buf bytes.Buffer
+	buf.WriteString("[\n")
+	write := func(entry any) error {
+		data, err := json.MarshalIndent(entry, "", "  ")
 		if err != nil {
 			return err
 		}
-		if b.Len() > 2 {
-			b.WriteString(", \n")
+		if buf.Len() > 2 {
+			buf.WriteString(", \n")
 		}
-		b.Write(data)
+		buf.Write(data)
 		return nil
 	}
 	if err := write(entryHead{Type: "appearances", File: c.Appearances}); err != nil {
 		return nil, err
 	}
-	for _, r := range c.others {
-		if err := write(r); err != nil {
+	for _, entry := range c.others {
+		if err := write(entry); err != nil {
 			return nil, err
 		}
 	}
-	for _, s := range c.Sheets {
+	for _, sheet := range c.Sheets {
 		if err := write(struct {
 			Type string `json:"type"`
 			Sheet
-		}{"sprite", s}); err != nil {
+		}{"sprite", sheet}); err != nil {
 			return nil, err
 		}
 	}
-	b.WriteString("\n]\n")
-	return b.Bytes(), nil
+	buf.WriteString("\n]\n")
+	return buf.Bytes(), nil
 }
 
 // FindDir returns the asset folder for a path: the folder itself, its
 // catalog file, or a Tibia install folder holding packages/Tibia/assets.
 func FindDir(path string) (string, error) {
-	st, err := os.Stat(path)
+	info, err := os.Stat(path)
 	if err != nil {
 		return "", err
 	}
-	if !st.IsDir() {
+	if !info.IsDir() {
 		if strings.EqualFold(filepath.Base(path), CatalogFile) {
 			return filepath.Dir(path), nil
 		}
 		path = filepath.Dir(path)
 	}
 	for _, dir := range []string{path, filepath.Join(path, "assets"), filepath.Join(path, "Tibia", "assets"), filepath.Join(path, "packages", "Tibia", "assets")} {
-		if st, err := os.Stat(filepath.Join(dir, CatalogFile)); err == nil && !st.IsDir() {
+		if info, err := os.Stat(filepath.Join(dir, CatalogFile)); err == nil && !info.IsDir() {
 			return dir, nil
 		}
 	}

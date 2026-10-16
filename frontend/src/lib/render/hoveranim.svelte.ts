@@ -29,13 +29,13 @@ export class HoverAnim {
     clearTimeout(this.timer);
     this.timer = setTimeout(async () => {
       try {
-        const t = await this.load(id);
-        if (!t || this.id !== id) return;
-        const g = t.frameGroups[HoverAnim.group(t)];
-        if (!g || g.frames < 2) return;
-        await this.cache.load(g.sprites);
+        const thing = await this.load(id);
+        if (!thing || this.id !== id) return;
+        const group = thing.frameGroups[HoverAnim.group(thing)];
+        if (!group || group.frames < 2) return;
+        await this.cache.load(group.sprites);
         if (this.id !== id) return;
-        this.current = { id, thing: t };
+        this.current = { id, thing: thing };
         this.ready++;
       } catch {
         /* thumbnail stays static */

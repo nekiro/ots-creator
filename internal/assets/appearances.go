@@ -18,12 +18,12 @@ import (
 // SpriteMap maps official sprite ids to piece ids.
 type SpriteMap interface {
 	// Pieces returns the first piece id of a sprite and its size in tiles.
-	Pieces(id uint32) (first uint32, w, h int, ok bool)
+	Pieces(id uint32) (first uint32, width, height int, ok bool)
 }
 
 // Resolver returns the official sprite id for the pieces of one texture
-// (w*h piece ids in tile order).
-type Resolver func(pieces []uint32, w, h int) (uint32, error)
+// (width*height piece ids in tile order).
+type Resolver func(pieces []uint32, width, height int) (uint32, error)
 
 // Original is kept in thing.Thing.Extra of decoded things. Things the
 // editor did not touch are written back byte for byte, and the fields the
@@ -44,209 +44,206 @@ type File struct {
 }
 
 var listFields = map[thing.Category]protowire.Number{
-	thing.CategoryItem:    1,
-	thing.CategoryOutfit:  2,
-	thing.CategoryEffect:  3,
-	thing.CategoryMissile: 4,
+	thing.CategoryItem:    appearancesObject,
+	thing.CategoryOutfit:  appearancesOutfit,
+	thing.CategoryEffect:  appearancesEffect,
+	thing.CategoryMissile: appearancesMissile,
 }
 
-// Appearance fields with texts.
-const (
-	fieldName        = 4
-	fieldDescription = 5
-)
-
-// Fixed frame groups.
-const (
-	groupOutfitIdle    = 0
-	groupObjectInitial = 2
-)
-
 // Decode parses an appearances file.
-func Decode(data []byte, sm SpriteMap) (*File, error) {
+func Decode(data []byte, spriteMap SpriteMap) (*File, error) {
 	root, err := parse(data)
 	if err != nil {
 		return nil, err
 	}
-	f := &File{Things: map[thing.Category][]*thing.Thing{}}
-	for _, fl := range root {
-		c := categoryOf(fl.num)
-		if c == thing.CategoryInvalid {
-			f.rest = append(f.rest, fl.raw...)
+	file := &File{Things: map[thing.Category][]*thing.Thing{}}
+	for _, entry := range root {
+		category := categoryOf(entry.num)
+		if category == thing.CategoryInvalid {
+			file.rest = append(file.rest, entry.raw...)
 			continue
 		}
-		if fl.typ != protowire.BytesType {
+		if entry.typ != protowire.BytesType {
 			return nil, errWire
 		}
-		t, err := decodeAppearance(fl.b, c, sm)
+		appearance, err := decodeAppearance(entry.payload, category, spriteMap)
 		if err != nil {
 			return nil, err
 		}
-		if t.ID < c.MinID() {
-			return nil, fmt.Errorf("appearances: %s id %d is below %d", c, t.ID, c.MinID())
+		if appearance.ID < category.MinID() {
+			return nil, fmt.Errorf("appearances: %s id %d is below %d", category, appearance.ID, category.MinID())
 		}
-		list := f.Things[c]
-		i := int(t.ID - c.MinID())
+		list := file.Things[category]
+		i := int(appearance.ID - category.MinID())
 		for len(list) <= i {
 			list = append(list, nil)
 		}
 		if list[i] != nil {
-			return nil, fmt.Errorf("appearances: duplicate %s %d", c, t.ID)
+			return nil, fmt.Errorf("appearances: duplicate %s %d", category, appearance.ID)
 		}
-		list[i] = t
-		f.Things[c] = list
+		list[i] = appearance
+		file.Things[category] = list
 	}
-	for _, c := range thing.Categories {
-		list := f.Things[c]
-		for i, t := range list {
-			if t == nil {
-				list[i] = thing.New(c.MinID()+uint32(i), c)
+	for _, category := range thing.Categories {
+		list := file.Things[category]
+		for i, appearance := range list {
+			if appearance == nil {
+				list[i] = thing.New(category.MinID()+uint32(i), category)
 			}
 		}
 		if len(list) == 0 {
-			f.Things[c] = []*thing.Thing{thing.New(c.MinID(), c)}
+			file.Things[category] = []*thing.Thing{thing.New(category.MinID(), category)}
 		}
 	}
-	return f, nil
+	return file, nil
 }
 
-func categoryOf(n protowire.Number) thing.Category {
-	for c, num := range listFields {
-		if num == n {
-			return c
+func categoryOf(num protowire.Number) thing.Category {
+	for category, listNum := range listFields {
+		if listNum == num {
+			return category
 		}
 	}
 	return thing.CategoryInvalid
 }
 
-func decodeAppearance(raw []byte, c thing.Category, sm SpriteMap) (*thing.Thing, error) {
-	m, err := parse(raw)
+func decodeAppearance(raw []byte, category thing.Category, spriteMap SpriteMap) (*thing.Thing, error) {
+	msg, err := parse(raw)
 	if err != nil {
 		return nil, err
 	}
-	t := &thing.Thing{ID: uint32(m.uint(1)), Category: c}
+	appearance := &thing.Thing{ID: uint32(msg.uint(appearanceID)), Category: category}
 	// Texts are Latin-1 like in the dat format.
-	if f, ok := m.get(fieldName); ok {
-		t.Name = binio.DecodeLatin1(f.b)
+	if name, ok := msg.get(appearanceName); ok {
+		appearance.Name = binio.DecodeLatin1(name.payload)
 	}
-	if f, ok := m.get(fieldDescription); ok {
-		t.Description = binio.DecodeLatin1(f.b)
+	if description, ok := msg.get(appearanceDescription); ok {
+		appearance.Description = binio.DecodeLatin1(description.payload)
 	}
-	decodeFlags(m.sub(3), &t.Props)
-	t.NpcSales = decodeNpcSales(m.sub(3))
-	orig := &Original{raw: raw, thing: t}
-	for _, gm := range m.all(2) {
-		if c != thing.CategoryOutfit && len(t.FrameGroups) == 1 {
+	decodeFlags(msg.sub(appearanceFlags), &appearance.Props)
+	appearance.NpcSales = decodeNpcSales(msg.sub(appearanceFlags))
+	original := &Original{raw: raw, thing: appearance}
+	for _, groupMsg := range msg.all(appearanceFrameGroup) {
+		if category != thing.CategoryOutfit && len(appearance.FrameGroups) == 1 {
 			break // only outfits have several groups in the editor
 		}
-		g, ids, err := decodeGroup(gm, c, sm)
+		group, spriteIDs, err := decodeGroup(groupMsg, category, spriteMap)
 		if err != nil {
-			return nil, fmt.Errorf("appearances: %s %d: %w", c, t.ID, err)
+			return nil, fmt.Errorf("appearances: %s %d: %w", category, appearance.ID, err)
 		}
-		t.FrameGroups = append(t.FrameGroups, g)
-		orig.sprites = append(orig.sprites, ids)
+		appearance.FrameGroups = append(appearance.FrameGroups, group)
+		original.sprites = append(original.sprites, spriteIDs)
 	}
-	if len(t.FrameGroups) == 0 {
-		return nil, fmt.Errorf("appearances: %s %d has no frame group", c, t.ID)
+	if len(appearance.FrameGroups) == 0 {
+		return nil, fmt.Errorf("appearances: %s %d has no frame group", category, appearance.ID)
 	}
-	t.Extra = orig
-	return t, nil
+	appearance.Extra = original
+	return appearance, nil
 }
 
-func u8(v uint64, what string) (uint8, error) {
-	if v == 0 {
-		v = 1
+// countByte converts a layout count to a byte; an unset count means 1.
+func countByte(value uint64, what string) (uint8, error) {
+	if value == 0 {
+		value = 1
 	}
-	if v > 255 {
-		return 0, fmt.Errorf("%s %d is too large", what, v)
+	if value > 255 {
+		return 0, fmt.Errorf("%s %d is too large", what, value)
 	}
-	return uint8(v), nil
+	return uint8(value), nil
 }
 
-func decodeGroup(gm message, c thing.Category, sm SpriteMap) (*thing.FrameGroup, []uint32, error) {
-	si := gm.sub(3)
-	g := &thing.FrameGroup{}
-	if c == thing.CategoryOutfit && gm.uint(1) != groupOutfitIdle {
-		g.Type = thing.FrameGroupWalking
+func decodeGroup(groupMsg message, category thing.Category, spriteMap SpriteMap) (*thing.FrameGroup, []uint32, error) {
+	spriteInfo := groupMsg.sub(frameGroupSpriteInfo)
+	group := &thing.FrameGroup{}
+	if category == thing.CategoryOutfit && groupMsg.uint(frameGroupFixedType) != groupOutfitIdle {
+		group.Type = thing.FrameGroupWalking
 	}
 	var err error
-	if g.PatternX, err = u8(si.uint(1), "pattern width"); err != nil {
+	if group.PatternX, err = countByte(spriteInfo.uint(spriteInfoPatternWidth), "pattern width"); err != nil {
 		return nil, nil, err
 	}
-	if g.PatternY, err = u8(si.uint(2), "pattern height"); err != nil {
+	if group.PatternY, err = countByte(spriteInfo.uint(spriteInfoPatternHeight), "pattern height"); err != nil {
 		return nil, nil, err
 	}
-	if g.PatternZ, err = u8(si.uint(3), "pattern depth"); err != nil {
+	if group.PatternZ, err = countByte(spriteInfo.uint(spriteInfoPatternDepth), "pattern depth"); err != nil {
 		return nil, nil, err
 	}
-	if g.Layers, err = u8(si.uint(4), "layers"); err != nil {
+	if group.Layers, err = countByte(spriteInfo.uint(spriteInfoLayers), "layers"); err != nil {
 		return nil, nil, err
 	}
-	anim := si.sub(6)
-	phases := anim.all(6)
-	if g.Frames, err = u8(uint64(len(phases)), "phase count"); err != nil {
+	animation := spriteInfo.sub(spriteInfoAnimation)
+	phases := animation.all(animationSpritePhase)
+	if group.Frames, err = countByte(uint64(len(phases)), "phase count"); err != nil {
 		return nil, nil, err
 	}
-	if g.Frames > 1 {
-		if anim.bool(2) {
-			g.Mode = thing.AnimationSync
-		}
-		switch int32(anim.uint(4)) {
-		case -1:
-			g.LoopCount = -1
-		case 1:
-			g.LoopCount = int32(anim.uint(5))
-		}
-		if anim.bool(3) {
-			g.StartFrame = -1
-		} else if s := anim.uint(1); s < uint64(g.Frames) {
-			g.StartFrame = int8(min(s, 127))
-		}
-		for _, p := range phases {
-			g.Durations = append(g.Durations, thing.FrameDuration{Min: uint32(p.uint(1)), Max: uint32(p.uint(2))})
+	if group.Frames > 1 {
+		decodeAnimation(group, animation, phases)
+	}
+	wideIDs := spriteInfo.uints(spriteInfoSpriteID)
+	spriteIDs := make([]uint32, len(wideIDs))
+	for i, id := range wideIDs {
+		spriteIDs[i] = uint32(id)
+	}
+	textures := group.TotalTextures()
+	if len(spriteIDs) != textures {
+		return nil, nil, fmt.Errorf("%d sprites for %d textures", len(spriteIDs), textures)
+	}
+	width, height := 1, 1
+	if len(spriteIDs) > 0 {
+		if _, spriteWidth, spriteHeight, ok := spriteMap.Pieces(spriteIDs[0]); ok {
+			width, height = spriteWidth, spriteHeight
 		}
 	}
-	ids64 := si.uints(5)
-	ids := make([]uint32, len(ids64))
-	for i, v := range ids64 {
-		ids[i] = uint32(v)
-	}
-	textures := g.TotalTextures()
-	if len(ids) != textures {
-		return nil, nil, fmt.Errorf("%d sprites for %d textures", len(ids), textures)
-	}
-	w, h := 1, 1
-	if len(ids) > 0 {
-		if _, pw, ph, ok := sm.Pieces(ids[0]); ok {
-			w, h = pw, ph
-		}
-	}
-	g.Width, g.Height = uint8(w), uint8(h)
-	g.ExactSize = uint8(min(max(si.uint(7), uint64(TileSize*max(w, h))), 255))
-	n := w * h
-	g.Sprites = make([]uint32, textures*n)
-	for i, id := range ids {
-		first, pw, ph, ok := sm.Pieces(id)
+	group.Width, group.Height = uint8(width), uint8(height)
+	group.ExactSize = uint8(min(max(spriteInfo.uint(spriteInfoBoundingSquare), uint64(TileSize*max(width, height))), 255))
+	piecesPerTexture := width * height
+	group.Sprites = make([]uint32, textures*piecesPerTexture)
+	for i, id := range spriteIDs {
+		first, spriteWidth, spriteHeight, ok := spriteMap.Pieces(id)
 		if !ok {
 			continue // missing sprites show as empty tiles
 		}
-		for th := range min(ph, h) {
-			for tw := range min(pw, w) {
-				g.Sprites[i*n+th*w+tw] = first + uint32(th*pw+tw)
+		for tileRow := range min(spriteHeight, height) {
+			for tileColumn := range min(spriteWidth, width) {
+				group.Sprites[i*piecesPerTexture+tileRow*width+tileColumn] = first + uint32(tileRow*spriteWidth+tileColumn)
 			}
 		}
 	}
-	return g, ids, nil
+	return group, spriteIDs, nil
 }
 
-// Blank reports whether t is a placeholder for an id missing from the file
+// decodeAnimation reads the animation of a group with several frames.
+func decodeAnimation(group *thing.FrameGroup, animation message, phases []message) {
+	if animation.bool(animationSynchronized) {
+		group.Mode = thing.AnimationSync
+	}
+	switch int32(animation.uint(animationLoopType)) {
+	case loopPingPong:
+		group.LoopCount = -1
+	case loopCounted:
+		group.LoopCount = int32(animation.uint(animationLoopCount))
+	}
+	if animation.bool(animationRandomStartPhase) {
+		group.StartFrame = -1
+	} else if startPhase := animation.uint(animationDefaultStartPhase); startPhase < uint64(group.Frames) {
+		group.StartFrame = int8(min(startPhase, 127))
+	}
+	for _, phase := range phases {
+		group.Durations = append(group.Durations, thing.FrameDuration{
+			Min: uint32(phase.uint(phaseDurationMin)),
+			Max: uint32(phase.uint(phaseDurationMax)),
+		})
+	}
+}
+
+// Blank reports whether an appearance is a placeholder for an id missing from the file
 // (or an object removed in the editor): nothing about it is worth writing.
-func Blank(t *thing.Thing) bool {
-	if t.Extra != nil || t.Props != (thing.Properties{}) || t.Name != "" || t.Description != "" || len(t.NpcSales) > 0 {
+func Blank(appearance *thing.Thing) bool {
+	if appearance.Extra != nil || appearance.Props != (thing.Properties{}) || appearance.Name != "" || appearance.Description != "" || len(appearance.NpcSales) > 0 {
 		return false
 	}
-	for _, g := range t.FrameGroups {
-		for _, id := range g.Sprites {
+	for _, group := range appearance.FrameGroups {
+		for _, id := range group.Sprites {
 			if id != 0 {
 				return false
 			}
@@ -256,144 +253,147 @@ func Blank(t *thing.Thing) bool {
 }
 
 // Encode writes an appearances file. Blank things are left out.
-func Encode(f *File, resolve Resolver) ([]byte, error) {
+func Encode(file *File, resolve Resolver) ([]byte, error) {
 	var out []byte
-	for _, c := range thing.Categories {
-		for _, t := range f.Things[c] {
-			if t == nil || Blank(t) {
+	for _, category := range thing.Categories {
+		for _, appearance := range file.Things[category] {
+			if appearance == nil || Blank(appearance) {
 				continue
 			}
-			b, err := encodeAppearance(t, resolve)
+			encoded, err := encodeAppearance(appearance, resolve)
 			if err != nil {
 				return nil, err
 			}
-			out = putBytes(out, listFields[c], b)
+			out = putBytes(out, listFields[category], encoded)
 		}
 	}
-	return append(out, f.rest...), nil
+	return append(out, file.rest...), nil
 }
 
 // textureIDs resolves the official sprite ids of every texture of a group.
-func textureIDs(t *thing.Thing, g *thing.FrameGroup, resolve Resolver) ([]uint32, error) {
-	w, h := int(g.Width), int(g.Height)
-	if _, ok := SpriteTypeFor(w, h); !ok {
-		return nil, fmt.Errorf("%s %d is %dx%d tiles; assets support up to 2x2", t.Category, t.ID, w, h)
+func textureIDs(appearance *thing.Thing, group *thing.FrameGroup, resolve Resolver) ([]uint32, error) {
+	width, height := int(group.Width), int(group.Height)
+	if _, ok := SpriteTypeFor(width, height); !ok {
+		return nil, fmt.Errorf("%s %d is %dx%d tiles; assets support up to 2x2", appearance.Category, appearance.ID, width, height)
 	}
-	n := w * h
-	ids := make([]uint32, g.TotalTextures())
-	for i := range ids {
-		id, err := resolve(g.Sprites[i*n:(i+1)*n], w, h)
+	piecesPerTexture := width * height
+	spriteIDs := make([]uint32, group.TotalTextures())
+	for i := range spriteIDs {
+		id, err := resolve(group.Sprites[i*piecesPerTexture:(i+1)*piecesPerTexture], width, height)
 		if err != nil {
-			return nil, fmt.Errorf("%s %d: %w", t.Category, t.ID, err)
+			return nil, fmt.Errorf("%s %d: %w", appearance.Category, appearance.ID, err)
 		}
-		ids[i] = id
+		spriteIDs[i] = id
 	}
-	return ids, nil
+	return spriteIDs, nil
 }
 
-func encodeAppearance(t *thing.Thing, resolve Resolver) ([]byte, error) {
-	if err := t.Validate(); err != nil {
+func encodeAppearance(appearance *thing.Thing, resolve Resolver) ([]byte, error) {
+	if err := appearance.Validate(); err != nil {
 		return nil, err
 	}
-	ids := make([][]uint32, len(t.FrameGroups))
-	for i, g := range t.FrameGroups {
+	spriteIDs := make([][]uint32, len(appearance.FrameGroups))
+	for i, group := range appearance.FrameGroups {
 		var err error
-		if ids[i], err = textureIDs(t, g, resolve); err != nil {
+		if spriteIDs[i], err = textureIDs(appearance, group, resolve); err != nil {
 			return nil, err
 		}
 	}
-	orig, _ := t.Extra.(*Original)
-	if orig != nil && orig.thing == t && slices.EqualFunc(ids, orig.sprites, slices.Equal) {
-		return orig.raw, nil
+	original, _ := appearance.Extra.(*Original)
+	if original != nil && original.thing == appearance && slices.EqualFunc(spriteIDs, original.sprites, slices.Equal) {
+		return original.raw, nil
 	}
-	var om message
-	var origGroups []message
-	var origIDs [][]uint32
-	if orig != nil {
-		om, _ = parse(orig.raw)
-		origGroups = om.all(2)
-		origIDs = orig.sprites
+	var originalMsg message
+	var originalGroups []message
+	var originalSpriteIDs [][]uint32
+	if original != nil {
+		originalMsg, _ = parse(original.raw)
+		originalGroups = originalMsg.all(appearanceFrameGroup)
+		originalSpriteIDs = original.sprites
 	}
-	b := putUint(nil, 1, uint64(t.ID))
-	for gi, g := range t.FrameGroups {
-		var og message
-		var oids []uint32
-		if gi < len(origGroups) {
-			og = origGroups[gi]
+	out := putUint(nil, appearanceID, uint64(appearance.ID))
+	for groupIndex, group := range appearance.FrameGroups {
+		var originalGroup message
+		var originalIDs []uint32
+		if groupIndex < len(originalGroups) {
+			originalGroup = originalGroups[groupIndex]
 		}
-		if gi < len(origIDs) {
-			oids = origIDs[gi]
+		if groupIndex < len(originalSpriteIDs) {
+			originalIDs = originalSpriteIDs[groupIndex]
 		}
-		b = putBytes(b, 2, encodeGroup(t.Category, g, ids[gi], og, slices.Equal(ids[gi], oids)))
+		sameSprites := slices.Equal(spriteIDs[groupIndex], originalIDs)
+		out = putBytes(out, appearanceFrameGroup, encodeGroup(appearance.Category, group, spriteIDs[groupIndex], originalGroup, sameSprites))
 	}
-	b = putBytes(b, 3, encodeFlags(&t.Props, t.NpcSales, om.sub(3)))
-	if t.Name != "" {
-		b = putBytes(b, fieldName, binio.EncodeLatin1(t.Name))
+	out = putBytes(out, appearanceFlags, encodeFlags(&appearance.Props, appearance.NpcSales, originalMsg.sub(appearanceFlags)))
+	if appearance.Name != "" {
+		out = putBytes(out, appearanceName, binio.EncodeLatin1(appearance.Name))
 	}
-	if t.Description != "" {
-		b = putBytes(b, fieldDescription, binio.EncodeLatin1(t.Description))
+	if appearance.Description != "" {
+		out = putBytes(out, appearanceDescription, binio.EncodeLatin1(appearance.Description))
 	}
-	return om.appendOthers(b, 1, 2, 3, fieldName, fieldDescription), nil
+	return originalMsg.appendOthers(out, appearanceID, appearanceFrameGroup, appearanceFlags, appearanceName, appearanceDescription), nil
 }
 
-func encodeGroup(c thing.Category, g *thing.FrameGroup, ids []uint32, og message, sameSprites bool) []byte {
-	fixed := uint64(groupObjectInitial)
-	if c == thing.CategoryOutfit {
-		fixed = uint64(g.Type)
+func encodeGroup(category thing.Category, group *thing.FrameGroup, spriteIDs []uint32, originalGroup message, sameSprites bool) []byte {
+	fixedType := uint64(groupObjectInitial)
+	if category == thing.CategoryOutfit {
+		fixedType = uint64(group.Type)
 	}
-	b := putUint(nil, 1, fixed)
-	b = putUint(b, 2, fixed) // the official files use the group type as id
-	b = putBytes(b, 3, encodeSpriteInfo(g, ids, og.sub(3), sameSprites))
-	return og.appendOthers(b, 1, 2, 3)
+	out := putUint(nil, frameGroupFixedType, fixedType)
+	out = putUint(out, frameGroupID, fixedType) // the official files use the group type as id
+	out = putBytes(out, frameGroupSpriteInfo, encodeSpriteInfo(group, spriteIDs, originalGroup.sub(frameGroupSpriteInfo), sameSprites))
+	return originalGroup.appendOthers(out, frameGroupFixedType, frameGroupID, frameGroupSpriteInfo)
 }
 
-func encodeSpriteInfo(g *thing.FrameGroup, ids []uint32, osi message, sameSprites bool) []byte {
-	b := putUint(nil, 1, uint64(g.PatternX))
-	b = putUint(b, 2, uint64(g.PatternY))
-	b = putUint(b, 3, uint64(g.PatternZ))
-	b = putUint(b, 4, uint64(g.Layers))
-	for _, id := range ids {
-		b = putUint(b, 5, uint64(id))
+func encodeSpriteInfo(group *thing.FrameGroup, spriteIDs []uint32, originalInfo message, sameSprites bool) []byte {
+	out := putUint(nil, spriteInfoPatternWidth, uint64(group.PatternX))
+	out = putUint(out, spriteInfoPatternHeight, uint64(group.PatternY))
+	out = putUint(out, spriteInfoPatternDepth, uint64(group.PatternZ))
+	out = putUint(out, spriteInfoLayers, uint64(group.Layers))
+	for _, id := range spriteIDs {
+		out = putUint(out, spriteInfoSpriteID, uint64(id))
 	}
-	if g.Frames > 1 {
-		b = putBytes(b, 6, encodeAnimation(g, osi.sub(6)))
+	if group.Frames > 1 {
+		out = putBytes(out, spriteInfoAnimation, encodeAnimation(group, originalInfo.sub(spriteInfoAnimation)))
 	}
 	// is_opaque lets the client skip drawing what lies below; it is only
 	// kept while the sprites are the same.
-	if f, ok := osi.get(8); ok && sameSprites {
-		b = append(b, f.raw...)
+	if opaque, ok := originalInfo.get(spriteInfoIsOpaque); ok && sameSprites {
+		out = append(out, opaque.raw...)
 	} else {
-		b = putUint(b, 8, 0)
+		out = putUint(out, spriteInfoIsOpaque, 0)
 	}
-	return osi.appendOthers(b, 1, 2, 3, 4, 5, 6, 8)
+	return originalInfo.appendOthers(out, spriteInfoPatternWidth, spriteInfoPatternHeight, spriteInfoPatternDepth,
+		spriteInfoLayers, spriteInfoSpriteID, spriteInfoAnimation, spriteInfoIsOpaque)
 }
 
-func encodeAnimation(g *thing.FrameGroup, oa message) []byte {
-	var b []byte
-	if g.StartFrame > 0 {
-		b = putUint(b, 1, uint64(g.StartFrame))
+func encodeAnimation(group *thing.FrameGroup, originalAnimation message) []byte {
+	var out []byte
+	if group.StartFrame > 0 {
+		out = putUint(out, animationDefaultStartPhase, uint64(group.StartFrame))
 	}
-	b = putUint(b, 2, boolToUint(g.Mode == thing.AnimationSync))
-	b = putBool(b, 3, g.StartFrame < 0)
+	out = putUint(out, animationSynchronized, boolToUint(group.Mode == thing.AnimationSync))
+	out = putBool(out, animationRandomStartPhase, group.StartFrame < 0)
 	switch {
-	case g.LoopCount < 0:
-		b = putInt(b, 4, -1)
-	case g.LoopCount == 0:
-		b = putInt(b, 4, 0)
+	case group.LoopCount < 0:
+		out = putInt(out, animationLoopType, loopPingPong)
+	case group.LoopCount == 0:
+		out = putInt(out, animationLoopType, loopInfinite)
 	default:
-		b = putInt(b, 4, 1)
-		b = putUint(b, 5, uint64(g.LoopCount))
+		out = putInt(out, animationLoopType, loopCounted)
+		out = putUint(out, animationLoopCount, uint64(group.LoopCount))
 	}
-	for _, d := range g.Durations {
-		p := putUint(nil, 1, uint64(d.Min))
-		p = putUint(p, 2, uint64(d.Max))
-		b = putBytes(b, 6, p)
+	for _, duration := range group.Durations {
+		phase := putUint(nil, phaseDurationMin, uint64(duration.Min))
+		phase = putUint(phase, phaseDurationMax, uint64(duration.Max))
+		out = putBytes(out, animationSpritePhase, phase)
 	}
-	return oa.appendOthers(b, 1, 2, 3, 4, 5, 6)
+	return originalAnimation.appendOthers(out, animationDefaultStartPhase, animationSynchronized, animationRandomStartPhase,
+		animationLoopType, animationLoopCount, animationSpritePhase)
 }
 
-func boolToUint(v bool) uint64 {
-	if v {
+func boolToUint(value bool) uint64 {
+	if value {
 		return 1
 	}
 	return 0

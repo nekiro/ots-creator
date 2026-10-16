@@ -13,16 +13,16 @@
 </script>
 
 <div class="m-form">
-  <div class="m-field"><span class="m-lbl">Name</span><input class="t-input" value={h.name} onchange={(e) => saveHouse({ ...h, name: e.currentTarget.value.trim() || h.name })} /></div>
+  <div class="m-field"><span class="m-lbl">Name</span><input class="t-input" value={h.name} onchange={(event) => saveHouse({ ...h, name: event.currentTarget.value.trim() || h.name })} /></div>
   <div class="m-field">
     <span class="m-lbl">Town</span>
-    <Select grow value={h.townId} options={townOptions} onchange={(v) => saveHouse({ ...h, townId: v })} />
+    <Select grow value={h.townId} options={townOptions} onchange={(value) => saveHouse({ ...h, townId: value })} />
     {#if h.townId}<button class="t-btn sm" onclick={() => mapCommands.focus({ kind: "town", id: h.townId })}>Open</button>{/if}
   </div>
   <div class="m-field">
     <span class="m-lbl">Rent</span>
-    <NumberField value={h.rent} min={0} max={100000000} width={90} onchange={(v) => saveHouse({ ...h, rent: v })} />
-    <label class="row"><input class="t-check" type="checkbox" checked={h.guildhall} onchange={(e) => saveHouse({ ...h, guildhall: e.currentTarget.checked })} />Guildhall</label>
+    <NumberField value={h.rent} min={0} max={100000000} width={90} onchange={(value) => saveHouse({ ...h, rent: value })} />
+    <label class="row"><input class="t-check" type="checkbox" checked={h.guildhall} onchange={(event) => saveHouse({ ...h, guildhall: event.currentTarget.checked })} />Guildhall</label>
   </div>
   <div class="m-field"><span class="m-lbl">Entrance</span><PosField value={h.exit} pickLabel="Click the tile in front of the door of {h.name}" onchange={(p) => saveHouse({ ...h, exit: p })} /></div>
   <div class="m-field"><span class="m-lbl">Size</span><span>{h.size ? `${h.size} tiles` : "No tiles yet"}</span><span class="t-label">#{h.id}</span></div>

@@ -49,7 +49,7 @@
     </div>
     <div class="row target">
       <span class="t-label">Replace with sprite</span>
-      <NumberField value={to} min={0} max={total} width={70} title="0 clears the slots" onchange={(v) => (to = v)} />
+      <NumberField value={to} min={0} max={total} width={70} title="0 clears the slots" onchange={(value) => (to = value)} />
       <span class="t-slot">{#if to > 0}<img class="pixel" src={res.spritePng(to, versions.sprite(to))} alt="" />{/if}</span>
       {#if to === 0}<span class="t-label">(empty)</span>{/if}
     </div>

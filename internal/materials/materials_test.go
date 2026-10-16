@@ -203,13 +203,3 @@ func TestAutoTilesets(t *testing.T) {
 		t.Fatalf("sets = %v", names)
 	}
 }
-
-func TestParseXMLToleratesTrailingNUL(t *testing.T) {
-	n, err := parseXML([]byte("<materials>\n\t<include file=\"a.xml\"/>\n</materials>\n\x00"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if n.name != "materials" || len(n.children) != 1 {
-		t.Fatalf("root %+v", n)
-	}
-}

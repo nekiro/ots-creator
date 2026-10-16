@@ -37,13 +37,13 @@
     <div class="row"><input class="t-input grow" bind:value={path} placeholder="Map file" /><button class="t-btn" onclick={browse}>Browse…</button></div>
     <div class="row">
       <span class="t-label lbl">Offset</span>
-      <NumberField label="x" value={dx} min={-65535} max={65535} width={56} onchange={(v) => (dx = v)} />
-      <NumberField label="y" value={dy} min={-65535} max={65535} width={56} onchange={(v) => (dy = v)} />
-      <NumberField label="z" value={dz} min={-15} max={15} width={32} onchange={(v) => (dz = v)} />
+      <NumberField label="x" value={dx} min={-65535} max={65535} width={56} onchange={(value) => (dx = value)} />
+      <NumberField label="y" value={dy} min={-65535} max={65535} width={56} onchange={(value) => (dy = value)} />
+      <NumberField label="z" value={dz} min={-15} max={15} width={32} onchange={(value) => (dz = value)} />
     </div>
     <div class="row">
       <span class="t-label lbl">Houses</span>
-      <Select grow value={houses} options={[{ value: "merge", label: "Keep their ids" }, { value: "renumber", label: "Give them new ids" }, { value: "skip", label: "Leave houses out" }]} onchange={(v) => (houses = v)} />
+      <Select grow value={houses} options={[{ value: "merge", label: "Keep their ids" }, { value: "renumber", label: "Give them new ids" }, { value: "skip", label: "Leave houses out" }]} onchange={(value) => (houses = value)} />
     </div>
     <label class="row"><input class="t-check" type="checkbox" bind:checked={replace} />Replace existing tiles (otherwise items are added)</label>
     <label class="row"><input class="t-check" type="checkbox" bind:checked={towns} />Add missing towns and waypoints</label>

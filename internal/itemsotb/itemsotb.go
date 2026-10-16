@@ -43,6 +43,11 @@ const (
 	FlagPickupable        = 1 << 5
 	FlagMovable           = 1 << 6
 	FlagStackable         = 1 << 7
+	FlagFloorChangeDown   = 1 << 8
+	FlagFloorChangeNorth  = 1 << 9
+	FlagFloorChangeEast   = 1 << 10
+	FlagFloorChangeSouth  = 1 << 11
+	FlagFloorChangeWest   = 1 << 12
 	FlagStackOrder        = 1 << 13
 	FlagReadable          = 1 << 14
 	FlagRotatable         = 1 << 15
@@ -56,6 +61,10 @@ const (
 	FlagFullGround        = 1 << 25
 	FlagForceUse          = 1 << 26
 )
+
+// FlagFloorChange is any of the floor change flags.
+const FlagFloorChange = FlagFloorChangeDown | FlagFloorChangeNorth | FlagFloorChangeEast |
+	FlagFloorChangeSouth | FlagFloorChangeWest
 
 // clientFlags are the flags Reload derives from the client. Other bits
 // (floor change, can not decay, distance read...) are server data.
@@ -86,6 +95,13 @@ var attrOrder = []byte{AttrServerID, AttrClientID, AttrSpriteHash, AttrMinimapCo
 
 const rootAttrVersion = 0x01
 
+// versionDescriptionSize is the size of the zero padded text after the
+// version numbers in the root version attribute (ItemEditor's CSDVersion).
+const versionDescriptionSize = 128
+
+// readableLensHelp is the lens help value of readable items (books, signs).
+const readableLensHelp = 1112
+
 // Attr is one item attribute.
 type Attr struct {
 	Type byte
@@ -115,12 +131,12 @@ type File struct {
 // New returns an empty items.otb with the given version, written like
 // ItemEditor writes it.
 func New(major, minor, build uint32) *File {
-	v := binary.LittleEndian.AppendUint32(nil, major)
-	v = binary.LittleEndian.AppendUint32(v, minor)
-	v = binary.LittleEndian.AppendUint32(v, build)
-	csd := make([]byte, 128)
-	copy(csd, fmt.Sprintf("OTB %d.%d.%d", major, minor, build))
-	return &File{rootAttrs: []Attr{{rootAttrVersion, append(v, csd...)}}}
+	version := binary.LittleEndian.AppendUint32(nil, major)
+	version = binary.LittleEndian.AppendUint32(version, minor)
+	version = binary.LittleEndian.AppendUint32(version, build)
+	description := make([]byte, versionDescriptionSize)
+	copy(description, fmt.Sprintf("OTB %d.%d.%d", major, minor, build))
+	return &File{rootAttrs: []Attr{{rootAttrVersion, append(version, description...)}}}
 }
 
 // Parse reads an items.otb.
@@ -132,36 +148,36 @@ func Parse(data []byte) (*File, error) {
 	if len(root.Props) < 4 {
 		return nil, fmt.Errorf("items.otb: root node without flags")
 	}
-	f := &File{ident: ident, rootType: root.Type, rootFlags: binary.LittleEndian.Uint32(root.Props)}
-	f.rootAttrs, f.rootTail = readAttrs(root.Props[4:])
-	for _, n := range root.Children {
-		if len(n.Children) > 0 {
+	file := &File{ident: ident, rootType: root.Type, rootFlags: binary.LittleEndian.Uint32(root.Props)}
+	file.rootAttrs, file.rootTail = readAttrs(root.Props[4:])
+	for _, node := range root.Children {
+		if len(node.Children) > 0 {
 			return nil, fmt.Errorf("items.otb: item node has child nodes")
 		}
-		if len(n.Props) < 4 {
+		if len(node.Props) < 4 {
 			return nil, fmt.Errorf("items.otb: item without flags")
 		}
-		it := &Item{Group: Group(n.Type), Flags: binary.LittleEndian.Uint32(n.Props)}
-		it.Attrs, it.tail = readAttrs(n.Props[4:])
-		f.Items = append(f.Items, it)
+		item := &Item{Group: Group(node.Type), Flags: binary.LittleEndian.Uint32(node.Props)}
+		item.Attrs, item.tail = readAttrs(node.Props[4:])
+		file.Items = append(file.Items, item)
 	}
-	return f, nil
+	return file, nil
 }
 
-// readAttrs reads the attributes in b; bytes that do not form a whole
+// readAttrs reads the attributes in props; bytes that do not form a whole
 // attribute are returned as the tail, so they are written back unchanged.
-func readAttrs(b []byte) ([]Attr, []byte) {
+func readAttrs(props []byte) ([]Attr, []byte) {
 	var out []Attr
-	for len(b) >= 3 {
-		n := int(binary.LittleEndian.Uint16(b[1:]))
-		if 3+n > len(b) {
+	for len(props) >= 3 {
+		length := int(binary.LittleEndian.Uint16(props[1:]))
+		if 3+length > len(props) {
 			break
 		}
-		out = append(out, Attr{Type: b[0], Data: slices.Clone(b[3 : 3+n])})
-		b = b[3+n:]
+		out = append(out, Attr{Type: props[0], Data: slices.Clone(props[3 : 3+length])})
+		props = props[3+length:]
 	}
-	if len(b) > 0 {
-		return out, slices.Clone(b)
+	if len(props) > 0 {
+		return out, slices.Clone(props)
 	}
 	return out, nil
 }
@@ -169,56 +185,56 @@ func readAttrs(b []byte) ([]Attr, []byte) {
 // Encode writes the file.
 func (f *File) Encode() ([]byte, error) {
 	var buf bytes.Buffer
-	w := otbnode.NewWriter(&buf, f.ident)
-	w.Start(f.rootType)
-	w.U32(f.rootFlags)
-	writeAttrs(w, f.rootAttrs)
-	w.Bytes(f.rootTail)
-	for _, it := range f.Items {
-		w.Start(byte(it.Group))
-		w.U32(it.Flags)
-		writeAttrs(w, it.Attrs)
-		w.Bytes(it.tail)
-		w.End()
+	writer := otbnode.NewWriter(&buf, f.ident)
+	writer.Start(f.rootType)
+	writer.U32(f.rootFlags)
+	writeAttrs(writer, f.rootAttrs)
+	writer.Bytes(f.rootTail)
+	for _, item := range f.Items {
+		writer.Start(byte(item.Group))
+		writer.U32(item.Flags)
+		writeAttrs(writer, item.Attrs)
+		writer.Bytes(item.tail)
+		writer.End()
 	}
-	w.End()
-	if err := w.Flush(); err != nil {
+	writer.End()
+	if err := writer.Flush(); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
 }
 
-func writeAttrs(w *otbnode.Writer, attrs []Attr) {
-	for _, a := range attrs {
-		w.U8(a.Type)
-		w.U16(uint16(len(a.Data)))
-		w.Bytes(a.Data)
+func writeAttrs(writer *otbnode.Writer, attrs []Attr) {
+	for _, attr := range attrs {
+		writer.U8(attr.Type)
+		writer.U16(uint16(len(attr.Data)))
+		writer.Bytes(attr.Data)
 	}
 }
 
 // Version returns the major, minor (client) and build version.
 func (f *File) Version() (major, minor, build uint32) {
-	for _, a := range f.rootAttrs {
-		if a.Type == rootAttrVersion && len(a.Data) >= 12 {
-			return binary.LittleEndian.Uint32(a.Data), binary.LittleEndian.Uint32(a.Data[4:]), binary.LittleEndian.Uint32(a.Data[8:])
+	for _, attr := range f.rootAttrs {
+		if attr.Type == rootAttrVersion && len(attr.Data) >= 12 {
+			return binary.LittleEndian.Uint32(attr.Data), binary.LittleEndian.Uint32(attr.Data[4:]), binary.LittleEndian.Uint32(attr.Data[8:])
 		}
 	}
 	return 0, 0, 0
 }
 
 // Attr returns the data of an attribute, or nil.
-func (it *Item) Attr(t byte) []byte {
-	for _, a := range it.Attrs {
-		if a.Type == t {
-			return a.Data
+func (it *Item) Attr(attrType byte) []byte {
+	for _, attr := range it.Attrs {
+		if attr.Type == attrType {
+			return attr.Data
 		}
 	}
 	return nil
 }
 
-func (it *Item) u16(t byte) uint16 {
-	if d := it.Attr(t); len(d) >= 2 {
-		return binary.LittleEndian.Uint16(d)
+func (it *Item) u16(attrType byte) uint16 {
+	if data := it.Attr(attrType); len(data) >= 2 {
+		return binary.LittleEndian.Uint16(data)
 	}
 	return 0
 }
@@ -236,17 +252,17 @@ func (it *Item) Deprecated() bool { return it.Group == GroupDeprecated }
 // SetClientID changes the client id.
 func (it *Item) SetClientID(id uint16) { it.set(AttrClientID, u16(id)) }
 
-func (it *Item) set(t byte, data []byte) {
+func (it *Item) set(attrType byte, data []byte) {
 	for i := range it.Attrs {
-		if it.Attrs[i].Type == t {
+		if it.Attrs[i].Type == attrType {
 			it.Attrs[i].Data = data
 			return
 		}
 	}
-	it.Attrs = append(it.Attrs, Attr{Type: t, Data: data})
+	it.Attrs = append(it.Attrs, Attr{Type: attrType, Data: data})
 }
 
-func u16(v uint16) []byte { return binary.LittleEndian.AppendUint16(nil, v) }
+func u16(value uint16) []byte { return binary.LittleEndian.AppendUint16(nil, value) }
 
 // NewItem returns an item for a new client item; Reload fills it.
 func NewItem(serverID, clientID uint16) *Item {
@@ -255,117 +271,145 @@ func NewItem(serverID, clientID uint16) *Item {
 
 // Clone returns a deep copy.
 func (it *Item) Clone() *Item {
-	c := *it
-	c.Attrs = make([]Attr, len(it.Attrs))
-	for i, a := range it.Attrs {
-		c.Attrs[i] = Attr{a.Type, slices.Clone(a.Data)}
+	clone := *it
+	clone.Attrs = make([]Attr, len(it.Attrs))
+	for i, attr := range it.Attrs {
+		clone.Attrs[i] = Attr{attr.Type, slices.Clone(attr.Data)}
 	}
-	c.tail = slices.Clone(it.tail)
-	return &c
+	clone.tail = slices.Clone(it.tail)
+	return &clone
 }
 
 // Equal reports whether two items encode the same.
-func (it *Item) Equal(o *Item) bool {
-	return it.Group == o.Group && it.Flags == o.Flags && bytes.Equal(it.tail, o.tail) &&
-		slices.EqualFunc(it.Attrs, o.Attrs, func(a, b Attr) bool { return a.Type == b.Type && bytes.Equal(a.Data, b.Data) })
+func (it *Item) Equal(other *Item) bool {
+	return it.Group == other.Group && it.Flags == other.Flags && bytes.Equal(it.tail, other.tail) &&
+		slices.EqualFunc(it.Attrs, other.Attrs, func(left, right Attr) bool {
+			return left.Type == right.Type && bytes.Equal(left.Data, right.Data)
+		})
 }
 
-// Reload sets what the client stores of the item from t, like ItemEditor's
-// "reload item attributes": group, client flags, ground speed, stack order,
-// light, minimap color, text lengths, market trade id and (when hash is not
-// nil) the sprite hash. The name is only set when the client has one.
-// Server ids, unknown attributes and server-only flags are kept.
-func (it *Item) Reload(t *thing.Thing, hash *[16]byte) {
-	p := &t.Props
+// Reload sets what the client stores of the item from client, like
+// ItemEditor's "reload item attributes": group, client flags, ground speed,
+// stack order, light, minimap color, text lengths, market trade id and
+// (when hash is not nil) the sprite hash. The name is only set when the
+// client has one. Server ids, unknown attributes and server-only flags are
+// kept.
+func (it *Item) Reload(client *thing.Thing, hash *[16]byte) {
+	it.reloadGroup(&client.Props)
+	order := stackOrder(&client.Props)
+	it.Flags = it.Flags&^clientFlags | flagsOf(client, order)
+	it.mergeAttrs(derivedAttrs(client, order, hash))
+}
+
+// reloadGroup sets the group the client knows of; groups of old item lists
+// (door, key, teleport...) are server data and are kept.
+func (it *Item) reloadGroup(props *thing.Properties) {
 	switch {
-	case p.Ground:
+	case props.Ground:
 		it.Group = GroupGround
-	case p.Container:
+	case props.Container:
 		it.Group = GroupContainer
-	case p.FluidContainer:
+	case props.FluidContainer:
 		it.Group = GroupFluid
-	case p.Fluid:
+	case props.Fluid:
 		it.Group = GroupSplash
 	default:
-		// Groups of old item lists (door, key, teleport...) are server data.
 		switch it.Group {
 		case GroupGround, GroupContainer, GroupFluid, GroupSplash:
 			it.Group = GroupNone
 		}
 	}
+}
 
-	var f uint32
+// stackOrder returns the items.otb stack order: 1 border, 2 bottom, 3 top
+// and 0 for none.
+func stackOrder(props *thing.Properties) byte {
+	switch {
+	case props.GroundBorder:
+		return 1
+	case props.OnBottom:
+		return 2
+	case props.OnTop:
+		return 3
+	}
+	return 0
+}
+
+// flagsOf returns the client flags of an item with the given stack order.
+func flagsOf(client *thing.Thing, order byte) uint32 {
+	props := &client.Props
+	var flags uint32
 	set := func(on bool, bit uint32) {
 		if on {
-			f |= bit
+			flags |= bit
 		}
 	}
-	set(p.Unpassable, FlagUnpassable)
-	set(p.BlockMissile, FlagBlockMissiles)
-	set(p.BlockPathfind, FlagBlockPathfinder)
-	set(p.HasElevation, FlagHasElevation)
-	set(p.MultiUse, FlagMultiUse)
-	set(p.ForceUse, FlagForceUse)
-	set(p.Pickupable, FlagPickupable)
-	set(!p.Unmoveable, FlagMovable)
-	set(p.Stackable, FlagStackable)
-	set(p.Writable || p.WritableOnce || (p.LensHelp && p.LensHelpValue == 1112), FlagReadable)
-	set(p.Rotatable, FlagRotatable)
-	set(p.Hangable, FlagHangable)
-	set(p.HookSouth, FlagHookSouth)
-	set(p.HookEast, FlagHookEast)
-	set(p.HasCharges, FlagClientCharges)
-	set(p.IgnoreLook, FlagIgnoreLook)
-	set(p.FullGround, FlagFullGround)
-	set(len(t.FrameGroups) > 0 && t.FrameGroups[0].Frames > 1, FlagIsAnimation)
-	var order byte
-	switch {
-	case p.GroundBorder:
-		order = 1
-	case p.OnBottom:
-		order = 2
-	case p.OnTop:
-		order = 3
-	}
+	set(props.Unpassable, FlagUnpassable)
+	set(props.BlockMissile, FlagBlockMissiles)
+	set(props.BlockPathfind, FlagBlockPathfinder)
+	set(props.HasElevation, FlagHasElevation)
+	set(props.MultiUse, FlagMultiUse)
+	set(props.ForceUse, FlagForceUse)
+	set(props.Pickupable, FlagPickupable)
+	set(!props.Unmoveable, FlagMovable)
+	set(props.Stackable, FlagStackable)
+	set(props.Writable || props.WritableOnce || (props.LensHelp && props.LensHelpValue == readableLensHelp), FlagReadable)
+	set(props.Rotatable, FlagRotatable)
+	set(props.Hangable, FlagHangable)
+	set(props.HookSouth, FlagHookSouth)
+	set(props.HookEast, FlagHookEast)
+	set(props.HasCharges, FlagClientCharges)
+	set(props.IgnoreLook, FlagIgnoreLook)
+	set(props.FullGround, FlagFullGround)
+	set(len(client.FrameGroups) > 0 && client.FrameGroups[0].Frames > 1, FlagIsAnimation)
 	set(order != 0, FlagStackOrder)
-	it.Flags = it.Flags&^clientFlags | f
+	return flags
+}
 
+// derivedAttrs returns the attributes Reload sets from the client; a nil
+// value removes the attribute.
+func derivedAttrs(client *thing.Thing, order byte, hash *[16]byte) map[byte][]byte {
+	props := &client.Props
 	derived := map[byte][]byte{}
-	put := func(on bool, t byte, data []byte) {
+	put := func(on bool, attrType byte, data []byte) {
 		if on {
-			derived[t] = data
+			derived[attrType] = data
 		} else {
-			derived[t] = nil
+			derived[attrType] = nil
 		}
 	}
-	put(p.Ground, AttrGroundSpeed, u16(p.GroundSpeed))
+	put(props.Ground, AttrGroundSpeed, u16(props.GroundSpeed))
 	put(order != 0, AttrStackOrder, []byte{order})
-	put(p.HasLight && (p.LightLevel != 0 || p.LightColor != 0), AttrLight, append(u16(p.LightLevel), u16(p.LightColor)...))
-	put(p.MiniMap && p.MiniMapColor != 0, AttrMinimapColor, u16(p.MiniMapColor))
-	put(p.Writable && p.MaxTextLength != 0, AttrMaxReadWriteChars, u16(p.MaxTextLength))
-	put(p.WritableOnce && p.MaxReadLength != 0, AttrMaxReadChars, u16(p.MaxReadLength))
-	put(p.IsMarket && p.Market.TradeAs != 0, AttrTradeAs, u16(p.Market.TradeAs))
-	if t.Name != "" {
-		derived[AttrName] = []byte(t.Name)
+	put(props.HasLight && (props.LightLevel != 0 || props.LightColor != 0), AttrLight, append(u16(props.LightLevel), u16(props.LightColor)...))
+	put(props.MiniMap && props.MiniMapColor != 0, AttrMinimapColor, u16(props.MiniMapColor))
+	put(props.Writable && props.MaxTextLength != 0, AttrMaxReadWriteChars, u16(props.MaxTextLength))
+	put(props.WritableOnce && props.MaxReadLength != 0, AttrMaxReadChars, u16(props.MaxReadLength))
+	put(props.IsMarket && props.Market.TradeAs != 0, AttrTradeAs, u16(props.Market.TradeAs))
+	if client.Name != "" {
+		derived[AttrName] = []byte(client.Name)
 	}
 	if hash != nil {
 		derived[AttrSpriteHash] = slices.Clone(hash[:])
 	}
+	return derived
+}
 
-	// Attributes in ItemEditor order, then the ones Reload does not know.
+// mergeAttrs replaces the attributes with derived ones, in ItemEditor order,
+// followed by the attributes Reload does not know.
+func (it *Item) mergeAttrs(derived map[byte][]byte) {
 	var attrs []Attr
-	for _, typ := range attrOrder {
-		data, ok := derived[typ]
+	for _, attrType := range attrOrder {
+		data, ok := derived[attrType]
 		if !ok {
-			data = it.Attr(typ)
+			data = it.Attr(attrType)
 		}
 		if data != nil {
-			attrs = append(attrs, Attr{typ, data})
+			attrs = append(attrs, Attr{attrType, data})
 		}
 	}
-	for _, a := range it.Attrs {
-		if !slices.Contains(attrOrder, a.Type) {
-			attrs = append(attrs, a)
+	for _, attr := range it.Attrs {
+		if !slices.Contains(attrOrder, attr.Type) {
+			attrs = append(attrs, attr)
 		}
 	}
 	it.Attrs = attrs
@@ -374,42 +418,46 @@ func (it *Item) Reload(t *thing.Thing, hash *[16]byte) {
 // SpriteSize is the only sprite size SpriteHash supports.
 const SpriteSize = 32
 
+// transparentChannel is the value of each color channel of a transparent
+// pixel in the sprite hash.
+const transparentChannel = 0x11
+
 // SpriteHash computes ItemEditor's sprite hash of an item: an MD5 over the
 // sprites of its first frame and pattern, each as 32x32 BGR0 pixels, bottom
 // row first, with transparent pixels in 0x111111. sprite returns the
 // compressed spr data of an index into the frame group's sprites (nil for
 // an empty sprite); transparent tells whether the data has alpha.
-func SpriteHash(g *thing.FrameGroup, transparent bool, sprite func(i int) ([]byte, error)) ([16]byte, error) {
-	h := md5.New()
+func SpriteHash(group *thing.FrameGroup, transparent bool, sprite func(i int) ([]byte, error)) ([16]byte, error) {
+	hasher := md5.New()
 	rgb := make([]byte, SpriteSize*SpriteSize*3)
-	out := make([]byte, SpriteSize*SpriteSize*4)
-	w, hh := int(g.Width), int(g.Height)
-	for l := 0; l < int(g.Layers); l++ {
-		for y := 0; y < hh; y++ {
-			for x := 0; x < w; x++ {
-				i := x + y*w + l*w*hh
+	hashed := make([]byte, SpriteSize*SpriteSize*4)
+	width, height := int(group.Width), int(group.Height)
+	for layer := 0; layer < int(group.Layers); layer++ {
+		for y := 0; y < height; y++ {
+			for x := 0; x < width; x++ {
+				spriteIndex := x + y*width + layer*width*height
 				var data []byte
-				if i < len(g.Sprites) && g.Sprites[i] != 0 {
+				if spriteIndex < len(group.Sprites) && group.Sprites[spriteIndex] != 0 {
 					var err error
-					if data, err = sprite(i); err != nil {
+					if data, err = sprite(spriteIndex); err != nil {
 						return [16]byte{}, err
 					}
 				}
 				decodeRGB(rgb, data, transparent)
-				for py := 0; py < SpriteSize; py++ {
-					src := (SpriteSize - py - 1) * SpriteSize * 3
-					for px := 0; px < SpriteSize; px++ {
-						o := SpriteSize*4*py + px*4
-						s := src + px*3
-						out[o], out[o+1], out[o+2], out[o+3] = rgb[s+2], rgb[s+1], rgb[s], 0
+				for row := 0; row < SpriteSize; row++ {
+					srcRow := (SpriteSize - row - 1) * SpriteSize * 3
+					for column := 0; column < SpriteSize; column++ {
+						dst := SpriteSize*4*row + column*4
+						src := srcRow + column*3
+						hashed[dst], hashed[dst+1], hashed[dst+2], hashed[dst+3] = rgb[src+2], rgb[src+1], rgb[src], 0
 					}
 				}
-				h.Write(out)
+				hasher.Write(hashed)
 			}
 		}
 	}
 	var sum [16]byte
-	h.Sum(sum[:0])
+	hasher.Sum(sum[:0])
 	return sum, nil
 }
 
@@ -418,19 +466,19 @@ func SpriteHash(g *thing.FrameGroup, transparent bool, sprite func(i int) ([]byt
 // their color whatever their alpha.
 func decodeRGB(dst, data []byte, transparent bool) {
 	for i := range dst {
-		dst[i] = 0x11
+		dst[i] = transparentChannel
 	}
 	channels := 3
 	if transparent {
 		channels = 4
 	}
-	n := SpriteSize * SpriteSize
+	pixelCount := SpriteSize * SpriteSize
 	pos, pixel := 0, 0
 	for pos+4 <= len(data) {
 		pixel += int(binary.LittleEndian.Uint16(data[pos:]))
 		colored := int(binary.LittleEndian.Uint16(data[pos+2:]))
 		pos += 4
-		for k := 0; k < colored && pixel < n && pos+channels <= len(data); k++ {
+		for i := 0; i < colored && pixel < pixelCount && pos+channels <= len(data); i++ {
 			copy(dst[pixel*3:pixel*3+3], data[pos:pos+3])
 			pos += channels
 			pixel++

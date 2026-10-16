@@ -9,7 +9,7 @@
 </script>
 
 <div class="m-form">
-  <div class="m-field"><span class="m-lbl">Name</span><input class="t-input" value={z.name} onchange={(e) => edit((id) => MapService.SaveZone(id, { id: z.id, name: e.currentTarget.value.trim() || z.name }))} /></div>
+  <div class="m-field"><span class="m-lbl">Name</span><input class="t-input" value={z.name} onchange={(event) => edit((id) => MapService.SaveZone(id, { id: z.id, name: event.currentTarget.value.trim() || z.name }))} /></div>
   <div class="m-field"><span class="m-lbl">Id</span><span>{z.id}</span></div>
   <p class="t-label hint">Zones mark tiles for scripts. They are saved in the zones file of the map.</p>
   <div class="acts">

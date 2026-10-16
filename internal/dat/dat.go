@@ -22,9 +22,9 @@ type Options struct {
 
 // OptionsFor returns the options mandated by a client version combined with
 // user selected features.
-func OptionsFor(version uint16, f client.Features) Options {
-	f.ApplyVersionDefaults(version)
-	return Options{Format: client.MetadataFormat(version), Features: f}
+func OptionsFor(version uint16, features client.Features) Options {
+	features.ApplyVersionDefaults(version)
+	return Options{Format: client.MetadataFormat(version), Features: features}
 }
 
 func (o Options) hasPatternZ() bool { return o.Format >= 3 }
@@ -39,14 +39,14 @@ type File struct {
 
 // NewFile returns an empty file.
 func NewFile(signature uint32) *File {
-	f := &File{Signature: signature, Things: map[thing.Category][]*thing.Thing{}}
-	return f
+	file := &File{Signature: signature, Things: map[thing.Category][]*thing.Thing{}}
+	return file
 }
 
 // Get returns a thing by category and id.
-func (f *File) Get(c thing.Category, id uint32) *thing.Thing {
-	list := f.Things[c]
-	i := int(id) - int(c.MinID())
+func (f *File) Get(category thing.Category, id uint32) *thing.Thing {
+	list := f.Things[category]
+	i := int(id) - int(category.MinID())
 	if i < 0 || i >= len(list) {
 		return nil
 	}
@@ -54,14 +54,14 @@ func (f *File) Get(c thing.Category, id uint32) *thing.Thing {
 }
 
 // MaxID returns the highest id of a category, or MinID-1 when it is empty.
-func (f *File) MaxID(c thing.Category) uint32 {
-	return c.MinID() + uint32(len(f.Things[c])) - 1
+func (f *File) MaxID(category thing.Category) uint32 {
+	return category.MinID() + uint32(len(f.Things[category])) - 1
 }
 
 // Decode parses a Tibia.dat file.
 func Decode(data []byte, opts Options) (*File, error) {
 	r := binio.NewReader(data)
-	f := NewFile(r.U32())
+	file := NewFile(r.U32())
 	var counts [4]uint16
 	for i := range counts {
 		counts[i] = r.U16()
@@ -70,135 +70,135 @@ func Decode(data []byte, opts Options) (*File, error) {
 		return nil, fmt.Errorf("dat header: %w", r.Err())
 	}
 	table := Table(opts.Format)
-	for i, c := range thing.Categories {
+	for i, category := range thing.Categories {
 		maxID := uint32(counts[i])
-		if maxID < c.MinID() {
+		if maxID < category.MinID() {
 			continue
 		}
-		list := make([]*thing.Thing, 0, maxID-c.MinID()+1)
-		for id := c.MinID(); id <= maxID; id++ {
-			t := &thing.Thing{ID: id, Category: c}
-			if err := table.ReadProperties(r, &t.Props); err != nil {
-				return nil, fmt.Errorf("%s %d: %w", c, id, err)
+		list := make([]*thing.Thing, 0, maxID-category.MinID()+1)
+		for id := category.MinID(); id <= maxID; id++ {
+			object := &thing.Thing{ID: id, Category: category}
+			if err := table.ReadProperties(r, &object.Props); err != nil {
+				return nil, fmt.Errorf("%s %d: %w", category, id, err)
 			}
-			if err := readGroups(r, t, opts); err != nil {
-				return nil, fmt.Errorf("%s %d: %w", c, id, err)
+			if err := readGroups(r, object, opts); err != nil {
+				return nil, fmt.Errorf("%s %d: %w", category, id, err)
 			}
-			list = append(list, t)
+			list = append(list, object)
 		}
-		f.Things[c] = list
+		file.Things[category] = list
 	}
-	return f, nil
+	return file, nil
 }
 
 // ReadThing decodes one thing (flags + texture patterns) from r. OBD v1
 // uses this layout.
-func ReadThing(r *binio.Reader, t *thing.Thing, opts Options) error {
-	if err := Table(opts.Format).ReadProperties(r, &t.Props); err != nil {
+func ReadThing(r *binio.Reader, object *thing.Thing, opts Options) error {
+	if err := Table(opts.Format).ReadProperties(r, &object.Props); err != nil {
 		return err
 	}
-	return readGroups(r, t, opts)
+	return readGroups(r, object, opts)
 }
 
-func readGroups(r *binio.Reader, t *thing.Thing, opts Options) error {
+func readGroups(r *binio.Reader, object *thing.Thing, opts Options) error {
 	groupCount := 1
-	withGroups := opts.Features.FrameGroups && t.Category == thing.CategoryOutfit
+	withGroups := opts.Features.FrameGroups && object.Category == thing.CategoryOutfit
 	if withGroups {
 		groupCount = int(r.U8())
 	}
-	t.FrameGroups = make([]*thing.FrameGroup, 0, groupCount)
+	object.FrameGroups = make([]*thing.FrameGroup, 0, groupCount)
 	for i := 0; i < groupCount; i++ {
-		g := &thing.FrameGroup{}
+		group := &thing.FrameGroup{}
 		if withGroups {
-			g.Type = thing.FrameGroupType(r.U8())
+			group.Type = thing.FrameGroupType(r.U8())
 		}
-		if err := ReadGroup(r, g, opts.hasPatternZ(), opts.Features.ImprovedAnimations, opts.Features.Extended, t.Category.DefaultDuration()); err != nil {
+		if err := ReadGroup(r, group, opts.hasPatternZ(), opts.Features.ImprovedAnimations, opts.Features.Extended, object.Category.DefaultDuration()); err != nil {
 			return err
 		}
-		t.FrameGroups = append(t.FrameGroups, g)
+		object.FrameGroups = append(object.FrameGroups, group)
 	}
 	return r.Err()
 }
 
 // ReadGroup reads one frame group layout followed by its sprite ids.
-func ReadGroup(r *binio.Reader, g *thing.FrameGroup, patternZ, durations, extended bool, defDuration uint32) error {
-	if err := ReadLayout(r, g, patternZ, durations, defDuration); err != nil {
+func ReadGroup(r *binio.Reader, group *thing.FrameGroup, patternZ, durations, extended bool, defaultDuration uint32) error {
+	if err := ReadLayout(r, group, patternZ, durations, defaultDuration); err != nil {
 		return err
 	}
-	for i := range g.Sprites {
+	for i := range group.Sprites {
 		if extended {
-			g.Sprites[i] = r.U32()
+			group.Sprites[i] = r.U32()
 		} else {
-			g.Sprites[i] = uint32(r.U16())
+			group.Sprites[i] = uint32(r.U16())
 		}
 	}
 	return r.Err()
 }
 
 // ReadLayout reads the dimensions and animation of a frame group and
-// allocates g.Sprites without reading sprite ids. Shared with the OBD codec.
-func ReadLayout(r *binio.Reader, g *thing.FrameGroup, patternZ, durations bool, defDuration uint32) error {
-	g.Width = r.U8()
-	g.Height = r.U8()
-	if g.Width > 1 || g.Height > 1 {
-		g.ExactSize = r.U8()
+// allocates group.Sprites without reading sprite ids. Shared with the OBD codec.
+func ReadLayout(r *binio.Reader, group *thing.FrameGroup, patternZ, durations bool, defaultDuration uint32) error {
+	group.Width = r.U8()
+	group.Height = r.U8()
+	if group.Width > 1 || group.Height > 1 {
+		group.ExactSize = r.U8()
 	} else {
-		g.ExactSize = 32
+		group.ExactSize = 32
 	}
-	g.Layers = r.U8()
-	g.PatternX = r.U8()
-	g.PatternY = r.U8()
+	group.Layers = r.U8()
+	group.PatternX = r.U8()
+	group.PatternY = r.U8()
 	if patternZ {
-		g.PatternZ = r.U8()
+		group.PatternZ = r.U8()
 	} else {
-		g.PatternZ = 1
+		group.PatternZ = 1
 	}
-	g.Frames = r.U8()
+	group.Frames = r.U8()
 	if r.Err() != nil {
 		return r.Err()
 	}
-	if g.Frames > 1 {
+	if group.Frames > 1 {
 		if durations {
-			g.Mode = thing.AnimationMode(r.U8())
-			g.LoopCount = r.I32()
-			g.StartFrame = r.I8()
-			g.Durations = make([]thing.FrameDuration, g.Frames)
-			for i := range g.Durations {
-				g.Durations[i].Min = r.U32()
-				g.Durations[i].Max = r.U32()
+			group.Mode = thing.AnimationMode(r.U8())
+			group.LoopCount = r.I32()
+			group.StartFrame = r.I8()
+			group.Durations = make([]thing.FrameDuration, group.Frames)
+			for i := range group.Durations {
+				group.Durations[i].Min = r.U32()
+				group.Durations[i].Max = r.U32()
 			}
 		} else {
-			g.EnsureDurations(defDuration)
+			group.EnsureDurations(defaultDuration)
 		}
 	}
-	total := g.TotalSprites()
+	total := group.TotalSprites()
 	if total == 0 || total > maxSpritesPerGroup {
 		return fmt.Errorf("invalid sprite count %d (%dx%d layers=%d patterns=%dx%dx%d frames=%d)",
-			total, g.Width, g.Height, g.Layers, g.PatternX, g.PatternY, g.PatternZ, g.Frames)
+			total, group.Width, group.Height, group.Layers, group.PatternX, group.PatternY, group.PatternZ, group.Frames)
 	}
-	g.Sprites = make([]uint32, total)
+	group.Sprites = make([]uint32, total)
 	return r.Err()
 }
 
 // Encode serializes a dat file.
-func Encode(f *File, opts Options) ([]byte, error) {
+func Encode(file *File, opts Options) ([]byte, error) {
 	w := binio.NewWriter(1 << 20)
-	w.U32(f.Signature)
-	for _, c := range thing.Categories {
-		maxID := f.MaxID(c)
+	w.U32(file.Signature)
+	for _, category := range thing.Categories {
+		maxID := file.MaxID(category)
 		if maxID > 0xFFFF {
-			return nil, fmt.Errorf("too many %ss: max id %d exceeds 65535", c, maxID)
+			return nil, fmt.Errorf("too many %ss: max id %d exceeds 65535", category, maxID)
 		}
 		w.U16(uint16(maxID))
 	}
-	for _, c := range thing.Categories {
-		for i, t := range f.Things[c] {
-			id := c.MinID() + uint32(i)
-			if t == nil {
-				return nil, fmt.Errorf("%s %d is missing", c, id)
+	for _, category := range thing.Categories {
+		for i, object := range file.Things[category] {
+			id := category.MinID() + uint32(i)
+			if object == nil {
+				return nil, fmt.Errorf("%s %d is missing", category, id)
 			}
-			if err := WriteThing(w, t, opts); err != nil {
-				return nil, fmt.Errorf("%s %d: %w", c, id, err)
+			if err := WriteThing(w, object, opts); err != nil {
+				return nil, fmt.Errorf("%s %d: %w", category, id, err)
 			}
 		}
 	}
@@ -206,28 +206,28 @@ func Encode(f *File, opts Options) ([]byte, error) {
 }
 
 // WriteThing encodes one thing (flags + texture patterns).
-func WriteThing(w *binio.Writer, t *thing.Thing, opts Options) error {
-	if err := t.Validate(); err != nil {
+func WriteThing(w *binio.Writer, object *thing.Thing, opts Options) error {
+	if err := object.Validate(); err != nil {
 		return err
 	}
-	Table(opts.Format).WriteProperties(w, &t.Props)
-	withGroups := opts.Features.FrameGroups && t.Category == thing.CategoryOutfit
-	groups := t.FrameGroups
+	Table(opts.Format).WriteProperties(w, &object.Props)
+	withGroups := opts.Features.FrameGroups && object.Category == thing.CategoryOutfit
+	groups := object.FrameGroups
 	if !withGroups {
 		groups = groups[:1]
 	} else {
 		w.U8(uint8(len(groups)))
 	}
-	for i, g := range groups {
+	for i, group := range groups {
 		if withGroups {
 			// ObjectBuilder marks a lone outfit group as "walking" (1).
-			typ := uint8(i)
+			groupType := uint8(i)
 			if len(groups) < 2 {
-				typ = 1
+				groupType = 1
 			}
-			w.U8(typ)
+			w.U8(groupType)
 		}
-		if err := WriteGroup(w, g, opts.hasPatternZ(), opts.Features.ImprovedAnimations, opts.Features.Extended); err != nil {
+		if err := WriteGroup(w, group, opts.hasPatternZ(), opts.Features.ImprovedAnimations, opts.Features.Extended); err != nil {
 			return err
 		}
 	}
@@ -235,11 +235,11 @@ func WriteThing(w *binio.Writer, t *thing.Thing, opts Options) error {
 }
 
 // WriteGroup writes one frame group layout followed by its sprite ids.
-func WriteGroup(w *binio.Writer, g *thing.FrameGroup, patternZ, durations, extended bool) error {
-	if err := WriteLayout(w, g, patternZ, durations); err != nil {
+func WriteGroup(w *binio.Writer, group *thing.FrameGroup, patternZ, durations, extended bool) error {
+	if err := WriteLayout(w, group, patternZ, durations); err != nil {
 		return err
 	}
-	for _, id := range g.Sprites {
+	for _, id := range group.Sprites {
 		if extended {
 			w.U32(id)
 		} else {
@@ -254,28 +254,28 @@ func WriteGroup(w *binio.Writer, g *thing.FrameGroup, patternZ, durations, exten
 
 // WriteLayout writes the dimensions and animation of a frame group without
 // sprite ids. Shared with the OBD codec.
-func WriteLayout(w *binio.Writer, g *thing.FrameGroup, patternZ, durations bool) error {
-	w.U8(g.Width)
-	w.U8(g.Height)
-	if g.Width > 1 || g.Height > 1 {
-		w.U8(g.ExactSize)
+func WriteLayout(w *binio.Writer, group *thing.FrameGroup, patternZ, durations bool) error {
+	w.U8(group.Width)
+	w.U8(group.Height)
+	if group.Width > 1 || group.Height > 1 {
+		w.U8(group.ExactSize)
 	}
-	w.U8(g.Layers)
-	w.U8(g.PatternX)
-	w.U8(g.PatternY)
+	w.U8(group.Layers)
+	w.U8(group.PatternX)
+	w.U8(group.PatternY)
 	if patternZ {
-		w.U8(g.PatternZ)
-	} else if g.PatternZ > 1 {
-		return fmt.Errorf("pattern Z %d is not supported by this format", g.PatternZ)
+		w.U8(group.PatternZ)
+	} else if group.PatternZ > 1 {
+		return fmt.Errorf("pattern Z %d is not supported by this format", group.PatternZ)
 	}
-	w.U8(g.Frames)
-	if durations && g.IsAnimation() {
-		w.U8(uint8(g.Mode))
-		w.I32(g.LoopCount)
-		w.I8(g.StartFrame)
-		for _, d := range g.Durations {
-			w.U32(d.Min)
-			w.U32(d.Max)
+	w.U8(group.Frames)
+	if durations && group.IsAnimation() {
+		w.U8(uint8(group.Mode))
+		w.I32(group.LoopCount)
+		w.I8(group.StartFrame)
+		for _, duration := range group.Durations {
+			w.U32(duration.Min)
+			w.U32(duration.Max)
 		}
 	}
 	return nil

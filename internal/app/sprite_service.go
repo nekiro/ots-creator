@@ -5,22 +5,23 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/nekiro/ots-creator/internal/fsutil"
 	"github.com/nekiro/ots-creator/internal/imaging"
 	"github.com/nekiro/ots-creator/internal/project"
 )
 
 // SpriteService edits sprites.
 type SpriteService struct {
-	s *Session
+	session *Session
 }
 
 // NewSpriteService returns the service.
-func NewSpriteService(s *Session) *SpriteService { return &SpriteService{s: s} }
+func NewSpriteService(session *Session) *SpriteService { return &SpriteService{session: session} }
 
 // ImportImages slices images into sprites and appends them. Magenta is
 // treated as transparent; fully transparent tiles are skipped.
 func (ss *SpriteService) ImportImages(paths []string) ([]uint32, error) {
-	p, err := ss.s.Project()
+	p, err := ss.session.Project()
 	if err != nil {
 		return nil, err
 	}
@@ -43,14 +44,15 @@ func (ss *SpriteService) ImportImages(paths []string) ([]uint32, error) {
 	}
 	ids, err := p.AddSprites(pixels)
 	if err == nil {
-		ss.s.Changed()
+		ss.session.Changed()
 	}
 	return ids, err
 }
 
-func isTransparent(px []byte) bool {
-	for i := 3; i < len(px); i += 4 {
-		if px[i] != 0 {
+// isTransparent reports whether every pixel of RGBA pixels has alpha 0.
+func isTransparent(pixels []byte) bool {
+	for alpha := 3; alpha < len(pixels); alpha += 4 {
+		if pixels[alpha] != 0 {
 			return false
 		}
 	}
@@ -59,7 +61,7 @@ func isTransparent(px []byte) bool {
 
 // Replace overwrites a sprite with the first tile of an image.
 func (ss *SpriteService) Replace(id uint32, path string) error {
-	p, err := ss.s.Project()
+	p, err := ss.session.Project()
 	if err != nil {
 		return err
 	}
@@ -72,20 +74,20 @@ func (ss *SpriteService) Replace(id uint32, path string) error {
 	if err := p.ReplaceSprite(id, imaging.Tile(img, 0, 0, p.SpriteSize())); err != nil {
 		return err
 	}
-	ss.s.Changed()
+	ss.session.Changed()
 	return nil
 }
 
 // Remove clears sprites (the last one is deleted).
 func (ss *SpriteService) Remove(ids []uint32) error {
-	p, err := ss.s.Project()
+	p, err := ss.session.Project()
 	if err != nil {
 		return err
 	}
 	if err := p.RemoveSprites(ids); err != nil {
 		return err
 	}
-	ss.s.Changed()
+	ss.session.Changed()
 	return nil
 }
 
@@ -93,7 +95,7 @@ func (ss *SpriteService) Remove(ids []uint32) error {
 // formats without alpha get a magenta background).
 func (ss *SpriteService) Export(ids []uint32, dir, format string) ([]string, error) {
 	format = imaging.FormatOf("x." + format)
-	p, err := ss.s.Project()
+	p, err := ss.session.Project()
 	if err != nil {
 		return nil, err
 	}
@@ -104,13 +106,13 @@ func (ss *SpriteService) Export(ids []uint32, dir, format string) ([]string, err
 		if err != nil {
 			return out, err
 		}
-		img := imagingNRGBA(px, size)
+		img := spriteImage(px, size)
 		data, err := imaging.Encode(img, format, imaging.Magenta)
 		if err != nil {
 			return out, err
 		}
 		path := filepath.Join(dir, fmt.Sprintf("%d.%s", id, format))
-		if err := os.WriteFile(path, data, 0o644); err != nil {
+		if err := os.WriteFile(path, data, fsutil.FileMode); err != nil {
 			return out, err
 		}
 		out = append(out, path)
@@ -121,14 +123,14 @@ func (ss *SpriteService) Export(ids []uint32, dir, format string) ([]string, err
 // AddPixels appends sprites from raw RGBA pixels (size*size*4 bytes each),
 // for example cut by the slicer. Fully transparent sprites are skipped.
 func (ss *SpriteService) AddPixels(sprites [][]byte) ([]uint32, error) {
-	p, err := ss.s.Project()
+	p, err := ss.session.Project()
 	if err != nil {
 		return nil, err
 	}
 	var pixels [][]byte
-	for _, px := range sprites {
-		if !isTransparent(px) {
-			pixels = append(pixels, px)
+	for _, sprite := range sprites {
+		if !isTransparent(sprite) {
+			pixels = append(pixels, sprite)
 		}
 	}
 	if len(pixels) == 0 {
@@ -136,37 +138,37 @@ func (ss *SpriteService) AddPixels(sprites [][]byte) ([]uint32, error) {
 	}
 	ids, err := p.AddSprites(pixels)
 	if err == nil {
-		ss.s.Changed()
+		ss.session.Changed()
 	}
 	return ids, err
 }
 
 // Optimize removes duplicate, empty and unused sprites and renumbers the
 // rest (see project.OptimizeSprites).
-func (ss *SpriteService) Optimize(o project.OptimizeOptions) (project.OptimizeResult, error) {
-	p, err := ss.s.Project()
+func (ss *SpriteService) Optimize(options project.OptimizeOptions) (project.OptimizeResult, error) {
+	p, err := ss.session.Project()
 	if err != nil {
 		return project.OptimizeResult{}, err
 	}
-	res, err := p.OptimizeSprites(o, ss.s.reporter("Optimizing sprites"))
-	if err == nil && (res.Before != res.After || res.Things > 0) {
-		ss.s.Changed()
+	result, err := p.OptimizeSprites(options, ss.session.reporter("Optimizing sprites"))
+	if err == nil && (result.Before != result.After || result.Things > 0) {
+		ss.session.Changed()
 	}
-	return res, err
+	return result, err
 }
 
 // Analyze reports what Optimize would remove without changing anything.
-func (ss *SpriteService) Analyze(o project.OptimizeOptions) (project.OptimizeResult, error) {
-	p, err := ss.s.Project()
+func (ss *SpriteService) Analyze(options project.OptimizeOptions) (project.OptimizeResult, error) {
+	p, err := ss.session.Project()
 	if err != nil {
 		return project.OptimizeResult{}, err
 	}
-	return p.AnalyzeSprites(o, ss.s.reporter("Checking sprites"))
+	return p.AnalyzeSprites(options, ss.session.reporter("Checking sprites"))
 }
 
 // Find returns the ids of sprites matching a filter (see project.FindSprites).
 func (ss *SpriteService) Find(filter string) ([]uint32, error) {
-	p, err := ss.s.Project()
+	p, err := ss.session.Project()
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +177,7 @@ func (ss *SpriteService) Find(filter string) ([]uint32, error) {
 
 // Users lists the objects that use a sprite.
 func (ss *SpriteService) Users(id uint32) ([]project.ThingRef, error) {
-	p, err := ss.s.Project()
+	p, err := ss.session.Project()
 	if err != nil {
 		return nil, err
 	}
@@ -185,13 +187,13 @@ func (ss *SpriteService) Users(id uint32) ([]project.ThingRef, error) {
 // ReplaceRefs points every use of the sprites in from at sprite to (0
 // clears them) and returns the number of changed objects.
 func (ss *SpriteService) ReplaceRefs(from []uint32, to uint32) (int, error) {
-	p, err := ss.s.Project()
+	p, err := ss.session.Project()
 	if err != nil {
 		return 0, err
 	}
-	n, err := p.ReplaceSpriteRefs(from, to)
-	if err == nil && n > 0 {
-		ss.s.Changed()
+	changed, err := p.ReplaceSpriteRefs(from, to)
+	if err == nil && changed > 0 {
+		ss.session.Changed()
 	}
-	return n, err
+	return changed, err
 }

@@ -4,8 +4,8 @@ import { res } from "./api";
 
 export const CHUNK = 32;
 
-/** Tile flags of the chunk format (see app/map_resources.go). */
-export const TF = {
+/** Tile flags of the chunk format (see app/map_http.go). */
+export const TileFlags = {
   selected: 1,
   modified: 2,
   house: 4,
@@ -24,7 +24,7 @@ export const TF = {
 } as const;
 
 /** Item flags of the chunk format. */
-export const IF = { selected: 1, ids: 2, text: 4, teleport: 8, contents: 16, doorId: 32 } as const;
+export const ItemFlags = { selected: 1, ids: 2, text: 4, teleport: 8, contents: 16, doorId: 32 } as const;
 
 export interface CreatureData {
   npc: boolean;
@@ -44,7 +44,7 @@ export interface CreatureData {
 export interface TileData {
   flags: number;
   house: number;
-  /** Items bottom to top; the ground first when flags has TF.ground. */
+  /** Items bottom to top; the ground first when flags has TileFlags.ground. */
   ids: Uint16Array;
   subs: Uint16Array;
   iflags: Uint8Array;
@@ -70,8 +70,13 @@ export function keyOf(x: number, y: number, z: number): number {
   return chunkKey(x >> 5, y >> 5, z);
 }
 
-export function splitKey(k: number): [number, number, number] {
-  return [Math.floor(k / 32768), Math.floor(k / 16) & 0x7ff, k & 15];
+export function splitKey(key: number): [number, number, number] {
+  return [Math.floor(key / 32768), Math.floor(key / 16) & 0x7ff, key & 15];
+}
+
+/** Index of tile (x, y) in its chunk's tiles. */
+export function tileIndex(x: number, y: number): number {
+  return ((y & 31) << 5) | (x & 31);
 }
 
 const decoder = new TextDecoder();
@@ -81,9 +86,9 @@ const NO_FLAGS = new Uint8Array(0);
 
 /** Decodes a chunk response into chunks. */
 export function decodeChunks(buf: ArrayBuffer): ChunkData[] {
-  const v = new DataView(buf);
+  const view = new DataView(buf);
   const bytes = new Uint8Array(buf);
-  let p = 0;
+  let offset = 0;
   const out: ChunkData[] = [];
   // The item arrays of all tiles are views into three shared buffers: an
   // array buffer per tile costs several times its few bytes. An item takes
@@ -92,86 +97,86 @@ export function decodeChunks(buf: ArrayBuffer): ChunkData[] {
   const allIds = new Uint16Array(room);
   const allSubs = new Uint16Array(room);
   const allFlags = new Uint8Array(room);
-  let q = 0;
-  while (p + 6 <= buf.byteLength) {
-    const key = v.getUint32(p, true);
-    const count = v.getUint16(p + 4, true);
-    p += 6;
+  let itemCursor = 0;
+  while (offset + 6 <= buf.byteLength) {
+    const key = view.getUint32(offset, true);
+    const count = view.getUint16(offset + 4, true);
+    offset += 6;
     const tiles: (TileData | undefined)[] = new Array(CHUNK * CHUNK);
-    for (let t = 0; t < count; t++) {
-      const idx = v.getUint16(p, true);
-      const flags = v.getUint16(p + 2, true);
-      p += 4;
+    for (let decoded = 0; decoded < count; decoded++) {
+      const index = view.getUint16(offset, true);
+      const flags = view.getUint16(offset + 2, true);
+      offset += 4;
       let house = 0;
-      if (flags & TF.house) {
-        house = v.getUint32(p, true);
-        p += 4;
+      if (flags & TileFlags.house) {
+        house = view.getUint32(offset, true);
+        offset += 4;
       }
-      const n = v.getUint8(p++);
-      const ids = n ? allIds.subarray(q, q + n) : NO_IDS;
-      const subs = n ? allSubs.subarray(q, q + n) : NO_IDS;
-      const iflags = n ? allFlags.subarray(q, q + n) : NO_FLAGS;
-      q += n;
-      for (let i = 0; i < n; i++) {
-        ids[i] = v.getUint16(p, true);
-        subs[i] = v.getUint16(p + 2, true);
-        iflags[i] = v.getUint8(p + 4);
-        p += 5;
+      const itemCount = view.getUint8(offset++);
+      const ids = itemCount ? allIds.subarray(itemCursor, itemCursor + itemCount) : NO_IDS;
+      const subs = itemCount ? allSubs.subarray(itemCursor, itemCursor + itemCount) : NO_IDS;
+      const iflags = itemCount ? allFlags.subarray(itemCursor, itemCursor + itemCount) : NO_FLAGS;
+      itemCursor += itemCount;
+      for (let i = 0; i < itemCount; i++) {
+        ids[i] = view.getUint16(offset, true);
+        subs[i] = view.getUint16(offset + 2, true);
+        iflags[i] = view.getUint8(offset + 4);
+        offset += 5;
       }
       let creatures: CreatureData[] | null = null;
-      if (flags & TF.creatures) {
-        const cn = v.getUint8(p++);
+      if (flags & TileFlags.creatures) {
+        const creatureCount = view.getUint8(offset++);
         creatures = [];
-        for (let i = 0; i < cn; i++) {
-          const cf = v.getUint8(p);
-          const c: CreatureData = {
-            npc: (cf & 1) !== 0,
-            selected: (cf & 2) !== 0,
-            dir: (cf >> 2) & 3,
-            lookType: v.getUint16(p + 1, true),
-            head: v.getUint8(p + 3),
-            body: v.getUint8(p + 4),
-            legs: v.getUint8(p + 5),
-            feet: v.getUint8(p + 6),
-            addons: v.getUint8(p + 7),
-            mount: v.getUint16(p + 8, true),
-            lookItem: v.getUint16(p + 10, true),
+        for (let i = 0; i < creatureCount; i++) {
+          const creatureFlags = view.getUint8(offset);
+          const creature: CreatureData = {
+            npc: (creatureFlags & 1) !== 0,
+            selected: (creatureFlags & 2) !== 0,
+            dir: (creatureFlags >> 2) & 3,
+            lookType: view.getUint16(offset + 1, true),
+            head: view.getUint8(offset + 3),
+            body: view.getUint8(offset + 4),
+            legs: view.getUint8(offset + 5),
+            feet: view.getUint8(offset + 6),
+            addons: view.getUint8(offset + 7),
+            mount: view.getUint16(offset + 8, true),
+            lookItem: view.getUint16(offset + 10, true),
             name: "",
           };
-          const len = v.getUint8(p + 12);
-          p += 13;
-          c.name = decoder.decode(bytes.subarray(p, p + len));
-          p += len;
-          creatures.push(c);
+          const len = view.getUint8(offset + 12);
+          offset += 13;
+          creature.name = decoder.decode(bytes.subarray(offset, offset + len));
+          offset += len;
+          creatures.push(creature);
         }
       }
       let spawn: TileData["spawn"] = null;
       let spawnNpc: TileData["spawnNpc"] = null;
-      if (flags & TF.spawn) {
-        spawn = { radius: v.getUint16(p, true), selected: v.getUint8(p + 2) === 1 };
-        p += 3;
+      if (flags & TileFlags.spawn) {
+        spawn = { radius: view.getUint16(offset, true), selected: view.getUint8(offset + 2) === 1 };
+        offset += 3;
       }
-      if (flags & TF.spawnNpc) {
-        spawnNpc = { radius: v.getUint16(p, true), selected: v.getUint8(p + 2) === 1 };
-        p += 3;
+      if (flags & TileFlags.spawnNpc) {
+        spawnNpc = { radius: view.getUint16(offset, true), selected: view.getUint8(offset + 2) === 1 };
+        offset += 3;
       }
       let zones: number[] | null = null;
-      if (flags & TF.zones) {
-        const zn = v.getUint8(p++);
+      if (flags & TileFlags.zones) {
+        const zoneCount = view.getUint8(offset++);
         zones = [];
-        for (let i = 0; i < zn; i++) {
-          zones.push(v.getUint16(p, true));
-          p += 2;
+        for (let i = 0; i < zoneCount; i++) {
+          zones.push(view.getUint16(offset, true));
+          offset += 2;
         }
       }
       let text: string | null = null;
-      if (flags & TF.text) {
-        const len = v.getUint16(p, true);
-        p += 2;
-        text = decoder.decode(bytes.subarray(p, p + len));
-        p += len;
+      if (flags & TileFlags.text) {
+        const len = view.getUint16(offset, true);
+        offset += 2;
+        text = decoder.decode(bytes.subarray(offset, offset + len));
+        offset += len;
       }
-      tiles[idx] = { flags, house, ids, subs, iflags, creatures, spawn, spawnNpc, zones, text };
+      tiles[index] = { flags, house, ids, subs, iflags, creatures, spawn, spawnNpc, zones, text };
     }
     out.push({ key, tiles, count });
   }
@@ -202,9 +207,9 @@ export class ChunkStore {
 
   /** The chunk, null when it is known to be empty, undefined when not loaded. */
   get(key: number): ChunkData | null | undefined {
-    const c = this.chunks.get(key);
-    if (c === undefined && !this.inflight.has(key)) this.queue(key);
-    return c;
+    const chunk = this.chunks.get(key);
+    if (chunk === undefined && !this.inflight.has(key)) this.queue(key);
+    return chunk;
   }
 
   /** The loaded chunk without requesting it. */
@@ -214,15 +219,15 @@ export class ChunkStore {
 
   tile(x: number, y: number, z: number): TileData | undefined {
     if (x < 0 || y < 0 || z < 0 || z > 15) return undefined;
-    const c = this.get(keyOf(x, y, z));
-    return c ? c.tiles[((y & 31) << 5) | (x & 31)] : undefined;
+    const chunk = this.get(keyOf(x, y, z));
+    return chunk ? chunk.tiles[tileIndex(x, y)] : undefined;
   }
 
   /** The tile when its chunk is loaded (no request). */
   peekTile(x: number, y: number, z: number): TileData | undefined {
     if (x < 0 || y < 0 || z < 0 || z > 15) return undefined;
-    const c = this.chunks.get(keyOf(x, y, z));
-    return c ? c.tiles[((y & 31) << 5) | (x & 31)] : undefined;
+    const chunk = this.chunks.get(keyOf(x, y, z));
+    return chunk ? chunk.tiles[tileIndex(x, y)] : undefined;
   }
 
   private queue(key: number): void {
@@ -236,31 +241,31 @@ export class ChunkStore {
     this.queued.clear();
     for (let i = 0; i < keys.length; i += BATCH) {
       const batch = keys.slice(i, i + BATCH);
-      for (const k of batch) this.inflight.add(k);
+      for (const key of batch) this.inflight.add(key);
       void this.fetch(batch, this.gen);
     }
   }
 
   private async fetch(keys: number[], gen: number): Promise<void> {
     const seq = ++this.seq;
-    for (const k of keys) this.latest.set(k, seq);
+    for (const key of keys) this.latest.set(key, seq);
     try {
-      const r = await fetch(res.chunks(this.mapId, keys, this.rev) + `&q=${seq}`);
-      if (!r.ok) throw new Error(await r.text());
-      const data = decodeChunks(await r.arrayBuffer());
+      const response = await fetch(res.chunks(this.mapId, keys, this.rev) + `&q=${seq}`);
+      if (!response.ok) throw new Error(await response.text());
+      const data = decodeChunks(await response.arrayBuffer());
       if (gen !== this.gen) return;
-      for (const c of data) {
-        if (this.latest.get(c.key) === seq) this.chunks.set(c.key, c.count ? c : null);
+      for (const chunk of data) {
+        if (this.latest.get(chunk.key) === seq) this.chunks.set(chunk.key, chunk.count ? chunk : null);
       }
       this.onload();
     } catch {
       // The map was closed or the request failed: try again on demand.
     } finally {
       if (gen === this.gen) {
-        for (const k of keys) {
-          if (this.latest.get(k) === seq) {
-            this.inflight.delete(k);
-            this.latest.delete(k);
+        for (const key of keys) {
+          if (this.latest.get(key) === seq) {
+            this.inflight.delete(key);
+            this.latest.delete(key);
           }
         }
       }
@@ -279,11 +284,11 @@ export class ChunkStore {
     }
     // Refetch changed chunks right away, keeping the old data until the
     // new one arrives so the map does not flicker.
-    const fresh = keys.filter((k) => this.chunks.has(k) || this.inflight.has(k));
+    const fresh = keys.filter((key) => this.chunks.has(key) || this.inflight.has(key));
     if (fresh.length) {
       for (let i = 0; i < fresh.length; i += BATCH) {
         const batch = fresh.slice(i, i + BATCH);
-        for (const k of batch) this.inflight.add(k);
+        for (const key of batch) this.inflight.add(key);
         void this.fetch(batch, this.gen);
       }
     }
@@ -292,8 +297,8 @@ export class ChunkStore {
   /** Forgets chunks far from a view to bound memory. */
   trim(keep: (key: number) => boolean, max = 3000): void {
     if (this.chunks.size <= max) return;
-    for (const k of this.chunks.keys()) {
-      if (!keep(k)) this.chunks.delete(k);
+    for (const key of this.chunks.keys()) {
+      if (!keep(key)) this.chunks.delete(key);
       if (this.chunks.size <= max * 0.75) break;
     }
   }

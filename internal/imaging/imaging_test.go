@@ -14,17 +14,17 @@ func solid(v byte, size int) []byte {
 }
 
 func TestSheetRoundTrip(t *testing.T) {
-	g := &thing.FrameGroup{Width: 2, Height: 1, Layers: 2, PatternX: 2, PatternY: 2, PatternZ: 1, Frames: 2}
-	g.Sprites = make([]uint32, g.TotalSprites())
-	src := make([][]byte, g.TotalSprites())
+	group := &thing.FrameGroup{Width: 2, Height: 1, Layers: 2, PatternX: 2, PatternY: 2, PatternZ: 1, Frames: 2}
+	group.Sprites = make([]uint32, group.TotalSprites())
+	src := make([][]byte, group.TotalSprites())
 	for i := range src {
 		if i%5 == 0 {
 			continue // empty slot
 		}
 		src[i] = solid(byte(i+1), 32)
 	}
-	img := Sheet(g, 32, Magenta, func(slot int) []byte { return src[slot] })
-	w, h := g.SheetSize(32)
+	img := Sheet(group, 32, Magenta, func(slot int) []byte { return src[slot] })
+	w, h := group.SheetSize(32)
 	if img.Rect.Dx() != w || img.Rect.Dy() != h {
 		t.Fatalf("sheet %v", img.Rect)
 	}
@@ -32,7 +32,7 @@ func TestSheetRoundTrip(t *testing.T) {
 	if c := img.NRGBAAt(32+5, 5); c != Magenta {
 		t.Fatalf("slot 0 pixel %v", c)
 	}
-	got, err := SliceSheet(img, g, 32)
+	got, err := SliceSheet(img, group, 32)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,17 +50,17 @@ func TestSheetRoundTrip(t *testing.T) {
 
 func TestSheetLayoutMatchesObjectBuilder(t *testing.T) {
 	// 2x1 tiles: sprite w=0 is drawn on the right.
-	g := &thing.FrameGroup{Width: 2, Height: 1, Layers: 1, PatternX: 1, PatternY: 1, PatternZ: 1, Frames: 1}
-	g.Sprites = make([]uint32, 2)
-	img := Sheet(g, 32, color.NRGBA{}, func(slot int) []byte { return solid(byte(10+slot), 32) })
+	group := &thing.FrameGroup{Width: 2, Height: 1, Layers: 1, PatternX: 1, PatternY: 1, PatternZ: 1, Frames: 1}
+	group.Sprites = make([]uint32, 2)
+	img := Sheet(group, 32, color.NRGBA{}, func(slot int) []byte { return solid(byte(10+slot), 32) })
 	if img.NRGBAAt(40, 0).R != 10 || img.NRGBAAt(0, 0).R != 11 {
 		t.Fatal("w=0 must be the right tile")
 	}
 }
 
 func TestSliceSheetSizeMismatch(t *testing.T) {
-	g := thing.NewFrameGroup()
-	if _, err := SliceSheet(image.NewNRGBA(image.Rect(0, 0, 10, 10)), g, 32); err == nil {
+	group := thing.NewFrameGroup()
+	if _, err := SliceSheet(image.NewNRGBA(image.Rect(0, 0, 10, 10)), group, 32); err == nil {
 		t.Fatal("expected error")
 	}
 }
@@ -160,5 +160,17 @@ func TestCropToContent(t *testing.T) {
 	empty := image.NewNRGBA(image.Rect(0, 0, 32, 32))
 	if CropToContent(empty) != empty {
 		t.Fatal("empty image must stay")
+	}
+}
+
+func TestShift(t *testing.T) {
+	img := image.NewNRGBA(image.Rect(0, 0, 4, 4))
+	img.SetNRGBA(1, 1, color.NRGBA{R: 9, A: 0xFF})
+	moved, ok := Shift(img, 2, 1)
+	if !ok || moved.NRGBAAt(3, 2).R != 9 || moved.NRGBAAt(1, 1).A != 0 {
+		t.Fatal("pixel not moved")
+	}
+	if _, ok := Shift(img, 3, 0); ok {
+		t.Fatal("shift out of the image should fail")
 	}
 }

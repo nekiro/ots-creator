@@ -38,13 +38,13 @@ func (c Category) String() string {
 }
 
 // ParseCategory converts a name produced by String back to a Category.
-func ParseCategory(s string) (Category, error) {
-	for _, c := range Categories {
-		if c.String() == s {
-			return c, nil
+func ParseCategory(name string) (Category, error) {
+	for _, category := range Categories {
+		if category.String() == name {
+			return category, nil
 		}
 	}
-	return CategoryInvalid, fmt.Errorf("invalid thing category %q", s)
+	return CategoryInvalid, fmt.Errorf("invalid thing category %q", name)
 }
 
 // Valid reports whether c is one of the four known categories.
@@ -197,7 +197,7 @@ type Properties struct {
 // (protobuf) clients store. dat/spr clients drop them.
 func (p *Properties) AssetOnly() []string {
 	var out []string
-	for _, f := range []struct {
+	for _, flag := range []struct {
 		key string
 		on  bool
 	}{
@@ -209,8 +209,8 @@ func (p *Properties) AssetOnly() []string {
 		{"wearout", p.Wearout}, {"clockExpire", p.ClockExpire}, {"expire", p.Expire},
 		{"expireStop", p.ExpireStop}, {"wrapKit", p.WrapKit},
 	} {
-		if f.on {
-			out = append(out, f.key)
+		if flag.on {
+			out = append(out, flag.key)
 		}
 	}
 	return out
@@ -265,9 +265,9 @@ type FrameGroup struct {
 
 // NewFrameGroup returns a 1x1 group with one empty sprite slot.
 func NewFrameGroup() *FrameGroup {
-	g := &FrameGroup{Width: 1, Height: 1, ExactSize: 32, Layers: 1, PatternX: 1, PatternY: 1, PatternZ: 1, Frames: 1}
-	g.Sprites = make([]uint32, 1)
-	return g
+	group := &FrameGroup{Width: 1, Height: 1, ExactSize: 32, Layers: 1, PatternX: 1, PatternY: 1, PatternZ: 1, Frames: 1}
+	group.Sprites = make([]uint32, 1)
+	return group
 }
 
 // IsAnimation reports whether the group has more than one frame.
@@ -284,63 +284,63 @@ func (g *FrameGroup) TotalTextures() int {
 }
 
 // SpriteIndex returns the slot index of one 32x32 piece. Parameter order
-// mirrors the client: w/h are tile offsets inside the texture.
-func (g *FrameGroup) SpriteIndex(w, h, layer, px, py, pz, frame int) int {
+// mirrors the client: tileX/tileY are tile offsets inside the texture.
+func (g *FrameGroup) SpriteIndex(tileX, tileY, layer, patternX, patternY, patternZ, frame int) int {
 	frames := max(int(g.Frames), 1)
-	return ((((((frame%frames)*int(g.PatternZ)+pz)*int(g.PatternY)+py)*int(g.PatternX)+px)*int(g.Layers)+layer)*int(g.Height)+h)*int(g.Width) + w
+	return ((((((frame%frames)*int(g.PatternZ)+patternZ)*int(g.PatternY)+patternY)*int(g.PatternX)+patternX)*int(g.Layers)+layer)*int(g.Height)+tileY)*int(g.Width) + tileX
 }
 
 // TextureIndex returns the index of a composed texture.
-func (g *FrameGroup) TextureIndex(layer, px, py, pz, frame int) int {
+func (g *FrameGroup) TextureIndex(layer, patternX, patternY, patternZ, frame int) int {
 	frames := max(int(g.Frames), 1)
-	return ((((frame%frames)*int(g.PatternZ)+pz)*int(g.PatternY)+py)*int(g.PatternX)+px)*int(g.Layers) + layer
+	return ((((frame%frames)*int(g.PatternZ)+patternZ)*int(g.PatternY)+patternY)*int(g.PatternX)+patternX)*int(g.Layers) + layer
 }
 
 // SheetSize returns the pixel size of the sprite sheet used for import/export.
 // Columns: patternZ*patternX*layers textures, rows: frames*patternY textures.
-func (g *FrameGroup) SheetSize(spriteSize int) (w, h int) {
-	w = int(g.PatternZ) * int(g.PatternX) * int(g.Layers) * int(g.Width) * spriteSize
-	h = int(g.Frames) * int(g.PatternY) * int(g.Height) * spriteSize
+func (g *FrameGroup) SheetSize(spriteSize int) (width, height int) {
+	width = int(g.PatternZ) * int(g.PatternX) * int(g.Layers) * int(g.Width) * spriteSize
+	height = int(g.Frames) * int(g.PatternY) * int(g.Height) * spriteSize
 	return
 }
 
 // Clone returns a deep copy.
 func (g *FrameGroup) Clone() *FrameGroup {
-	c := *g
-	c.Durations = slices.Clone(g.Durations)
-	c.Sprites = slices.Clone(g.Sprites)
-	return &c
+	clone := *g
+	clone.Durations = slices.Clone(g.Durations)
+	clone.Sprites = slices.Clone(g.Sprites)
+	return &clone
 }
 
 // EnsureDurations makes the durations slice match the frame count, filling
 // new entries with the given default.
-func (g *FrameGroup) EnsureDurations(def uint32) {
-	n := int(g.Frames)
-	if n <= 1 {
+func (g *FrameGroup) EnsureDurations(defaultDuration uint32) {
+	frames := int(g.Frames)
+	if frames <= 1 {
 		g.Durations = nil
 		return
 	}
-	for len(g.Durations) < n {
-		g.Durations = append(g.Durations, FrameDuration{Min: def, Max: def})
+	for len(g.Durations) < frames {
+		g.Durations = append(g.Durations, FrameDuration{Min: defaultDuration, Max: defaultDuration})
 	}
-	g.Durations = g.Durations[:n]
+	g.Durations = g.Durations[:frames]
 }
 
 // Resize changes the layout and keeps existing sprite ids where the
-// (w,h,layer,px,py,pz,frame) coordinates still exist.
-func (g *FrameGroup) Resize(width, height, layers, px, py, pz, frames uint8, defDuration uint32) {
+// (tileX,tileY,layer,patternX,patternY,patternZ,frame) coordinates still exist.
+func (g *FrameGroup) Resize(width, height, layers, patternX, patternY, patternZ, frames uint8, defaultDuration uint32) {
 	old := g.Clone()
 	g.Width, g.Height, g.Layers = width, height, layers
-	g.PatternX, g.PatternY, g.PatternZ, g.Frames = px, py, pz, frames
+	g.PatternX, g.PatternY, g.PatternZ, g.Frames = patternX, patternY, patternZ, frames
 	g.Sprites = make([]uint32, g.TotalSprites())
-	for f := 0; f < int(min(old.Frames, frames)); f++ {
-		for z := 0; z < int(min(old.PatternZ, pz)); z++ {
-			for y := 0; y < int(min(old.PatternY, py)); y++ {
-				for x := 0; x < int(min(old.PatternX, px)); x++ {
-					for l := 0; l < int(min(old.Layers, layers)); l++ {
-						for hh := 0; hh < int(min(old.Height, height)); hh++ {
-							for ww := 0; ww < int(min(old.Width, width)); ww++ {
-								g.Sprites[g.SpriteIndex(ww, hh, l, x, y, z, f)] = old.Sprites[old.SpriteIndex(ww, hh, l, x, y, z, f)]
+	for frame := 0; frame < int(min(old.Frames, frames)); frame++ {
+		for z := 0; z < int(min(old.PatternZ, patternZ)); z++ {
+			for y := 0; y < int(min(old.PatternY, patternY)); y++ {
+				for x := 0; x < int(min(old.PatternX, patternX)); x++ {
+					for layer := 0; layer < int(min(old.Layers, layers)); layer++ {
+						for tileY := 0; tileY < int(min(old.Height, height)); tileY++ {
+							for tileX := 0; tileX < int(min(old.Width, width)); tileX++ {
+								g.Sprites[g.SpriteIndex(tileX, tileY, layer, x, y, z, frame)] = old.Sprites[old.SpriteIndex(tileX, tileY, layer, x, y, z, frame)]
 							}
 						}
 					}
@@ -348,7 +348,7 @@ func (g *FrameGroup) Resize(width, height, layers, px, py, pz, frames uint8, def
 			}
 		}
 	}
-	g.EnsureDurations(defDuration)
+	g.EnsureDurations(defaultDuration)
 	if int(g.StartFrame) >= int(frames) {
 		g.StartFrame = 0
 	}
@@ -387,19 +387,19 @@ type Thing struct {
 
 // New returns an empty thing with one default frame group. Outfits get four
 // directions like ObjectBuilder does.
-func New(id uint32, c Category) *Thing {
-	g := NewFrameGroup()
-	if c == CategoryOutfit {
-		g.PatternX = 4
-		g.Sprites = make([]uint32, g.TotalSprites())
+func New(id uint32, category Category) *Thing {
+	group := NewFrameGroup()
+	if category == CategoryOutfit {
+		group.PatternX = 4
+		group.Sprites = make([]uint32, group.TotalSprites())
 	}
-	return &Thing{ID: id, Category: c, FrameGroups: []*FrameGroup{g}}
+	return &Thing{ID: id, Category: category, FrameGroups: []*FrameGroup{group}}
 }
 
 // Group returns the frame group of the given type, falling back to the first.
-func (t *Thing) Group(ft FrameGroupType) *FrameGroup {
-	if int(ft) < len(t.FrameGroups) {
-		return t.FrameGroups[ft]
+func (t *Thing) Group(groupType FrameGroupType) *FrameGroup {
+	if int(groupType) < len(t.FrameGroups) {
+		return t.FrameGroups[groupType]
 	}
 	if len(t.FrameGroups) > 0 {
 		return t.FrameGroups[0]
@@ -409,20 +409,20 @@ func (t *Thing) Group(ft FrameGroupType) *FrameGroup {
 
 // Clone returns a deep copy.
 func (t *Thing) Clone() *Thing {
-	c := *t
-	c.NpcSales = slices.Clone(t.NpcSales)
-	c.FrameGroups = make([]*FrameGroup, len(t.FrameGroups))
-	for i, g := range t.FrameGroups {
-		c.FrameGroups[i] = g.Clone()
+	clone := *t
+	clone.NpcSales = slices.Clone(t.NpcSales)
+	clone.FrameGroups = make([]*FrameGroup, len(t.FrameGroups))
+	for i, group := range t.FrameGroups {
+		clone.FrameGroups[i] = group.Clone()
 	}
-	return &c
+	return &clone
 }
 
 // SpriteIDs returns every sprite id referenced by all frame groups.
 func (t *Thing) SpriteIDs() []uint32 {
 	var ids []uint32
-	for _, g := range t.FrameGroups {
-		ids = append(ids, g.Sprites...)
+	for _, group := range t.FrameGroups {
+		ids = append(ids, group.Sprites...)
 	}
 	return ids
 }
@@ -438,8 +438,8 @@ func (t *Thing) Validate() error {
 	if t.Category != CategoryOutfit && len(t.FrameGroups) > 1 {
 		return fmt.Errorf("%s %d: only outfits can have more than one frame group", t.Category, t.ID)
 	}
-	for i, g := range t.FrameGroups {
-		if err := g.Validate(); err != nil {
+	for i, group := range t.FrameGroups {
+		if err := group.Validate(); err != nil {
 			return fmt.Errorf("%s %d group %d: %w", t.Category, t.ID, i, err)
 		}
 	}
@@ -450,25 +450,26 @@ func (t *Thing) Validate() error {
 // followed by the walking frames, as in a sprite sheet of the whole outfit.
 // A thing with one group returns a copy of it; ok is false when the groups
 // have different layouts.
-func (t *Thing) Stacked() (g *FrameGroup, ok bool) {
+func (t *Thing) Stacked() (stacked *FrameGroup, ok bool) {
 	if len(t.FrameGroups) == 0 {
 		return nil, false
 	}
-	g = t.FrameGroups[0].Clone()
+	stacked = t.FrameGroups[0].Clone()
 	if len(t.FrameGroups) == 1 {
-		return g, true
+		return stacked, true
 	}
-	w := t.FrameGroups[1]
-	if w.Width != g.Width || w.Height != g.Height || w.Layers != g.Layers || w.PatternX != g.PatternX ||
-		w.PatternY != g.PatternY || w.PatternZ != g.PatternZ || int(g.Frames)+int(w.Frames) > 255 {
+	walking := t.FrameGroups[1]
+	if walking.Width != stacked.Width || walking.Height != stacked.Height || walking.Layers != stacked.Layers ||
+		walking.PatternX != stacked.PatternX || walking.PatternY != stacked.PatternY || walking.PatternZ != stacked.PatternZ ||
+		int(stacked.Frames)+int(walking.Frames) > 255 {
 		return nil, false
 	}
-	g.Frames += w.Frames
-	g.Sprites = append(g.Sprites, w.Sprites...)
-	g.Durations = append(g.Durations, w.Durations...)
-	if len(g.Durations) != int(g.Frames) {
-		g.Durations = nil
-		g.EnsureDurations(t.Category.DefaultDuration())
+	stacked.Frames += walking.Frames
+	stacked.Sprites = append(stacked.Sprites, walking.Sprites...)
+	stacked.Durations = append(stacked.Durations, walking.Durations...)
+	if len(stacked.Durations) != int(stacked.Frames) {
+		stacked.Durations = nil
+		stacked.EnsureDurations(t.Category.DefaultDuration())
 	}
-	return g, true
+	return stacked, true
 }

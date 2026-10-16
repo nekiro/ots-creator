@@ -68,3 +68,12 @@ func TestChunkRepack(t *testing.T) {
 		}
 	}
 }
+
+func TestForgetAuxFileNames(t *testing.T) {
+	m := New(32, 32)
+	m.HouseFile, m.SpawnFile, m.NpcFile, m.ZoneFile = "h.xml", "s.xml", "n.xml", "z.xml"
+	m.ForgetAuxFileNames()
+	if m.HouseFile != "" || m.SpawnFile != "" || m.NpcFile != "" || m.ZoneFile != "" {
+		t.Fatalf("names kept: %+v", m)
+	}
+}

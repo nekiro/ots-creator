@@ -29,8 +29,8 @@ export function hsiToRgb(color: number): number {
   }
   if (i === 0) return 0;
   if (s === 0) {
-    const v = Math.floor(i * 0xff);
-    return (v << 16) | (v << 8) | v;
+    const gray = Math.floor(i * 0xff);
+    return (gray << 16) | (gray << 8) | gray;
   }
   let r = 0,
     g = 0,
@@ -66,27 +66,27 @@ export const DEFAULT_COLORS: OutfitColors = { head: 78, body: 69, legs: 58, feet
  * modified in place.
  */
 export function colorize(base: Uint8ClampedArray, template: Uint8ClampedArray, colors: OutfitColors): void {
-  const rgb = (c: number) => {
-    const v = hsiToRgb(c);
-    return [(v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff];
+  const rgb = (color: number) => {
+    const packed = hsiToRgb(color);
+    return [(packed >> 16) & 0xff, (packed >> 8) & 0xff, packed & 0xff];
   };
   const head = rgb(colors.head);
   const body = rgb(colors.body);
   const legs = rgb(colors.legs);
   const feet = rgb(colors.feet);
-  for (let p = 0; p < base.length; p += 4) {
-    if (template[p + 3] === 0 || base[p + 3] === 0) continue;
-    const r = template[p] > 0;
-    const g = template[p + 1] > 0;
-    const b = template[p + 2] > 0;
-    let c: number[] | null = null;
-    if (r && g && !b) c = head;
-    else if (r && !g && !b) c = body;
-    else if (!r && g && !b) c = legs;
-    else if (!r && !g && b) c = feet;
-    if (!c) continue;
-    base[p] = (base[p] * c[0]) / 255;
-    base[p + 1] = (base[p + 1] * c[1]) / 255;
-    base[p + 2] = (base[p + 2] * c[2]) / 255;
+  for (let offset = 0; offset < base.length; offset += 4) {
+    if (template[offset + 3] === 0 || base[offset + 3] === 0) continue;
+    const red = template[offset] > 0;
+    const green = template[offset + 1] > 0;
+    const blue = template[offset + 2] > 0;
+    let multiplier: number[] | null = null;
+    if (red && green && !blue) multiplier = head;
+    else if (red && !green && !blue) multiplier = body;
+    else if (!red && green && !blue) multiplier = legs;
+    else if (!red && !green && blue) multiplier = feet;
+    if (!multiplier) continue;
+    base[offset] = (base[offset] * multiplier[0]) / 255;
+    base[offset + 1] = (base[offset + 1] * multiplier[1]) / 255;
+    base[offset + 2] = (base[offset + 2] * multiplier[2]) / 255;
   }
 }

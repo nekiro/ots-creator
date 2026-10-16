@@ -32,6 +32,7 @@
   import ThingList from "./features/ThingList.svelte";
   import { commands, handlePaste, handleShortcut } from "./lib/commands";
   import { app, initState } from "./lib/state.svelte";
+  import { readPositive, writeStored } from "./lib/storage";
   import Splitter from "./lib/ui/Splitter.svelte";
   import ContextMenu from "./lib/ui/ContextMenu.svelte";
   import ConfirmDialog from "./lib/ui/ConfirmDialog.svelte";
@@ -45,12 +46,12 @@
   let mapHover = $state("");
 
   // In the map editor only map shortcuts apply (Ctrl+S saves the map, not the client).
-  function onkeydown(e: KeyboardEvent) {
+  function onkeydown(event: KeyboardEvent) {
     if (map.mode === "map") {
-      if (!app.dialog && !map.dialog) mapShortcut(e);
+      if (!app.dialog && !map.dialog) mapShortcut(event);
       return;
     }
-    handleShortcut(e);
+    handleShortcut(event);
   }
 
   // Height of the sprite list; the splitter trades it with the preview.
@@ -61,13 +62,7 @@
   let spritesHeight = $state(loadHeight());
 
   function loadHeight(): number {
-    try {
-      const v = Number(localStorage.getItem(SPRITES_KEY));
-      if (v > 0) return v;
-    } catch {
-      /* storage unavailable */
-    }
-    return 260;
+    return readPositive(SPRITES_KEY) ?? 260;
   }
 
   function resizeSprites(dy: number) {
@@ -76,11 +71,7 @@
   }
 
   function saveHeight() {
-    try {
-      localStorage.setItem(SPRITES_KEY, String(spritesHeight));
-    } catch {
-      /* ignore */
-    }
+    writeStored(SPRITES_KEY, String(spritesHeight));
   }
 
   // The backend holds window closes while edits are unapplied.
@@ -115,7 +106,7 @@
 </script>
 
 <svelte:window {onkeydown} />
-<svelte:document onpaste={(e) => map.mode === "objects" && handlePaste(e, group)} />
+<svelte:document onpaste={(event) => map.mode === "objects" && handlePaste(event, group)} />
 
 <div class="shell" data-file-drop-target>
   <MenuBar />

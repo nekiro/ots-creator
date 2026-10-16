@@ -39,20 +39,20 @@ func ParseVersions(data []byte) ([]Version, error) {
 		return nil, fmt.Errorf("parse versions: %w", err)
 	}
 	out := make([]Version, 0, len(doc.Versions))
-	for _, x := range doc.Versions {
-		value, err := strconv.ParseUint(x.Value, 10, 16)
+	for _, entry := range doc.Versions {
+		value, err := strconv.ParseUint(entry.Value, 10, 16)
 		if err != nil {
-			return nil, fmt.Errorf("version %q: bad value: %w", x.String, err)
+			return nil, fmt.Errorf("version %q: bad value: %w", entry.String, err)
 		}
-		dat, err := strconv.ParseUint(x.Dat, 16, 32)
+		datSignature, err := strconv.ParseUint(entry.Dat, 16, 32)
 		if err != nil {
-			return nil, fmt.Errorf("version %q: bad dat signature: %w", x.String, err)
+			return nil, fmt.Errorf("version %q: bad dat signature: %w", entry.String, err)
 		}
-		spr, err := strconv.ParseUint(x.Spr, 16, 32)
+		sprSignature, err := strconv.ParseUint(entry.Spr, 16, 32)
 		if err != nil {
-			return nil, fmt.Errorf("version %q: bad spr signature: %w", x.String, err)
+			return nil, fmt.Errorf("version %q: bad spr signature: %w", entry.String, err)
 		}
-		out = append(out, Version{Value: uint16(value), Name: x.String, DatSignature: uint32(dat), SprSignature: uint32(spr)})
+		out = append(out, Version{Value: uint16(value), Name: entry.String, DatSignature: uint32(datSignature), SprSignature: uint32(sprSignature)})
 	}
 	return out, nil
 }
@@ -65,20 +65,20 @@ var (
 // Versions returns the built-in version table.
 func Versions() []Version {
 	builtinOnce.Do(func() {
-		v, err := ParseVersions(versionsXML)
+		parsed, err := ParseVersions(versionsXML)
 		if err != nil {
 			panic(err) // embedded data is covered by tests
 		}
-		builtin = v
+		builtin = parsed
 	})
 	return slices.Clone(builtin)
 }
 
 // FindBySignatures returns the first version that matches both signatures.
-func FindBySignatures(dat, spr uint32) (Version, bool) {
-	for _, v := range Versions() {
-		if v.DatSignature == dat && v.SprSignature == spr {
-			return v, true
+func FindBySignatures(datSignature, sprSignature uint32) (Version, bool) {
+	for _, version := range Versions() {
+		if version.DatSignature == datSignature && version.SprSignature == sprSignature {
+			return version, true
 		}
 	}
 	return Version{}, false
@@ -87,9 +87,9 @@ func FindBySignatures(dat, spr uint32) (Version, bool) {
 // FindByValue returns every version with the given numeric value.
 func FindByValue(value uint16) []Version {
 	var out []Version
-	for _, v := range Versions() {
-		if v.Value == value {
-			out = append(out, v)
+	for _, version := range Versions() {
+		if version.Value == value {
+			out = append(out, version)
 		}
 	}
 	return out

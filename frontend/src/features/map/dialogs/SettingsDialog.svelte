@@ -42,15 +42,15 @@
 
   // Records the next key press for the action; a combination used by another
   // action moves here.
-  function onkeydown(e: KeyboardEvent) {
+  function onkeydown(event: KeyboardEvent) {
     if (!recording) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.key === "Escape") {
       recording = null;
       return;
     }
-    const combo = comboOf(e);
+    const combo = comboOf(event);
     if (!combo) return;
     const target = KEY_ACTIONS.find((a) => a.id === recording)!;
     for (const a of KEY_ACTIONS) {
@@ -72,8 +72,8 @@
       map.settings = { ...s };
       map.keys = $state.snapshot(keys);
       map.dialog = null;
-    } catch (e) {
-      toast(errorMessage(e), "error");
+    } catch (err) {
+      toast(errorMessage(err), "error");
     }
   }
 </script>
@@ -89,11 +89,11 @@
     <div class="col form">
       {#each OPTIONS as o}
         <label class="opt">
-          <input class="t-check" type="checkbox" checked={!!s[o.key]} onchange={(e) => ((s as unknown as Record<string, unknown>)[o.key] = e.currentTarget.checked)} />
+          <input class="t-check" type="checkbox" checked={!!s[o.key]} onchange={(event) => ((s as unknown as Record<string, unknown>)[o.key] = event.currentTarget.checked)} />
           <span class="col"><span>{o.label}</span><span class="t-label hint">{o.hint}</span></span>
         </label>
       {/each}
-      <div class="row"><span>Default spawn time</span><NumberField value={s.defaultSpawnTime} min={1} max={86400} width={60} onchange={(v) => (s.defaultSpawnTime = v)} /><span class="t-label">seconds</span></div>
+      <div class="row"><span>Default spawn time</span><NumberField value={s.defaultSpawnTime} min={1} max={86400} width={60} onchange={(value) => (s.defaultSpawnTime = value)} /><span class="t-label">seconds</span></div>
     </div>
   {:else}
     <div class="t-label hint">Click + and press a key. Click a key to remove it. Esc, the arrows, 1–9 and mouse gestures cannot be changed.</div>

@@ -6,8 +6,8 @@ export type PasteMode = "object" | "properties";
 
 let copied: Thing | null = null;
 
-export function copyThing(t: Thing): void {
-  copied = JSON.parse(JSON.stringify(t));
+export function copyThing(thing: Thing): void {
+  copied = JSON.parse(JSON.stringify(thing));
 }
 
 export function clipboardThing(): Thing | null {

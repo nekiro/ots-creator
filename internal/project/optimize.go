@@ -39,59 +39,59 @@ type spritePlan struct {
 
 // AnalyzeSprites reports what OptimizeSprites would remove without changing
 // anything. Things is not counted. progress may be nil.
-func (p *Project) AnalyzeSprites(o OptimizeOptions, progress func(done, total int)) (OptimizeResult, error) {
+func (p *Project) AnalyzeSprites(options OptimizeOptions, progress func(done, total int)) (OptimizeResult, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	pl, err := p.planSprites(o, newCounter(int(p.sprites.count()), progress))
-	return pl.res, err
+	plan, err := p.planSprites(options, newCounter(int(p.sprites.count()), progress))
+	return plan.res, err
 }
 
 // planSprites finds duplicate, empty and unused sprites by content hash,
-// ticking prog for every sprite. The caller holds p.mu.
-func (p *Project) planSprites(o OptimizeOptions, prog *counter) (spritePlan, error) {
-	n := p.sprites.count()
-	res := OptimizeResult{Before: n, After: n}
+// ticking progress for every sprite. The caller holds p.mu.
+func (p *Project) planSprites(options OptimizeOptions, progress *counter) (spritePlan, error) {
+	count := p.sprites.count()
+	res := OptimizeResult{Before: count, After: count}
 
-	hashes := make([]spriteHash, n+1)
-	err := p.sprites.eachHash(func(id uint32, h spriteHash) {
-		hashes[id] = h
-		prog.tick()
+	hashes := make([]spriteHash, count+1)
+	err := p.sprites.eachHash(func(id uint32, contentHash spriteHash) {
+		hashes[id] = contentHash
+		progress.tick()
 	})
 	if err != nil {
 		return spritePlan{res: res}, err
 	}
 
-	canon := make([]uint32, n+1)
-	first := make(map[spriteHash]uint32, n)
-	for id := uint32(1); id <= n; id++ {
+	canon := make([]uint32, count+1)
+	first := make(map[spriteHash]uint32, count)
+	for id := uint32(1); id <= count; id++ {
 		canon[id] = id
-		h := hashes[id]
-		if h == (spriteHash{}) {
-			if o.Empty {
+		contentHash := hashes[id]
+		if contentHash == (spriteHash{}) {
+			if options.Empty {
 				canon[id] = 0
 				res.Empty++
 			}
 			continue
 		}
-		if !o.Duplicates {
+		if !options.Duplicates {
 			continue
 		}
-		if prev, ok := first[h]; ok {
+		if prev, ok := first[contentHash]; ok {
 			canon[id] = prev
 			res.Duplicates++
 		} else {
-			first[h] = id
+			first[contentHash] = id
 		}
 	}
 
-	used := make([]bool, n+1)
-	for _, c := range thing.Categories {
-		for _, t := range p.things.Things[c] {
-			if t == nil {
+	used := make([]bool, count+1)
+	for _, category := range thing.Categories {
+		for _, object := range p.things.Things[category] {
+			if object == nil {
 				continue
 			}
-			for _, id := range t.SpriteIDs() {
-				if id <= n {
+			for _, id := range object.SpriteIDs() {
+				if id <= count {
 					used[canon[id]] = true
 				}
 			}
@@ -99,11 +99,11 @@ func (p *Project) planSprites(o OptimizeOptions, prog *counter) (spritePlan, err
 	}
 
 	// Sprites that stay, in order, and their new ids.
-	newID := make([]uint32, n+1)
+	newID := make([]uint32, count+1)
 	var next uint32
-	for id := uint32(1); id <= n; id++ {
-		keep := canon[id] == id && (hashes[id] != (spriteHash{}) || !o.Empty)
-		if keep && o.Unused && !used[id] {
+	for id := uint32(1); id <= count; id++ {
+		keep := canon[id] == id && (hashes[id] != (spriteHash{}) || !options.Empty)
+		if keep && options.Unused && !used[id] {
 			keep = false
 			res.Unused++
 		}
@@ -132,59 +132,59 @@ func (p *Project) planSprites(o OptimizeOptions, prog *counter) (spritePlan, err
 // OptimizeSprites removes duplicate, empty and unused sprites, renumbers
 // the remaining ones without gaps (keeping their order) and rewrites the
 // sprite ids of every thing. It is one undo step. progress may be nil.
-func (p *Project) OptimizeSprites(o OptimizeOptions, progress func(done, total int)) (OptimizeResult, error) {
+func (p *Project) OptimizeSprites(options OptimizeOptions, progress func(done, total int)) (OptimizeResult, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	// Hashing every sprite, then moving every sprite.
-	prog := newCounter(2*int(p.sprites.count()), progress)
-	pl, err := p.planSprites(o, prog)
+	ticker := newCounter(2*int(p.sprites.count()), progress)
+	plan, err := p.planSprites(options, ticker)
 	if err != nil {
-		return pl.res, err
+		return plan.res, err
 	}
-	res, canon, newID := pl.res, pl.canon, pl.newID
-	n, next := res.Before, res.After
+	res, canon, newID := plan.res, plan.canon, plan.newID
+	before, next := res.Before, res.After
 	remap := func(id uint32) uint32 {
-		if id == 0 || id > n {
+		if id == 0 || id > before {
 			return id
 		}
 		return newID[canon[id]]
 	}
 
-	r := p.record("Optimize sprites")
-	for _, c := range thing.Categories {
-		for _, cur := range p.things.Things[c] {
-			if cur == nil {
+	edit := p.record("Optimize sprites")
+	for _, category := range thing.Categories {
+		for _, current := range p.things.Things[category] {
+			if current == nil {
 				continue
 			}
-			var t *thing.Thing
-			for gi, g := range cur.FrameGroups {
-				for si, id := range g.Sprites {
-					if m := remap(id); m != id {
-						if t == nil {
-							t = cur.Clone()
+			var object *thing.Thing
+			for groupIndex, group := range current.FrameGroups {
+				for slot, id := range group.Sprites {
+					if mapped := remap(id); mapped != id {
+						if object == nil {
+							object = current.Clone()
 						}
-						t.FrameGroups[gi].Sprites[si] = m
+						object.FrameGroups[groupIndex].Sprites[slot] = mapped
 					}
 				}
 			}
-			if t != nil {
-				r.setThing(c, t.ID, t)
+			if object != nil {
+				edit.setThing(category, object.ID, object)
 				res.Things++
 			}
 		}
 	}
 	// Move kept sprites down (aliases: nothing is decoded), then record
 	// every dropped slot so undo can restore it, then shrink.
-	for id := uint32(1); id <= n; id++ {
-		if m := newID[id]; m != 0 && m != id {
-			r.moveSprite(m, id) // m < id: id is not written yet
+	for id := uint32(1); id <= before; id++ {
+		if mapped := newID[id]; mapped != 0 && mapped != id {
+			edit.moveSprite(mapped, id) // m < id: id is not written yet
 		}
-		prog.tick()
+		ticker.tick()
 	}
-	for id := next + 1; id <= n; id++ {
-		r.setSprite(id, nil)
+	for id := next + 1; id <= before; id++ {
+		edit.setSprite(id, nil)
 	}
-	r.setSpriteCount(next)
-	r.commit()
+	edit.setSpriteCount(next)
+	edit.commit()
 	return res, nil
 }

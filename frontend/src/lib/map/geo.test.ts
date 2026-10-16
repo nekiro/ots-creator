@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decodeGeo, geoBits, GEO, QUAD_BYTES } from "./geo";
+import { decodeGeo, decodeGeoSignature, encodeGeoSignature, geoBits, GEO, QUAD_BYTES } from "./geo";
 
 describe("decodeGeo", () => {
   it("decodes chunks with their parts", () => {
@@ -40,5 +40,13 @@ describe("decodeGeo", () => {
     const off = { pathing: false, houses: false, special: false, zones: false, spawns: false, highlightItems: false, ghostItems: false, creatures: false, onlyModified: false, animation: false };
     expect(geoBits(off)).toBe(0);
     expect(geoBits({ ...off, houses: true, animation: true })).toBe(GEO.houses | GEO.animation);
+  });
+});
+
+describe("geo signature", () => {
+  it("round trips", () => {
+    const signature = { bits: GEO.houses | GEO.zones, house: 12, blockSize: 4 };
+    expect(encodeGeoSignature(signature)).toBe(`${GEO.houses | GEO.zones}|12|4`);
+    expect(decodeGeoSignature(encodeGeoSignature(signature))).toEqual(signature);
   });
 });

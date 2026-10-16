@@ -1,6 +1,7 @@
 package app
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -29,19 +30,31 @@ var (
 	MarketAPIURL   = "https://otscreatormarket.nekiro.dev"
 )
 
-// marketIndexTTL is how long a downloaded index is reused.
-const marketIndexTTL = 5 * time.Minute
+// Market timeouts.
+const (
+	// marketIndexTTL is how long a downloaded index is reused.
+	marketIndexTTL = 5 * time.Minute
+	// marketRequestTimeout bounds every market request; callers add their
+	// own deadline.
+	marketRequestTimeout = 2 * time.Minute
+	marketIndexTimeout   = 30 * time.Second
+	marketFileTimeout    = 60 * time.Second
+	marketSubmitTimeout  = 2 * time.Minute
+	marketDeleteTimeout  = 30 * time.Second
+)
 
-// httpClient bounds every market request; callers add their own deadline.
-var httpClient = &http.Client{Timeout: 2 * time.Minute}
+// shareSpriteSizes are the sprite sizes a shared image may be cut into.
+var shareSpriteSizes = []int{32, 64}
+
+var httpClient = &http.Client{Timeout: marketRequestTimeout}
 
 // MarketService browses the market, imports entries and shares objects
 // and sprites.
 type MarketService struct {
-	s   *Session
-	st  *settings.Store
-	src *market.Source // nil when not configured
-	api *market.API    // nil when not configured
+	session  *Session
+	settings *settings.Store
+	src      *market.Source // nil when not configured
+	api      *market.API    // nil when not configured
 
 	mu      sync.Mutex
 	index   *market.Index
@@ -49,24 +62,25 @@ type MarketService struct {
 }
 
 // NewMarketService returns the service for the configured market.
-func NewMarketService(s *Session, st *settings.Store) *MarketService {
-	m := &MarketService{s: s, st: st}
-	if u := cmpOr(os.Getenv("OTS_MARKET_URL"), MarketFilesURL); u != "" {
-		m.src = market.NewSource(u)
-		m.src.HTTP = httpClient
-	}
-	if u := cmpOr(os.Getenv("OTS_MARKET_API"), MarketAPIURL); u != "" {
-		m.api = market.NewAPI(u)
-		m.api.HTTP = httpClient
-	}
-	return m
+func NewMarketService(session *Session, store *settings.Store) *MarketService {
+	filesURL := cmp.Or(os.Getenv("OTS_MARKET_URL"), MarketFilesURL)
+	apiURL := cmp.Or(os.Getenv("OTS_MARKET_API"), MarketAPIURL)
+	return newMarketService(session, store, filesURL, apiURL, httpClient)
 }
 
-func cmpOr(a, b string) string {
-	if a != "" {
-		return a
+// newMarketService returns the service for a market at filesURL and apiURL
+// ("" for none).
+func newMarketService(session *Session, store *settings.Store, filesURL, apiURL string, client *http.Client) *MarketService {
+	m := &MarketService{session: session, settings: store}
+	if filesURL != "" {
+		m.src = market.NewSource(filesURL)
+		m.src.HTTP = client
 	}
-	return b
+	if apiURL != "" {
+		m.api = market.NewAPI(apiURL)
+		m.api.HTTP = client
+	}
+	return m
 }
 
 var errNoMarket = errors.New("this build has no market configured")
@@ -86,14 +100,14 @@ type MarketConfig struct {
 
 // Config returns the market configuration.
 func (m *MarketService) Config() MarketConfig {
-	c := MarketConfig{Browse: m.src != nil, Share: m.api != nil && m.src != nil, Author: m.st.Get().MarketAuthor}
+	config := MarketConfig{Browse: m.src != nil, Share: m.api != nil && m.src != nil, Author: m.settings.Get().MarketAuthor}
 	if m.api != nil {
-		c.CaptchaURL = m.api.CaptchaURL()
-		if u, err := url.Parse(c.CaptchaURL); err == nil {
-			c.CaptchaOrigin = u.Scheme + "://" + u.Host
+		config.CaptchaURL = m.api.CaptchaURL()
+		if captcha, err := url.Parse(config.CaptchaURL); err == nil {
+			config.CaptchaOrigin = captcha.Scheme + "://" + captcha.Host
 		}
 	}
-	return c
+	return config
 }
 
 // MarketIndex is the index for the UI. Preview and file paths are relative
@@ -113,74 +127,74 @@ func (m *MarketService) Index(refresh bool) (*MarketIndex, error) {
 		return nil, errNoMarket
 	}
 	m.mu.Lock()
-	idx := m.index
+	index := m.index
 	if refresh || time.Since(m.fetched) > marketIndexTTL {
-		idx = nil
+		index = nil
 	}
 	m.mu.Unlock()
-	if idx == nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	if index == nil {
+		ctx, cancel := context.WithTimeout(context.Background(), marketIndexTimeout)
 		defer cancel()
 		var err error
-		if idx, err = m.src.Index(ctx); err != nil {
+		if index, err = m.src.Index(ctx); err != nil {
 			return nil, fmt.Errorf("market: %w", err)
 		}
 		m.mu.Lock()
-		m.index, m.fetched = idx, time.Now()
+		m.index, m.fetched = index, time.Now()
 		m.mu.Unlock()
 	}
-	prefs := m.st.Get()
-	out := &MarketIndex{Base: m.src.PreviewBase(), Entries: idx.Entries, Mine: []string{}, Admin: prefs.MarketAdminToken != ""}
-	for _, e := range idx.Entries {
-		if prefs.MarketShared[e.ID] != "" {
-			out.Mine = append(out.Mine, e.ID)
+	prefs := m.settings.Get()
+	out := &MarketIndex{Base: m.src.PreviewBase(), Entries: index.Entries, Mine: []string{}, Admin: prefs.MarketAdminToken != ""}
+	for _, entry := range index.Entries {
+		if prefs.MarketShared[entry.ID] != "" {
+			out.Mine = append(out.Mine, entry.ID)
 		}
 	}
 	return out, nil
 }
 
 func (m *MarketService) entry(id string) (*market.Entry, error) {
-	idx, err := m.Index(false)
+	index, err := m.Index(false)
 	if err != nil {
 		return nil, err
 	}
-	for i := range idx.Entries {
-		if idx.Entries[i].ID == id {
-			return &idx.Entries[i], nil
+	for i := range index.Entries {
+		if index.Entries[i].ID == id {
+			return &index.Entries[i], nil
 		}
 	}
 	return nil, fmt.Errorf("market entry %s does not exist", id)
 }
 
 func (m *MarketService) download(id string) (*market.Entry, []byte, error) {
-	e, err := m.entry(id)
+	entry, err := m.entry(id)
 	if err != nil {
 		return nil, nil, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), marketFileTimeout)
 	defer cancel()
-	data, err := m.src.File(ctx, e)
+	data, err := m.src.File(ctx, entry)
 	if err != nil {
-		return nil, nil, fmt.Errorf("download %s: %w", e.Name, err)
+		return nil, nil, fmt.Errorf("download %s: %w", entry.Name, err)
 	}
-	return e, data, nil
+	return entry, data, nil
 }
 
 // Read downloads an object entry for previewing. No client needs to be
 // open.
 func (m *MarketService) Read(id string) (*ObjectFile, error) {
-	e, data, err := m.download(id)
+	entry, data, err := m.download(id)
 	if err != nil {
 		return nil, err
 	}
-	if e.Kind != market.KindObject {
-		return nil, fmt.Errorf("%s is not an object", e.Name)
+	if entry.Kind != market.KindObject {
+		return nil, fmt.Errorf("%s is not an object", entry.Name)
 	}
-	d, _, err := market.ReadObject(&e.Meta, data)
+	object, _, err := market.ReadObject(&entry.Meta, data)
 	if err != nil {
 		return nil, err
 	}
-	return newObjectFile(e.File, d), nil
+	return newObjectFile(entry.File, object), nil
 }
 
 // MarketImport reports an imported entry: an object (Category and ID) or
@@ -196,41 +210,41 @@ type MarketImport struct {
 // sprite packs add their sprites. Files are checked like any other
 // untrusted file.
 func (m *MarketService) Import(id string) (*MarketImport, error) {
-	p, err := m.s.Project()
+	p, err := m.session.Project()
 	if err != nil {
 		return nil, err
 	}
-	e, data, err := m.download(id)
+	entry, data, err := m.download(id)
 	if err != nil {
 		return nil, err
 	}
-	if e.SpriteSize != p.SpriteSize() {
-		return nil, fmt.Errorf("%s uses %dpx sprites, client uses %dpx", e.Name, e.SpriteSize, p.SpriteSize())
+	if entry.SpriteSize != p.SpriteSize() {
+		return nil, fmt.Errorf("%s uses %dpx sprites, client uses %dpx", entry.Name, entry.SpriteSize, p.SpriteSize())
 	}
-	res := &MarketImport{Kind: e.Kind, Sprites: []uint32{}}
-	switch e.Kind {
+	result := &MarketImport{Kind: entry.Kind, Sprites: []uint32{}}
+	switch entry.Kind {
 	case market.KindObject:
-		d, _, err := market.ReadObject(&e.Meta, data)
+		object, _, err := market.ReadObject(&entry.Meta, data)
 		if err != nil {
 			return nil, err
 		}
-		res.Category = d.Thing.Category
-		if res.ID, err = p.ImportOBD(d, 0); err != nil {
+		result.Category = object.Thing.Category
+		if result.ID, err = p.ImportOBD(object, 0); err != nil {
 			return nil, err
 		}
 	case market.KindSprites:
-		sprites, _, err := market.ReadPack(&e.Meta, data)
+		sprites, _, err := market.ReadPack(&entry.Meta, data)
 		if err != nil {
 			return nil, err
 		}
-		if res.Sprites, err = p.AddSprites(sprites); err != nil {
+		if result.Sprites, err = p.AddSprites(sprites); err != nil {
 			return nil, err
 		}
 	default:
-		return nil, fmt.Errorf("unknown entry kind %q", e.Kind)
+		return nil, fmt.Errorf("unknown entry kind %q", entry.Kind)
 	}
-	m.s.Changed()
-	return res, nil
+	m.session.Changed()
+	return result, nil
 }
 
 // ShareRequest is what the author fills in. Captcha is the captcha token.
@@ -243,46 +257,46 @@ type ShareRequest struct {
 	Captcha     string   `json:"captcha"`
 }
 
-func (r ShareRequest) meta(kind string, size int) market.Meta {
+func (req ShareRequest) meta(kind string, spriteSize int) market.Meta {
 	return market.Meta{
-		Name:        strings.TrimSpace(r.Name),
+		Name:        strings.TrimSpace(req.Name),
 		Kind:        kind,
-		Tags:        market.NormalizeTags(r.Tags),
-		Description: strings.TrimSpace(r.Description),
-		License:     r.License,
-		Author:      strings.TrimSpace(r.Author),
-		SpriteSize:  size,
+		Tags:        market.NormalizeTags(req.Tags),
+		Description: strings.TrimSpace(req.Description),
+		License:     req.License,
+		Author:      strings.TrimSpace(req.Author),
+		SpriteSize:  spriteSize,
 	}
 }
 
 // ShareObject publishes one object and returns the new entry id.
-func (m *MarketService) ShareObject(c thing.Category, id uint32, req ShareRequest) (string, error) {
-	p, err := m.s.Project()
+func (m *MarketService) ShareObject(category thing.Category, id uint32, req ShareRequest) (string, error) {
+	p, err := m.session.Project()
 	if err != nil {
 		return "", err
 	}
-	d, err := p.ExportOBD(c, id, obd.Version3)
+	object, err := p.ExportOBD(category, id, obd.Version3)
 	if err != nil {
 		return "", err
 	}
-	return m.shareOBD(d, req)
+	return m.shareOBD(object, req)
 }
 
 // shareOBD publishes OBD data as an object entry.
-func (m *MarketService) shareOBD(d *obd.Data, req ShareRequest) (string, error) {
-	d.Thing.Name, d.Thing.Description = "", "" // assets names do not travel
-	d.Version = obd.Version3
-	data, err := obd.Encode(d)
+func (m *MarketService) shareOBD(object *obd.Data, req ShareRequest) (string, error) {
+	object.Thing.Name, object.Thing.Description = "", "" // assets names do not travel
+	object.Version = obd.Version3
+	data, err := obd.Encode(object)
 	if err != nil {
 		return "", err
 	}
-	meta := req.meta(market.KindObject, d.SpriteSize)
-	meta.Category = d.Thing.Category.String()
-	back, info, err := market.ReadObject(&meta, data)
+	meta := req.meta(market.KindObject, object.SpriteSize)
+	meta.Category = object.Thing.Category.String()
+	decoded, info, err := market.ReadObject(&meta, data)
 	if err != nil {
 		return "", err
 	}
-	preview, err := market.Preview(back)
+	preview, err := market.Preview(decoded)
 	if err != nil {
 		return "", err
 	}
@@ -295,30 +309,30 @@ func (m *MarketService) shareOBD(d *obd.Data, req ShareRequest) (string, error) 
 // ShareSprites publishes sprites as a pack and returns the new entry id.
 // Empty sprites are left out.
 func (m *MarketService) ShareSprites(ids []uint32, req ShareRequest) (string, error) {
-	p, err := m.s.Project()
+	p, err := m.session.Project()
 	if err != nil {
 		return "", err
 	}
 	var sprites [][]byte
 	for _, id := range ids {
-		px, err := p.SpritePixels(id)
+		pixels, err := p.SpritePixels(id)
 		if err != nil {
 			return "", err
 		}
-		sprites = append(sprites, px)
+		sprites = append(sprites, pixels)
 	}
 	return m.sharePixels(sprites, p.SpriteSize(), req)
 }
 
 // sharePixels publishes sprites as a pack; empty sprites are left out.
-func (m *MarketService) sharePixels(all [][]byte, size int, req ShareRequest) (string, error) {
+func (m *MarketService) sharePixels(all [][]byte, spriteSize int, req ShareRequest) (string, error) {
 	var sprites [][]byte
-	for _, px := range all {
-		if !isTransparent(px) {
-			sprites = append(sprites, px)
+	for _, pixels := range all {
+		if !isTransparent(pixels) {
+			sprites = append(sprites, pixels)
 		}
 	}
-	img, err := market.PackImage(sprites, size)
+	img, err := market.PackImage(sprites, spriteSize)
 	if err != nil {
 		return "", err
 	}
@@ -326,7 +340,7 @@ func (m *MarketService) sharePixels(all [][]byte, size int, req ShareRequest) (s
 	if err != nil {
 		return "", err
 	}
-	meta := req.meta(market.KindSprites, size)
+	meta := req.meta(market.KindSprites, spriteSize)
 	_, info, err := market.ReadPack(&meta, data)
 	if err != nil {
 		return "", err
@@ -340,13 +354,13 @@ func (m *MarketService) sharePixels(all [][]byte, size int, req ShareRequest) (s
 // transparent) as a sprite pack. No client needs to be open.
 func (m *MarketService) ShareFile(path string, spriteSize int, req ShareRequest) (string, error) {
 	if isObjectFile(path) {
-		d, err := readObject(path)
+		object, err := readObject(path)
 		if err != nil {
 			return "", err
 		}
-		return m.shareOBD(d, req)
+		return m.shareOBD(object, req)
 	}
-	if spriteSize != 32 && spriteSize != 64 {
+	if !slices.Contains(shareSpriteSizes, spriteSize) {
 		return "", fmt.Errorf("sprite size %d is not 32 or 64", spriteSize)
 	}
 	img, err := imaging.Load(path)
@@ -361,21 +375,21 @@ func (m *MarketService) ShareFile(path string, spriteSize int, req ShareRequest)
 	return m.sharePixels(imaging.SliceTiles(img, spriteSize), spriteSize, req)
 }
 
-func (m *MarketService) submit(s market.Submission) (string, error) {
+func (m *MarketService) submit(submission market.Submission) (string, error) {
 	if m.api == nil || m.src == nil {
 		return "", errNoMarket
 	}
-	if err := s.Meta.Validate(); err != nil {
+	if err := submission.Meta.Validate(); err != nil {
 		return "", err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), marketSubmitTimeout)
 	defer cancel()
-	shared, err := m.api.Submit(ctx, s)
+	shared, err := m.api.Submit(ctx, submission)
 	if err != nil {
 		return "", err
 	}
-	m.st.SetMarketShared(shared.ID, shared.DeleteToken)
-	m.st.SetMarketAuthor(s.Meta.Author)
+	m.settings.SetMarketShared(shared.ID, shared.DeleteToken)
+	m.settings.SetMarketAuthor(submission.Meta.Author)
 	m.mu.Lock()
 	m.index = nil // the next read shows the new entry
 	m.mu.Unlock()
@@ -388,22 +402,22 @@ func (m *MarketService) Delete(id string) error {
 	if m.api == nil {
 		return errNoMarket
 	}
-	prefs := m.st.Get()
-	token := cmpOr(prefs.MarketShared[id], prefs.MarketAdminToken)
+	prefs := m.settings.Get()
+	token := cmp.Or(prefs.MarketShared[id], prefs.MarketAdminToken)
 	if token == "" {
 		return errors.New("only the author can delete this entry")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), marketDeleteTimeout)
 	defer cancel()
 	if err := m.api.Delete(ctx, id, token); err != nil {
 		return err
 	}
-	m.st.SetMarketShared(id, "")
+	m.settings.SetMarketShared(id, "")
 	m.mu.Lock()
 	if m.index != nil {
-		idx := *m.index
-		idx.Entries = slices.DeleteFunc(slices.Clone(idx.Entries), func(e market.Entry) bool { return e.ID == id })
-		m.index = &idx
+		index := *m.index
+		index.Entries = slices.DeleteFunc(slices.Clone(index.Entries), func(entry market.Entry) bool { return entry.ID == id })
+		m.index = &index
 	}
 	m.mu.Unlock()
 	return nil

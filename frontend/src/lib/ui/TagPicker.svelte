@@ -9,6 +9,7 @@
   import { toCss } from "../pixelscale";
   import { portal } from "./portal";
   import { reveal } from "./reveal";
+  import { clamp } from "../math";
 
   let {
     value,
@@ -101,33 +102,33 @@
 
   function move(delta: number) {
     if (!rows.length) return;
-    active = Math.min(Math.max(active + delta, 0), rows.length - 1);
+    active = clamp(active + delta, 0, rows.length - 1);
     reveal(list, list?.querySelector<HTMLElement>(`[data-i="${active}"]`));
   }
 
-  function onkeydown(e: KeyboardEvent) {
-    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      e.preventDefault();
+  function onkeydown(event: KeyboardEvent) {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
       if (!open) show();
-      else move(e.key === "ArrowDown" ? 1 : -1);
-    } else if (e.key === "Enter" || (e.key === "," && allowCustom)) {
-      e.preventDefault();
+      else move(event.key === "ArrowDown" ? 1 : -1);
+    } else if (event.key === "Enter" || (event.key === "," && allowCustom)) {
+      event.preventDefault();
       if (open && rows[active]) add(rows[active].tag);
       else if (custom) add(custom);
-    } else if (e.key === "Escape" && open) {
-      e.preventDefault();
-      e.stopPropagation(); // the dialog stays open
+    } else if (event.key === "Escape" && open) {
+      event.preventDefault();
+      event.stopPropagation(); // the dialog stays open
       open = false;
-    } else if (e.key === "Backspace" && !query && value.length) {
+    } else if (event.key === "Backspace" && !query && value.length) {
       remove(value[value.length - 1]);
-    } else if (e.key === "Tab") {
+    } else if (event.key === "Tab") {
       open = false;
     }
   }
 </script>
 
 <svelte:window
-  onmousedown={(e) => open && !list?.contains(e.target as Node) && !field.contains(e.target as Node) && (open = false)}
+  onmousedown={(event) => open && !list?.contains(event.target as Node) && !field.contains(event.target as Node) && (open = false)}
   onresize={() => (open = false)}
   onblur={() => (open = false)}
 />
@@ -135,7 +136,7 @@
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 <div class="field t-input" class:on={open} bind:this={field} onclick={() => input.focus()}>
   {#each value as t (t)}
-    <span class="chip">{t}<button type="button" class="x" title="Remove {t}" onclick={(e) => (e.stopPropagation(), remove(t))}>×</button></span>
+    <span class="chip">{t}<button type="button" class="x" title="Remove {t}" onclick={(event) => (event.stopPropagation(), remove(t))}>×</button></span>
   {/each}
   <input
     bind:this={input}
@@ -160,7 +161,7 @@
         tabindex="-1"
         data-i={i}
         onmouseenter={() => (active = i)}
-        onmousedown={(e) => e.preventDefault()}
+        onmousedown={(event) => event.preventDefault()}
         onclick={() => add(r.tag)}
         onkeydown={() => {}}
       >

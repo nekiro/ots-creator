@@ -11,12 +11,12 @@ import (
 // DialogService exposes native file dialogs to the frontend. Each dialog
 // is named by a key and opens in the folder it last confirmed.
 type DialogService struct {
-	st *settings.Store
+	settings *settings.Store
 }
 
 // NewDialogService returns the service; st remembers the dialog folders.
 func NewDialogService(st *settings.Store) *DialogService {
-	return &DialogService{st: st}
+	return &DialogService{settings: st}
 }
 
 // FileFilter is one entry of a dialog filter list, e.g. {"Client files", "*.dat;*.spr;*.otfi"}.
@@ -28,10 +28,10 @@ type FileFilter struct {
 // lastDir returns the folder the dialog last confirmed while it still
 // exists; "" leaves the start folder to the system.
 func (ds *DialogService) lastDir(key string) string {
-	if ds.st == nil {
+	if ds.settings == nil {
 		return ""
 	}
-	dir := ds.st.LastDir(key)
+	dir := ds.settings.LastDir(key)
 	if fi, err := os.Stat(dir); dir == "" || err != nil || !fi.IsDir() {
 		return ""
 	}
@@ -39,30 +39,30 @@ func (ds *DialogService) lastDir(key string) string {
 }
 
 func (ds *DialogService) remember(key, dir string) {
-	if ds.st != nil && dir != "" {
-		_ = ds.st.SetLastDir(key, dir)
+	if ds.settings != nil && dir != "" {
+		_ = ds.settings.SetLastDir(key, dir)
 	}
 }
 
 // OpenFiles shows an open dialog. It returns no paths when cancelled.
 func (ds *DialogService) OpenFiles(key, title string, filters []FileFilter, multiple bool) ([]string, error) {
-	d := application.Get().Dialog.OpenFile().SetTitle(title).CanChooseFiles(true).SetDirectory(ds.lastDir(key))
-	for _, f := range filters {
-		d.AddFilter(f.Name, f.Pattern)
+	dialog := application.Get().Dialog.OpenFile().SetTitle(title).CanChooseFiles(true).SetDirectory(ds.lastDir(key))
+	for _, filter := range filters {
+		dialog.AddFilter(filter.Name, filter.Pattern)
 	}
 	var paths []string
 	if multiple {
-		ps, err := d.PromptForMultipleSelection()
+		selected, err := dialog.PromptForMultipleSelection()
 		if err != nil {
 			return nil, err
 		}
-		paths = ps
+		paths = selected
 	} else {
-		p, err := d.PromptForSingleSelection()
-		if err != nil || p == "" {
+		selected, err := dialog.PromptForSingleSelection()
+		if err != nil || selected == "" {
 			return nil, err
 		}
-		paths = []string{p}
+		paths = []string{selected}
 	}
 	if len(paths) > 0 {
 		ds.remember(key, filepath.Dir(paths[0]))
@@ -81,11 +81,11 @@ func (ds *DialogService) PickDirectory(key, title string) (string, error) {
 
 // SaveFile shows a save dialog. It returns "" when cancelled.
 func (ds *DialogService) SaveFile(key, title, filename string, filters []FileFilter) (string, error) {
-	d := application.Get().Dialog.SaveFile().SetMessage(title).SetFilename(filename).CanCreateDirectories(true).SetDirectory(ds.lastDir(key))
-	for _, f := range filters {
-		d.AddFilter(f.Name, f.Pattern)
+	dialog := application.Get().Dialog.SaveFile().SetMessage(title).SetFilename(filename).CanCreateDirectories(true).SetDirectory(ds.lastDir(key))
+	for _, filter := range filters {
+		dialog.AddFilter(filter.Name, filter.Pattern)
 	}
-	path, err := d.PromptForSingleSelection()
+	path, err := dialog.PromptForSingleSelection()
 	if err == nil && path != "" {
 		ds.remember(key, filepath.Dir(path))
 	}

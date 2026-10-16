@@ -11,6 +11,7 @@
   // like the Tibia client. The popup is position:fixed so scrolling
   // containers and dialogs never clip it.
   import { tick } from "svelte";
+  import { clamp } from "../math";
   import { toCss } from "../pixelscale";
   import { portal } from "./portal";
   import { reveal } from "./reveal";
@@ -44,16 +45,16 @@
   let list = $state<HTMLDivElement>();
   let rect = $state({ left: 0, top: 0, width: 0, up: false });
 
-  const selected = $derived(options.findIndex((o) => o.value === value));
+  const selected = $derived(options.findIndex((option) => option.value === value));
   const label = $derived(selected >= 0 ? options[selected].label : placeholder);
 
   async function show() {
     if (disabled || open) return;
-    const b = btn.getBoundingClientRect();
-    const r = { left: toCss(b.left), top: toCss(b.top), bottom: toCss(b.bottom), width: toCss(b.width) };
-    const h = Math.min(options.length, maxItems) * ITEM_H + 4;
-    const up = r.bottom + h > toCss(window.innerHeight) - 4 && r.top - h > 4;
-    rect = { left: r.left, top: up ? r.top - h : r.bottom, width: r.width, up };
+    const button = btn.getBoundingClientRect();
+    const box = { left: toCss(button.left), top: toCss(button.top), bottom: toCss(button.bottom), width: toCss(button.width) };
+    const popupHeight = Math.min(options.length, maxItems) * ITEM_H + 4;
+    const up = box.bottom + popupHeight > toCss(window.innerHeight) - 4 && box.top - popupHeight > 4;
+    rect = { left: box.left, top: up ? box.top - popupHeight : box.bottom, width: box.width, up };
     active = Math.max(selected, 0);
     open = true;
     await tick();
@@ -79,25 +80,25 @@
   }
 
   function pick(i: number) {
-    const o = options[i];
-    if (!o || o.disabled) return;
+    const option = options[i];
+    if (!option || option.disabled) return;
     hide();
     btn.focus();
-    if (o.value !== value) onchange(o.value);
+    if (option.value !== value) onchange(option.value);
   }
 
   function move(delta: number) {
     if (!options.length) return;
     let i = active;
-    for (let k = 0; k < options.length; k++) {
-      i = Math.min(Math.max(i + delta, 0), options.length - 1);
+    for (let tries = 0; tries < options.length; tries++) {
+      i = clamp(i + delta, 0, options.length - 1);
       if (!options[i].disabled) break;
     }
     active = i;
     scrollToItem(i);
   }
 
-  function onkeydown(e: KeyboardEvent) {
+  function onkeydown(event: KeyboardEvent) {
     if (disabled) return;
     const keys: Record<string, () => void> = {
       ArrowDown: () => (open ? move(1) : show()),
@@ -111,20 +112,20 @@
       Escape: () => open && hide(),
       Tab: () => hide(),
     };
-    const fn = keys[e.key];
-    if (fn) {
-      if (e.key !== "Tab") e.preventDefault();
-      if (e.key === "Escape" && open) e.stopPropagation();
-      fn();
+    const action = keys[event.key];
+    if (action) {
+      if (event.key !== "Tab") event.preventDefault();
+      if (event.key === "Escape" && open) event.stopPropagation();
+      action();
       return;
     }
     // Type to jump: first option starting with the typed character.
-    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
-      const ch = e.key.toLowerCase();
+    if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
+      const typed = event.key.toLowerCase();
       const start = (open ? active : selected) + 1;
-      for (let k = 0; k < options.length; k++) {
-        const i = (start + k) % options.length;
-        if (options[i].label.toLowerCase().startsWith(ch) && !options[i].disabled) {
+      for (let offset = 0; offset < options.length; offset++) {
+        const i = (start + offset) % options.length;
+        if (options[i].label.toLowerCase().startsWith(typed) && !options[i].disabled) {
           if (open) {
             active = i;
             scrollToItem(i);
@@ -137,7 +138,7 @@
 </script>
 
 <svelte:window
-  onmousedown={(e) => open && !list?.contains(e.target as Node) && !btn.contains(e.target as Node) && hide()}
+  onmousedown={(event) => open && !list?.contains(event.target as Node) && !btn.contains(event.target as Node) && hide()}
   onresize={hide}
   onblur={hide}
 />
@@ -153,9 +154,9 @@
   {title}
   aria-haspopup="listbox"
   aria-expanded={open}
-  onmousedown={(e) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
+  onmousedown={(event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
     btn.focus();
     open ? hide() : show();
   }}
@@ -183,7 +184,7 @@
         tabindex="-1"
         data-i={i}
         onmouseenter={() => !o.disabled && (active = i)}
-        onmousedown={(e) => e.preventDefault()}
+        onmousedown={(event) => event.preventDefault()}
         onclick={() => pick(i)}
         onkeydown={() => {}}
       >

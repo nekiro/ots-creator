@@ -108,9 +108,9 @@
   }
 </script>
 
-<svelte:window onresize={syncMaximised} onmousedown={(e) => !(e.target as HTMLElement).closest(".menubar") && (openMenu = null)} />
+<svelte:window onresize={syncMaximised} onmousedown={(event) => !(event.target as HTMLElement).closest(".menubar") && (openMenu = null)} />
 
-<nav class="menubar" ondblclick={(e) => e.target === e.currentTarget || (e.target as HTMLElement).matches(".spacer, .logo") ? Window.ToggleMaximise() : null}>
+<nav class="menubar" ondblclick={(event) => event.target === event.currentTarget || (event.target as HTMLElement).matches(".spacer, .logo") ? Window.ToggleMaximise() : null}>
   <img class="logo" src="/icon.png" alt="" width="16" height="16" draggable="false" />
   <div class="modes" role="tablist">
     <button class="mode" class:on={map.mode === "objects"} role="tab" aria-selected={map.mode === "objects"} title="Object editor" onclick={() => mapCommands.setMode("objects")}>Objects</button>

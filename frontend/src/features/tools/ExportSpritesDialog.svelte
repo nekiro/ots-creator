@@ -45,14 +45,14 @@
     </div>
     <div class="row">
       <span class="t-label label">Format</span>
-      <Select grow value={format} options={IMAGE_FORMATS} onchange={(v) => (format = v)} />
+      <Select grow value={format} options={IMAGE_FORMATS} onchange={(value) => (format = value)} />
     </div>
     {#if sheets}
       <div class="row">
         <span class="t-label label">Sprites</span>
-        <NumberField value={columns} min={1} max={64} width={50} title="Sprites per row" onchange={(v) => (columns = v)} />
+        <NumberField value={columns} min={1} max={64} width={50} title="Sprites per row" onchange={(value) => (columns = value)} />
         <span class="t-label">×</span>
-        <NumberField value={rows} min={1} max={64} width={50} title="Rows per sheet" onchange={(v) => (rows = v)} />
+        <NumberField value={rows} min={1} max={64} width={50} title="Rows per sheet" onchange={(value) => (rows = value)} />
         <span class="t-label">= {columns * size}×{rows * size} px</span>
       </div>
       <label class="row" title={format === "png" ? "" : "Only PNG keeps transparency"}

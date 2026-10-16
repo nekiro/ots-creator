@@ -29,28 +29,28 @@ export interface Look extends Omit<Appearance, "s" | "ox" | "oy" | "el"> {
   total: number;
 }
 
-function prepare(a: Appearance): Look {
-  const l = a as unknown as Look;
-  l.s = a.s ?? [];
-  l.ox = a.ox ?? 0;
-  l.oy = a.oy ?? 0;
-  l.el = a.el ?? 0;
-  l.cum = null;
-  l.total = 0;
-  if (a.f > 1) {
-    const ds = a.d && a.d.length === a.f ? a.d : new Array(a.f).fill(a.f > 1 ? 500 : 0);
-    let t = 0;
-    l.cum = ds.map((d) => (t += Math.max(d, 50)));
-    l.total = t;
+function prepare(appearance: Appearance): Look {
+  const look = appearance as unknown as Look;
+  look.s = appearance.s ?? [];
+  look.ox = appearance.ox ?? 0;
+  look.oy = appearance.oy ?? 0;
+  look.el = appearance.el ?? 0;
+  look.cum = null;
+  look.total = 0;
+  if (appearance.f > 1) {
+    const durations = appearance.d && appearance.d.length === appearance.f ? appearance.d : new Array(appearance.f).fill(appearance.f > 1 ? 500 : 0);
+    let end = 0;
+    look.cum = durations.map((duration) => (end += Math.max(duration, 50)));
+    look.total = end;
   }
-  return l;
+  return look;
 }
 
-/** Frame of an animation at time t (all instances run in sync). */
-export function frameAt(l: Look, t: number): number {
-  if (!l.cum) return 0;
-  const m = t % l.total;
-  for (let i = 0; i < l.cum.length; i++) if (m < l.cum[i]) return i;
+/** Frame of an animation at a time (all instances run in sync). */
+export function frameAt(look: Look, time: number): number {
+  if (!look.cum) return 0;
+  const inLoop = time % look.total;
+  for (let i = 0; i < look.cum.length; i++) if (inLoop < look.cum[i]) return i;
   return 0;
 }
 
@@ -64,12 +64,12 @@ class Cache {
   ) {}
 
   get(id: number): Look | null | undefined {
-    const v = this.map.get(id);
-    if (v === undefined && !this.queued.has(id)) {
+    const look = this.map.get(id);
+    if (look === undefined && !this.queued.has(id)) {
       this.queued.add(id);
       if (!this.timer) this.timer = window.setTimeout(() => this.flush(), 0);
     }
-    return v;
+    return look;
   }
 
   private async flush(): Promise<void> {

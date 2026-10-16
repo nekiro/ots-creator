@@ -16,11 +16,15 @@
 </script>
 
 <script lang="ts">
+  import { fitZoom } from "../lib/render/zoom";
+  import { clamp } from "../lib/math";
+  import { defaultDirection, frameGroupAt, hasImprovedAnimations } from "../lib/thing";
   import { untrack } from "svelte";
   import { Category, encodeBytes, errorMessage, Format, normalizeThing, ThingService, type Thing } from "../lib/api";
   import { Animator, guessImproved, previewDurations } from "../lib/render/animator";
   import { PREVIEW_DROP } from "../lib/commands";
-  import { compose, stackBottomRight, type PixelSource } from "../lib/render/compose";
+  import { compose, type PixelSource } from "../lib/render/compose";
+  import { mountedPattern, renderPreviewImage } from "../lib/render/previewImage";
   import { clampPos, fillSlots, textureSlots, type TexturePos } from "../lib/render/layout";
   import { droppedSprites } from "../lib/dragsprites";
   import SheetEditor from "./SheetEditor.svelte";
@@ -65,7 +69,7 @@
   let dropSlot = $state<number | null>(null);
 
   const thing = $derived(source ? source.thing : app.draft);
-  const g = $derived(thing?.frameGroups[Math.min(group, (thing?.frameGroups.length ?? 1) - 1)] ?? null);
+  const frameGroup = $derived(frameGroupAt(thing, group));
   const isOutfit = $derived(thing?.category === Category.CategoryOutfit);
   const size = $derived(source ? source.size : loaded >= 0 ? spriteCache.size : 32);
 
@@ -73,25 +77,25 @@
   // Fitting a small object to a big window would blow it up past what is
   // useful to look at.
   const MAX_FIT_ZOOM = 4;
-  const fitZoom = $derived.by(() => {
-    if (!g || !stageSize[0]) return 4;
-    const w = canvasSize[0] || g.width * size;
-    const h = canvasSize[1] || g.height * size;
-    const margin = 34; // canvas-wrap margin and borders
-    const r = Math.min((stageSize[0] - margin) / w, (stageSize[1] - margin) / h);
-    return Math.min(MAX_FIT_ZOOM, Math.max(1, Math.floor(r)));
+  /** Canvas-wrap margin and borders. */
+  const STAGE_MARGIN = 34;
+  const fittedZoom = $derived.by(() => {
+    if (!frameGroup || !stageSize[0]) return 4;
+    const contentWidth = canvasSize[0] || frameGroup.width * size;
+    const contentHeight = canvasSize[1] || frameGroup.height * size;
+    return fitZoom(stageSize[0], stageSize[1], contentWidth, contentHeight, STAGE_MARGIN, MAX_FIT_ZOOM);
   });
-  const zoom = $derived(manualZoom ?? fitZoom);
+  const zoom = $derived(manualZoom ?? fittedZoom);
 
   $effect(() => {
     if (!stage) return;
-    const ro = new ResizeObserver(() => (stageSize = [stage!.clientWidth, stage!.clientHeight]));
-    ro.observe(stage);
-    return () => ro.disconnect();
+    const resizeObserver = new ResizeObserver(() => (stageSize = [stage!.clientWidth, stage!.clientHeight]));
+    resizeObserver.observe(stage);
+    return () => resizeObserver.disconnect();
   });
 
-  function setZoom(z: number) {
-    const next = Math.min(MAX_ZOOM, Math.max(1, z));
+  function setZoom(requested: number) {
+    const next = clamp(requested, 1, MAX_ZOOM);
     const factor = next / zoom;
     manualZoom = next;
     view.rescale(factor);
@@ -100,8 +104,8 @@
   // The stage is a canvas, not a scrolled box: the texture is centered and
   // moved by the pan offset (space + drag, middle button drag, wheel).
   const view = new PanView(
-    () => ({ w: (canvasSize[0] || (g?.width ?? 1) * size) * zoom, h: (canvasSize[1] || (g?.height ?? 1) * size) * zoom, sw: stageSize[0], sh: stageSize[1] }),
-    (d) => setZoom(zoom + d),
+    () => ({ w: (canvasSize[0] || (frameGroup?.width ?? 1) * size) * zoom, h: (canvasSize[1] || (frameGroup?.height ?? 1) * size) * zoom, sw: stageSize[0], sh: stageSize[1] }),
+    (delta) => setZoom(zoom + delta),
   );
 
   // Pixel editing of the shown texture (raw layer, no colors or addons).
@@ -134,34 +138,34 @@
     return false;
   }
 
-  function pixelAt(e: PointerEvent): [number, number] {
-    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    return [Math.floor((e.clientX - r.left) / zoom), Math.floor((e.clientY - r.top) / zoom)];
+  function pixelAt(event: PointerEvent): [number, number] {
+    const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    return [Math.floor((event.clientX - bounds.left) / zoom), Math.floor((event.clientY - bounds.top) / zoom)];
   }
 
-  function paintDown(e: PointerEvent) {
-    if (!editing || e.button !== 0 || view.ready || !g || stroke) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const base = compose(g, g.sprites, size, { pos }, getSprite);
-    const [x, y] = pixelAt(e);
+  function paintDown(event: PointerEvent) {
+    if (!editing || event.button !== 0 || view.ready || !frameGroup || stroke) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const base = compose(frameGroup, frameGroup.sprites, size, { pos }, getSprite);
+    const [x, y] = pixelAt(event);
     if (tool === "picker") {
-      const c = getPixel(base, x, y);
-      if (c[3]) paintHex = rgbaToHex(c);
+      const color = getPixel(base, x, y);
+      if (color[3]) paintHex = rgbaToHex(color);
       tool = "pencil";
       return;
     }
     if (!canEdit()) return;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
     paintImage = new ImageData(new Uint8ClampedArray(base.data), base.width, base.height);
-    stroke = { id: e.pointerId, before: base, last: [x, y] };
+    stroke = { id: event.pointerId, before: base, last: [x, y] };
     drawLine(paintImage, x, y, x, y, paintColor());
     paintTick++;
   }
 
-  function paintMove(e: PointerEvent) {
-    if (stroke?.id !== e.pointerId || !paintImage) return;
-    const [x, y] = pixelAt(e);
+  function paintMove(event: PointerEvent) {
+    if (stroke?.id !== event.pointerId || !paintImage) return;
+    const [x, y] = pixelAt(event);
     drawLine(paintImage, stroke.last[0], stroke.last[1], x, y, paintColor());
     stroke.last = [x, y];
     paintTick++;
@@ -171,12 +175,12 @@
     return tool === "eraser" ? [0, 0, 0, 0] : hexToRGBA(paintHex);
   }
 
-  async function paintUp(e: PointerEvent) {
-    const s = stroke;
-    if (s?.id !== e.pointerId) return;
+  async function paintUp(event: PointerEvent) {
+    const ended = stroke;
+    if (ended?.id !== event.pointerId) return;
     stroke = null;
-    if (!paintImage || !g || !thing) return;
-    const { slots, pixels } = changedSlots(s.before, paintImage, g, pos, size);
+    if (!paintImage || !frameGroup || !thing) return;
+    const { slots, pixels } = changedSlots(ended.before, paintImage, frameGroup, pos, size);
     if (!slots.length) {
       paintImage = null;
       return;
@@ -211,15 +215,15 @@
     view.reset();
     paintImage = null;
     stroke = null;
-    pos = { layer: 0, x: isOutfit && (thing?.frameGroups[0]?.patternX ?? 1) > 2 ? 2 : 0, y: 0, z: 0, frame: 0 };
+    pos = { layer: 0, x: defaultDirection(thing), y: 0, z: 0, frame: 0 };
     hoverSlot = null;
   });
 
   // Keep the position valid when the layout changes.
   $effect(() => {
-    if (!g) return;
-    const c = clampPos(g, pos);
-    if (JSON.stringify(c) !== JSON.stringify(pos)) pos = c;
+    if (!frameGroup) return;
+    const clamped = clampPos(frameGroup, pos);
+    if (JSON.stringify(clamped) !== JSON.stringify(pos)) pos = clamped;
   });
 
   // Any outfit can be a mount: the client has no mount flag.
@@ -227,31 +231,31 @@
     savedMountId = mountId;
     const id = mountId;
     void app.rev;
-    if (readonly || !isOutfit || !mount || (g?.patternZ ?? 1) < 2 || id < 1) {
+    if (readonly || !isOutfit || !mount || (frameGroup?.patternZ ?? 1) < 2 || id < 1) {
       mountThing = null;
       return;
     }
     let stale = false;
     ThingService.Get(Category.CategoryOutfit, id).then(
-      (t) => !stale && (mountThing = t ? normalizeThing(t) : null),
-      (e) => {
+      (loadedMount) => !stale && (mountThing = loadedMount ? normalizeThing(loadedMount) : null),
+      (err) => {
         if (stale) return;
         mountThing = null;
-        toast(errorMessage(e), "error");
+        toast(errorMessage(err), "error");
       },
     );
     return () => (stale = true);
   });
-  const mg = $derived(mountThing?.frameGroups[Math.min(group, mountThing.frameGroups.length - 1)] ?? null);
+  const mountGroup = $derived(frameGroupAt(mountThing, group));
 
   $effect(() => {
-    if (mg) spriteCache.load(mg.sprites).then(() => loaded++);
+    if (mountGroup) spriteCache.load(mountGroup.sprites).then(() => loaded++);
   });
 
   // Load all sprites of the current group.
   $effect(() => {
-    if (!g || source) return;
-    const ids = g.sprites;
+    if (!frameGroup || source) return;
+    const ids = frameGroup.sprites;
     void app.rev;
     spriteCache.load(ids).then(() => {
       loaded++;
@@ -266,29 +270,29 @@
   // Animation.
   let animator: Animator | null = null;
   $effect(() => {
-    if (!g || g.frames < 2 || !playing || editing) {
+    if (!frameGroup || frameGroup.frames < 2 || !playing || editing) {
       animator = null;
       return;
     }
     const info = app.project?.info;
-    const durations = previewDurations(g, {
+    const durations = previewDurations(frameGroup, {
       outfit: isOutfit,
       groups: thing?.frameGroups.length ?? 1,
       animateAlways: !!thing?.props.animateAlways,
-      improved: source ? (source.improved ?? guessImproved(source.thing)) : !!info && (info.format === Format.FormatAssets || info.features.improvedAnimations),
+      improved: source ? (source.improved ?? guessImproved(source.thing)) : hasImprovedAnimations(info),
     });
     try {
-      animator = new Animator(Number(g.mode), 0, Math.min(Math.max(g.startFrame, 0), g.frames - 1), durations, performance.now());
+      animator = new Animator(Number(frameGroup.mode), 0, clamp(frameGroup.startFrame, 0, frameGroup.frames - 1), durations, performance.now());
       animator.setFrame(untrack(() => pos.frame), performance.now());
     } catch {
       animator = null;
       return;
     }
     let raf = 0;
-    const tick = (t: number) => {
+    const tick = (time: number) => {
       if (!animator) return;
-      const f = animator.update(t);
-      if (f !== pos.frame) pos.frame = f;
+      const frame = animator.update(time);
+      if (frame !== pos.frame) pos.frame = frame;
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -299,60 +303,47 @@
   $effect(() => {
     void loaded;
     void paintTick;
-    if (!g || !canvas) return;
-    const addons = isOutfit ? [addon1 ? 1 : -1, addon2 ? 2 : -1].filter((y) => y > 0) : [];
-    const p = { ...pos, z: isOutfit && mount && g.patternZ > 1 ? 1 : pos.z };
-    const get = getSprite;
+    if (!frameGroup || !canvas) return;
+    let image: ImageData;
     if (editing) {
       // The raw texture of the chosen layer, as it is stored.
-      const img = paintImage ?? compose(g, g.sprites, size, { pos }, get);
+      image = paintImage ?? compose(frameGroup, frameGroup.sprites, size, { pos }, getSprite);
       riderOffset = [0, 0];
-      canvasSize = [img.width, img.height];
-      canvas.width = img.width;
-      canvas.height = img.height;
-      canvas.getContext("2d")!.putImageData(img, 0, 0);
-      return;
+    } else {
+      const outfitColors = isOutfit && colorize ? colors : null;
+      const preview = renderPreviewImage({ frameGroup, mountGroup, size, pos, isOutfit, mount, addon1, addon2, colors: outfitColors, get: getSprite });
+      image = preview.image;
+      riderOffset = preview.riderOffset;
     }
-    const outfitColors = isOutfit && colorize ? colors : null;
-    const rider = compose(g, g.sprites, size, { pos: p, addons, colors: outfitColors }, get);
-    let img = rider;
-    riderOffset = [0, 0];
-    if (isOutfit && mount && g.patternZ > 1 && mg) {
-      const mp = { layer: 0, x: Math.min(pos.x, mg.patternX - 1), y: 0, z: 0, frame: pos.frame % mg.frames };
-      const stacked = stackBottomRight([compose(mg, mg.sprites, size, { pos: mp, colors: outfitColors }, get), rider]);
-      img = stacked.image;
-      riderOffset = stacked.offsets[1];
-    }
-    canvasSize = [img.width, img.height];
-    const c = canvas;
-    c.width = img.width;
-    c.height = img.height;
-    c.getContext("2d")!.putImageData(img, 0, 0);
+    canvasSize = [image.width, image.height];
+    canvas.width = image.width;
+    canvas.height = image.height;
+    canvas.getContext("2d")!.putImageData(image, 0, 0);
   });
 
-  const slots = $derived(g ? textureSlots(g, { ...pos, z: isOutfit && mount && g.patternZ > 1 ? 1 : pos.z }, size) : []);
+  const slots = $derived(frameGroup ? textureSlots(frameGroup, { ...pos, z: mountedPattern(frameGroup, isOutfit, mount) ? 1 : pos.z }, size) : []);
 
-  function setDir(d: number) {
-    if (g && d < g.patternX) pos.x = d;
+  function setDir(direction: number) {
+    if (frameGroup && direction < frameGroup.patternX) pos.x = direction;
   }
 
   function step(delta: number) {
-    if (!g) return;
+    if (!frameGroup) return;
     playing = false;
-    pos.frame = (pos.frame + delta + g.frames) % g.frames;
+    pos.frame = (pos.frame + delta + frameGroup.frames) % frameGroup.frames;
   }
 
   /** Puts sprites into slot and the following ones (multi-drag). */
   function assign(slot: number, ids: number[]) {
-    if (readonly || !g || !app.draft) return;
-    const grp = app.draft.frameGroups[Math.min(group, app.draft.frameGroups.length - 1)];
-    if (grp) grp.sprites = fillSlots(grp.sprites, slot, ids);
+    if (readonly || !frameGroup || !app.draft) return;
+    const draftGroup = frameGroupAt(app.draft, group)!;
+    if (draftGroup) draftGroup.sprites = fillSlots(draftGroup.sprites, slot, ids);
   }
 
-  function onDrop(e: DragEvent, slot: number) {
-    e.preventDefault();
+  function onDrop(event: DragEvent, slot: number) {
+    event.preventDefault();
     dropSlot = null;
-    const ids = droppedSprites(e);
+    const ids = droppedSprites(event);
     if (ids.length) assign(slot, ids);
   }
 
@@ -366,7 +357,7 @@
   const shownAuto = $derived(sheetView ? sheetManualZoom === null : manualZoom === null);
 
   function zoomBy(delta: number) {
-    if (sheetView) sheetManualZoom = Math.min(MAX_ZOOM, Math.max(1, shownZoom + delta));
+    if (sheetView) sheetManualZoom = clamp(shownZoom + delta, 1, MAX_ZOOM);
     else setZoom(zoom + delta);
   }
 
@@ -383,15 +374,15 @@
     if (!source) savedSheetView = sheetView;
   });
 
-  function openTexture(p: TexturePos) {
-    pos = { ...p };
+  function openTexture(texturePos: TexturePos) {
+    pos = { ...texturePos };
     playing = false;
     sheetView = false;
   }
 
-  function onSlotKey(e: KeyboardEvent, slot: number) {
-    if (e.key === "Delete" || e.key === "Backspace") {
-      e.preventDefault();
+  function onSlotKey(event: KeyboardEvent, slot: number) {
+    if (event.key === "Delete" || event.key === "Backspace") {
+      event.preventDefault();
       assign(slot, [0]);
     }
   }
@@ -402,10 +393,10 @@
 <svelte:window onkeydown={view.key} onkeyup={view.key} onblur={view.blur} />
 
 <div class="preview" {...readonly ? {} : { id: PREVIEW_DROP, "data-file-drop-target": true }}>
-  {#if g && sheetView}
+  {#if frameGroup && sheetView}
   <div class="stage-wrap">
     <SheetEditor
-      {g}
+      frameGroup={frameGroup}
       {size}
       {loaded}
       selected={app.selectedSprites}
@@ -418,7 +409,7 @@
       get={getSprite}
       {readonly}
       onpick={(slot) => {
-        const id = g.sprites[slot];
+        const id = frameGroup.sprites[slot];
         if (readonly) return;
         if (id) app.selectedSprites = [id];
       }}
@@ -438,7 +429,7 @@
     bind:this={stage}
     {...view.handlers}
   >
-    {#if g}
+    {#if frameGroup}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
         class="canvas-wrap"
@@ -447,35 +438,35 @@
         onpointermove={paintMove}
         onpointerup={paintUp}
         onpointercancel={paintUp}
-        style="width:{(canvasSize[0] || g.width * size) * zoom}px;height:{(canvasSize[1] || g.height * size) * zoom}px;transform:{view.transform}"
+        style="width:{(canvasSize[0] || frameGroup.width * size) * zoom}px;height:{(canvasSize[1] || frameGroup.height * size) * zoom}px;transform:{view.transform}"
       >
         <canvas bind:this={canvas} class="pixel" style="width:100%;height:100%"></canvas>
         {#if showPixelGrid && zoom >= PIXEL_GRID_ZOOM}
           <div class="pixel-grid" style="background-size:{zoom}px {zoom}px"></div>
         {/if}
         <div class="slots" class:grid={showGrid}>
-          {#each slots as s (s.slot)}
-            {@const id = g.sprites[s.slot]}
+          {#each slots as slotInfo (slotInfo.slot)}
+            {@const id = frameGroup.sprites[slotInfo.slot]}
             <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
             <div
               class="slot"
-              class:drop={dropSlot === s.slot}
+              class:drop={dropSlot === slotInfo.slot}
               class:sel={id !== 0 && app.selectedSprites.includes(id)}
-              style="left:{(s.x + riderOffset[0]) * zoom}px;top:{(s.y + riderOffset[1]) * zoom}px;width:{size * zoom}px;height:{size * zoom}px"
-              title="Slot {s.slot} → sprite #{id}{id ? '' : ' (empty)'}{readonly ? '' : '. Drop a sprite here, Del clears.'}"
+              style="left:{(slotInfo.x + riderOffset[0]) * zoom}px;top:{(slotInfo.y + riderOffset[1]) * zoom}px;width:{size * zoom}px;height:{size * zoom}px"
+              title="Slot {slotInfo.slot} → sprite #{id}{id ? '' : ' (empty)'}{readonly ? '' : '. Drop a sprite here, Del clears.'}"
               tabindex="0"
               role="button"
               onclick={() => id && !readonly && (app.selectedSprites = [id])}
-              onkeydown={(e) => onSlotKey(e, s.slot)}
-              onmouseenter={() => (hoverSlot = s.slot)}
+              onkeydown={(event) => onSlotKey(event, slotInfo.slot)}
+              onmouseenter={() => (hoverSlot = slotInfo.slot)}
               onmouseleave={() => (hoverSlot = null)}
-              ondragover={(e) => {
+              ondragover={(event) => {
                 if (readonly) return;
-                e.preventDefault();
-                dropSlot = s.slot;
+                event.preventDefault();
+                dropSlot = slotInfo.slot;
               }}
               ondragleave={() => (dropSlot = null)}
-              ondrop={(e) => onDrop(e, s.slot)}
+              ondrop={(event) => onDrop(event, slotInfo.slot)}
             ></div>
           {/each}
         </div>
@@ -484,13 +475,13 @@
       <div class="empty">Select an object</div>
     {/if}
   </div>
-  {#if g && hoverSlot !== null}
-    <div class="slot-info t-small">slot {hoverSlot} · sprite #{g.sprites[hoverSlot]}</div>
+  {#if frameGroup && hoverSlot !== null}
+    <div class="slot-info t-small">slot {hoverSlot} · sprite #{frameGroup.sprites[hoverSlot]}</div>
   {/if}
   </div>
   {/if}
 
-  {#if g && thing}
+  {#if frameGroup && thing}
     <div class="controls">
       <div class="row playback">
         {#if thing.frameGroups.length > 1}
@@ -501,12 +492,12 @@
           </div>
           <span class="t-vsep"></span>
         {/if}
-        <button class="t-icon-btn" title="Previous frame" disabled={g.frames < 2} onclick={() => step(-1)}><Icon name="prev" /></button>
-        <button class="t-icon-btn" class:on={playing} title={playing ? "Pause" : "Play"} disabled={g.frames < 2} onclick={() => (playing = !playing)}>
+        <button class="t-icon-btn" title="Previous frame" disabled={frameGroup.frames < 2} onclick={() => step(-1)}><Icon name="prev" /></button>
+        <button class="t-icon-btn" class:on={playing} title={playing ? "Pause" : "Play"} disabled={frameGroup.frames < 2} onclick={() => (playing = !playing)}>
           <Icon name={playing ? "pause" : "play"} />
         </button>
-        <button class="t-icon-btn" title="Next frame" disabled={g.frames < 2} onclick={() => step(1)}><Icon name="next" /></button>
-        <span class="t-value frame">{pos.frame + 1}/{g.frames}</span>
+        <button class="t-icon-btn" title="Next frame" disabled={frameGroup.frames < 2} onclick={() => step(1)}><Icon name="next" /></button>
+        <span class="t-value frame">{pos.frame + 1}/{frameGroup.frames}</span>
         <span class="t-vsep"></span>
         <button class="t-icon-btn" title="Zoom out" onclick={() => zoomBy(-1)}><Icon name="zoomout" /></button>
         <button class="t-value zoom" class:auto={shownAuto} title={shownAuto ? "Fits the window" : "Click to fit the window"} onclick={zoomFit}>
@@ -535,39 +526,39 @@
       </div>
 
       <div class="row">
-        {#if isOutfit && g.patternX === 4}
+        {#if isOutfit && frameGroup.patternX === 4}
           <span class="t-label">Direction</span>
           {#each ["arrowN", "arrowE", "arrowS", "arrowW"] as icon, d}
             <button class="t-icon-btn" class:on={pos.x === d} title={["North", "East", "South", "West"][d]} onclick={() => setDir(d)}><Icon name={icon} /></button>
           {/each}
-        {:else if g.patternX > 1}
-          <div class="row"><span class="t-label">Pattern X</span><Slider max={g.patternX - 1} bind:value={pos.x} /><span class="t-value num">{pos.x}</span></div>
+        {:else if frameGroup.patternX > 1}
+          <div class="row"><span class="t-label">Pattern X</span><Slider max={frameGroup.patternX - 1} bind:value={pos.x} /><span class="t-value num">{pos.x}</span></div>
         {/if}
         {#if isOutfit}
-          {#if g.patternY > 1}
+          {#if frameGroup.patternY > 1}
             <label class="row"><input class="t-check" type="checkbox" bind:checked={addon1} />Addon 1</label>
           {/if}
-          {#if g.patternY > 2}
+          {#if frameGroup.patternY > 2}
             <label class="row"><input class="t-check" type="checkbox" bind:checked={addon2} />Addon 2</label>
           {/if}
-          {#if g.patternZ > 1}
+          {#if frameGroup.patternZ > 1}
             <label class="row" title="Show the outfit riding another looktype"><input class="t-check" type="checkbox" bind:checked={mount} />Mount</label>
             {#if mount && !readonly}
-              <NumberField value={mountId} min={0} max={app.maxId(Category.CategoryOutfit)} width={50} title="Mount looktype (0 = none)" onchange={(v) => (mountId = v)} />
+              <NumberField value={mountId} min={0} max={app.maxId(Category.CategoryOutfit)} width={50} title="Mount looktype (0 = none)" onchange={(value) => (mountId = value)} />
             {/if}
           {/if}
         {:else}
-          {#if g.patternY > 1}
-            <div class="row"><span class="t-label">Pattern Y</span><Slider max={g.patternY - 1} bind:value={pos.y} /><span class="t-value num">{pos.y}</span></div>
+          {#if frameGroup.patternY > 1}
+            <div class="row"><span class="t-label">Pattern Y</span><Slider max={frameGroup.patternY - 1} bind:value={pos.y} /><span class="t-value num">{pos.y}</span></div>
           {/if}
-          {#if g.patternZ > 1}
-            <div class="row"><span class="t-label">Pattern Z</span><Slider max={g.patternZ - 1} bind:value={pos.z} /><span class="t-value num">{pos.z}</span></div>
+          {#if frameGroup.patternZ > 1}
+            <div class="row"><span class="t-label">Pattern Z</span><Slider max={frameGroup.patternZ - 1} bind:value={pos.z} /><span class="t-value num">{pos.z}</span></div>
           {/if}
         {/if}
-        {#if g.layers > 1}
+        {#if frameGroup.layers > 1}
           <div class="row" title="Show the layer instead of the composed outfit">
             <span class="t-label">Layer</span>
-            <Slider max={g.layers - 1} bind:value={pos.layer} />
+            <Slider max={frameGroup.layers - 1} bind:value={pos.layer} />
             <span class="t-value num">{pos.layer}</span>
           </div>
         {/if}
@@ -590,13 +581,13 @@
           >
         </div>
       {/if}
-      {#if isOutfit && g.layers > 1}
+      {#if isOutfit && frameGroup.layers > 1}
         <div class="row">
           <label class="row"><input class="t-check" type="checkbox" bind:checked={colorize} />Colors</label>
-          <ColorPicker label="Head" value={colors.head} onchange={(v) => (colors.head = v)} />
-          <ColorPicker label="Body" value={colors.body} onchange={(v) => (colors.body = v)} />
-          <ColorPicker label="Legs" value={colors.legs} onchange={(v) => (colors.legs = v)} />
-          <ColorPicker label="Feet" value={colors.feet} onchange={(v) => (colors.feet = v)} />
+          <ColorPicker label="Head" value={colors.head} onchange={(value) => (colors.head = value)} />
+          <ColorPicker label="Body" value={colors.body} onchange={(value) => (colors.body = value)} />
+          <ColorPicker label="Legs" value={colors.legs} onchange={(value) => (colors.legs = value)} />
+          <ColorPicker label="Feet" value={colors.feet} onchange={(value) => (colors.feet = value)} />
         </div>
       {/if}
     </div>

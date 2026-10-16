@@ -50,30 +50,30 @@ func viewerKind(name string) string {
 // List returns the OBD files and images in dir, OBD files first, each
 // group sorted by name with numbers in natural order.
 func (*ViewerService) List(dir string) ([]ViewerEntry, error) {
-	des, err := os.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
 	out := []ViewerEntry{}
-	for _, de := range des {
-		kind := viewerKind(de.Name())
-		if de.IsDir() || kind == "" {
+	for _, file := range files {
+		kind := viewerKind(file.Name())
+		if file.IsDir() || kind == "" {
 			continue
 		}
 		var size int64
-		if info, err := de.Info(); err == nil {
+		if info, err := file.Info(); err == nil {
 			size = info.Size()
 		}
-		out = append(out, ViewerEntry{Path: filepath.Join(dir, de.Name()), Name: de.Name(), Kind: kind, Size: size})
+		out = append(out, ViewerEntry{Path: filepath.Join(dir, file.Name()), Name: file.Name(), Kind: kind, Size: size})
 	}
-	slices.SortFunc(out, func(a, b ViewerEntry) int {
-		if a.Kind != b.Kind {
-			if a.Kind == ViewerOBD {
+	slices.SortFunc(out, func(first, second ViewerEntry) int {
+		if first.Kind != second.Kind {
+			if first.Kind == ViewerOBD {
 				return -1
 			}
 			return 1
 		}
-		return naturalCompare(a.Name, b.Name)
+		return naturalCompare(first.Name, second.Name)
 	})
 	return out, nil
 }
@@ -96,33 +96,35 @@ func (*ViewerService) ReadImage(path string) (*ImageFile, error) {
 }
 
 // naturalCompare orders "item_9" before "item_10", ignoring case.
-func naturalCompare(a, b string) int {
-	a, b = strings.ToLower(a), strings.ToLower(b)
-	for a != "" && b != "" {
-		da, db := digits(a), digits(b)
-		if da > 0 && db > 0 {
-			na, nb := strings.TrimLeft(a[:da], "0"), strings.TrimLeft(b[:db], "0")
-			if len(na) != len(nb) {
-				return len(na) - len(nb)
+func naturalCompare(first, second string) int {
+	first, second = strings.ToLower(first), strings.ToLower(second)
+	for first != "" && second != "" {
+		firstDigits, secondDigits := leadingDigits(first), leadingDigits(second)
+		if firstDigits > 0 && secondDigits > 0 {
+			firstNumber := strings.TrimLeft(first[:firstDigits], "0")
+			secondNumber := strings.TrimLeft(second[:secondDigits], "0")
+			if len(firstNumber) != len(secondNumber) {
+				return len(firstNumber) - len(secondNumber)
 			}
-			if c := strings.Compare(na, nb); c != 0 {
-				return c
+			if order := strings.Compare(firstNumber, secondNumber); order != 0 {
+				return order
 			}
-			a, b = a[da:], b[db:]
+			first, second = first[firstDigits:], second[secondDigits:]
 			continue
 		}
-		if a[0] != b[0] {
-			return int(a[0]) - int(b[0])
+		if first[0] != second[0] {
+			return int(first[0]) - int(second[0])
 		}
-		a, b = a[1:], b[1:]
+		first, second = first[1:], second[1:]
 	}
-	return len(a) - len(b)
+	return len(first) - len(second)
 }
 
-func digits(s string) int {
-	n := 0
-	for n < len(s) && s[n] >= '0' && s[n] <= '9' {
-		n++
+// leadingDigits counts the digits text starts with.
+func leadingDigits(text string) int {
+	count := 0
+	for count < len(text) && text[count] >= '0' && text[count] <= '9' {
+		count++
 	}
-	return n
+	return count
 }

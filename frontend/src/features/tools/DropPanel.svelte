@@ -9,6 +9,7 @@
   import Icon from "../../lib/ui/Icon.svelte";
   import VirtualGrid from "../../lib/ui/VirtualGrid.svelte";
   import { loading as imgLoading } from "../../lib/ui/loading";
+  import { clamp } from "../../lib/math";
 
   let {
     queue: q,
@@ -41,7 +42,7 @@
     const n = ++request;
     ThingService.Find(c, { content: "empty", flag: "", name: "" }).then(
       (r) => n === request && (empty = r ?? []),
-      (e) => n === request && toast(errorMessage(e), "error"),
+      (err) => n === request && toast(errorMessage(err), "error"),
     );
   });
   const first = $derived(minId(category));
@@ -51,11 +52,11 @@
 
   let jump = $state("");
   let scrollTo = $state<number | null>(null);
-  function onJump(e: KeyboardEvent) {
-    if (e.key !== "Enter") return;
+  function onJump(event: KeyboardEvent) {
+    if (event.key !== "Enter") return;
     const id = parseInt(jump, 10);
     if (!Number.isFinite(id)) return;
-    const i = empty ? empty.findIndex((x) => x >= id) : Math.min(Math.max(id, first), end) - first;
+    const i = empty ? empty.findIndex((x) => x >= id) : clamp(id, first, end) - first;
     scrollTo = i < 0 ? count - 1 : i;
   }
 
@@ -72,7 +73,7 @@
 
   let hovered = $state<number | null>(null);
 
-  function slotMenu(e: MouseEvent, id: number) {
+  function slotMenu(event: MouseEvent, id: number) {
     const none = () => !queue.length || !!app.busy;
     const at = id === end ? 0 : id;
     const items: MenuEntry[] = [
@@ -82,11 +83,11 @@
       { label: `Drop all ${queue.length} at the end`, action: () => dropAt(0, 0), disabled: none },
     ];
     if (id !== end && onshowSlot) items.push("-", { label: "Show in list", action: () => onshowSlot(id) });
-    openContextMenu(e, items);
+    openContextMenu(event, items);
   }
 
-  function queueMenu(e: MouseEvent, key: number | string) {
-    openContextMenu(e, [
+  function queueMenu(event: MouseEvent, key: number | string) {
+    openContextMenu(event, [
       { label: "Drop next", action: () => q.toFront(category, key) },
       { label: "Remove from queue", action: () => q.dequeue(category, [key]) },
       { label: "Show in list", action: () => onshow(key) },
@@ -110,7 +111,7 @@
       {#each queue as it, i (it.key)}
         {@const src = q.thumb(it)}
         {@const label = q.label(it)}
-        <button class="q" class:next={i === 0} title={i === 0 ? `${label} drops next (right click for more)` : `${label}: click to drop next`} onclick={() => q.toFront(category, it.key)} oncontextmenu={(e) => queueMenu(e, it.key)}>
+        <button class="q" class:next={i === 0} title={i === 0 ? `${label} drops next (right click for more)` : `${label}: click to drop next`} onclick={() => q.toFront(category, it.key)} oncontextmenu={(event) => queueMenu(event, it.key)}>
           <span class="t-slot"><img class="pixel" {src} alt="" decoding="async" draggable="false" use:imgLoading={src} /></span>
           <span class="id">{typeof it.key === "number" ? it.key : label}</span>
         </button>
@@ -139,7 +140,7 @@
           disabled={!!app.busy}
           onclick={() => dropAt(isEnd ? 0 : id)}
           onmouseenter={() => (hovered = id)}
-          oncontextmenu={(e) => slotMenu(e, id)}
+          oncontextmenu={(event) => slotMenu(event, id)}
         >
           <span class="t-slot">
             {#if next !== null && hovered === id}

@@ -28,47 +28,47 @@ type Info struct {
 }
 
 // ReadObject decodes an object entry file and checks it against meta.
-func ReadObject(m *Meta, data []byte) (*obd.Data, Info, error) {
+func ReadObject(meta *Meta, data []byte) (*obd.Data, Info, error) {
 	if len(data) > MaxObjectBytes {
 		return nil, Info{}, fmt.Errorf("%s is larger than %d bytes", ObjectFile, MaxObjectBytes)
 	}
-	d, err := obd.Decode(data)
+	decoded, err := obd.Decode(data)
 	if err != nil {
 		return nil, Info{}, fmt.Errorf("%s: %w", ObjectFile, err)
 	}
-	if err := d.Thing.Validate(); err != nil {
+	if err := decoded.Thing.Validate(); err != nil {
 		return nil, Info{}, fmt.Errorf("%s: %w", ObjectFile, err)
 	}
-	if d.SpriteSize != m.SpriteSize {
-		return nil, Info{}, fmt.Errorf("%s uses %d px sprites, meta says %d", ObjectFile, d.SpriteSize, m.SpriteSize)
+	if decoded.SpriteSize != meta.SpriteSize {
+		return nil, Info{}, fmt.Errorf("%s uses %d px sprites, meta says %d", ObjectFile, decoded.SpriteSize, meta.SpriteSize)
 	}
-	if d.Thing.Category.String() != m.Category {
-		return nil, Info{}, fmt.Errorf("%s is a %s, meta says %s", ObjectFile, d.Thing.Category, m.Category)
+	if decoded.Thing.Category.String() != meta.Category {
+		return nil, Info{}, fmt.Errorf("%s is a %s, meta says %s", ObjectFile, decoded.Thing.Category, meta.Category)
 	}
-	g := d.Thing.FrameGroups[0]
-	info := Info{ClientVersion: d.ClientVersion, Width: int(g.Width), Height: int(g.Height)}
-	for _, g := range d.Thing.FrameGroups {
-		info.Frames += int(g.Frames)
-		info.Sprites += len(g.Sprites)
+	first := decoded.Thing.FrameGroups[0]
+	info := Info{ClientVersion: decoded.ClientVersion, Width: int(first.Width), Height: int(first.Height)}
+	for _, group := range decoded.Thing.FrameGroups {
+		info.Frames += int(group.Frames)
+		info.Sprites += len(group.Sprites)
 	}
-	return d, info, nil
+	return decoded, info, nil
 }
 
 // ReadPack decodes a sprite pack and returns its non-empty sprites in grid
 // order (left to right, top to bottom).
-func ReadPack(m *Meta, data []byte) ([][]byte, Info, error) {
+func ReadPack(meta *Meta, data []byte) ([][]byte, Info, error) {
 	if len(data) > MaxPackBytes {
 		return nil, Info{}, fmt.Errorf("%s is larger than %d bytes", SpritesFile, MaxPackBytes)
 	}
-	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+	config, _, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
 		return nil, Info{}, fmt.Errorf("%s: %w", SpritesFile, err)
 	}
-	size := m.SpriteSize
-	if size == 0 || cfg.Width%size != 0 || cfg.Height%size != 0 || cfg.Width == 0 || cfg.Height == 0 {
-		return nil, Info{}, fmt.Errorf("%s is %dx%d, not a grid of %d px sprites", SpritesFile, cfg.Width, cfg.Height, size)
+	size := meta.SpriteSize
+	if size == 0 || config.Width%size != 0 || config.Height%size != 0 || config.Width == 0 || config.Height == 0 {
+		return nil, Info{}, fmt.Errorf("%s is %dx%d, not a grid of %d px sprites", SpritesFile, config.Width, config.Height, size)
 	}
-	if (cfg.Width/size)*(cfg.Height/size) > MaxPackSprites {
+	if (config.Width/size)*(config.Height/size) > MaxPackSprites {
 		return nil, Info{}, fmt.Errorf("%s holds more than %d sprites", SpritesFile, MaxPackSprites)
 	}
 	img, err := imaging.Decode(bytes.NewReader(data))
@@ -78,26 +78,29 @@ func ReadPack(m *Meta, data []byte) ([][]byte, Info, error) {
 	imaging.RemoveMagenta(img)
 	imaging.Normalize(img)
 	var sprites [][]byte
-	for _, px := range imaging.SliceTiles(img, size) {
-		if slices.ContainsFunc(alphas(px), func(a byte) bool { return a != 0 }) {
-			sprites = append(sprites, px)
+	for _, pixels := range imaging.SliceTiles(img, size) {
+		if slices.ContainsFunc(alphas(pixels), func(alpha byte) bool { return alpha != 0 }) {
+			sprites = append(sprites, pixels)
 		}
 	}
 	if len(sprites) == 0 {
 		return nil, Info{}, fmt.Errorf("%s has no sprites", SpritesFile)
 	}
-	return sprites, Info{Width: cfg.Width / size, Height: cfg.Height / size, Sprites: len(sprites)}, nil
+	return sprites, Info{Width: config.Width / size, Height: config.Height / size, Sprites: len(sprites)}, nil
 }
 
-func alphas(px []byte) []byte {
-	out := make([]byte, 0, len(px)/4)
-	for i := 3; i < len(px); i += 4 {
-		out = append(out, px[i])
+func alphas(pixels []byte) []byte {
+	out := make([]byte, 0, len(pixels)/4)
+	for i := 3; i < len(pixels); i += 4 {
+		out = append(out, pixels[i])
 	}
 	return out
 }
 
-// PackImage lays sprites out in a grid of up to 8 columns.
+// packColumns is the widest grid PackImage lays sprites out in.
+const packColumns = 8
+
+// PackImage lays sprites out in a grid of up to packColumns columns.
 func PackImage(sprites [][]byte, size int) (*image.NRGBA, error) {
 	if len(sprites) == 0 {
 		return nil, errors.New("no sprites")
@@ -105,11 +108,11 @@ func PackImage(sprites [][]byte, size int) (*image.NRGBA, error) {
 	if len(sprites) > MaxPackSprites {
 		return nil, fmt.Errorf("a pack holds at most %d sprites", MaxPackSprites)
 	}
-	cols := min(len(sprites), 8)
-	rows := (len(sprites) + cols - 1) / cols
-	img := image.NewNRGBA(image.Rect(0, 0, cols*size, rows*size))
-	for i, px := range sprites {
-		imaging.PutTile(img, (i%cols)*size, (i/cols)*size, size, px)
+	columns := min(len(sprites), packColumns)
+	rows := (len(sprites) + columns - 1) / columns
+	img := image.NewNRGBA(image.Rect(0, 0, columns*size, rows*size))
+	for i, pixels := range sprites {
+		imaging.PutTile(img, (i%columns)*size, (i/columns)*size, size, pixels)
 	}
 	return img, nil
 }
@@ -118,76 +121,79 @@ func PackImage(sprites [][]byte, size int) (*image.NRGBA, error) {
 // them with the creature speed; stored durations are placeholders).
 const walkFrameMs = 100
 
+// maxPreviewFrames bounds the frames of a preview GIF.
+const maxPreviewFrames = 64
+
 // Preview renders an animated GIF of an object: outfits walk south, other
 // things show their first pattern. Outfits with a color mask layer are
 // painted with the default outfit colors.
-func Preview(d *obd.Data) ([]byte, error) {
-	t := d.Thing
-	gi := 0
+func Preview(object *obd.Data) ([]byte, error) {
+	thingType := object.Thing
+	groupIndex := 0
 	walking := false
-	if t.Category == thing.CategoryOutfit {
-		for i, g := range t.FrameGroups {
-			if g.Type == thing.FrameGroupWalking && g.Frames > 1 {
-				gi, walking = i, true
+	if thingType.Category == thing.CategoryOutfit {
+		for i, group := range thingType.FrameGroups {
+			if group.Type == thing.FrameGroupWalking && group.Frames > 1 {
+				groupIndex, walking = i, true
 			}
 		}
 	}
-	g := t.FrameGroups[gi]
-	px := 0
-	if t.Category == thing.CategoryOutfit && g.PatternX > uint8(thing.South) {
-		px = int(thing.South)
+	group := thingType.FrameGroups[groupIndex]
+	patternX := 0
+	if thingType.Category == thing.CategoryOutfit && group.PatternX > uint8(thing.South) {
+		patternX = int(thing.South)
 	}
-	size := d.SpriteSize
-	w, h := int(g.Width)*size, int(g.Height)*size
-	frames := make([]*image.NRGBA, 0, g.Frames)
-	for f := 0; f < int(g.Frames) && f < 64; f++ {
-		img := image.NewNRGBA(image.Rect(0, 0, w, h))
-		for th := 0; th < int(g.Height); th++ {
-			for tw := 0; tw < int(g.Width); tw++ {
-				s := d.Sprites[gi][g.SpriteIndex(tw, th, 0, px, 0, 0, f)].Pixels
-				if t.Category == thing.CategoryOutfit && g.Layers > 1 {
-					s = slices.Clone(s)
-					colorize(s, d.Sprites[gi][g.SpriteIndex(tw, th, 1, px, 0, 0, f)].Pixels)
+	size := object.SpriteSize
+	width, height := int(group.Width)*size, int(group.Height)*size
+	frames := make([]*image.NRGBA, 0, group.Frames)
+	for frameIndex := 0; frameIndex < int(group.Frames) && frameIndex < maxPreviewFrames; frameIndex++ {
+		img := image.NewNRGBA(image.Rect(0, 0, width, height))
+		for tileY := 0; tileY < int(group.Height); tileY++ {
+			for tileX := 0; tileX < int(group.Width); tileX++ {
+				pixels := object.Sprites[groupIndex][group.SpriteIndex(tileX, tileY, 0, patternX, 0, 0, frameIndex)].Pixels
+				if thingType.Category == thing.CategoryOutfit && group.Layers > 1 {
+					pixels = slices.Clone(pixels)
+					colorize(pixels, object.Sprites[groupIndex][group.SpriteIndex(tileX, tileY, 1, patternX, 0, 0, frameIndex)].Pixels)
 				}
-				imaging.PutTile(img, (int(g.Width)-1-tw)*size, (int(g.Height)-1-th)*size, size, s)
+				imaging.PutTile(img, (int(group.Width)-1-tileX)*size, (int(group.Height)-1-tileY)*size, size, pixels)
 			}
 		}
 		frames = append(frames, img)
 	}
 	// Crop every frame to the union of visible pixels.
 	var box image.Rectangle
-	for _, f := range frames {
-		box = box.Union(imaging.ContentBounds(f))
+	for _, frame := range frames {
+		box = box.Union(imaging.ContentBounds(frame))
 	}
 	if box.Empty() {
-		box = image.Rect(0, 0, min(w, size), min(h, size))
+		box = image.Rect(0, 0, min(width, size), min(height, size))
 	}
-	for _, f := range frames {
-		for i := 0; i < len(f.Pix); i += 4 {
-			c := opaque(color.NRGBA{f.Pix[i], f.Pix[i+1], f.Pix[i+2], f.Pix[i+3]})
-			f.Pix[i], f.Pix[i+1], f.Pix[i+2], f.Pix[i+3] = c.R, c.G, c.B, c.A
+	for _, frame := range frames {
+		for i := 0; i < len(frame.Pix); i += 4 {
+			pixel := opaque(color.NRGBA{frame.Pix[i], frame.Pix[i+1], frame.Pix[i+2], frame.Pix[i+3]})
+			frame.Pix[i], frame.Pix[i+1], frame.Pix[i+2], frame.Pix[i+3] = pixel.R, pixel.G, pixel.B, pixel.A
 		}
 	}
-	pal, exact := palette(frames, box)
+	colors, exact := palette(frames, box)
 	out := &gif.GIF{LoopCount: 0}
-	for i, f := range frames {
-		p := image.NewPaletted(image.Rect(0, 0, box.Dx(), box.Dy()), pal)
+	for i, frame := range frames {
+		paletted := image.NewPaletted(image.Rect(0, 0, box.Dx(), box.Dy()), colors)
 		if exact {
 			for y := 0; y < box.Dy(); y++ {
 				for x := 0; x < box.Dx(); x++ {
-					p.SetColorIndex(x, y, uint8(pal.Index(f.NRGBAAt(box.Min.X+x, box.Min.Y+y))))
+					paletted.SetColorIndex(x, y, uint8(colors.Index(frame.NRGBAAt(box.Min.X+x, box.Min.Y+y))))
 				}
 			}
 		} else {
-			draw.FloydSteinberg.Draw(p, p.Rect, f, box.Min)
+			draw.FloydSteinberg.Draw(paletted, paletted.Rect, frame, box.Min)
 		}
 		delay := walkFrameMs
-		if !walking && i < len(g.Durations) {
-			delay = int(g.Durations[i].Min+g.Durations[i].Max) / 2
+		if !walking && i < len(group.Durations) {
+			delay = int(group.Durations[i].Min+group.Durations[i].Max) / 2
 		} else if !walking {
-			delay = int(t.Category.DefaultDuration())
+			delay = int(thingType.Category.DefaultDuration())
 		}
-		out.Image = append(out.Image, p)
+		out.Image = append(out.Image, paletted)
 		out.Delay = append(out.Delay, max(delay/10, 2))
 		out.Disposal = append(out.Disposal, gif.DisposalBackground)
 	}
@@ -201,48 +207,48 @@ func Preview(d *obd.Data) ([]byte, error) {
 var transparent = color.NRGBA{}
 
 // opaque maps half transparent pixels to the GIF's one bit alpha.
-func opaque(c color.NRGBA) color.NRGBA {
-	if c.A < 128 {
+func opaque(pixel color.NRGBA) color.NRGBA {
+	if pixel.A < 128 {
 		return transparent
 	}
-	c.A = 255
-	return c
+	pixel.A = 255
+	return pixel
 }
 
 // palette returns the exact colors of the frames when they fit in a GIF
 // palette, else a web palette for dithering. Index 0 is transparent.
 func palette(frames []*image.NRGBA, box image.Rectangle) (color.Palette, bool) {
-	pal := color.Palette{transparent}
+	colors := color.Palette{transparent}
 	seen := map[color.NRGBA]bool{transparent: true}
-	for _, f := range frames {
+	for _, frame := range frames {
 		for y := box.Min.Y; y < box.Max.Y; y++ {
 			for x := box.Min.X; x < box.Max.X; x++ {
-				c := f.NRGBAAt(x, y)
-				if !seen[c] {
-					seen[c] = true
-					pal = append(pal, c)
-					if len(pal) > 256 {
+				pixel := frame.NRGBAAt(x, y)
+				if !seen[pixel] {
+					seen[pixel] = true
+					colors = append(colors, pixel)
+					if len(colors) > 256 {
 						return webPalette(), false
 					}
 				}
 			}
 		}
 	}
-	return pal, true
+	return colors, true
 }
 
 func webPalette() color.Palette {
-	pal := color.Palette{transparent}
-	for r := 0; r < 6; r++ {
-		for g := 0; g < 6; g++ {
-			for b := 0; b < 6; b++ {
-				pal = append(pal, color.NRGBA{uint8(r * 51), uint8(g * 51), uint8(b * 51), 255})
+	colors := color.Palette{transparent}
+	for red := 0; red < 6; red++ {
+		for green := 0; green < 6; green++ {
+			for blue := 0; blue < 6; blue++ {
+				colors = append(colors, color.NRGBA{uint8(red * 51), uint8(green * 51), uint8(blue * 51), 255})
 			}
 		}
 	}
-	for i := len(pal); i < 256; i++ {
-		v := uint8((i - 217) * 6)
-		pal = append(pal, color.NRGBA{v, v, v, 255})
+	for i := len(colors); i < 256; i++ {
+		gray := uint8((i - 217) * 6)
+		colors = append(colors, color.NRGBA{gray, gray, gray, 255})
 	}
-	return pal
+	return colors
 }

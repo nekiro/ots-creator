@@ -13,59 +13,59 @@ func hsiToRGB(color int) [3]uint8 {
 	if color < 0 || color >= steps*values {
 		color = 0
 	}
-	var h, s, i float64
+	var hue, saturation, intensity float64
 	if color%steps == 0 {
-		i = 1 - float64(color)/steps/values
+		intensity = 1 - float64(color)/steps/values
 	} else {
-		h = float64(color%steps) * (1.0 / 18)
-		s, i = 1, 1
+		hue = float64(color%steps) * (1.0 / 18)
+		saturation, intensity = 1, 1
 		switch color / steps {
 		case 0:
-			s, i = 0.25, 1
+			saturation, intensity = 0.25, 1
 		case 1:
-			s, i = 0.25, 0.75
+			saturation, intensity = 0.25, 0.75
 		case 2:
-			s, i = 0.5, 0.75
+			saturation, intensity = 0.5, 0.75
 		case 3:
-			s, i = 0.667, 0.75
+			saturation, intensity = 0.667, 0.75
 		case 4:
-			s, i = 1, 1
+			saturation, intensity = 1, 1
 		case 5:
-			s, i = 1, 0.75
+			saturation, intensity = 1, 0.75
 		case 6:
-			s, i = 1, 0.5
+			saturation, intensity = 1, 0.5
 		}
 	}
-	if i == 0 {
+	if intensity == 0 {
 		return [3]uint8{}
 	}
-	if s == 0 {
-		v := uint8(math.Floor(i * 0xff))
-		return [3]uint8{v, v, v}
+	if saturation == 0 {
+		gray := uint8(math.Floor(intensity * 0xff))
+		return [3]uint8{gray, gray, gray}
 	}
-	var r, g, b float64
+	var red, green, blue float64
 	switch {
-	case h < 1.0/6:
-		r, b = i, i*(1-s)
-		g = b + (i-b)*6*h
-	case h < 2.0/6:
-		g, b = i, i*(1-s)
-		r = g - (i-b)*(6*h-1)
-	case h < 3.0/6:
-		g, r = i, i*(1-s)
-		b = r + (i-r)*(6*h-2)
-	case h < 4.0/6:
-		b, r = i, i*(1-s)
-		g = b - (i-r)*(6*h-3)
-	case h < 5.0/6:
-		b, g = i, i*(1-s)
-		r = g + (i-g)*(6*h-4)
+	case hue < 1.0/6:
+		red, blue = intensity, intensity*(1-saturation)
+		green = blue + (intensity-blue)*6*hue
+	case hue < 2.0/6:
+		green, blue = intensity, intensity*(1-saturation)
+		red = green - (intensity-blue)*(6*hue-1)
+	case hue < 3.0/6:
+		green, red = intensity, intensity*(1-saturation)
+		blue = red + (intensity-red)*(6*hue-2)
+	case hue < 4.0/6:
+		blue, red = intensity, intensity*(1-saturation)
+		green = blue - (intensity-red)*(6*hue-3)
+	case hue < 5.0/6:
+		blue, green = intensity, intensity*(1-saturation)
+		red = green + (intensity-green)*(6*hue-4)
 	default:
-		r, g = i, i*(1-s)
-		b = r - (i-g)*(6*h-5)
+		red, green = intensity, intensity*(1-saturation)
+		blue = red - (intensity-green)*(6*hue-5)
 	}
-	c := func(v float64) uint8 { return uint8(int(math.Floor(v*0xff)) & 0xff) }
-	return [3]uint8{c(r), c(g), c(b)}
+	toByte := func(gray float64) uint8 { return uint8(int(math.Floor(gray*0xff)) & 0xff) }
+	return [3]uint8{toByte(red), toByte(green), toByte(blue)}
 }
 
 // colorize multiplies base pixels by the default outfit colors where the
@@ -73,30 +73,30 @@ func hsiToRGB(color int) [3]uint8 {
 // feet. Both are RGBA buffers of the same size.
 func colorize(base, template []byte) {
 	var colors [4][3]uint8
-	for k, c := range defaultColors {
-		colors[k] = hsiToRGB(c)
+	for part, paletteIndex := range defaultColors {
+		colors[part] = hsiToRGB(paletteIndex)
 	}
-	for p := 0; p+3 < len(base); p += 4 {
-		if template[p+3] == 0 || base[p+3] == 0 {
+	for offset := 0; offset+3 < len(base); offset += 4 {
+		if template[offset+3] == 0 || base[offset+3] == 0 {
 			continue
 		}
-		r, g, b := template[p] > 0, template[p+1] > 0, template[p+2] > 0
-		k := -1
+		red, green, blue := template[offset] > 0, template[offset+1] > 0, template[offset+2] > 0
+		part := -1
 		switch {
-		case r && g && !b:
-			k = 0
-		case r && !g && !b:
-			k = 1
-		case !r && g && !b:
-			k = 2
-		case !r && !g && b:
-			k = 3
+		case red && green && !blue:
+			part = 0
+		case red && !green && !blue:
+			part = 1
+		case !red && green && !blue:
+			part = 2
+		case !red && !green && blue:
+			part = 3
 		}
-		if k < 0 {
+		if part < 0 {
 			continue
 		}
 		for j := range 3 {
-			base[p+j] = uint8(int(base[p+j]) * int(colors[k][j]) / 255)
+			base[offset+j] = uint8(int(base[offset+j]) * int(colors[part][j]) / 255)
 		}
 	}
 }

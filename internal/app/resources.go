@@ -2,14 +2,10 @@ package app
 
 import (
 	"errors"
-	"fmt"
-	"io"
+	"image"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/nekiro/ots-creator/internal/imaging"
 	"github.com/nekiro/ots-creator/internal/project"
@@ -38,13 +34,13 @@ const maxBatch = 4096
 // The response header X-Sprite-Size carries the sprite edge length. URLs
 // should include ?r={rev} so cached responses are invalidated on change.
 type Resources struct {
-	s *Session
+	session *Session
 	// Maps serves /res/map/ (map chunks and minimaps).
 	Maps *MapService
 }
 
 // NewResources returns the handler.
-func NewResources(s *Session) *Resources { return &Resources{s: s} }
+func NewResources(session *Session) *Resources { return &Resources{session: session} }
 
 // Middleware routes /res/ requests to the handler and everything else to next.
 func (h *Resources) Middleware(next http.Handler) http.Handler {
@@ -67,11 +63,11 @@ func (h *Resources) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.Maps.serveMap(w, r, parts[1:])
 		return
 	}
-	project := h.s.Project
+	client := h.session.Project
 	if len(parts) > 1 && parts[0] == "b" {
-		project, parts = h.s.Other, parts[1:]
+		client, parts = h.session.Other, parts[1:]
 	}
-	p, err := project()
+	p, err := client()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
@@ -96,93 +92,44 @@ func (h *Resources) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func parseID(s string) (uint32, error) {
-	n, err := strconv.ParseUint(s, 10, 32)
-	return uint32(n), err
+func parseID(text string) (uint32, error) {
+	id, err := strconv.ParseUint(text, 10, 32)
+	return uint32(id), err
 }
 
-func (h *Resources) sprite(w http.ResponseWriter, p *project.Project, idStr string) {
-	id, err := parseID(idStr)
-	if err != nil {
-		http.Error(w, "bad sprite id", http.StatusBadRequest)
-		return
-	}
-	px, err := p.SpritePixels(id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Write(px)
-}
-
-func (h *Resources) spritePNG(w http.ResponseWriter, p *project.Project, idStr string) {
-	id, err := parseID(idStr)
-	if err != nil {
-		http.Error(w, "bad sprite id", http.StatusBadRequest)
-		return
-	}
-	px, err := p.SpritePixels(id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-	data, err := imaging.EncodePNG(imagingNRGBA(px, p.SpriteSize()))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "image/png")
-	w.Write(data)
-}
-
-func (h *Resources) sprites(w http.ResponseWriter, r *http.Request, p *project.Project) {
-	raw := strings.Split(r.URL.Query().Get("ids"), ",")
-	if len(raw) > maxBatch {
-		http.Error(w, "too many ids", http.StatusBadRequest)
-		return
-	}
-	size := p.SpriteSize() * p.SpriteSize() * 4
-	out := make([]byte, 0, len(raw)*size)
-	empty := make([]byte, size)
-	for _, s := range raw {
-		id, err := parseID(s)
-		if err != nil {
-			http.Error(w, "bad sprite id "+s, http.StatusBadRequest)
-			return
-		}
-		if id == 0 {
-			out = append(out, empty...)
-			continue
-		}
-		px, err := p.SpritePixels(id)
-		if err != nil {
-			out = append(out, empty...) // missing sprites render empty
-			continue
-		}
-		out = append(out, px...)
-	}
-	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Write(out)
-}
-
-func (h *Resources) sheet(w http.ResponseWriter, r *http.Request, p *project.Project, catStr, idStr string) {
-	c, err := thing.ParseCategory(catStr)
+// parseThing parses the category and id of a thing URL, answering bad
+// requests itself; ok is false then.
+func parseThing(w http.ResponseWriter, categoryText, idText string) (category thing.Category, id uint32, ok bool) {
+	category, err := thing.ParseCategory(categoryText)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return 0, 0, false
 	}
-	id, err := parseID(idStr)
-	if err != nil {
+	if id, err = parseID(idText); err != nil {
 		http.Error(w, "bad id", http.StatusBadRequest)
-		return
+		return 0, 0, false
 	}
-	group, _ := strconv.Atoi(r.URL.Query().Get("g"))
-	img, err := renderSheet(p, c, id, group, r.URL.Query().Get("bg") == "transparent")
+	return category, id, true
+}
+
+// spritePixels reads the sprite of an id URL part, answering errors
+// itself; ok is false then.
+func spritePixels(w http.ResponseWriter, p *project.Project, idText string) (pixels []byte, ok bool) {
+	id, err := parseID(idText)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		http.Error(w, "bad sprite id", http.StatusBadRequest)
+		return nil, false
 	}
+	pixels, err = p.SpritePixels(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return nil, false
+	}
+	return pixels, true
+}
+
+// servePNG answers with an image as PNG.
+func servePNG(w http.ResponseWriter, img image.Image) {
 	data, err := imaging.EncodePNG(img)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -192,45 +139,80 @@ func (h *Resources) sheet(w http.ResponseWriter, r *http.Request, p *project.Pro
 	w.Write(data)
 }
 
-func (h *Resources) texture(w http.ResponseWriter, r *http.Request, p *project.Project, catStr, idStr string, thumb bool) {
-	c, err := thing.ParseCategory(catStr)
+func (h *Resources) sprite(w http.ResponseWriter, p *project.Project, idText string) {
+	if pixels, ok := spritePixels(w, p, idText); ok {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Write(pixels)
+	}
+}
+
+func (h *Resources) spritePNG(w http.ResponseWriter, p *project.Project, idText string) {
+	if pixels, ok := spritePixels(w, p, idText); ok {
+		servePNG(w, spriteImage(pixels, p.SpriteSize()))
+	}
+}
+
+func (h *Resources) sprites(w http.ResponseWriter, r *http.Request, p *project.Project) {
+	idTexts := strings.Split(r.URL.Query().Get("ids"), ",")
+	if len(idTexts) > maxBatch {
+		http.Error(w, "too many ids", http.StatusBadRequest)
+		return
+	}
+	spriteBytes := p.SpriteSize() * p.SpriteSize() * 4
+	out := make([]byte, 0, len(idTexts)*spriteBytes)
+	empty := make([]byte, spriteBytes)
+	for _, idText := range idTexts {
+		id, err := parseID(idText)
+		if err != nil {
+			http.Error(w, "bad sprite id "+idText, http.StatusBadRequest)
+			return
+		}
+		if id == 0 {
+			out = append(out, empty...)
+			continue
+		}
+		pixels, err := p.SpritePixels(id)
+		if err != nil {
+			out = append(out, empty...) // missing sprites render empty
+			continue
+		}
+		out = append(out, pixels...)
+	}
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Write(out)
+}
+
+func (h *Resources) sheet(w http.ResponseWriter, r *http.Request, p *project.Project, categoryText, idText string) {
+	category, id, ok := parseThing(w, categoryText, idText)
+	if !ok {
+		return
+	}
+	group := queryInt(r.URL.Query(), "g")
+	img, err := renderSheet(p, category, id, group, r.URL.Query().Get("bg") == "transparent")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	id, err := parseID(idStr)
-	if err != nil {
-		http.Error(w, "bad id", http.StatusBadRequest)
+	servePNG(w, img)
+}
+
+func (h *Resources) texture(w http.ResponseWriter, r *http.Request, p *project.Project, categoryText, idText string, thumb bool) {
+	category, id, ok := parseThing(w, categoryText, idText)
+	if !ok {
 		return
 	}
 	var pos project.TexturePos
 	if thumb {
-		t, err := p.Thing(c, id)
+		found, err := p.Thing(category, id)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		pos = project.ThumbnailPos(t)
-	} else {
-		q := r.URL.Query()
-		num := func(k string) int { n, _ := strconv.Atoi(q.Get(k)); return max(n, 0) }
-		pos = project.TexturePos{Group: thing.FrameGroupType(num("g")), Layer: num("l"), PatternX: num("x"), PatternY: num("y"), PatternZ: num("z"), Frame: num("f")}
-		// wrap=1 takes x, y, z as a map position: the pattern the client
-		// draws there (grounds and borders vary by tile).
-		if q.Get("wrap") == "1" {
-			t, err := p.Thing(c, id)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusNotFound)
-				return
-			}
-			if g := t.Group(pos.Group); g != nil {
-				pos.PatternX %= max(int(g.PatternX), 1)
-				pos.PatternY %= max(int(g.PatternY), 1)
-				pos.PatternZ %= max(int(g.PatternZ), 1)
-			}
-		}
+		pos = project.ThumbnailPos(found)
+	} else if pos, ok = texturePos(w, r, p, category, id); !ok {
+		return
 	}
-	img, err := p.Render(c, id, pos)
+	img, err := p.Render(category, id, pos)
 	if err != nil {
 		status := http.StatusBadRequest
 		if errors.Is(err, ErrNoProject) {
@@ -244,37 +226,31 @@ func (h *Resources) texture(w http.ResponseWriter, r *http.Request, p *project.P
 		// a 64x64 texture is not drawn tiny in a corner.
 		img = imaging.CropToContent(img)
 	}
-	data, err := imaging.EncodePNG(img)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "image/png")
-	w.Write(data)
+	servePNG(w, img)
 }
 
-// appendPerfLog appends the request body (one line of timings from the map
-// renderer) to map-perf.log in the user's config directory, where it can be
-// read without devtools.
-func appendPerfLog(w http.ResponseWriter, r *http.Request) {
-	line, err := io.ReadAll(io.LimitReader(r.Body, 4096))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+// texturePos reads the texture of a /res/texture request. wrap=1 takes
+// x, y, z as a map position: the pattern the client draws there (grounds
+// and borders vary by tile).
+func texturePos(w http.ResponseWriter, r *http.Request, p *project.Project, category thing.Category, id uint32) (project.TexturePos, bool) {
+	query := r.URL.Query()
+	param := func(name string) int { return max(queryInt(query, name), 0) }
+	pos := project.TexturePos{
+		Group: thing.FrameGroupType(param("g")), Layer: param("l"),
+		PatternX: param("x"), PatternY: param("y"), PatternZ: param("z"), Frame: param("f"),
 	}
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	if query.Get("wrap") != "1" {
+		return pos, true
 	}
-	dir = filepath.Join(dir, "OTS Creator")
-	_ = os.MkdirAll(dir, 0o755)
-	f, err := os.OpenFile(filepath.Join(dir, "map-perf.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	found, err := p.Thing(category, id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return pos, false
 	}
-	defer f.Close()
-	fmt.Fprintf(f, "%s %s\n", time.Now().Format("15:04:05.000"), strings.TrimSpace(string(line)))
-	w.WriteHeader(http.StatusNoContent)
+	if group := found.Group(pos.Group); group != nil {
+		pos.PatternX %= max(int(group.PatternX), 1)
+		pos.PatternY %= max(int(group.PatternY), 1)
+		pos.PatternZ %= max(int(group.PatternZ), 1)
+	}
+	return pos, true
 }

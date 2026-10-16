@@ -1,7 +1,7 @@
 // Overlays drawn over the map every frame in screen pixels: grid, spawn
 // radiuses, selection and area rectangles, markers, the client view box,
 // and labels (creature names, item texts, positions, item tooltips).
-import { IF, TF } from "./chunks";
+import { ItemFlags, TileFlags } from "./chunks";
 import { ALPHA, COLORS, LABEL_COLORS, LIMITS, ZOOM } from "./constants";
 import { labelText, wrapText } from "./itemText";
 import type { QuadBatch } from "./quadBatch";
@@ -70,7 +70,7 @@ function drawSpawns(overlay: Overlay): void {
   const { scene, camera, batch, z, tilePx, lineWidth } = overlay;
   forEachTile(overlay, LIMITS.spawnSearch, LIMITS.spawnSearch, (x, y) => {
     const tile = scene.chunks.peekTile(x, y, z);
-    if (!tile || !(tile.flags & (TF.spawn | TF.spawnNpc))) return;
+    if (!tile || !(tile.flags & (TileFlags.spawn | TileFlags.spawnNpc))) return;
     for (const spawn of [tile.spawn, tile.spawnNpc]) {
       if (!spawn) continue;
       const radius = spawn.radius;
@@ -184,12 +184,12 @@ function labelItemTooltips(overlay: Overlay): void {
     if (!tile) return;
     for (let i = 0; i < tile.ids.length; i++) {
       const itemFlags = tile.iflags[i];
-      if (!(itemFlags & (IF.ids | IF.text | IF.teleport | IF.doorId))) continue;
+      if (!(itemFlags & (ItemFlags.ids | ItemFlags.text | ItemFlags.teleport | ItemFlags.doorId))) continue;
       const tags: string[] = [];
-      if (itemFlags & IF.ids) tags.push("id");
-      if (itemFlags & IF.text) tags.push("text");
-      if (itemFlags & IF.teleport) tags.push("tp");
-      if (itemFlags & IF.doorId) tags.push("door");
+      if (itemFlags & ItemFlags.ids) tags.push("id");
+      if (itemFlags & ItemFlags.text) tags.push("text");
+      if (itemFlags & ItemFlags.teleport) tags.push("tp");
+      if (itemFlags & ItemFlags.doorId) tags.push("door");
       result.labels.push({ x: camera.tileX(x, z) + tilePx / 2, y: camera.tileY(y, z) + tilePx / 2, text: `${tile.ids[i]} ${tags.join(" ")}`, color: LABEL_COLORS.tooltip });
       break;
     }

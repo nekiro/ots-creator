@@ -12,7 +12,7 @@
   let values = $state<Record<string, number | string>>({});
   let filter = $state("");
 
-  const changes = $derived(Object.values(states).filter((v) => v !== undefined).length);
+  const changes = $derived(Object.values(states).filter((value) => value !== undefined).length);
   const count = $derived(app.selection.length);
 
   // A new selection or category starts clean.
@@ -81,17 +81,17 @@
                                 class="t-check"
                                 type="checkbox"
                                 checked={(Number(values[fd.key] ?? 0) & bit) !== 0}
-                                onchange={(e) => (values[fd.key] = e.currentTarget.checked ? Number(values[fd.key] ?? 0) | bit : Number(values[fd.key] ?? 0) & ~bit)}
+                                onchange={(event) => (values[fd.key] = event.currentTarget.checked ? Number(values[fd.key] ?? 0) | bit : Number(values[fd.key] ?? 0) & ~bit)}
                               />{name}</label
                             >
                           {/each}
                         </span>
                       {:else if fd.kind === "select"}
-                        <Select grow value={values[fd.key] ?? 0} options={options(fd)} onchange={(v) => (values[fd.key] = v)} />
+                        <Select grow value={values[fd.key] ?? 0} options={options(fd)} onchange={(value) => (values[fd.key] = value)} />
                       {:else if fd.kind === "text"}
-                        <input class="t-input grow" value={values[fd.key] ?? ""} onchange={(e) => (values[fd.key] = e.currentTarget.value)} />
+                        <input class="t-input grow" value={values[fd.key] ?? ""} onchange={(event) => (values[fd.key] = event.currentTarget.value)} />
                       {:else}
-                        <NumberField value={Number(values[fd.key] ?? 0)} min={fd.kind === "i16" ? -32768 : 0} max={fd.kind === "i16" ? 32767 : 65535} onchange={(v) => (values[fd.key] = v)} />
+                        <NumberField value={Number(values[fd.key] ?? 0)} min={fd.kind === "i16" ? -32768 : 0} max={fd.kind === "i16" ? 32767 : 65535} onchange={(value) => (values[fd.key] = value)} />
                       {/if}
                     </label>
                   {/each}

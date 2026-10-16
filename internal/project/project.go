@@ -4,12 +4,14 @@ package project
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
-	"sync/atomic"
+
+	"github.com/nekiro/ots-creator/internal/fsutil"
 
 	"github.com/nekiro/ots-creator/internal/assets"
 	"github.com/nekiro/ots-creator/internal/client"
@@ -84,73 +86,69 @@ type OpenOptions struct {
 }
 
 // Open loads a dat/spr pair.
-func Open(o OpenOptions) (*Project, error) {
-	datBytes, err := os.ReadFile(o.DatPath)
+func Open(options OpenOptions) (*Project, error) {
+	datBytes, err := os.ReadFile(options.DatPath)
 	if err != nil {
 		return nil, err
 	}
-	sprBytes, err := os.ReadFile(o.SprPath)
+	sprBytes, err := os.ReadFile(options.SprPath)
 	if err != nil {
 		return nil, err
 	}
 	if len(datBytes) < 4 || len(sprBytes) < 4 {
 		return nil, fmt.Errorf("dat or spr file is too small")
 	}
-	datSig := le32(datBytes)
-	sprSig := le32(sprBytes)
-	var v client.Version
-	if o.Version != nil {
-		v = *o.Version
+	datSignature := binary.LittleEndian.Uint32(datBytes)
+	sprSignature := binary.LittleEndian.Uint32(sprBytes)
+	var version client.Version
+	if options.Version != nil {
+		version = *options.Version
 	} else {
 		var ok bool
-		v, ok = client.FindBySignatures(datSig, sprSig)
+		version, ok = client.FindBySignatures(datSignature, sprSignature)
 		if !ok {
-			return nil, fmt.Errorf("%w: dat 0x%X, spr 0x%X", ErrUnknownVersion, datSig, sprSig)
+			return nil, fmt.Errorf("%w: dat 0x%X, spr 0x%X", ErrUnknownVersion, datSignature, sprSignature)
 		}
 	}
-	f := o.Features
-	f.ApplyVersionDefaults(v.Value)
-	things, err := dat.Decode(datBytes, dat.Options{Format: client.MetadataFormat(v.Value), Features: f})
+	features := options.Features
+	features.ApplyVersionDefaults(version.Value)
+	things, err := dat.Decode(datBytes, dat.Options{Format: client.MetadataFormat(version.Value), Features: features})
 	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", filepath.Base(o.DatPath), err)
+		return nil, fmt.Errorf("read %s: %w", filepath.Base(options.DatPath), err)
 	}
-	sf, err := spr.Open(sprBytes, spr.Options{Extended: f.Extended, Transparent: f.Transparency, SpriteSize: f.SpriteSize})
+	spriteFile, err := spr.Open(sprBytes, spr.Options{Extended: features.Extended, Transparent: features.Transparency, SpriteSize: features.SpriteSize})
 	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", filepath.Base(o.SprPath), err)
+		return nil, fmt.Errorf("read %s: %w", filepath.Base(options.SprPath), err)
 	}
-	p := &Project{
-		version:  v,
-		features: f,
+	project := &Project{
+		version:  version,
+		features: features,
 		format:   FormatDat,
-		datPath:  o.DatPath,
-		sprPath:  o.SprPath,
+		datPath:  options.DatPath,
+		sprPath:  options.SprPath,
 		things:   things,
-		sprites:  newSpriteStore(sprFile(sf), f.SpriteSize, f.Transparency),
+		sprites:  newSpriteStore(sprFile(spriteFile), features.SpriteSize, features.Transparency),
 	}
-	p.resetBase()
-	return p, nil
+	project.resetBase()
+	return project, nil
 }
 
 // New creates an empty client with one item, outfit, effect and missile,
 // like ObjectBuilder does.
-func New(v client.Version, f client.Features) *Project {
-	f.ApplyVersionDefaults(v.Value)
-	things := dat.NewFile(v.DatSignature)
-	for _, c := range thing.Categories {
-		things.Things[c] = []*thing.Thing{thing.New(c.MinID(), c)}
+func New(version client.Version, features client.Features) *Project {
+	features.ApplyVersionDefaults(version.Value)
+	things := dat.NewFile(version.DatSignature)
+	for _, category := range thing.Categories {
+		things.Things[category] = []*thing.Thing{thing.New(category.MinID(), category)}
 	}
 	return &Project{
-		version:  v,
-		features: f,
+		version:  version,
+		features: features,
 		format:   FormatDat,
 		things:   things,
-		sprites:  newSpriteStore(nil, f.SpriteSize, f.Transparency),
+		sprites:  newSpriteStore(nil, features.SpriteSize, features.Transparency),
 		unsaved:  true,
 	}
-}
-
-func le32(b []byte) uint32 {
-	return uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16 | uint32(b[3])<<24
 }
 
 // Info returns a snapshot of the project state.
@@ -163,8 +161,8 @@ func (p *Project) Info() Info {
 func (p *Project) infoLocked() Info {
 	var otb *OTBInfo
 	if p.otb != nil {
-		in := p.otb.info
-		otb = &in
+		info := p.otb.info
+		otb = &info
 	}
 	label, supported := dat.Table(client.MetadataFormat(p.version.Value)).Name(), dat.Table(client.MetadataFormat(p.version.Value)).Supported()
 	if p.format == FormatAssets {
@@ -225,98 +223,71 @@ type CompileStats struct {
 	OTB *OTBReport `json:"otb"`
 }
 
-// counter reports work done to a CompileOptions.Progress.
-type counter struct {
-	done   atomic.Int64
-	total  int
-	report func(done, total int)
-}
-
-func newCounter(total int, report func(done, total int)) *counter {
-	if report == nil {
-		report = func(int, int) {}
-	}
-	return &counter{total: total, report: report}
-}
-
-func (c *counter) tick() { c.report(int(c.done.Add(1)), c.total) }
-
-// countingSource ticks a counter for every sprite read.
-type countingSource struct {
-	spr.Source
-	c *counter
-}
-
-func (s countingSource) Compressed(id uint32) ([]byte, error) {
-	s.c.tick()
-	return s.Source.Compressed(id)
-}
-
 // Compile writes the project to disk. Files are written to temporary files
 // first and renamed, so a failure never leaves broken files behind.
 // Properties unsupported by the target format are dropped; use Warnings to
 // list them beforehand.
-func (p *Project) Compile(o CompileOptions) error {
+func (p *Project) Compile(options CompileOptions) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	// The items.otb is synced against the items on disk, before they change.
 	otbFile, otbData, otbRep := p.prepareOTB()
-	if o.Stats != nil {
-		o.Stats.OTB = otbRep
+	if options.Stats != nil {
+		options.Stats.OTB = otbRep
 	}
-	if o.Format == FormatAssets {
-		if err := p.compileAssets(o.DatPath, o.Progress, o.Stats); err != nil {
+	if options.Format == FormatAssets {
+		if err := p.compileAssets(options.DatPath, options.Progress, options.Stats); err != nil {
 			return err
 		}
 		p.writeOTB(otbFile, otbData, otbRep)
 		p.saved()
 		return nil
 	}
-	f := o.Features
-	f.ApplyVersionDefaults(o.Version.Value)
-	if f.SpriteSize != p.features.SpriteSize {
-		return fmt.Errorf("changing sprite size from %d to %d is not supported", p.features.SpriteSize, f.SpriteSize)
+	features := options.Features
+	features.ApplyVersionDefaults(options.Version.Value)
+	if features.SpriteSize != p.features.SpriteSize {
+		return fmt.Errorf("changing sprite size from %d to %d is not supported", p.features.SpriteSize, features.SpriteSize)
 	}
-	file := &dat.File{Signature: o.Version.DatSignature, Things: p.things.Things}
-	datBytes, err := dat.Encode(file, dat.Options{Format: client.MetadataFormat(o.Version.Value), Features: f})
+	file := &dat.File{Signature: options.Version.DatSignature, Things: p.things.Things}
+	datBytes, err := dat.Encode(file, dat.Options{Format: client.MetadataFormat(options.Version.Value), Features: features})
 	if err != nil {
 		return err
 	}
 	var sprBuf bytes.Buffer
-	src := p.sprites.source(f.Transparency)
+	src := p.sprites.source(features.Transparency)
 	// Every sprite is read three times: for the size and by both passes of
 	// spr.Encode.
-	src = countingSource{src, newCounter(3*int(src.Count()), o.Progress)}
-	if size, err := encodedSize(src, f.Extended); err == nil {
+	src = countingSource{src, newCounter(3*int(src.Count()), options.Progress)}
+	if size, err := encodedSize(src, features.Extended); err == nil {
 		sprBuf.Grow(size) // one allocation instead of repeated doubling
 	}
-	if err := spr.Encode(&sprBuf, o.Version.SprSignature, src, spr.Options{Extended: f.Extended, Transparent: f.Transparency, SpriteSize: f.SpriteSize}); err != nil {
+	if err := spr.Encode(&sprBuf, options.Version.SprSignature, src, spr.Options{Extended: features.Extended, Transparent: features.Transparency, SpriteSize: features.SpriteSize}); err != nil {
 		return err
 	}
-	if err := writeAtomic(o.DatPath, datBytes); err != nil {
+	if err := fsutil.WriteAtomic(options.DatPath, datBytes); err != nil {
 		return err
 	}
-	if err := writeAtomic(o.SprPath, sprBuf.Bytes()); err != nil {
+	if err := fsutil.WriteAtomic(options.SprPath, sprBuf.Bytes()); err != nil {
 		return err
 	}
-	if o.WriteOTFI {
-		otfi := client.OTFI{Features: f, MetadataFile: filepath.Base(o.DatPath), SpritesFile: filepath.Base(o.SprPath)}
-		base := filepath.Join(filepath.Dir(o.DatPath), trimExt(filepath.Base(o.DatPath))+".otfi")
-		if err := writeAtomic(base, otfi.Marshal()); err != nil {
+	if options.WriteOTFI {
+		otfi := client.OTFI{Features: features, MetadataFile: filepath.Base(options.DatPath), SpritesFile: filepath.Base(options.SprPath)}
+		base := filepath.Join(filepath.Dir(options.DatPath), fsutil.TrimExt(filepath.Base(options.DatPath))+".otfi")
+		if err := fsutil.WriteAtomic(base, otfi.Marshal()); err != nil {
 			return err
 		}
 	}
 	p.writeOTB(otbFile, otbData, otbRep)
 	// Reload sprites from the new file so the in-memory overlay is dropped.
-	sf, err := spr.Open(sprBuf.Bytes(), spr.Options{Extended: f.Extended, Transparent: f.Transparency, SpriteSize: f.SpriteSize})
+	spriteFile, err := spr.Open(sprBuf.Bytes(), spr.Options{Extended: features.Extended, Transparent: features.Transparency, SpriteSize: features.SpriteSize})
 	if err != nil {
 		return fmt.Errorf("reopen compiled spr: %w", err)
 	}
-	p.sprites = newSpriteStore(sprFile(sf), f.SpriteSize, f.Transparency)
+	p.sprites = newSpriteStore(sprFile(spriteFile), features.SpriteSize, features.Transparency)
 	p.format, p.assets = FormatDat, nil
-	p.version, p.features = o.Version, f
-	p.datPath, p.sprPath = o.DatPath, o.SprPath
-	p.things.Signature = o.Version.DatSignature
+	p.version, p.features = options.Version, features
+	p.datPath, p.sprPath = options.DatPath, options.SprPath
+	p.things.Signature = options.Version.DatSignature
 	p.saved()
 	return nil
 }
@@ -332,22 +303,22 @@ func (p *Project) saved() {
 
 // Warnings lists things whose properties would be lost when compiling to
 // the given format and version.
-func (p *Project) Warnings(format Format, v client.Version) []string {
+func (p *Project) Warnings(format Format, version client.Version) []string {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	if format == FormatAssets {
 		return p.assetWarnings()
 	}
-	table := dat.Table(client.MetadataFormat(v.Value))
+	table := dat.Table(client.MetadataFormat(version.Value))
 	var out []string
-	for _, c := range thing.Categories {
-		for _, t := range p.things.Things[c] {
-			u := table.Unsupported(&t.Props)
-			if len(t.NpcSales) > 0 {
-				u = append(u, "npcSales")
+	for _, category := range thing.Categories {
+		for _, object := range p.things.Things[category] {
+			unsupported := table.Unsupported(&object.Props)
+			if len(object.NpcSales) > 0 {
+				unsupported = append(unsupported, "npcSales")
 			}
-			if len(u) > 0 {
-				out = append(out, fmt.Sprintf("%s %d: %v", c, t.ID, u))
+			if len(unsupported) > 0 {
+				out = append(out, fmt.Sprintf("%s %d: %v", category, object.ID, unsupported))
 			}
 		}
 	}
@@ -360,40 +331,16 @@ func encodedSize(src spr.Source, extended bool) (int, error) {
 	if extended {
 		header = 8
 	}
-	n := src.Count()
-	size := header + int(n)*4
-	for id := uint32(1); id <= n; id++ {
-		c, err := src.Compressed(id)
+	count := src.Count()
+	size := header + int(count)*4
+	for id := uint32(1); id <= count; id++ {
+		compressed, err := src.Compressed(id)
 		if err != nil {
 			return 0, err
 		}
-		if len(c) > 0 {
-			size += 5 + len(c)
+		if len(compressed) > 0 {
+			size += 5 + len(compressed)
 		}
 	}
 	return size, nil
-}
-
-func trimExt(name string) string { return name[:len(name)-len(filepath.Ext(name))] }
-
-func writeAtomic(path string, data []byte) error {
-	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp*")
-	if err != nil {
-		return err
-	}
-	name := tmp.Name()
-	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		os.Remove(name)
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		os.Remove(name)
-		return err
-	}
-	if err := os.Rename(name, path); err != nil {
-		os.Remove(name)
-		return err
-	}
-	return nil
 }

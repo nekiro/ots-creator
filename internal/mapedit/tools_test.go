@@ -13,7 +13,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/otmap"
 )
 
-
 // toolsPut stores a tile with the given ground (0: none) and items.
 func toolsPut(e *Editor, pos otmap.Position, ground uint16, items ...otmap.Item) {
 	e.Map.SetTile(pos, &otmap.Tile{Ground: otmap.Item{ID: ground}, Items: items})

@@ -4,6 +4,7 @@
   // not being objects, and can be imported as sprites. Objects can also be
   // queued and dropped into chosen slots of the client (DropPanel,
   // queue.svelte.ts).
+  import { frameGroupAt } from "../../lib/thing";
   import { onMount, tick } from "svelte";
   import { SvelteMap } from "svelte/reactivity";
   import {
@@ -16,9 +17,7 @@
     SpriteService,
     ThingService,
     ViewerService,
-    decodeBytes,
     errorMessage,
-    normalizeThing,
     type ImageFile,
     type ObjectFile,
     type Thing,
@@ -36,6 +35,10 @@
   import { DEFAULT_COLORS } from "../../lib/render/outfit";
   import { fileQueue } from "../../lib/queue.svelte";
   import DropPanel from "./DropPanel.svelte";
+  import { formatKb } from "../../lib/format";
+  import { LruCache } from "../../lib/lruCache";
+  import { decodeObjectFile } from "../../lib/objectFile";
+  import { nextIndex } from "../../lib/ui/listNav";
 
   const FILTERS = [
     { name: "Objects and images (*.otobj, *.obd, *.png, *.bmp, *.gif, *.jpg)", pattern: "*.otobj;*.obd;*.png;*.bmp;*.gif;*.jpg;*.jpeg" },
@@ -58,13 +61,13 @@
   let zoom = $state(3);
   let error = $state("");
 
-  const g = $derived(thing?.frameGroups[Math.min(group, thing.frameGroups.length - 1)] ?? null);
+  const frameGroup = $derived(frameGroupAt(thing, group));
   const get = (id: number) => (id > 0 ? pixels[id - 1] : undefined);
   const source = $derived<PreviewSource | null>(thing && file ? { key: current, thing, get, size: file.spriteSize } : null);
-  const index = $derived(entries.findIndex((e) => e.path === current));
+  const index = $derived(entries.findIndex((event) => event.path === current));
   const entry = $derived(entries[index] ?? null);
   const name = $derived(current.replace(/^.*[\\/]/, ""));
-  const counts = $derived({ obd: entries.filter((e) => e.kind === "obd").length, image: entries.filter((e) => e.kind === "image").length });
+  const counts = $derived({ obd: entries.filter((event) => event.kind === "obd").length, image: entries.filter((event) => event.kind === "image").length });
 
   onMount(() => {
     const path = app.obdPath;
@@ -78,7 +81,7 @@
   }
 
   // Windows paths compare without case and separator differences.
-  const samePath = (a: string, b: string) => a.replace(/\//g, "\\").toLowerCase() === b.replace(/\//g, "\\").toLowerCase();
+  const samePath = (first: string, second: string) => first.replace(/\//g, "\\").toLowerCase() === second.replace(/\//g, "\\").toLowerCase();
 
   /** Shows a file and lists the other files of its folder. */
   async function open(path: string) {
@@ -89,14 +92,14 @@
       listing = true;
       try {
         entries = (await ViewerService.List(folder)) ?? [];
-      } catch (e) {
+      } catch (err) {
         entries = [];
-        toast(errorMessage(e), "error");
+        toast(errorMessage(err), "error");
       } finally {
         listing = false;
       }
     }
-    await show(entries.find((e) => samePath(e.path, path))?.path ?? path);
+    await show(entries.find((event) => samePath(event.path, path))?.path ?? path);
     await tick();
     list?.querySelector<HTMLElement>(".vgrid")?.focus();
   }
@@ -110,28 +113,20 @@
   const CACHE_SIZE = 32;
   const CELL_W = 64;
   const CELL_H = 64;
-  const cache = new Map<string, Promise<Loaded>>();
+  const cache = new LruCache<string, Promise<Loaded>>(CACHE_SIZE);
 
   function read(path: string): Promise<Loaded> {
     const hit = cache.get(path);
-    if (hit) {
-      cache.delete(path);
-      cache.set(path, hit); // most recent last
-      return hit;
-    }
-    const p = load(path);
-    p.catch(() => cache.delete(path));
-    cache.set(path, p);
-    while (cache.size > CACHE_SIZE) cache.delete(cache.keys().next().value!);
-    return p;
+    if (hit) return hit;
+    const reading = load(path);
+    reading.catch(() => cache.delete(path));
+    cache.set(path, reading);
+    return reading;
   }
 
   function load(path: string): Promise<Loaded> {
     return OBJECT_EXT.test(path)
-      ? ThingService.ReadObject(path).then((f) => {
-          if (!f?.thing) throw new Error("empty object file");
-          return { kind: "obd", file: f, thing: normalizeThing(f.thing), pixels: (f.sprites ?? []).map((b) => decodeBytes(b as unknown as string)) };
-        })
+      ? ThingService.ReadObject(path).then((file) => ({ kind: "obd", ...decodeObjectFile(file, "empty object file") }))
       : ViewerService.ReadImage(path).then((img) => {
           if (!img) throw new Error("empty image");
           return { kind: "image", image: { ...img, url: `data:image/png;base64,${img.png}` } };
@@ -146,9 +141,9 @@
   let reading = 0;
 
   function wantThumb(_node: HTMLElement, path: string) {
-    const want = (p: string) => {
-      if (thumbs.has(p) || wanted.includes(p)) return;
-      wanted.push(p);
+    const want = (wantedPath: string) => {
+      if (thumbs.has(wantedPath) || wanted.includes(wantedPath)) return;
+      wanted.push(wantedPath);
       pump();
     };
     want(path);
@@ -159,8 +154,8 @@
     while (reading < 3 && wanted.length) {
       const path = wanted.pop()!;
       reading++;
-      (cache.get(path) ?? load(path))
-        .then((r) => thumbs.set(path, r.kind === "image" ? r.image.url : thumbnail(r.thing, r.pixels, r.file.spriteSize)))
+      (cache.peek(path) ?? load(path))
+        .then((loaded) => thumbs.set(path, loaded.kind === "image" ? loaded.image.url : thumbnail(loaded.thing, loaded.pixels, loaded.file.spriteSize)))
         .catch(() => thumbs.set(path, ""))
         .finally(() => {
           reading--;
@@ -170,9 +165,9 @@
   }
 
   function prefetch() {
-    for (const d of [1, -1]) {
-      const e = entries[index + d];
-      if (e) read(e.path).catch(() => {});
+    for (const offset of [1, -1]) {
+      const neighbour = entries[index + offset];
+      if (neighbour) read(neighbour.path).catch(() => {});
     }
   }
 
@@ -187,27 +182,27 @@
     clearTimeout(loaderTimer);
     loaderTimer = setTimeout(() => current === path && (loading = true), 120);
     try {
-      const r = await read(path);
+      const loaded = await read(path);
       if (current !== path) return;
-      if (r.kind === "image") {
-        image = r.image;
+      if (loaded.kind === "image") {
+        image = loaded.image;
         file = null;
         thing = null;
       } else {
-        pixels = r.pixels;
-        file = r.file;
-        thing = r.thing;
+        pixels = loaded.pixels;
+        file = loaded.file;
+        thing = loaded.thing;
         image = null;
         group = 0;
-        dropCategory = r.thing.category;
-        if (!thumbs.get(path)) thumbs.set(path, thumbnail(r.thing, r.pixels, r.file.spriteSize));
+        dropCategory = loaded.thing.category;
+        if (!thumbs.get(path)) thumbs.set(path, thumbnail(loaded.thing, loaded.pixels, loaded.file.spriteSize));
       }
-    } catch (e) {
+    } catch (err) {
       if (current !== path) return;
       file = null;
       thing = null;
       image = null;
-      error = errorMessage(e);
+      error = errorMessage(err);
     } finally {
       if (current === path) {
         clearTimeout(loaderTimer);
@@ -220,51 +215,48 @@
     prefetch();
   }
 
-  function onkeydown(e: KeyboardEvent, columns: number) {
-    const rows = Math.max(1, Math.floor((list?.clientHeight ?? 0) / CELL_H));
-    const step: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -columns, ArrowDown: columns, PageUp: -columns * rows, PageDown: columns * rows };
-    if (!(e.key in step) || !entries.length) return;
-    e.preventDefault();
-    const i = Math.min(Math.max((index < 0 ? 0 : index) + step[e.key], 0), entries.length - 1);
-    void show(entries[i].path);
+  function onkeydown(event: KeyboardEvent, columns: number) {
+    const pageRows = Math.max(1, Math.floor((list?.clientHeight ?? 0) / CELL_H));
+    const next = nextIndex(event.key, index < 0 ? 0 : index, entries.length, { columns, pageRows });
+    if (next === null || !entries.length) return;
+    event.preventDefault();
+    void show(entries[next].path);
   }
-
-  const kb = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`);
 
   // Queue of object files to drop into chosen ids of the client.
   let dropCategory = $state<Category>(app.category);
   const queueCounts = $derived(fileQueue.counts());
-  const queuedPaths = $derived(new Set(app.fileQueue.map((q) => q.key)));
+  const queuedPaths = $derived(new Set(app.fileQueue.map((item) => item.key)));
 
   /** First frame of a thing, cropped to its visible pixels, as a PNG data URL. */
-  function thumbnail(t: Thing, px: Uint8ClampedArray[], size: number): string {
-    const g = t.frameGroups[0];
-    const outfit = t.category === Category.CategoryOutfit;
-    const img = compose(g, g.sprites, size, { pos: { layer: 0, x: outfit ? Math.min(2, g.patternX - 1) : 0, y: 0, z: 0, frame: 0 }, colors: outfit ? DEFAULT_COLORS : null }, (id) => (id > 0 ? px[id - 1] : undefined));
-    const box = contentBox(img) ?? { x: 0, y: 0, w: img.width, h: img.height };
+  function thumbnail(object: Thing, spritePixels: Uint8ClampedArray[], size: number): string {
+    const frameGroup = object.frameGroups[0];
+    const outfit = object.category === Category.CategoryOutfit;
+    const texture = compose(frameGroup, frameGroup.sprites, size, { pos: { layer: 0, x: outfit ? Math.min(2, frameGroup.patternX - 1) : 0, y: 0, z: 0, frame: 0 }, colors: outfit ? DEFAULT_COLORS : null }, (id) => (id > 0 ? spritePixels[id - 1] : undefined));
+    const box = contentBox(texture) ?? { x: 0, y: 0, w: texture.width, h: texture.height };
     const full = document.createElement("canvas");
-    full.width = img.width;
-    full.height = img.height;
-    full.getContext("2d")!.putImageData(img, 0, 0);
-    const c = document.createElement("canvas");
-    c.width = box.w;
-    c.height = box.h;
-    c.getContext("2d")!.drawImage(full, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
-    return c.toDataURL();
+    full.width = texture.width;
+    full.height = texture.height;
+    full.getContext("2d")!.putImageData(texture, 0, 0);
+    const cropped = document.createElement("canvas");
+    cropped.width = box.w;
+    cropped.height = box.h;
+    cropped.getContext("2d")!.drawImage(full, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
+    return cropped.toDataURL();
   }
 
   /** Queues an object file, or takes it out of the queue. */
   async function toggleQueue(path: string) {
-    const q = app.fileQueue.find((x) => x.key === path);
-    if (q) {
-      fileQueue.dequeue(q.category, [path]);
+    const queued = app.fileQueue.find((item) => item.key === path);
+    if (queued) {
+      fileQueue.dequeue(queued.category, [path]);
       return;
     }
     let r: Loaded;
     try {
       r = await read(path);
-    } catch (e) {
-      toast(errorMessage(e), "error");
+    } catch (err) {
+      toast(errorMessage(err), "error");
       return;
     }
     if (r.kind !== "obd") return;
@@ -339,7 +331,7 @@ Click to open another file` : "Open a file"} onclick={browse}>{dir || "No folder
       {:else}
         <div class="stage checker">
           {#if image}
-            <PanStage {zoom} onzoom={(d) => (zoom = stepZoom(zoom, d))} resetKey={current}>
+            <PanStage {zoom} onzoom={(direction) => (zoom = stepZoom(zoom, direction))} resetKey={current}>
               <img class="pixel" src={image.url} alt={name} />
             </PanStage>
           {:else if error}
@@ -364,17 +356,17 @@ Click to open another file` : "Open a file"} onclick={browse}>{dir || "No folder
       {#if image}
         <div class="notice">
           <Icon name="info" />
-          <span>Plain {image.format.toUpperCase()} image, {image.width}×{image.height} px{entry ? `, ${kb(entry.size)}` : ""}. Not an object; it can only be imported as sprites.</span>
+          <span>Plain {image.format.toUpperCase()} image, {image.width}×{image.height} px{entry ? `, ${formatKb(entry.size)}` : ""}. Not an object; it can only be imported as sprites.</span>
         </div>
-      {:else if thing && file && g}
+      {:else if thing && file && frameGroup}
         <div class="info t-panel">
           <span class="t-label">Type</span><span>{CATEGORY_NAMES[thing.category]}</span>
           <span class="t-label">Format</span><span>{file.format === "otobj" ? "OTOBJ" : "OBD"} {file.version}</span>
           <span class="t-label">Client</span><span>{(file.clientVersion / 100).toFixed(2)}</span>
-          <span class="t-label">Size</span><span>{g.width}×{g.height} ({file.spriteSize}px)</span>
-          <span class="t-label">Layers</span><span>{g.layers}</span>
-          <span class="t-label">Pattern</span><span>{g.patternX}×{g.patternY}×{g.patternZ}</span>
-          <span class="t-label">Frames</span><span>{g.frames}</span>
+          <span class="t-label">Size</span><span>{frameGroup.width}×{frameGroup.height} ({file.spriteSize}px)</span>
+          <span class="t-label">Layers</span><span>{frameGroup.layers}</span>
+          <span class="t-label">Pattern</span><span>{frameGroup.patternX}×{frameGroup.patternY}×{frameGroup.patternZ}</span>
+          <span class="t-label">Frames</span><span>{frameGroup.frames}</span>
           <span class="t-label">Sprites</span><span>{pixels.length}</span>
         </div>
       {/if}

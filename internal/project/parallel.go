@@ -11,10 +11,10 @@ import (
 // no sheet is decoded twice.
 const spriteChunk = 256
 
-// thingChunk returns the number of thing ids per work item for n ids: small
+// thingChunk returns the number of thing ids per work item for count ids: small
 // enough that every core gets work (outfits are few but have many sprites).
-func thingChunk(n uint32) uint32 {
-	return max(8, n/uint32(runtime.GOMAXPROCS(0)*8))
+func thingChunk(count uint32) uint32 {
+	return max(8, count/uint32(runtime.GOMAXPROCS(0)*8))
 }
 
 // parallelRange calls fn for consecutive chunks of [first, last] on all

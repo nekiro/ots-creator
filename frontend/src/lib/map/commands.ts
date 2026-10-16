@@ -1,23 +1,22 @@
 // User actions of the map editor, shared by menus, toolbars and shortcuts.
 import { Events } from "@wailsio/runtime";
 import { DialogService, encodeBytes, errorMessage } from "../api";
+import { clamp } from "../math";
 import { ask } from "../confirm.svelte";
 import { openContextMenu, type MenuEntry } from "../menu.svelte";
 import { app, toast } from "../state.svelte";
-import { MapService, SpawnFormat, pos, type Position } from "./api";
+import { MapService, SpawnFormat, type Position } from "./api";
+import { MAX_FLOOR } from "./constants";
+import { tileToWorld } from "./coords";
 import { whenRendered } from "./rendered";
-import { applyChange, edit, loadMapData, map, refreshTile, selectBrush, setCam, warningCount, ZOOMS, type Focus } from "./state.svelte";
+import { panTiles, startPosition, stepZoom, zoomAround } from "./camera";
+import { applyChange, edit, loadMapData, map, refreshTile, selectBrush, setCam, warningCount, type Focus } from "./state.svelte";
 
 const MAPS = [{ name: "OTBM maps (*.otbm)", pattern: "*.otbm" }];
 
 /** Sprite size of the open client (world pixels per tile). */
 export function spriteSize(): number {
   return app.project?.info.features.spriteSize || 32;
-}
-
-/** Tile offset of a floor when drawn from the current floor. */
-export function floorAdjust(z: number, floor: number): number {
-  return floor <= 7 ? 7 - z : floor - z;
 }
 
 function needClient(): boolean {
@@ -31,26 +30,16 @@ function needClient(): boolean {
 async function afterOpen(id: number, center?: Position): Promise<void> {
   map.activeId = id;
   if (!map.cams[id]) {
-    const info = map.maps.find((m) => m.id === id);
-    let c = center;
-    if (!c && info?.hasBounds) {
-      const [x0, y0, x1, y1] = info.bounds;
-      c = pos(Math.round((x0 + x1) / 2), Math.round((y0 + y1) / 2), 7);
-      // Prefer a temple: towns are where people start.
-      const t = info.towns?.[0];
-      if (t && t.temple.x) c = t.temple;
-    }
-    c ??= pos(Math.min(1000, Math.floor((info?.props.width ?? 2048) / 2)), Math.min(1000, Math.floor((info?.props.height ?? 2048) / 2)), 7);
-    goTo(c, id);
+    const info = map.maps.find((open) => open.id === id);
+    goTo(center ?? startPosition(info), id);
   }
 }
 
 /** Centers the view of a map on a position. */
-export function goTo(p: Position, id = map.activeId): void {
+export function goTo(position: Position, id = map.activeId): void {
   if (id === null) return;
-  const S = spriteSize();
-  const a = p.z <= 7 ? 7 - p.z : 0;
-  setCam(id, { x: (p.x - a + 0.5) * S, y: (p.y - a + 0.5) * S, floor: p.z, zoom: map.cams[id]?.zoom ?? 1 });
+  const center = tileToWorld(position, spriteSize());
+  setCam(id, { x: center.x, y: center.y, floor: position.z, zoom: map.cams[id]?.zoom ?? 1 });
 }
 
 export const mapCommands = {
@@ -67,8 +56,8 @@ export const mapCommands = {
       const separate = map.data?.mode === "client";
       const info = await MapService.NewMap({ width: 2048, height: 2048, spawnFormat: separate ? SpawnFormat.SpawnsSeparate : SpawnFormat.SpawnsSingle, description: "", fill: "" });
       await mapCommands.created(info.id);
-    } catch (e) {
-      toast(errorMessage(e), "error");
+    } catch (err) {
+      toast(errorMessage(err), "error");
     }
   },
 
@@ -82,31 +71,31 @@ export const mapCommands = {
     const name = path.split(/[\\/]/).pop() ?? path;
     map.loading = { name, step: "Starting", percent: 0 };
     const off = Events.On("map:progress", (ev: { data: { label: string; done: number; total: number } }) => {
-      const p = ev.data;
-      if (map.loading) map.loading = { name, step: p.label, percent: p.total > 0 ? (p.done / p.total) * 100 : 0 };
+      const progress = ev.data;
+      if (map.loading) map.loading = { name, step: progress.label, percent: progress.total > 0 ? (progress.done / progress.total) * 100 : 0 };
     });
     const started = performance.now();
     try {
-      const r = await MapService.OpenMap(path);
+      const opened = await MapService.OpenMap(path);
       off();
       map.loading = { name, step: "Preparing the view", percent: 98 };
       await loadMapData(!map.items);
-      if (!map.maps.some((m) => m.id === r.info.id)) map.maps = [...map.maps, r.info];
-      await afterOpen(r.info.id);
+      if (!map.maps.some((open) => open.id === opened.info.id)) map.maps = [...map.maps, opened.info];
+      await afterOpen(opened.info.id);
       // The loader stays until the first view is drawn, not on a black map.
       map.loading = { name, step: "Drawing the map", percent: 99 };
-      await whenRendered(r.info.id);
-      const w = (r.warnings ?? []).filter((x): x is string => !!x);
-      map.loadWarnings = { ...map.loadWarnings, [r.info.id]: w };
+      await whenRendered(opened.info.id);
+      const warnings = (opened.warnings ?? []).filter((x): x is string => !!x);
+      map.loadWarnings = { ...map.loadWarnings, [opened.info.id]: warnings };
       // Whole open: reading the file, the item data and the first view.
       const took = `${((performance.now() - started) / 1000).toFixed(1)} s`;
-      if (w.length) {
-        const show = () => ((map.activeId = r.info.id), (map.dialog = "warnings"));
-        const n = warningCount(w);
-        toast(`Opened ${r.info.name} in ${took} with ${n.toLocaleString()} warning${n > 1 ? "s" : ""}.`, "info", 12000, undefined, { label: "Show warnings", run: show });
-      } else toast(`Opened ${r.info.name} in ${took}.`, "success");
-    } catch (e) {
-      toast(errorMessage(e), "error");
+      if (warnings.length) {
+        const show = () => ((map.activeId = opened.info.id), (map.dialog = "warnings"));
+        const count = warningCount(warnings);
+        toast(`Opened ${opened.info.name} in ${took} with ${count.toLocaleString()} warning${count > 1 ? "s" : ""}.`, "info", 12000, undefined, { label: "Show warnings", run: show });
+      } else toast(`Opened ${opened.info.name} in ${took}.`, "success");
+    } catch (err) {
+      toast(errorMessage(err), "error");
     } finally {
       off();
       map.loading = null;
@@ -119,30 +108,30 @@ export const mapCommands = {
   },
 
   async save(as = false): Promise<boolean> {
-    const m = map.active;
-    if (!m) return false;
-    let path = m.path;
+    const active = map.active;
+    if (!active) return false;
+    let path = active.path;
     if (as || !path) {
-      path = await DialogService.SaveFile("saveMap", "Save map", m.name, MAPS);
+      path = await DialogService.SaveFile("saveMap", "Save map", active.name, MAPS);
       if (!path) return false;
     }
     const name = path.split(/[\\/]/).pop() ?? path;
     const title = "Saving map";
     map.loading = { name, step: "Starting", percent: 0, title };
     const off = Events.On("map:progress", (ev: { data: { label: string; done: number; total: number } }) => {
-      const p = ev.data;
-      if (map.loading) map.loading = { name, step: p.label, percent: p.total > 0 ? (p.done / p.total) * 100 : 0, title };
+      const progress = ev.data;
+      if (map.loading) map.loading = { name, step: progress.label, percent: progress.total > 0 ? (progress.done / progress.total) * 100 : 0, title };
     });
     try {
-      const ch = await MapService.SaveMap(m.id, path);
+      const change = await MapService.SaveMap(active.id, path);
       off();
       map.loading = { name, step: "Reloading the item data", percent: 100, title };
-      applyChange(m.id, ch);
+      applyChange(active.id, change);
       await loadMapData();
-      toast(`Saved ${ch.info.name}.`, "success");
+      toast(`Saved ${change.info.name}.`, "success");
       return true;
-    } catch (e) {
-      toast(errorMessage(e), "error");
+    } catch (err) {
+      toast(errorMessage(err), "error");
       return false;
     } finally {
       off();
@@ -151,30 +140,30 @@ export const mapCommands = {
   },
 
   async close(id = map.activeId) {
-    const m = map.maps.find((x) => x.id === id);
-    if (!m) return;
-    if (m.changed) {
-      const ok = await ask({ title: "Unsaved map", message: `${m.name} has unsaved changes. Close it anyway?`, ok: "Close" });
+    const closing = map.maps.find((open) => open.id === id);
+    if (!closing) return;
+    if (closing.changed) {
+      const ok = await ask({ title: "Unsaved map", message: `${closing.name} has unsaved changes. Close it anyway?`, ok: "Close" });
       if (!ok) return;
     }
-    await MapService.CloseMap(m.id);
-    map.maps = map.maps.filter((x) => x.id !== m.id);
-    if (map.activeId === m.id) map.activeId = map.maps[0]?.id ?? null;
+    await MapService.CloseMap(closing.id);
+    map.maps = map.maps.filter((open) => open.id !== closing.id);
+    if (map.activeId === closing.id) map.activeId = map.maps[0]?.id ?? null;
     map.inspect = null;
     map.tile = null;
     map.focus = null;
   },
 
   /** Lists the undo history at the mouse; a click goes back or forward to that step. */
-  async historyMenu(e: MouseEvent) {
+  async historyMenu(event: MouseEvent) {
     const id = map.activeId;
     if (id === null) return;
-    const ev = { clientX: e.clientX, clientY: e.clientY, preventDefault() {}, stopPropagation() {} } as MouseEvent;
-    const h = await MapService.History(id);
-    const undo = (h?.undo ?? []).filter((x) => !!x);
-    const redo = (h?.redo ?? []).filter((x) => !!x);
-    const steps = async (n: number, back: boolean) => {
-      for (let i = 0; i < n; i++) applyChange(id, back ? await MapService.Undo(id) : await MapService.Redo(id));
+    const at = { clientX: event.clientX, clientY: event.clientY, preventDefault() {}, stopPropagation() {} } as MouseEvent;
+    const history = await MapService.History(id);
+    const undo = (history?.undo ?? []).filter((step) => !!step);
+    const redo = (history?.redo ?? []).filter((step) => !!step);
+    const steps = async (count: number, back: boolean) => {
+      for (let i = 0; i < count; i++) applyChange(id, back ? await MapService.Undo(id) : await MapService.Redo(id));
     };
     const items: MenuEntry[] = [];
     // Newest first: redo steps (faded in the label), then what is applied.
@@ -182,7 +171,7 @@ export const mapCommands = {
     if (redo.length) items.push("-");
     for (let i = undo.length - 1; i >= 0; i--) items.push({ label: `${i === undo.length - 1 ? "● " : ""}${undo[i].label} · ${undo[i].tiles} tiles`, action: () => steps(undo.length - 1 - i, true) });
     items.push("-", { label: "The map as opened", action: () => steps(undo.length, true), disabled: () => !undo.length });
-    openContextMenu(ev, items.slice(0, 60));
+    openContextMenu(at, items.slice(0, 60));
   },
 
   undo: () => edit((id) => MapService.Undo(id)),
@@ -192,10 +181,10 @@ export const mapCommands = {
     const id = map.activeId;
     if (id === null) return;
     try {
-      const n = await MapService.Copy(id);
-      toast(`Copied ${n} tile${n === 1 ? "" : "s"}.`);
-    } catch (e) {
-      toast(errorMessage(e), "error");
+      const count = await MapService.Copy(id);
+      toast(`Copied ${count} tile${count === 1 ? "" : "s"}.`);
+    } catch (err) {
+      toast(errorMessage(err), "error");
     }
   },
   cut: () => edit((id) => MapService.Cut(id)),
@@ -214,15 +203,15 @@ export const mapCommands = {
   clearSelection: () => edit((id) => MapService.ClearSelection(id)),
 
   tool(name: string, inSelection = false) {
-    return edit((id) => MapService.Tool(id, name, inSelection)).then((ch) => {
-      if (ch && ch.count >= 0 && name !== "clearModified") toast(`${ch.count.toLocaleString()} changed.`);
+    return edit((id) => MapService.Tool(id, name, inSelection)).then((change) => {
+      if (change && change.count >= 0 && name !== "clearModified") toast(`${change.count.toLocaleString()} changed.`);
     });
   },
 
   floor(z: number) {
     const id = map.activeId;
     if (id === null) return;
-    setCam(id, { floor: Math.min(15, Math.max(0, z)) });
+    setCam(id, { floor: clamp(z, 0, MAX_FLOOR) });
   },
   floorUp: () => mapCommands.floor(map.floor - 1),
   floorDown: () => mapCommands.floor(map.floor + 1),
@@ -231,15 +220,13 @@ export const mapCommands = {
     const id = map.activeId;
     if (id === null) return;
     const cam = map.cam;
-    let i = ZOOMS.findIndex((z) => z >= cam.zoom - 1e-6);
-    if (i < 0) i = ZOOMS.length - 1;
-    const next = ZOOMS[Math.min(ZOOMS.length - 1, Math.max(0, i + step))];
+    const next = stepZoom(cam.zoom, step);
     if (anchor) {
       // Keep the point under the cursor in place.
       const dpr = window.devicePixelRatio || 1;
-      const ox = (anchor.x - anchor.w / 2) / dpr;
-      const oy = (anchor.y - anchor.h / 2) / dpr;
-      setCam(id, { zoom: next, x: cam.x + ox / cam.zoom - ox / next, y: cam.y + oy / cam.zoom - oy / next });
+      const offsetX = (anchor.x - anchor.w / 2) / dpr;
+      const offsetY = (anchor.y - anchor.h / 2) / dpr;
+      setCam(id, { zoom: next, ...zoomAround(cam.x, cam.y, cam.zoom, next, offsetX, offsetY) });
     } else setCam(id, { zoom: next });
   },
   zoomReset: () => map.activeId !== null && setCam(map.activeId, { zoom: 1 }),
@@ -248,10 +235,9 @@ export const mapCommands = {
   pan(dx: number, dy: number) {
     const id = map.activeId;
     if (id === null) return;
-    const S = spriteSize();
-    const k = 1 / map.cam.zoom;
-    const tiles = (n: number) => (n ? Math.sign(n) * Math.max(1, Math.round(Math.abs(n) * k)) : 0);
-    setCam(id, { x: map.cam.x + tiles(dx) * S, y: map.cam.y + tiles(dy) * S });
+    const tileSize = spriteSize();
+    const zoom = map.cam.zoom;
+    setCam(id, { x: map.cam.x + panTiles(dx, zoom) * tileSize, y: map.cam.y + panTiles(dy, zoom) * tileSize });
   },
 
   eraser() {
@@ -259,23 +245,23 @@ export const mapCommands = {
   },
 
   async toggleAutomagic() {
-    const s = map.settings;
-    if (!s) return;
-    const next = { ...s, automagic: !s.automagic };
+    const settings = map.settings;
+    if (!settings) return;
+    const next = { ...settings, automagic: !settings.automagic };
     await MapService.SetEditorSettings(next);
     map.settings = next;
     toast(next.automagic ? "Automatic borders and walls are on." : "Automatic borders and walls are off.", "info", 2000, "automagic");
   },
 
-  inspect(p: Position | null) {
-    map.inspect = p;
-    map.focus = p ? { kind: "tile" } : null;
+  inspect(position: Position | null) {
+    map.inspect = position;
+    map.focus = position ? { kind: "tile" } : null;
     void refreshTile();
   },
 
   /** Shows a part of the world (or the map with null) in the inspector. */
-  focus(f: Focus | null) {
-    map.focus = f;
+  focus(focus: Focus | null) {
+    map.focus = focus;
   },
 
   find(preset: { ids?: number[]; inSelection?: boolean; replace?: boolean } | null = null) {
@@ -299,8 +285,8 @@ export const mapCommands = {
         const bytes = new Uint8Array(await blob.arrayBuffer());
         await MapService.SaveImage(path, encodeBytes(bytes));
         toast("Screenshot saved.", "success");
-      } catch (e) {
-        toast(errorMessage(e), "error");
+      } catch (err) {
+        toast(errorMessage(err), "error");
       }
     }, "image/png");
   },

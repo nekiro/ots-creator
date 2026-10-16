@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { hasImprovedAnimations } from "../lib/thing";
+  import { keyStep } from "../lib/ui/listNav";
+  import { anchoredRange, idRange } from "../lib/selection";
   import { CATEGORIES, CATEGORY_LABELS, Format, errorMessage, minId, normalizeThing, res, ThingService } from "../lib/api";
   import { commands, thingDropId } from "../lib/commands";
   import { FLAG_GROUPS, flagVisible } from "../lib/flags";
@@ -14,6 +17,7 @@
   import ThingCanvas from "../lib/ui/ThingCanvas.svelte";
   import VirtualGrid from "../lib/ui/VirtualGrid.svelte";
   import { loading } from "../lib/ui/loading";
+  import { clamp } from "../lib/math";
 
   const CONTENT_OPTIONS = [
     { value: "", label: "All objects" },
@@ -33,30 +37,30 @@
 
   const flagOptions = $derived([
     { value: "", label: "Any flag" },
-    ...FLAG_GROUPS.flatMap((g) => g.flags)
-      .filter((f) => flagVisible(f.key, app.category, false))
-      .map((f) => ({ value: f.key as string, label: f.label })),
+    ...FLAG_GROUPS.flatMap((group) => group.flags)
+      .filter((field) => flagVisible(field.key, app.category, false))
+      .map((field) => ({ value: field.key as string, label: field.label })),
   ]);
   const filtered = $derived(content !== "" || flag !== "" || name !== "");
 
   // A flag hidden for the new category no longer applies.
   $effect(() => {
-    if (flag && !flagOptions.some((o) => o.value === flag)) flag = "";
+    if (flag && !flagOptions.some((option) => option.value === flag)) flag = "";
   });
 
   let request = 0;
   $effect(() => {
-    const c = app.category;
-    const f = { content, flag, name };
+    const category = app.category;
+    const query = { content, flag, name };
     void app.rev;
     if (!app.open || !filtered) {
       ids = null;
       return;
     }
-    const n = ++request;
-    ThingService.Find(c, f).then(
-      (r) => n === request && (ids = r ?? []),
-      (e) => n === request && toast(errorMessage(e), "error"),
+    const thisRequest = ++request;
+    ThingService.Find(category, query).then(
+      (found) => thisRequest === request && (ids = found ?? []),
+      (err) => thisRequest === request && toast(errorMessage(err), "error"),
     );
   });
 
@@ -71,32 +75,32 @@
     return i < 0 ? null : i;
   });
   $effect(() => {
-    const c = app.category;
+    const category = app.category;
     void app.rev;
     if (!app.open || app.project?.info.format !== Format.FormatAssets) {
       names = {};
       return;
     }
-    ThingService.Names(c).then((n) => c === app.category && (names = (n ?? {}) as Record<number, string>));
+    ThingService.Names(category).then((loaded) => category === app.category && (names = (loaded ?? {}) as Record<number, string>));
   });
 
   function go(id: number) {
     const max = app.maxId(app.category);
-    void select(Math.min(Math.max(id, first), max));
+    void select(clamp(id, first, max));
   }
 
   function goIndex(i: number) {
-    if (count > 0) void select(idAt(Math.min(Math.max(i, 0), count - 1)));
+    if (count > 0) void select(idAt(clamp(i, 0, count - 1)));
   }
 
-  function onJump(e: KeyboardEvent) {
-    if (e.key !== "Enter") return;
+  function onJump(event: KeyboardEvent) {
+    if (event.key !== "Enter") return;
     if (name) {
       if (count > 0) goIndex(0);
       return;
     }
-    const n = parseInt(jump, 10);
-    if (Number.isFinite(n)) go(n);
+    const typed = parseInt(jump, 10);
+    if (Number.isFinite(typed)) go(typed);
   }
 
   // Animated thumbnail of the hovered object (animated objects only).
@@ -106,40 +110,41 @@
     return raw && cat === app.category ? normalizeThing(raw) : null;
   });
 
-  function click(e: MouseEvent, id: number) {
-    if (e.shiftKey && app.focused !== null) {
-      const a = indexOf(app.focused);
-      const b = indexOf(id);
-      if (a >= 0 && b >= 0) {
-        const [lo, hi] = a < b ? [a, b] : [b, a];
-        const range = Array.from({ length: hi - lo + 1 }, (_, k) => idAt(lo + k));
-        app.selection = [app.focused, ...range.filter((x) => x !== app.focused)];
+  function click(event: MouseEvent, id: number) {
+    if (event.shiftKey && app.focused !== null) {
+      const focusedIndex = indexOf(app.focused);
+      const clickedIndex = indexOf(id);
+      if (focusedIndex >= 0 && clickedIndex >= 0) {
+        app.selection = anchoredRange(app.focused, idRange(focusedIndex, clickedIndex).map(idAt));
         return;
       }
     }
-    void select(id, e.ctrlKey || e.metaKey);
+    void select(id, event.ctrlKey || event.metaKey);
   }
 
-  function oncontextmenu(e: MouseEvent, id: number) {
+  function oncontextmenu(event: MouseEvent, id: number) {
     if (!app.selection.includes(id)) void select(id);
-    openContextMenu(e, objectMenu(true));
+    openContextMenu(event, objectMenu(true));
   }
 
-  function onkeydown(e: KeyboardEvent, columns: number) {
+  /** Rows Page Up and Page Down move. */
+  const PAGE_ROWS = 8;
+
+  function onkeydown(event: KeyboardEvent, columns: number) {
     if (app.focused === null) return;
-    const step: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -columns, ArrowDown: columns, PageUp: -columns * 8, PageDown: columns * 8 };
-    if (e.key in step) {
-      e.preventDefault();
-      const i = indexOf(app.focused);
-      goIndex(i < 0 ? 0 : i + step[e.key]);
-    } else if (e.key === "Home") {
-      e.preventDefault();
+    const step = keyStep(event.key, { columns, pageRows: PAGE_ROWS });
+    if (step !== null) {
+      event.preventDefault();
+      const current = indexOf(app.focused);
+      goIndex(current < 0 ? 0 : current + step);
+    } else if (event.key === "Home") {
+      event.preventDefault();
       goIndex(0);
-    } else if (e.key === "End") {
-      e.preventDefault();
+    } else if (event.key === "End") {
+      event.preventDefault();
       goIndex(count - 1);
-    } else if (e.key === "Delete") {
-      e.preventDefault();
+    } else if (event.key === "Delete") {
+      event.preventDefault();
       void commands.remove();
     }
   }
@@ -161,7 +166,7 @@
     <input class="t-input grow" placeholder={app.project?.info.format === Format.FormatAssets ? "Go to id or search name…" : "Go to id… (Enter)"} bind:value={jump} onkeydown={onJump} />
   </div>
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="list t-panel" oncontextmenu={(e) => !(e.target as HTMLElement).closest(".thing") && openContextMenu(e, objectListMenu())}>
+  <div class="list t-panel" oncontextmenu={(event) => !(event.target as HTMLElement).closest(".thing") && openContextMenu(event, objectListMenu())}>
     {#if app.open}
       <VirtualGrid {count} cellWidth={LIST_CELL.width} cellHeight={48} gap={LIST_CELL.gap} scrollTo={focusIndex} {onkeydown}>
         {#snippet cell(i)}
@@ -173,15 +178,15 @@
             class:sel={app.selection.includes(id)}
             class:focus={app.focused === id}
             title={names[id] ? `#${id} ${names[id]}` : `#${id}`}
-            onclick={(e) => click(e, id)}
+            onclick={(event) => click(event, id)}
             onmouseenter={() => hover.enter(id)}
             onmouseleave={() => hover.leave()}
             ondblclick={() => select(id)}
-            oncontextmenu={(e) => oncontextmenu(e, id)}
+            oncontextmenu={(event) => oncontextmenu(event, id)}
           >
             <span class="t-slot">
               {#if hover.current?.id === id}
-                <ThingCanvas thing={hover.current.thing} get={(sid) => spriteCache.get(sid)?.pixels} size={spriteCache.size} ready={hover.ready} group={HoverAnim.group(hover.current.thing)} fit={32} colorize={false} improved={app.project?.info.format === Format.FormatAssets || !!app.project?.info.features.improvedAnimations} />
+                <ThingCanvas thing={hover.current.thing} get={(sid) => spriteCache.get(sid)?.pixels} size={spriteCache.size} ready={hover.ready} group={HoverAnim.group(hover.current.thing)} fit={32} colorize={false} improved={hasImprovedAnimations(app.project?.info)} />
               {:else}
                 {@const src = res.thumb(app.category, id, versions.thing(app.category, id))}
                 <img class="pixel" {src} alt="" loading="lazy" decoding="async" draggable="false" use:loading={src} />
@@ -197,8 +202,8 @@
     {/if}
   </div>
   <div class="row filters">
-    <Select grow value={content} options={CONTENT_OPTIONS} disabled={!app.open} onchange={(v) => (content = v)} />
-    <Select grow value={flag} options={flagOptions} disabled={!app.open} maxItems={14} onchange={(v) => (flag = v)} />
+    <Select grow value={content} options={CONTENT_OPTIONS} disabled={!app.open} onchange={(value) => (content = value)} />
+    <Select grow value={flag} options={flagOptions} disabled={!app.open} maxItems={14} onchange={(value) => (flag = value)} />
     <button class="t-icon-btn" title="Clear filters" disabled={!filtered} onclick={() => ((content = ""), (flag = ""), (jump = ""))}><Icon name="close" /></button>
   </div>
   <div class="row foot">

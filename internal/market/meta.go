@@ -75,17 +75,17 @@ func ValidID(id string) bool { return idPattern.MatchString(id) }
 // NormalizeTags lowercases, trims and dedupes tags; spaces become dashes.
 func NormalizeTags(tags []string) []string {
 	out := []string{}
-	for _, t := range tags {
-		t = strings.Join(strings.Fields(strings.ToLower(t)), "-")
-		if t != "" && !slices.Contains(out, t) {
-			out = append(out, t)
+	for _, tag := range tags {
+		tag = strings.Join(strings.Fields(strings.ToLower(tag)), "-")
+		if tag != "" && !slices.Contains(out, tag) {
+			out = append(out, tag)
 		}
 	}
 	return out
 }
 
-func plain(s string, max int) bool {
-	return s != "" && s == strings.TrimSpace(s) && utf8.RuneCountInString(s) <= max && !strings.ContainsFunc(s, unicode.IsControl)
+func plain(text string, maxRunes int) bool {
+	return text != "" && text == strings.TrimSpace(text) && utf8.RuneCountInString(text) <= maxRunes && !strings.ContainsFunc(text, unicode.IsControl)
 }
 
 // Validate checks the fields an author fills in.
@@ -115,9 +115,9 @@ func (m *Meta) Validate() error {
 	if len(m.Tags) > MaxTags {
 		errs = append(errs, fmt.Errorf("more than %d tags", MaxTags))
 	}
-	for _, t := range m.Tags {
-		if len(t) > MaxTag || !tagPattern.MatchString(t) {
-			errs = append(errs, fmt.Errorf("tag %q must be lowercase letters, digits and dashes, at most %d", t, MaxTag))
+	for _, tag := range m.Tags {
+		if len(tag) > MaxTag || !tagPattern.MatchString(tag) {
+			errs = append(errs, fmt.Errorf("tag %q must be lowercase letters, digits and dashes, at most %d", tag, MaxTag))
 		}
 	}
 	if len(NormalizeTags(m.Tags)) != len(m.Tags) {

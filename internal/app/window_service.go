@@ -19,7 +19,7 @@ type FilesDropped struct {
 
 // WindowService guards the main window against closing with unsaved work.
 type WindowService struct {
-	s *Session
+	session *Session
 	// Maps reports unsaved maps.
 	Maps      *MapService
 	close     func()
@@ -29,12 +29,12 @@ type WindowService struct {
 
 // NewWindowService returns the guard. close closes the main window.
 func NewWindowService(s *Session, close func()) *WindowService {
-	return &WindowService{s: s, close: close}
+	return &WindowService{session: s, close: close}
 }
 
 // SetUnapplied tells the backend whether the editor holds edits that were
 // not applied to the client yet.
-func (ws *WindowService) SetUnapplied(v bool) { ws.unapplied.Store(v) }
+func (ws *WindowService) SetUnapplied(unapplied bool) { ws.unapplied.Store(unapplied) }
 
 // Quit closes the window without asking.
 func (ws *WindowService) Quit() {
@@ -51,21 +51,21 @@ func BlockClose(ws *WindowService) func() bool {
 		if ws.force.Load() || !ws.unsaved() {
 			return false
 		}
-		ws.s.notify(EventCloseRequested, nil)
+		ws.session.notify(EventCloseRequested, nil)
 		return true
 	}
 }
 
 func (ws *WindowService) unsaved() bool {
-	if ws.unapplied.Load() || ws.s.exporting.Load() > 0 {
+	if ws.unapplied.Load() || ws.session.exporting.Load() > 0 {
 		return true
 	}
 	if ws.Maps != nil && ws.Maps.AnyChanged() {
 		return true
 	}
-	if st := ws.s.OtherState(); st.Open && st.Info.Changed {
+	if other := ws.session.OtherState(); other.Open && other.Info.Changed {
 		return true
 	}
-	st := ws.s.State()
-	return st.Open && st.Info.Changed
+	state := ws.session.State()
+	return state.Open && state.Info.Changed
 }

@@ -55,12 +55,12 @@ export interface FilesDropped {
 export type FrameGroup = Omit<GoFrameGroup, "sprites" | "durations"> & { sprites: number[]; durations: FrameDuration[] };
 export type Thing = Omit<GoThing, "frameGroups" | "npcSales"> & { frameGroups: FrameGroup[]; npcSales: NpcSale[] };
 
-export function normalizeThing(t: GoThing): Thing {
-  const plain = JSON.parse(JSON.stringify(t)) as GoThing;
+export function normalizeThing(thing: GoThing): Thing {
+  const plain = JSON.parse(JSON.stringify(thing)) as GoThing;
   return {
     ...plain,
     npcSales: plain.npcSales ?? [],
-    frameGroups: (plain.frameGroups ?? []).filter((g): g is GoFrameGroup => !!g).map((g) => ({ ...g, sprites: g.sprites ?? [], durations: g.durations ?? [] })),
+    frameGroups: (plain.frameGroups ?? []).filter((group): group is GoFrameGroup => !!group).map((group) => ({ ...group, sprites: group.sprites ?? [], durations: group.durations ?? [] })),
   };
 }
 
@@ -80,8 +80,8 @@ export const CATEGORY_LABELS: Record<number, string> = {
 
 export const CATEGORIES = [Category.CategoryItem, Category.CategoryOutfit, Category.CategoryEffect, Category.CategoryMissile];
 
-export function minId(c: Category): number {
-  return c === Category.CategoryItem ? 100 : 1;
+export function minId(category: Category): number {
+  return category === Category.CategoryItem ? 100 : 1;
 }
 
 export const res = {
@@ -119,12 +119,12 @@ export function formatSize(bytes: number): string {
 }
 
 /** Normalizes Go errors (strings or Error objects) into a message. */
-export function errorMessage(e: unknown): string {
-  if (e instanceof Error) return e.message;
-  if (typeof e === "string") return e;
+export function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "string") return err;
   try {
-    return JSON.stringify(e);
+    return JSON.stringify(err);
   } catch {
-    return String(e);
+    return String(err);
   }
 }

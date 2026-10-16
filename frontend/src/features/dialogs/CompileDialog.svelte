@@ -21,7 +21,7 @@
   let warnings = $state<string[]>([]);
 
   const keyOf = (v: Version) => `${v.value}|${v.name}|${v.datSignature}|${v.sprSignature}`;
-  const version = $derived(versions.find((v) => keyOf(v) === versionKey) ?? null);
+  const version = $derived(versions.find((value) => keyOf(value) === versionKey) ?? null);
   const sep = $derived(dir.includes("\\") ? "\\" : "/");
 
   onMount(async () => {
@@ -81,7 +81,7 @@
           { value: Format.FormatDat, label: "Tibia.dat + Tibia.spr" },
           { value: Format.FormatAssets, label: "Assets folder (Tibia 12+, protobuf)" },
         ]}
-        onchange={(v) => (format = v as Format)}
+        onchange={(value) => (format = value as Format)}
       />
     </label>
     <label class="row">
@@ -103,7 +103,7 @@
       </label>
       <label class="row">
         <span class="t-label lbl">Version</span>
-        <Select grow value={versionKey} options={versions.map((v) => ({ value: keyOf(v), label: v.name }))} onchange={(v) => (versionKey = v)} />
+        <Select grow value={versionKey} options={versions.map((value) => ({ value: keyOf(value), label: value.name }))} onchange={(value) => (versionKey = value)} />
       </label>
       {#if version}<FeaturesEditor bind:features version={version.value} sizeLocked />{/if}
       <label class="row"><input class="t-check" type="checkbox" bind:checked={writeOtfi} />Write OTClient feature file (.otfi)</label>

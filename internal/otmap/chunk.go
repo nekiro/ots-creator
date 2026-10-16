@@ -21,7 +21,7 @@ type Chunk struct {
 	// Rev is the map revision of the last change in this chunk.
 	Rev uint64
 
-	// cells holds per tile: 0 = none, cellPtr|i = ptrs[i], else packed[v-1].
+	// cells holds per tile: 0 = none, cellPtr|i = ptrs[i], else packed[cell-1].
 	cells  [ChunkSize * ChunkSize]uint16
 	packed []packedTile
 	items  []packedItem
@@ -32,12 +32,20 @@ type Chunk struct {
 	dead     int
 }
 
-const cellPtr = 0x8000
+const (
+	cellPtr = 0x8000
+	// maxPackedItems keeps the item count of a packed tile, the ground
+	// included, within its uint8.
+	maxPackedItems = 254
+	// minDeadToRepack is the number of dead packed tiles below which a
+	// chunk is never repacked.
+	minDeadToRepack = 32
+)
 
 type packedTile struct {
-	off    uint32 // first item in Chunk.items
-	n      uint8  // items, the ground included
-	ground bool   // items[off] is the ground
+	offset uint32 // first item in Chunk.items
+	count  uint8  // items, the ground included
+	ground bool   // items[offset] is the ground
 }
 
 type packedItem struct {
@@ -45,42 +53,42 @@ type packedItem struct {
 }
 
 // packable reports whether a tile can be stored packed.
-func packable(t *Tile) bool {
-	if t.Flags != 0 || t.HouseID != 0 || t.State != 0 || t.Ext != nil || len(t.Items) > 254 {
+func packable(tile *Tile) bool {
+	if tile.Flags != 0 || tile.HouseID != 0 || tile.State != 0 || tile.Ext != nil || len(tile.Items) > maxPackedItems {
 		return false
 	}
-	if g := t.Ground; g.Ext != nil || g.Selected {
+	if ground := tile.Ground; ground.Ext != nil || ground.Selected {
 		return false
 	}
-	for i := range t.Items {
-		if it := &t.Items[i]; it.Ext != nil || it.Selected {
+	for i := range tile.Items {
+		if item := &tile.Items[i]; item.Ext != nil || item.Selected {
 			return false
 		}
 	}
-	return t.Ground.ID != 0 || len(t.Items) > 0
+	return tile.Ground.ID != 0 || len(tile.Items) > 0
 }
 
 // get returns the tile at local index i: the stored *Tile, or a packed
 // tile unpacked into a new Tile.
 func (c *Chunk) get(i int) *Tile {
-	v := c.cells[i]
+	cell := c.cells[i]
 	switch {
-	case v == 0:
+	case cell == 0:
 		return nil
-	case v&cellPtr != 0:
-		return c.ptrs[v&^cellPtr]
+	case cell&cellPtr != 0:
+		return c.ptrs[cell&^cellPtr]
 	default:
-		return c.unpack(c.packed[v-1], &Tile{}, nil)
+		return c.unpack(c.packed[cell-1], &Tile{}, nil)
 	}
 }
 
-// unpack fills t from a packed tile. Items go into buf when it has room
-// (then t is only valid until buf is reused), else into a new slice.
-func (c *Chunk) unpack(pt packedTile, t *Tile, buf []Item) *Tile {
-	src := c.items[pt.off : pt.off+uint32(pt.n)]
-	*t = Tile{}
-	if pt.ground {
-		t.Ground = Item{ID: src[0].id, Subtype: src[0].subtype}
+// unpack fills tile from a packed tile. Items go into buf when it has room
+// (then tile is only valid until buf is reused), else into a new slice.
+func (c *Chunk) unpack(stored packedTile, tile *Tile, buf []Item) *Tile {
+	src := c.items[stored.offset : stored.offset+uint32(stored.count)]
+	*tile = Tile{}
+	if stored.ground {
+		tile.Ground = Item{ID: src[0].id, Subtype: src[0].subtype}
 		src = src[1:]
 	}
 	if len(src) > 0 {
@@ -90,86 +98,86 @@ func (c *Chunk) unpack(pt packedTile, t *Tile, buf []Item) *Tile {
 		} else {
 			items = make([]Item, len(src))
 		}
-		for k, it := range src {
-			items[k] = Item{ID: it.id, Subtype: it.subtype}
+		for i, item := range src {
+			items[i] = Item{ID: item.id, Subtype: item.subtype}
 		}
-		t.Items = items
+		tile.Items = items
 	}
-	return t
+	return tile
 }
 
-// set stores t at local index i (nil removes) and reports whether a tile
+// set stores tile at local index i (nil removes) and reports whether a tile
 // was there before. Packing is up to the caller (pack).
-func (c *Chunk) set(i int, t *Tile, pack bool) (had bool) {
-	v := c.cells[i]
-	had = v != 0
+func (c *Chunk) set(i int, tile *Tile, pack bool) (had bool) {
+	cell := c.cells[i]
+	had = cell != 0
 	// Release what the cell holds.
 	switch {
-	case v&cellPtr != 0:
-		slot := v &^ cellPtr
-		if t != nil && !(pack && packable(t)) {
-			c.ptrs[slot] = t // replace in place
+	case cell&cellPtr != 0:
+		slot := cell &^ cellPtr
+		if tile != nil && !(pack && packable(tile)) {
+			c.ptrs[slot] = tile // replace in place
 			return had
 		}
 		c.ptrs[slot] = nil
 		c.freePtrs = append(c.freePtrs, slot)
-	case v != 0:
+	case cell != 0:
 		c.dead++
 	}
 	c.cells[i] = 0
-	if t == nil {
+	if tile == nil {
 		c.maybeRepack()
 		return had
 	}
-	if pack && packable(t) {
-		c.cells[i] = c.addPacked(t)
+	if pack && packable(tile) {
+		c.cells[i] = c.addPacked(tile)
 	} else {
 		var slot uint16
-		if n := len(c.freePtrs); n > 0 {
-			slot = c.freePtrs[n-1]
-			c.freePtrs = c.freePtrs[:n-1]
+		if freeCount := len(c.freePtrs); freeCount > 0 {
+			slot = c.freePtrs[freeCount-1]
+			c.freePtrs = c.freePtrs[:freeCount-1]
 		} else {
 			slot = uint16(len(c.ptrs))
 			c.ptrs = append(c.ptrs, nil)
 		}
-		c.ptrs[slot] = t
+		c.ptrs[slot] = tile
 		c.cells[i] = cellPtr | slot
 	}
 	c.maybeRepack()
 	return had
 }
 
-func (c *Chunk) addPacked(t *Tile) uint16 {
-	pt := packedTile{off: uint32(len(c.items))}
-	if t.Ground.ID != 0 {
-		pt.ground = true
-		c.items = append(c.items, packedItem{t.Ground.ID, t.Ground.Subtype})
+func (c *Chunk) addPacked(tile *Tile) uint16 {
+	stored := packedTile{offset: uint32(len(c.items))}
+	if tile.Ground.ID != 0 {
+		stored.ground = true
+		c.items = append(c.items, packedItem{tile.Ground.ID, tile.Ground.Subtype})
 	}
-	for _, it := range t.Items {
-		c.items = append(c.items, packedItem{it.ID, it.Subtype})
+	for _, item := range tile.Items {
+		c.items = append(c.items, packedItem{item.ID, item.Subtype})
 	}
-	pt.n = uint8(len(c.items) - int(pt.off))
-	c.packed = append(c.packed, pt)
+	stored.count = uint8(len(c.items) - int(stored.offset))
+	c.packed = append(c.packed, stored)
 	return uint16(len(c.packed))
 }
 
 // maybeRepack drops dead packed tiles once they are half of the chunk.
 func (c *Chunk) maybeRepack() {
-	if c.dead < 32 || c.dead*2 < len(c.packed) {
+	if c.dead < minDeadToRepack || c.dead*2 < len(c.packed) {
 		return
 	}
 	live := len(c.packed) - c.dead
 	packed := make([]packedTile, 0, live)
 	items := make([]packedItem, 0, len(c.items))
-	for i, v := range c.cells {
-		if v == 0 || v&cellPtr != 0 {
+	for i, cell := range c.cells {
+		if cell == 0 || cell&cellPtr != 0 {
 			continue
 		}
-		pt := c.packed[v-1]
-		off := uint32(len(items))
-		items = append(items, c.items[pt.off:pt.off+uint32(pt.n)]...)
-		pt.off = off
-		packed = append(packed, pt)
+		stored := c.packed[cell-1]
+		offset := uint32(len(items))
+		items = append(items, c.items[stored.offset:stored.offset+uint32(stored.count)]...)
+		stored.offset = offset
+		packed = append(packed, stored)
 		c.cells[i] = uint16(len(packed))
 	}
 	c.packed, c.items, c.dead = packed, slices.Clip(items), 0
@@ -186,10 +194,10 @@ func (c *Chunk) clip() {
 }
 
 // eachPtr calls fn for every tile stored as *Tile.
-func (c *Chunk) eachPtr(fn func(t *Tile)) {
-	for _, t := range c.ptrs {
-		if t != nil {
-			fn(t)
+func (c *Chunk) eachPtr(fn func(tile *Tile)) {
+	for _, tile := range c.ptrs {
+		if tile != nil {
+			fn(tile)
 		}
 	}
 }
@@ -198,33 +206,33 @@ func (c *Chunk) eachPtr(fn func(t *Tile)) {
 // tile is unpacked into scratch and buf (see unpack): it is only valid
 // until they are reused.
 func (c *Chunk) Peek(x, y int, scratch *Tile, buf []Item) *Tile {
-	v := c.cells[y<<ChunkBits|x]
+	cell := c.cells[y<<ChunkBits|x]
 	switch {
-	case v == 0:
+	case cell == 0:
 		return nil
-	case v&cellPtr != 0:
-		return c.ptrs[v&^cellPtr]
+	case cell&cellPtr != 0:
+		return c.ptrs[cell&^cellPtr]
 	default:
-		return c.unpack(c.packed[v-1], scratch, buf)
+		return c.unpack(c.packed[cell-1], scratch, buf)
 	}
 }
 
 // Each calls fn for every tile of the chunk. Packed tiles are passed as a
-// reused copy: t is only valid during the call (Clone it to keep it), and
+// reused copy: tile is only valid during the call (Clone it to keep it), and
 // changing it does not change the map.
-func (c *Chunk) Each(fn func(p Position, t *Tile)) {
+func (c *Chunk) Each(fn func(pos Position, tile *Tile)) {
 	var scratch Tile
 	var buf [16]Item
 	for i := range c.cells {
-		v := c.cells[i]
-		if v == 0 {
+		cell := c.cells[i]
+		if cell == 0 {
 			continue
 		}
-		p := Position{c.X<<ChunkBits | uint16(i&(ChunkSize-1)), c.Y<<ChunkBits | uint16(i>>ChunkBits), c.Z}
-		if v&cellPtr != 0 {
-			fn(p, c.ptrs[v&^cellPtr])
+		pos := Position{c.X<<ChunkBits | uint16(i&(ChunkSize-1)), c.Y<<ChunkBits | uint16(i>>ChunkBits), c.Z}
+		if cell&cellPtr != 0 {
+			fn(pos, c.ptrs[cell&^cellPtr])
 		} else {
-			fn(p, c.unpack(c.packed[v-1], &scratch, buf[:]))
+			fn(pos, c.unpack(c.packed[cell-1], &scratch, buf[:]))
 		}
 	}
 }

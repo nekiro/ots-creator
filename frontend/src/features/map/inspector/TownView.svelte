@@ -12,7 +12,7 @@
 </script>
 
 <div class="m-form">
-  <div class="m-field"><span class="m-lbl">Name</span><input class="t-input" value={t.name} onchange={(e) => saveTown({ ...t, name: e.currentTarget.value.trim() || t.name })} /></div>
+  <div class="m-field"><span class="m-lbl">Name</span><input class="t-input" value={t.name} onchange={(event) => saveTown({ ...t, name: event.currentTarget.value.trim() || t.name })} /></div>
   <div class="m-field"><span class="m-lbl">Temple</span><PosField value={t.temple} pickLabel="Click the temple of {t.name}" onchange={(p) => saveTown({ ...t, temple: p })} /></div>
   <div class="m-field"><span class="m-lbl">Id</span><span>{t.id}</span></div>
 

@@ -18,26 +18,26 @@ export type Choice = "ok" | "alt" | null;
 /** Labels of buttons that destroy something: shown red. */
 export const DESTRUCTIVE = /^(remove|delete|discard|clear|erase|reset)\b/i;
 
-export const confirmState = $state<{ question: (Question & { resolve: (c: Choice) => void }) | null }>({ question: null });
+export const confirmState = $state<{ question: (Question & { resolve: (choice: Choice) => void }) | null }>({ question: null });
 
 /** Shows a confirmation dialog. A second question cancels the first. */
-export async function ask(q: Question): Promise<boolean> {
-  return (await choose({ ...q, alt: undefined })) === "ok";
+export async function ask(question: Question): Promise<boolean> {
+  return (await choose({ ...question, alt: undefined })) === "ok";
 }
 
 /** Shows a confirmation dialog with an extra button. A second question cancels the first. */
-export function choose(q: Question): Promise<Choice> {
+export function choose(question: Question): Promise<Choice> {
   confirmState.question?.resolve(null);
   return new Promise((resolve) => {
-    confirmState.question = { ...q, resolve };
+    confirmState.question = { ...question, resolve };
   });
 }
 
 /** Answers the pending question: true is the ok button, false is Cancel. */
-export function answer(c: boolean | "alt"): void {
-  const q = confirmState.question;
+export function answer(button: boolean | "alt"): void {
+  const question = confirmState.question;
   confirmState.question = null;
-  q?.resolve(c === true ? "ok" : c === "alt" ? "alt" : null);
+  question?.resolve(button === true ? "ok" : button === "alt" ? "alt" : null);
 }
 
 export interface TextQuestion {
@@ -47,19 +47,19 @@ export interface TextQuestion {
   ok?: string;
 }
 
-export const promptState = $state<{ question: (TextQuestion & { resolve: (v: string | null) => void }) | null }>({ question: null });
+export const promptState = $state<{ question: (TextQuestion & { resolve: (text: string | null) => void }) | null }>({ question: null });
 
 /** Asks for a line of text (Tibia-style window.prompt); null when cancelled. */
-export function askText(q: TextQuestion): Promise<string | null> {
+export function askText(question: TextQuestion): Promise<string | null> {
   promptState.question?.resolve(null);
   return new Promise((resolve) => {
-    promptState.question = { ...q, resolve };
+    promptState.question = { ...question, resolve };
   });
 }
 
 /** Answers the pending text question. */
-export function answerText(v: string | null): void {
-  const q = promptState.question;
+export function answerText(text: string | null): void {
+  const question = promptState.question;
   promptState.question = null;
-  q?.resolve(v);
+  question?.resolve(text);
 }

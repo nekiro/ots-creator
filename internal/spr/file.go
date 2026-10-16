@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 )
 
 // Options select the encoding of a spr file.
@@ -43,17 +44,17 @@ func Open(data []byte, opts Options) (*File, error) {
 	if len(data) < opts.headerSize() {
 		return nil, fmt.Errorf("spr: file too small (%d bytes)", len(data))
 	}
-	f := &File{Signature: binary.LittleEndian.Uint32(data), opts: opts, data: data}
+	file := &File{Signature: binary.LittleEndian.Uint32(data), opts: opts, data: data}
 	if opts.Extended {
-		f.Count = binary.LittleEndian.Uint32(data[4:])
+		file.Count = binary.LittleEndian.Uint32(data[4:])
 	} else {
-		f.Count = uint32(binary.LittleEndian.Uint16(data[4:]))
+		file.Count = uint32(binary.LittleEndian.Uint16(data[4:]))
 	}
-	tableEnd := uint64(opts.headerSize()) + uint64(f.Count)*4
+	tableEnd := uint64(opts.headerSize()) + uint64(file.Count)*4
 	if tableEnd > uint64(len(data)) {
-		return nil, fmt.Errorf("spr: address table for %d sprites exceeds file size %d (wrong extended setting?)", f.Count, len(data))
+		return nil, fmt.Errorf("spr: address table for %d sprites exceeds file size %d (wrong extended setting?)", file.Count, len(data))
 	}
-	return f, nil
+	return file, nil
 }
 
 // Options returns the options used to open the file.
@@ -65,33 +66,33 @@ func (f *File) Compressed(id uint32) ([]byte, error) {
 	if id == 0 || id > f.Count {
 		return nil, fmt.Errorf("spr: sprite id %d out of range [1,%d]", id, f.Count)
 	}
-	at := f.opts.headerSize() + int(id-1)*4
-	addr := uint64(binary.LittleEndian.Uint32(f.data[at:]))
-	if addr == 0 {
+	entry := f.opts.headerSize() + int(id-1)*4
+	address := uint64(binary.LittleEndian.Uint32(f.data[entry:]))
+	if address == 0 {
 		return nil, nil
 	}
-	if addr+5 > uint64(len(f.data)) {
-		return nil, fmt.Errorf("spr: sprite %d address %d out of file", id, addr)
+	if address+5 > uint64(len(f.data)) {
+		return nil, fmt.Errorf("spr: sprite %d address %d out of file", id, address)
 	}
 	// 3 bytes of color key (ignored), then u16 length.
-	n := uint64(binary.LittleEndian.Uint16(f.data[addr+3:]))
-	start := addr + 5
-	if start+n > uint64(len(f.data)) {
+	length := uint64(binary.LittleEndian.Uint16(f.data[address+3:]))
+	start := address + 5
+	if start+length > uint64(len(f.data)) {
 		return nil, fmt.Errorf("spr: sprite %d data exceeds file", id)
 	}
-	if n == 0 {
+	if length == 0 {
 		return nil, nil
 	}
-	return f.data[start : start+n], nil
+	return f.data[start : start+length], nil
 }
 
 // Pixels returns the decoded RGBA pixels of a sprite.
 func (f *File) Pixels(id uint32) ([]byte, error) {
-	c, err := f.Compressed(id)
+	compressed, err := f.Compressed(id)
 	if err != nil {
 		return nil, err
 	}
-	return Decompress(c, f.opts.size(), f.opts.Transparent)
+	return Decompress(compressed, f.opts.size(), f.opts.Transparent)
 }
 
 // Source supplies compressed sprites for Encode.
@@ -103,65 +104,67 @@ type Source interface {
 	Compressed(id uint32) ([]byte, error)
 }
 
-// Encode writes a spr file. It calls src.Compressed twice for every sprite
-// (once to lay out addresses, once to write), so the source should be cheap.
-func Encode(out io.Writer, signature uint32, src Source, opts Options) error {
-	count := src.Count()
-	if !opts.Extended && count > 0xFFFF {
+// Encode writes a spr file. It calls source.Compressed twice for every
+// sprite (once to lay out addresses, once to write), so the source should
+// be cheap.
+func Encode(out io.Writer, signature uint32, source Source, opts Options) error {
+	count := source.Count()
+	if !opts.Extended && count > math.MaxUint16 {
 		return fmt.Errorf("spr: %d sprites need the extended feature", count)
 	}
-	bw := bufio.NewWriterSize(out, 1<<20)
-	var hdr [8]byte
-	binary.LittleEndian.PutUint32(hdr[:], signature)
+	buffered := bufio.NewWriterSize(out, 1<<20)
+	var header [8]byte
+	binary.LittleEndian.PutUint32(header[:], signature)
 	if opts.Extended {
-		binary.LittleEndian.PutUint32(hdr[4:], count)
+		binary.LittleEndian.PutUint32(header[4:], count)
 	} else {
-		binary.LittleEndian.PutUint16(hdr[4:], uint16(count))
+		binary.LittleEndian.PutUint16(header[4:], uint16(count))
 	}
-	if _, err := bw.Write(hdr[:opts.headerSize()]); err != nil {
+	if _, err := buffered.Write(header[:opts.headerSize()]); err != nil {
 		return err
 	}
 
 	offset := uint64(opts.headerSize()) + uint64(count)*4
-	var buf [4]byte
+	var entry [4]byte
 	for id := uint32(1); id <= count; id++ {
-		c, err := src.Compressed(id)
+		compressed, err := source.Compressed(id)
 		if err != nil {
 			return fmt.Errorf("sprite %d: %w", id, err)
 		}
-		if len(c) > 0xFFFF {
-			return fmt.Errorf("sprite %d: compressed size %d exceeds 65535", id, len(c))
+		if len(compressed) > math.MaxUint16 {
+			return fmt.Errorf("sprite %d: compressed size %d exceeds 65535", id, len(compressed))
 		}
-		addr := uint32(0)
-		if len(c) > 0 {
-			if offset > 0xFFFFFFFF {
+		address := uint32(0)
+		if len(compressed) > 0 {
+			if offset > math.MaxUint32 {
 				return fmt.Errorf("spr: file exceeds 4 GiB")
 			}
-			addr = uint32(offset)
-			offset += 5 + uint64(len(c))
+			address = uint32(offset)
+			offset += 5 + uint64(len(compressed))
 		}
-		binary.LittleEndian.PutUint32(buf[:], addr)
-		if _, err := bw.Write(buf[:]); err != nil {
+		binary.LittleEndian.PutUint32(entry[:], address)
+		if _, err := buffered.Write(entry[:]); err != nil {
 			return err
 		}
 	}
 	for id := uint32(1); id <= count; id++ {
-		c, err := src.Compressed(id)
+		compressed, err := source.Compressed(id)
 		if err != nil {
 			return fmt.Errorf("sprite %d: %w", id, err)
 		}
-		if len(c) == 0 {
+		if len(compressed) == 0 {
 			continue
 		}
 		// Magenta color key, kept for compatibility with old tools.
-		if _, err := bw.Write([]byte{0xFF, 0x00, 0xFF, byte(len(c)), byte(len(c) >> 8)}); err != nil {
+		length := len(compressed)
+		if _, err := buffered.Write([]byte{0xFF, 0x00, 0xFF, byte(length), byte(length >> 8)}); err != nil {
 			return err
 		}
-		if _, err := bw.Write(c); err != nil {
+		if _, err := buffered.Write(compressed); err != nil {
 			return err
 		}
 	}
-	return bw.Flush()
+	return buffered.Flush()
 }
 
 // SliceSource is a Source backed by a slice where index 0 is sprite 1.

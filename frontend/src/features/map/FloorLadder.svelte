@@ -7,10 +7,10 @@
   const used = $derived(map.active?.floors ?? 0);
   const floors = Array.from({ length: 16 }, (_, z) => z);
 
-  function wheel(e: WheelEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    mapCommands.floor(map.floor + (e.deltaY > 0 ? 1 : -1));
+  function wheel(event: WheelEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    mapCommands.floor(map.floor + (event.deltaY > 0 ? 1 : -1));
   }
 </script>
 

@@ -27,14 +27,14 @@ type deltaSet struct {
 	sprites map[uint32]struct{}
 }
 
-func (d *deltaSet) thing(c thing.Category, id uint32) {
+func (d *deltaSet) thing(category thing.Category, id uint32) {
 	if d.all {
 		return
 	}
 	if d.things == nil {
 		d.things = map[ThingRef]struct{}{}
 	}
-	d.things[ThingRef{c, id}] = struct{}{}
+	d.things[ThingRef{category, id}] = struct{}{}
 }
 
 func (d *deltaSet) sprite(id uint32) {
@@ -50,14 +50,14 @@ func (d *deltaSet) sprite(id uint32) {
 	}
 }
 
-// spriteRange marks ids in (a, b] or (b, a].
-func (d *deltaSet) spriteRange(a, b uint32) {
-	lo, hi := min(a, b), max(a, b)
-	if hi-lo > deltaLimit {
+// spriteRange marks ids in (from, to] or (to, from].
+func (d *deltaSet) spriteRange(from, to uint32) {
+	low, high := min(from, to), max(from, to)
+	if high-low > deltaLimit {
 		d.everything()
 		return
 	}
-	for id := lo + 1; id <= hi; id++ {
+	for id := low + 1; id <= high; id++ {
 		d.sprite(id)
 	}
 }
@@ -70,36 +70,36 @@ func (d *deltaSet) everything() {
 func (p *Project) TakeDelta() Delta {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	d := p.delta
+	delta := p.delta
 	p.delta = deltaSet{}
-	out := Delta{All: d.all, Things: []ThingRef{}, Sprites: []uint32{}}
-	if d.all {
+	out := Delta{All: delta.all, Things: []ThingRef{}, Sprites: []uint32{}}
+	if delta.all {
 		return out
 	}
-	for id := range d.sprites {
+	for id := range delta.sprites {
 		out.Sprites = append(out.Sprites, id)
 	}
-	if len(d.sprites) > 0 {
-		for _, c := range thing.Categories {
-			for _, t := range p.things.Things[c] {
-				if t == nil {
+	if len(delta.sprites) > 0 {
+		for _, category := range thing.Categories {
+			for _, object := range p.things.Things[category] {
+				if object == nil {
 					continue
 				}
-				if usesAny(t, d.sprites) {
-					d.thing(c, t.ID)
+				if usesAny(object, delta.sprites) {
+					delta.thing(category, object.ID)
 				}
 			}
 		}
 	}
-	for r := range d.things {
-		out.Things = append(out.Things, r)
+	for ref := range delta.things {
+		out.Things = append(out.Things, ref)
 	}
 	return out
 }
 
-func usesAny(t *thing.Thing, ids map[uint32]struct{}) bool {
-	for _, g := range t.FrameGroups {
-		for _, id := range g.Sprites {
+func usesAny(object *thing.Thing, ids map[uint32]struct{}) bool {
+	for _, group := range object.FrameGroups {
+		for _, id := range group.Sprites {
 			if _, ok := ids[id]; ok {
 				return true
 			}

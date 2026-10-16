@@ -81,26 +81,26 @@
     void Promise.resolve(e.run());
   }
 
-  function onkey(e: KeyboardEvent) {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      e.stopPropagation();
+  function onkey(event: KeyboardEvent) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
       close();
-    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      e.preventDefault();
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
       const n = entries.length;
       if (!n) return;
-      active = (active + (e.key === "ArrowDown" ? 1 : n - 1)) % n;
+      active = (active + (event.key === "ArrowDown" ? 1 : n - 1)) % n;
       void tick().then(() => list?.querySelector(".on")?.scrollIntoView({ block: "nearest" }));
-    } else if (e.key === "Enter") {
-      e.preventDefault();
+    } else if (event.key === "Enter") {
+      event.preventDefault();
       run(entries[active]);
     }
   }
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<div class="overlay" transition:backdrop|global onmousedown={(e) => e.target === e.currentTarget && close()}>
+<div class="overlay" transition:backdrop|global onmousedown={(event) => event.target === event.currentTarget && close()}>
   <div class="box t-window" transition:pop|global role="dialog" aria-label="Command palette">
     <input class="t-input big" bind:this={input} bind:value={text} placeholder="Position, place, brush, item, creature or command…" onkeydown={onkey} spellcheck="false" />
     <div class="list" bind:this={list}>

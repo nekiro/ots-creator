@@ -96,10 +96,10 @@ class AppState {
   }
   dirty = $derived(!!this.draft && JSON.stringify(this.draft) !== this.original);
   supported = $derived(new Set(this.project?.info?.supported ?? []));
-  maxId(c: Category): number {
-    const k = this.project?.info?.counts;
-    if (!k) return 0;
-    return [0, k.items, k.outfits, k.effects, k.missiles][c] ?? 0;
+  maxId(category: Category): number {
+    const counts = this.project?.info?.counts;
+    if (!counts) return 0;
+    return [0, counts.items, counts.outfits, counts.effects, counts.missiles][category] ?? 0;
   }
 }
 
@@ -152,22 +152,22 @@ const toastTimers = new Map<number, ReturnType<typeof setTimeout>>();
 const MAX_TOASTS = 4;
 /** Shows a toast. One with the key of a shown toast replaces it and keeps it up longer. */
 export function toast(text: string, kind: ToastKind = "info", ms = 3500, key?: string, action?: Toast["action"]): void {
-  const old = key ? app.toasts.find((x) => x.key === key) : undefined;
-  const t = old ? { ...old, kind, text, action } : { id: ++toastSeq, kind, text, key, action };
-  app.toasts = old ? app.toasts.map((x) => (x.id === t.id ? t : x)) : [...app.toasts, t];
+  const old = key ? app.toasts.find((other) => other.key === key) : undefined;
+  const shown = old ? { ...old, kind, text, action } : { id: ++toastSeq, kind, text, key, action };
+  app.toasts = old ? app.toasts.map((other) => (other.id === shown.id ? shown : other)) : [...app.toasts, shown];
   while (app.toasts.length > MAX_TOASTS) {
     const gone = app.toasts[0];
     clearTimeout(toastTimers.get(gone.id));
     toastTimers.delete(gone.id);
     app.toasts = app.toasts.slice(1);
   }
-  clearTimeout(toastTimers.get(t.id));
+  clearTimeout(toastTimers.get(shown.id));
   toastTimers.set(
-    t.id,
+    shown.id,
     setTimeout(
       () => {
-        app.toasts = app.toasts.filter((x) => x.id !== t.id);
-        toastTimers.delete(t.id);
+        app.toasts = app.toasts.filter((other) => other.id !== shown.id);
+        toastTimers.delete(shown.id);
       },
       kind === "error" ? ms * 2 : ms,
     ),
@@ -176,7 +176,7 @@ export function toast(text: string, kind: ToastKind = "info", ms = 3500, key?: s
 
 /** Whether a toast with the key is shown. */
 export function hasToast(key: string): boolean {
-  return app.toasts.some((x) => x.key === key);
+  return app.toasts.some((shown) => shown.key === key);
 }
 
 /**
@@ -188,8 +188,8 @@ export async function run<T>(label: string, fn: () => Promise<T>, opts?: { modal
   if (opts?.modal) app.modal = label;
   try {
     return await fn();
-  } catch (e) {
-    toast(errorMessage(e), "error");
+  } catch (err) {
+    toast(errorMessage(err), "error");
     return undefined;
   } finally {
     app.busy = null;
@@ -198,11 +198,11 @@ export async function run<T>(label: string, fn: () => Promise<T>, opts?: { modal
   }
 }
 
-function applyState(s: State): void {
+function applyState(state: State): void {
   const wasOpen = app.open;
-  app.project = s;
-  versions.apply(s.rev, s.delta);
-  if (!s.open) {
+  app.project = state;
+  versions.apply(state.rev, state.delta);
+  if (!state.open) {
     app.selection = [];
     app.draft = null;
     app.original = "";
@@ -219,22 +219,22 @@ function applyState(s: State): void {
   }
 }
 
-function applyOther(s: State): void {
+function applyOther(state: State): void {
   // Queued ids belong to the client they were queued from.
-  if (!s.open || s.info?.datPath !== app.other?.info?.datPath) app.queue = [];
-  app.other = s;
-  otherVersions.apply(s.rev, s.delta);
+  if (!state.open || state.info?.datPath !== app.other?.info?.datPath) app.queue = [];
+  app.other = state;
+  otherVersions.apply(state.rev, state.delta);
 }
 
 export async function initState(): Promise<void> {
-  Events.On("project:changed", (ev) => applyState(ev.data));
-  Events.On("compare:changed", (ev) => applyOther(ev.data));
+  Events.On("project:changed", (event) => applyState(event.data));
+  Events.On("compare:changed", (event) => applyOther(event.data));
   // Long operations report progress in the busy label.
-  Events.On("app:progress", (ev) => {
-    const p = ev.data;
-    if ((app.busy || app.stoppable) && p.done < p.total) {
-      app.busy = p.percent ? `${p.label} ${Math.floor((p.done / p.total) * 100)}%` : `${p.label} ${p.done.toLocaleString()}/${p.total.toLocaleString()}`;
-      app.progress = { done: p.done, total: p.total };
+  Events.On("app:progress", (event) => {
+    const progress = event.data;
+    if ((app.busy || app.stoppable) && progress.done < progress.total) {
+      app.busy = progress.percent ? `${progress.label} ${Math.floor((progress.done / progress.total) * 100)}%` : `${progress.label} ${progress.done.toLocaleString()}/${progress.total.toLocaleString()}`;
+      app.progress = { done: progress.done, total: progress.total };
     }
   });
   applyState(await ProjectService.State());
@@ -245,15 +245,15 @@ async function reloadDraft(): Promise<void> {
   const id = app.focused;
   if (id === null || !app.open) return;
   try {
-    const t = await ThingService.Get(app.category, id);
-    if (t && app.focused === id) setDraft(t);
+    const thing = await ThingService.Get(app.category, id);
+    if (thing && app.focused === id) setDraft(thing);
   } catch {
     /* thing vanished; selection is fixed by applyState */
   }
 }
 
-function setDraft(t: Parameters<typeof normalizeThing>[0]): void {
-  const plain = normalizeThing(t);
+function setDraft(thing: Parameters<typeof normalizeThing>[0]): void {
+  const plain = normalizeThing(thing);
   app.draft = plain;
   app.original = JSON.stringify(plain);
 }
@@ -262,32 +262,32 @@ function setDraft(t: Parameters<typeof normalizeThing>[0]): void {
 export async function select(id: number, additive = false): Promise<void> {
   if (!app.open) return;
   if (additive) {
-    app.selection = app.selection.includes(id) ? app.selection.filter((x) => x !== id) : [...app.selection, id];
+    app.selection = app.selection.includes(id) ? app.selection.filter((selected) => selected !== id) : [...app.selection, id];
     return;
   }
   app.selection = [id];
   try {
-    const t = await ThingService.Get(app.category, id);
-    if (t && app.focused === id) setDraft(t);
-  } catch (e) {
-    toast(errorMessage(e), "error");
+    const thing = await ThingService.Get(app.category, id);
+    if (thing && app.focused === id) setDraft(thing);
+  } catch (err) {
+    toast(errorMessage(err), "error");
   }
 }
 
-export async function setCategory(c: Category): Promise<void> {
-  app.category = c;
+export async function setCategory(category: Category): Promise<void> {
+  app.category = category;
   app.selection = [];
-  await select(c === Category.CategoryItem ? 100 : 1);
+  await select(category === Category.CategoryItem ? 100 : 1);
 }
 
 export async function applyDraft(): Promise<void> {
   if (!app.draft || !app.dirty) return;
-  const d = $state.snapshot(app.draft);
+  const snapshot = $state.snapshot(app.draft);
   try {
-    await ThingService.Update(d as Thing);
-    app.original = JSON.stringify(d);
-  } catch (e) {
-    toast(errorMessage(e), "error");
+    await ThingService.Update(snapshot as Thing);
+    app.original = JSON.stringify(snapshot);
+  } catch (err) {
+    toast(errorMessage(err), "error");
   }
 }
 

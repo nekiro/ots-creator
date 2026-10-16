@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io"
 	"math"
+
+	"github.com/nekiro/ots-creator/internal/binio"
 )
 
 const (
@@ -50,7 +52,7 @@ func ParseProgress(data []byte, progress func(done, total int)) (root *Node, ide
 // the nodes above it, with their properties (their Children lack the
 // streamed nodes). Nodes above depth are returned in root as usual.
 // Properties and nodes passed to visit are only valid during the call.
-func Stream(data []byte, depth int, progress func(done, total int), visit func(stack []*Node, n *Node) error) (root *Node, ident [4]byte, err error) {
+func Stream(data []byte, depth int, progress func(done, total int), visit func(stack []*Node, node *Node) error) (root *Node, ident [4]byte, err error) {
 	return parse(data, &parser{progress: progress, depth: depth, visit: visit})
 }
 
@@ -59,7 +61,7 @@ func parse(data []byte, p *parser) (root *Node, ident [4]byte, err error) {
 		return nil, ident, fmt.Errorf("%w: file too small", ErrFormat)
 	}
 	copy(ident[:], data[:4])
-	p.data, p.pos, p.next = data, 4, progressStep
+	p.data, p.pos, p.nextProgress = data, 4, progressStep
 	if p.data[p.pos] != nodeStart {
 		return nil, ident, fmt.Errorf("%w: no root node", ErrFormat)
 	}
@@ -73,12 +75,12 @@ type parser struct {
 	pos  int
 	// buf holds every node's unescaped properties back to back; nodes slice
 	// into it, so parsing allocates one buffer instead of one per node.
-	buf      []byte
-	progress func(done, total int)
-	next     int
+	buf          []byte
+	progress     func(done, total int)
+	nextProgress int
 	// Streaming (see Stream): nodes at depth go to visit, stack is the path.
 	depth int
-	visit func(stack []*Node, n *Node) error
+	visit func(stack []*Node, node *Node) error
 	stack []*Node
 }
 
@@ -87,49 +89,48 @@ func (p *parser) node() (*Node, error) {
 	if p.pos >= len(p.data) {
 		return nil, fmt.Errorf("%w: truncated node", ErrFormat)
 	}
-	n := &Node{Type: p.data[p.pos]}
+	node := &Node{Type: p.data[p.pos]}
 	p.pos++
-	start := len(p.buf)
-	streamKids := p.visit != nil && len(p.stack)+1 == p.depth
+	propsStart := len(p.buf)
+	streamChildren := p.visit != nil && len(p.stack)+1 == p.depth
 	if p.visit != nil {
-		p.stack = append(p.stack, n)
+		p.stack = append(p.stack, node)
 		defer func() { p.stack = p.stack[:len(p.stack)-1] }()
 	}
-	kids := 0
+	childCount := 0
 	for p.pos < len(p.data) {
-		b := p.data[p.pos]
-		switch b {
+		switch p.data[p.pos] {
 		case nodeStart:
-			if kids == 0 {
+			if childCount == 0 {
 				// Copied: streamed children reuse the buffer after it.
-				n.Props = p.buf[start:len(p.buf):len(p.buf)]
-				if streamKids {
-					n.Props = append([]byte(nil), n.Props...)
+				node.Props = p.buf[propsStart:len(p.buf):len(p.buf)]
+				if streamChildren {
+					node.Props = append([]byte(nil), node.Props...)
 				}
 			}
-			kids++
+			childCount++
 			p.pos++
-			mark := len(p.buf)
+			childStart := len(p.buf)
 			child, err := p.node()
 			if err != nil {
 				return nil, err
 			}
-			if streamKids {
+			if streamChildren {
 				if err := p.visit(p.stack, child); err != nil {
 					return nil, err
 				}
-				p.buf = p.buf[:mark]
+				p.buf = p.buf[:childStart]
 			} else {
-				n.Children = append(n.Children, child)
+				node.Children = append(node.Children, child)
 			}
 			// Properties after children are not part of the format.
-			start = len(p.buf)
+			propsStart = len(p.buf)
 		case nodeEnd:
-			if kids == 0 {
-				n.Props = p.buf[start:len(p.buf):len(p.buf)]
+			if childCount == 0 {
+				node.Props = p.buf[propsStart:len(p.buf):len(p.buf)]
 			}
 			p.pos++
-			return n, nil
+			return node, nil
 		case escape:
 			if p.pos+1 >= len(p.data) {
 				return nil, fmt.Errorf("%w: dangling escape", ErrFormat)
@@ -138,19 +139,19 @@ func (p *parser) node() (*Node, error) {
 			p.pos += 2
 		default:
 			// Copy the run of plain bytes at once.
-			end := p.pos + 1
-			for end < len(p.data) {
-				c := p.data[end]
-				if c == nodeStart || c == nodeEnd || c == escape {
+			runEnd := p.pos + 1
+			for runEnd < len(p.data) {
+				value := p.data[runEnd]
+				if value == nodeStart || value == nodeEnd || value == escape {
 					break
 				}
-				end++
+				runEnd++
 			}
-			p.buf = append(p.buf, p.data[p.pos:end]...)
-			p.pos = end
-			if p.progress != nil && p.pos >= p.next {
+			p.buf = append(p.buf, p.data[p.pos:runEnd]...)
+			p.pos = runEnd
+			if p.progress != nil && p.pos >= p.nextProgress {
 				p.progress(p.pos, len(p.data))
-				p.next = p.pos + progressStep
+				p.nextProgress = p.pos + progressStep
 			}
 		}
 	}
@@ -158,167 +159,139 @@ func (p *parser) node() (*Node, error) {
 }
 
 // Reader reads little-endian values from node properties with a sticky
-// error.
+// error. It wraps binio.Reader and adds the node file string formats;
+// read errors are reported as ErrFormat.
 type Reader struct {
-	b   []byte
-	pos int
-	err error
+	props binio.Reader
 }
 
 // NewReader returns a reader over props.
-func NewReader(props []byte) *Reader { return &Reader{b: props} }
+func NewReader(props []byte) *Reader { return &Reader{props: *binio.NewReader(props)} }
 
 // Err returns the first read error.
-func (r *Reader) Err() error { return r.err }
+func (r *Reader) Err() error {
+	err := r.props.Err()
+	if err == nil || errors.Is(err, ErrFormat) {
+		return err
+	}
+	return fmt.Errorf("%w: property: %v", ErrFormat, err)
+}
 
 // Remaining is the number of unread bytes.
-func (r *Reader) Remaining() int { return len(r.b) - r.pos }
+func (r *Reader) Remaining() int { return r.props.Remaining() }
 
 // More reports whether bytes are left and no error happened.
-func (r *Reader) More() bool { return r.err == nil && r.pos < len(r.b) }
-
-func (r *Reader) take(n int) []byte {
-	if r.err != nil {
-		return nil
-	}
-	if n < 0 || r.pos+n > len(r.b) {
-		r.err = fmt.Errorf("%w: property needs %d bytes, %d left", ErrFormat, n, len(r.b)-r.pos)
-		return nil
-	}
-	s := r.b[r.pos : r.pos+n]
-	r.pos += n
-	return s
-}
+func (r *Reader) More() bool { return r.props.Err() == nil && r.props.Remaining() > 0 }
 
 // U8 reads a byte.
-func (r *Reader) U8() uint8 {
-	if b := r.take(1); b != nil {
-		return b[0]
-	}
-	return 0
-}
+func (r *Reader) U8() uint8 { return r.props.U8() }
 
 // U16 reads a little-endian uint16.
-func (r *Reader) U16() uint16 {
-	if b := r.take(2); b != nil {
-		return binary.LittleEndian.Uint16(b)
-	}
-	return 0
-}
+func (r *Reader) U16() uint16 { return r.props.U16() }
 
 // U32 reads a little-endian uint32.
-func (r *Reader) U32() uint32 {
-	if b := r.take(4); b != nil {
-		return binary.LittleEndian.Uint32(b)
-	}
-	return 0
-}
+func (r *Reader) U32() uint32 { return r.props.U32() }
 
 // U64 reads a little-endian uint64.
-func (r *Reader) U64() uint64 {
-	if b := r.take(8); b != nil {
-		return binary.LittleEndian.Uint64(b)
-	}
-	return 0
-}
+func (r *Reader) U64() uint64 { return r.props.U64() }
 
-// Bytes reads n raw bytes.
-func (r *Reader) Bytes(n int) []byte { return r.take(n) }
+// Bytes reads count raw bytes.
+func (r *Reader) Bytes(count int) []byte { return r.props.Bytes(count) }
 
-// Skip skips n bytes.
-func (r *Reader) Skip(n int) { r.take(n) }
+// Skip skips count bytes.
+func (r *Reader) Skip(count int) { r.props.Bytes(count) }
 
 // String reads a string with a uint16 length.
 func (r *Reader) String() string {
-	n := int(r.U16())
-	return string(r.take(n))
+	length := int(r.props.U16())
+	return string(r.props.Bytes(length))
 }
 
 // LongString reads a string with a uint32 length.
 func (r *Reader) LongString() string {
-	n := r.U32()
-	if n > math.MaxInt32 {
-		r.err = fmt.Errorf("%w: string too long", ErrFormat)
+	length := r.props.U32()
+	if length > math.MaxInt32 {
+		r.props.Fail(fmt.Errorf("%w: string too long", ErrFormat))
 		return ""
 	}
-	return string(r.take(int(n)))
+	return string(r.props.Bytes(int(length)))
 }
 
 // Writer writes a node file with escaping.
 type Writer struct {
-	w   *bufio.Writer
-	err error
-	tmp [8]byte
+	out     *bufio.Writer
+	err     error
+	scratch [8]byte
 }
 
 // NewWriter writes the identifier and returns a writer.
-func NewWriter(w io.Writer, ident [4]byte) *Writer {
-	bw := bufio.NewWriterSize(w, 1<<20)
-	_, err := bw.Write(ident[:])
-	return &Writer{w: bw, err: err}
+func NewWriter(dest io.Writer, ident [4]byte) *Writer {
+	out := bufio.NewWriterSize(dest, 1<<20)
+	_, err := out.Write(ident[:])
+	return &Writer{out: out, err: err}
 }
 
 // Start opens a node of the given type.
-func (w *Writer) Start(t byte) {
+func (w *Writer) Start(nodeType byte) {
 	w.raw(nodeStart)
-	w.U8(t)
+	w.U8(nodeType)
 }
 
 // End closes the current node.
 func (w *Writer) End() { w.raw(nodeEnd) }
 
-func (w *Writer) raw(b byte) {
+func (w *Writer) raw(value byte) {
 	if w.err == nil {
-		w.err = w.w.WriteByte(b)
+		w.err = w.out.WriteByte(value)
 	}
 }
 
 // U8 writes an escaped byte.
-func (w *Writer) U8(b byte) {
-	if b == nodeStart || b == nodeEnd || b == escape {
+func (w *Writer) U8(value byte) {
+	if value == nodeStart || value == nodeEnd || value == escape {
 		w.raw(escape)
 	}
-	w.raw(b)
+	w.raw(value)
 }
 
 // Bytes writes escaped bytes.
-func (w *Writer) Bytes(p []byte) {
-	for _, b := range p {
-		w.U8(b)
+func (w *Writer) Bytes(data []byte) {
+	for _, value := range data {
+		w.U8(value)
 	}
 }
 
 // U16 writes a little-endian uint16.
-func (w *Writer) U16(v uint16) {
-	binary.LittleEndian.PutUint16(w.tmp[:], v)
-	w.Bytes(w.tmp[:2])
+func (w *Writer) U16(value uint16) {
+	binary.LittleEndian.PutUint16(w.scratch[:], value)
+	w.Bytes(w.scratch[:2])
 }
 
 // U32 writes a little-endian uint32.
-func (w *Writer) U32(v uint32) {
-	binary.LittleEndian.PutUint32(w.tmp[:], v)
-	w.Bytes(w.tmp[:4])
+func (w *Writer) U32(value uint32) {
+	binary.LittleEndian.PutUint32(w.scratch[:], value)
+	w.Bytes(w.scratch[:4])
 }
 
 // U64 writes a little-endian uint64.
-func (w *Writer) U64(v uint64) {
-	binary.LittleEndian.PutUint64(w.tmp[:], v)
-	w.Bytes(w.tmp[:8])
+func (w *Writer) U64(value uint64) {
+	binary.LittleEndian.PutUint64(w.scratch[:], value)
+	w.Bytes(w.scratch[:8])
 }
 
 // String writes a string with a uint16 length (truncated to 65535 bytes).
-func (w *Writer) String(s string) {
-	if len(s) > math.MaxUint16 {
-		s = s[:math.MaxUint16]
+func (w *Writer) String(text string) {
+	if len(text) > math.MaxUint16 {
+		text = text[:math.MaxUint16]
 	}
-	w.U16(uint16(len(s)))
-	w.Bytes([]byte(s))
+	w.U16(uint16(len(text)))
+	w.Bytes([]byte(text))
 }
 
 // LongString writes a string with a uint32 length.
-func (w *Writer) LongString(s string) {
-	w.U32(uint32(len(s)))
-	w.Bytes([]byte(s))
+func (w *Writer) LongString(text string) {
+	w.U32(uint32(len(text)))
+	w.Bytes([]byte(text))
 }
 
 // Flush writes buffered data and returns the first error.
@@ -326,5 +299,5 @@ func (w *Writer) Flush() error {
 	if w.err != nil {
 		return w.err
 	}
-	return w.w.Flush()
+	return w.out.Flush()
 }

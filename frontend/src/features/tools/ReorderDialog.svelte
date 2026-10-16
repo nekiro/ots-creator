@@ -10,6 +10,7 @@
   import Select from "../../lib/ui/Select.svelte";
   import VirtualGrid from "../../lib/ui/VirtualGrid.svelte";
   import { loading as imgLoading } from "../../lib/ui/loading";
+  import { clamp } from "../../lib/math";
 
   let category = $state<Category>(app.category);
   let insert = $state(false);
@@ -50,20 +51,20 @@
     scrollTo = 0;
   }
 
-  function click(e: MouseEvent, id: number) {
+  function click(event: MouseEvent, id: number) {
     if (held.length) {
       void move(held, id);
       return;
     }
     if (id === end) return;
-    if (e.shiftKey && anchor !== null) {
+    if (event.shiftKey && anchor !== null) {
       const [lo, hi] = anchor < id ? [anchor, id] : [id, anchor];
       const range = Array.from({ length: hi - lo + 1 }, (_, k) => lo + k);
-      selected = e.ctrlKey ? [...new Set([...selected, ...range])] : range;
+      selected = event.ctrlKey ? [...new Set([...selected, ...range])] : range;
       return;
     }
     anchor = id;
-    if (e.ctrlKey || e.metaKey) selected = selectedSet.has(id) ? selected.filter((x) => x !== id) : [...selected, id];
+    if (event.ctrlKey || event.metaKey) selected = selectedSet.has(id) ? selected.filter((x) => x !== id) : [...selected, id];
     else selected = [id];
   }
 
@@ -73,31 +74,31 @@
     toast(`Click the slot where ${held.length > 1 ? `#${held[0]} and the others go` : `#${held[0]} goes`} (Esc cancels).`, "info", 3500, "reorder");
   }
 
-  function onkeydown(e: KeyboardEvent) {
-    const mod = e.ctrlKey || e.metaKey;
-    if (e.key === "Escape" && held.length) {
-      e.preventDefault();
-      e.stopPropagation();
+  function onkeydown(event: KeyboardEvent) {
+    const mod = event.ctrlKey || event.metaKey;
+    if (event.key === "Escape" && held.length) {
+      event.preventDefault();
+      event.stopPropagation();
       held = [];
       over = null;
-    } else if (mod && e.key.toLowerCase() === "x") {
-      e.preventDefault();
+    } else if (mod && event.key.toLowerCase() === "x") {
+      event.preventDefault();
       cut();
-    } else if (mod && e.key.toLowerCase() === "a") {
-      e.preventDefault();
+    } else if (mod && event.key.toLowerCase() === "a") {
+      event.preventDefault();
       selected = Array.from({ length: end - first }, (_, k) => first + k);
     }
   }
 
-  function dragstart(e: DragEvent, id: number) {
-    if (id === end || !e.dataTransfer) return;
+  function dragstart(event: DragEvent, id: number) {
+    if (id === end || !event.dataTransfer) return;
     if (!selectedSet.has(id)) {
       selected = [id];
       anchor = id;
     }
     dragging = [...selected].sort((a, b) => a - b);
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", dragging.join(","));
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", dragging.join(","));
   }
 
   function dragend() {
@@ -105,8 +106,8 @@
     over = null;
   }
 
-  function drop(e: DragEvent, id: number) {
-    e.preventDefault();
+  function drop(event: DragEvent, id: number) {
+    event.preventDefault();
     const ids = dragging;
     dragend();
     if (ids.length) void move(ids, id);
@@ -144,11 +145,11 @@
   }
 
   let jump = $state("");
-  function onJump(e: KeyboardEvent) {
-    if (e.key !== "Enter") return;
+  function onJump(event: KeyboardEvent) {
+    if (event.key !== "Enter") return;
     const id = parseInt(jump, 10);
     if (!Number.isFinite(id)) return;
-    scrollTo = Math.min(Math.max(id, first), end) - first;
+    scrollTo = clamp(id, first, end) - first;
   }
 
   // Thumbnails follow undo and other edits made while the window is open.
@@ -178,7 +179,7 @@
           { value: true, label: "Insert and shift" },
         ]}
         title="Swap: the objects at the target take the freed ids. Insert: the objects go before the target and the ones between shift."
-        onchange={(v) => (insert = v)}
+        onchange={(value) => (insert = value)}
       />
       <label class="row check" class:off={category !== Category.CategoryItem} title="Change item ids stored in items (market trade as and show as, former object, NPC currency) to the new ids">
         <input class="t-check" type="checkbox" bind:checked={updateRefs} disabled={category !== Category.CategoryItem} />Update item references
@@ -204,16 +205,16 @@
             title={isEnd ? "After the last object" : `#${id}`}
             draggable={!isEnd && !held.length}
             disabled={!!app.busy}
-            onclick={(e) => click(e, id)}
+            onclick={(event) => click(event, id)}
             onmouseenter={() => held.length && (over = id)}
-            ondragstart={(e) => dragstart(e, id)}
+            ondragstart={(event) => dragstart(event, id)}
             ondragend={dragend}
-            ondragover={(e) => {
+            ondragover={(event) => {
               if (!dragging.length) return;
-              e.preventDefault();
+              event.preventDefault();
               over = id;
             }}
-            ondrop={(e) => drop(e, id)}
+            ondrop={(event) => drop(event, id)}
           >
             <span class="t-slot">
               {#if isEnd}

@@ -45,15 +45,15 @@ export class SpriteCache {
     const waits: Promise<void>[] = [];
     for (const id of new Set(ids)) {
       if (id === 0 || this.entries.has(id)) continue;
-      const p = this.inflight.get(id);
-      if (p) waits.push(p);
+      const pending = this.inflight.get(id);
+      if (pending) waits.push(pending);
       else missing.push(id);
     }
     for (let i = 0; i < missing.length; i += BATCH) {
       const chunk = missing.slice(i, i + BATCH);
-      const p = this.fetchChunk(chunk, this.gen);
-      for (const id of chunk) this.inflight.set(id, p);
-      waits.push(p);
+      const pending = this.fetchChunk(chunk, this.gen);
+      for (const id of chunk) this.inflight.set(id, pending);
+      waits.push(pending);
     }
     await Promise.all(waits);
   }

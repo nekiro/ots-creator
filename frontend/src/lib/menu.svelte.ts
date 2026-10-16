@@ -13,12 +13,12 @@ export type MenuEntry = MenuItem | "-";
 /** The open context menu, rendered once by ContextMenu in App. */
 export const contextMenu = $state<{ items: MenuEntry[] | null; x: number; y: number }>({ items: null, x: 0, y: 0 });
 
-export function openContextMenu(e: MouseEvent, items: MenuEntry[]): void {
-  e.preventDefault();
-  e.stopPropagation();
+export function openContextMenu(event: MouseEvent, items: MenuEntry[]): void {
+  event.preventDefault();
+  event.stopPropagation();
   contextMenu.items = items;
-  contextMenu.x = toCss(e.clientX);
-  contextMenu.y = toCss(e.clientY);
+  contextMenu.x = toCss(event.clientX);
+  contextMenu.y = toCss(event.clientY);
 }
 
 export function closeContextMenu(): void {

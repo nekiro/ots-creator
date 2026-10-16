@@ -5,9 +5,9 @@
 /** Pixels of the content that always stay inside the stage. */
 const KEEP = 32;
 
-function typing(e: KeyboardEvent): boolean {
-  const t = e.target as HTMLElement | null;
-  return !!t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName));
+function typing(event: KeyboardEvent): boolean {
+  const target = event.target as HTMLElement | null;
+  return !!target && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
 }
 
 export class PanView {
@@ -38,10 +38,10 @@ export class PanView {
   /** Moves to x, y, keeping a corner of the content inside the stage. */
   set(x: number, y: number): void {
     const { w, h, sw, sh } = this.size();
-    const mx = Math.max(0, (w + sw) / 2 - KEEP);
-    const my = Math.max(0, (h + sh) / 2 - KEEP);
-    this.x = Math.round(Math.min(mx, Math.max(-mx, x)));
-    this.y = Math.round(Math.min(my, Math.max(-my, y)));
+    const maxX = Math.max(0, (w + sw) / 2 - KEEP);
+    const maxY = Math.max(0, (h + sh) / 2 - KEEP);
+    this.x = Math.round(Math.min(maxX, Math.max(-maxX, x)));
+    this.y = Math.round(Math.min(maxY, Math.max(-maxY, y)));
   }
 
   /** Scales the offset for a zoom change, so the centered pixel stays put. */
@@ -55,13 +55,13 @@ export class PanView {
   }
 
   /** Attach to the window: space toggles pan mode while over the stage. */
-  key = (e: KeyboardEvent): void => {
-    if (e.code !== "Space" || typing(e)) return;
-    if (e.type === "keyup") {
-      if (this.ready) e.preventDefault(); // a focused button must not click
+  key = (event: KeyboardEvent): void => {
+    if (event.code !== "Space" || typing(event)) return;
+    if (event.type === "keyup") {
+      if (this.ready) event.preventDefault(); // a focused button must not click
       this.ready = false;
     } else if (this.over || this.ready) {
-      e.preventDefault();
+      event.preventDefault();
       this.ready = true;
     }
   };
@@ -74,34 +74,34 @@ export class PanView {
   readonly handlers = {
     onmouseenter: () => (this.over = true),
     onmouseleave: () => (this.over = false),
-    onwheel: (e: WheelEvent) => {
-      e.preventDefault();
-      if (e.ctrlKey) {
-        this.onzoom?.(e.deltaY < 0 ? 1 : -1);
+    onwheel: (event: WheelEvent) => {
+      event.preventDefault();
+      if (event.ctrlKey) {
+        this.onzoom?.(event.deltaY < 0 ? 1 : -1);
         return;
       }
-      const [dx, dy] = e.shiftKey ? [e.deltaY, e.deltaX] : [e.deltaX, e.deltaY];
+      const [dx, dy] = event.shiftKey ? [event.deltaY, event.deltaX] : [event.deltaX, event.deltaY];
       this.set(this.x - dx, this.y - dy);
     },
-    onpointerdown: (e: PointerEvent) => {
-      if (!(this.ready && e.button === 0) && e.button !== 1) return;
-      e.preventDefault();
-      this.stage = e.currentTarget as HTMLElement;
-      this.stage.setPointerCapture(e.pointerId);
-      this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, px: this.x, py: this.y };
+    onpointerdown: (event: PointerEvent) => {
+      if (!(this.ready && event.button === 0) && event.button !== 1) return;
+      event.preventDefault();
+      this.stage = event.currentTarget as HTMLElement;
+      this.stage.setPointerCapture(event.pointerId);
+      this.drag = { id: event.pointerId, x: event.clientX, y: event.clientY, px: this.x, py: this.y };
       this.dragging = true;
     },
-    onpointermove: (e: PointerEvent) => {
-      const d = this.drag;
-      if (d?.id !== e.pointerId) return;
-      this.set(d.px + e.clientX - d.x, d.py + e.clientY - d.y);
+    onpointermove: (event: PointerEvent) => {
+      const drag = this.drag;
+      if (drag?.id !== event.pointerId) return;
+      this.set(drag.px + event.clientX - drag.x, drag.py + event.clientY - drag.y);
     },
-    onpointerup: (e: PointerEvent) => this.end(e),
-    onpointercancel: (e: PointerEvent) => this.end(e),
+    onpointerup: (event: PointerEvent) => this.end(event),
+    onpointercancel: (event: PointerEvent) => this.end(event),
   };
 
-  private end(e: PointerEvent): void {
-    if (this.drag?.id !== e.pointerId) return;
+  private end(event: PointerEvent): void {
+    if (this.drag?.id !== event.pointerId) return;
     this.drag = null;
     this.dragging = false;
   }
@@ -110,16 +110,16 @@ export class PanView {
 /** Zoom steps of image views: fine below 1x, whole pixels above 2x. */
 export const ZOOM_LEVELS = [0.1, 0.15, 0.2, 0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 16];
 
-/** The next zoom level from z in direction d (+1 in, -1 out). */
-export function stepZoom(z: number, d: number): number {
-  const eps = 1e-6;
-  if (d > 0) return ZOOM_LEVELS.find((l) => l > z + eps) ?? ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
-  return [...ZOOM_LEVELS].reverse().find((l) => l < z - eps) ?? ZOOM_LEVELS[0];
+/** The next zoom level from zoom in a direction (+1 in, -1 out). */
+export function stepZoom(zoom: number, direction: number): number {
+  const epsilon = 1e-6;
+  if (direction > 0) return ZOOM_LEVELS.find((level) => level > zoom + epsilon) ?? ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
+  return [...ZOOM_LEVELS].reverse().find((level) => level < zoom - epsilon) ?? ZOOM_LEVELS[0];
 }
 
 /** "3×" from 1x up, "50%" below. */
-export function zoomLabel(z: number): string {
-  return z >= 1 ? `${Math.round(z * 100) / 100}×` : `${Math.round(z * 100)}%`;
+export function zoomLabel(zoom: number): string {
+  return zoom >= 1 ? `${Math.round(zoom * 100) / 100}×` : `${Math.round(zoom * 100)}%`;
 }
 
 /**
@@ -128,6 +128,6 @@ export function zoomLabel(z: number): string {
  */
 export function fitZoom(w: number, h: number, sw: number, sh: number, max = 8, margin = 16): number {
   if (!w || !h || !sw || !sh) return 1;
-  const r = Math.min((sw - margin) / w, (sh - margin) / h);
-  return r >= 1 ? Math.min(max, Math.floor(r)) : Math.max(ZOOM_LEVELS[0], r);
+  const ratio = Math.min((sw - margin) / w, (sh - margin) / h);
+  return ratio >= 1 ? Math.min(max, Math.floor(ratio)) : Math.max(ZOOM_LEVELS[0], ratio);
 }

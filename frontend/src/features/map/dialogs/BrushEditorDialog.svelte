@@ -12,6 +12,7 @@
   import TagPicker from "../../../lib/ui/TagPicker.svelte";
   import BrushPreview from "../BrushPreview.svelte";
   import { frameOf, previewOf, type Frame } from "../../../lib/map/brushpreview";
+  import { MAIN_WALLS, MORE_WALLS, chances, collectionsContaining, ensureBrushShape, missingForSave, normalizeBrushForSave, stampOf } from "../../../lib/map/brushEdit";
 
   // A new brush starts by choosing what it paints; the form then shows only
   // what that kind needs, in order, with the rarely changed parts folded.
@@ -35,8 +36,6 @@
     n: "North", e: "East", s: "South", w: "West", cnw: "Corner NW", cne: "Corner NE", csw: "Corner SW", cse: "Corner SE",
     dnw: "Diagonal NW", dne: "Diagonal NE", dsw: "Diagonal SW", dse: "Diagonal SE", c: "Center",
   };
-  const MAIN_WALLS = ["horizontal", "vertical", "corner", "pole"];
-  const MORE_WALLS = ["north end", "south end", "east end", "west end", "north T", "south T", "east T", "west T", "northeast diagonal", "southwest diagonal", "southeast diagonal", "intersection", "untouchable"];
   const DOOR_TYPES = ["normal", "locked", "quest", "magic", "archway", "window", "hatch window"];
   const TABLE_PARTS = ["north", "south", "east", "west", "horizontal", "vertical", "alone"];
 
@@ -45,12 +44,10 @@
   const isNew = !target.name;
 
   let step = $state<"type" | "edit">(isNew && !fromSelection ? "type" : "edit");
-  let b = $state<Brush>({ name: "", type: target.type === "fromSelection" ? "doodad" : target.type } as Brush);
+  let brush = $state<Brush>({ name: "", type: target.type === "fromSelection" ? "doodad" : target.type } as Brush);
   let borders = $state<Border[]>([]);
   /** Collections the brush is in; edited brushes start with their current ones. */
-  let collections = $state<string[]>(
-    isNew ? [] : (map.palette?.tilesets ?? []).filter((t) => !!t && !t.auto && [...(t.terrain ?? []), ...(t.doodads ?? [])].some((x) => x?.name === target.name)).map((t) => t!.name),
-  );
+  let collections = $state<string[]>(isNew ? [] : collectionsContaining(map.palette?.tilesets, target.name));
   let loading = $state(!isNew);
   let saving = $state(false);
   let moreWalls = $state(false);
@@ -59,159 +56,118 @@
   let edge = $state("n");
 
   $effect(() => {
-    void MapService.Borders().then((bs) => (borders = (bs ?? []).filter((x): x is Border => !!x)));
+    void MapService.Borders().then((loaded) => (borders = (loaded ?? []).filter((border): border is Border => !!border)));
     if (!isNew) {
       void MapService.Brush(target.name).then(
-        (x) => {
-          b = JSON.parse(JSON.stringify(x));
+        (loaded) => {
+          brush = JSON.parse(JSON.stringify(loaded));
           loading = false;
         },
-        (e) => {
-          toast(errorMessage(e), "error");
+        (err) => {
+          toast(errorMessage(err), "error");
           map.dialog = null;
         },
       );
     }
   });
 
-  const brushNames = $derived((map.palette?.brushes ?? []).filter((x) => !!x && x.name !== b.name).map((x) => x.name));
-  const tilesets = $derived((map.palette?.tilesets ?? []).filter((t) => !!t && !t.auto).map((t) => t.name));
-  const borderOptions = $derived([{ value: 0, label: "None" }, ...borders.map((x) => ({ value: x.id, label: `Border ${x.id}${x.group ? ` (group ${x.group})` : ""}` }))]);
-
-  function chances(list: Chance[] | null | undefined): Chance[] {
-    return (list ?? []).filter((c): c is Chance => !!c);
-  }
+  const brushNames = $derived((map.palette?.brushes ?? []).filter((other) => !!other && other.name !== brush.name).map((other) => other.name));
+  const tilesets = $derived((map.palette?.tilesets ?? []).filter((tileset) => !!tileset && !tileset.auto).map((tileset) => tileset.name));
+  const borderOptions = $derived([{ value: 0, label: "None" }, ...borders.map((border) => ({ value: border.id, label: `Border ${border.id}${border.group ? ` (group ${border.group})` : ""}` }))]);
 
   function newBorder(): Border {
     return { id: 0, edges: {}, group: 0 } as Border;
   }
 
-  async function saveBorder(bd: Border): Promise<number> {
-    const id = await MapService.SaveBorder($state.snapshot(bd) as Border);
-    borders = (await MapService.Borders())?.filter((x): x is Border => !!x) ?? borders;
+  async function saveBorder(border: Border): Promise<number> {
+    const id = await MapService.SaveBorder($state.snapshot(border) as Border);
+    borders = (await MapService.Borders())?.filter((saved): saved is Border => !!saved) ?? borders;
     return id;
   }
 
-  const typeLabel = $derived(TYPES.find((t) => t.value === b.type)?.label ?? b.type);
+  const typeLabel = $derived(TYPES.find((type) => type.value === brush.type)?.label ?? brush.type);
   /** A brush made from a selection: one group of tiles and nothing else. */
-  const stamp = $derived.by(() => {
-    const alts = (b.alternatives ?? []).filter((a) => !!a);
-    if (b.type !== "doodad" || alts.length !== 1 || (alts[0]!.singles ?? []).length) return null;
-    const comps = (alts[0]!.composites ?? []).filter((c) => !!c);
-    return comps.length === 1 ? comps[0]! : null;
-  });
+  const stamp = $derived(stampOf(brush));
 
   // Editing a stamp: chosen tiles in preview coordinates. The frame is taken
   // once, so the preview keeps its place when edge tiles go (placement
   // offsets never change).
-  type P = { x: number; y: number };
-  let picked = $state<P[]>([]);
+  type TilePoint = { x: number; y: number };
+  let picked = $state<TilePoint[]>([]);
   let frame = $state<Frame | null>(null);
   $effect(() => {
     if (stamp && !frame) frame = frameOf(stamp.tiles);
   });
-  const tileAt = (p: P) => (stamp?.tiles ?? []).find((t) => !!t && !t.z && frame && t.x === frame.x + p.x && t.y === frame.y + p.y) ?? null;
+  const tileAt = (point: TilePoint) =>
+    (stamp?.tiles ?? []).find((tile) => !!tile && !tile.z && frame && tile.x === frame.x + point.x && tile.y === frame.y + point.y) ?? null;
   type StampTile = NonNullable<ReturnType<typeof tileAt>>;
-  function selectTiles(tiles: P[], add: boolean) {
-    picked = add ? [...picked, ...tiles.filter((t) => !picked.some((p) => p.x === t.x && p.y === t.y))] : tiles;
+  function selectTiles(tiles: TilePoint[], add: boolean) {
+    picked = add ? [...picked, ...tiles.filter((tile) => !picked.some((point) => point.x === tile.x && point.y === tile.y))] : tiles;
   }
-  function removeItem(t: StampTile, k: number) {
-    t.items = (t.items ?? []).filter((_, i) => i !== k);
-    if (!t.items.length && stamp) stamp.tiles = (stamp.tiles ?? []).filter((x) => x !== t);
+  function removeItem(tile: StampTile, itemIndex: number) {
+    tile.items = (tile.items ?? []).filter((_, i) => i !== itemIndex);
+    if (!tile.items.length && stamp) stamp.tiles = (stamp.tiles ?? []).filter((other) => other !== tile);
   }
   /** Clears the chosen tiles: the map keeps what is there. */
   function clearPicked() {
     if (!stamp || !picked.length) return;
-    const gone = new Set(picked.map(tileAt).filter((t) => !!t));
-    stamp.tiles = (stamp.tiles ?? []).filter((x) => !gone.has(x));
+    const gone = new Set(picked.map(tileAt).filter((tile) => !!tile));
+    stamp.tiles = (stamp.tiles ?? []).filter((tile) => !gone.has(tile));
     picked = [];
   }
-  function onkeydown(e: KeyboardEvent) {
-    if (!stamp || !picked.length || (e.key !== "Delete" && e.key !== "Backspace")) return;
-    if ((e.target as HTMLElement).closest("input, textarea, select, [contenteditable]")) return;
-    e.preventDefault();
+  function onkeydown(event: KeyboardEvent) {
+    if (!stamp || !picked.length || (event.key !== "Delete" && event.key !== "Backspace")) return;
+    if ((event.target as HTMLElement).closest("input, textarea, select, [contenteditable]")) return;
+    event.preventDefault();
     clearPicked();
   }
 
-  function chooseType(t: string) {
-    b.type = t;
+  function chooseType(type: string) {
+    brush.type = type;
     step = "edit";
   }
 
-  /** The first item of the brush: the library icon when none is chosen. */
-  function firstItem(): number {
-    const ids = [
-      ...chances(b.items),
-      ...Object.values(b.walls ?? {}).flatMap((w) => chances(w?.items)),
-      ...Object.values(b.parts ?? {}).flatMap((l) => chances(l)),
-      ...(b.alternatives ?? []).flatMap((a) => (a?.singles ?? []).map((x) => x?.item)),
-    ];
-    return ids.find((x) => x?.id)?.id ?? 0;
+  /** What still stops saving, told in the footer. */
+  const missing = $derived(missingForSave(brush, fromSelection));
+
+  function save() {
+    if (fromSelection) void saveDoodadFromSelection();
+    else void saveBrush();
   }
 
-  /** What still stops saving, told in the footer. */
-  const missing = $derived.by(() => {
-    if (!b.name?.trim()) return "Give the brush a name.";
-    if (fromSelection) return "";
-    const has = (l: Chance[] | null | undefined) => chances(l).some((c) => c.id);
-    switch (b.type) {
-      case "ground":
-        return has(b.items) ? "" : "Add at least one ground item.";
-      case "wall":
-      case "decoration":
-        return ["horizontal", "vertical"].every((a) => has(b.walls?.[a]?.items)) ? "" : "Give the horizontal and vertical pieces.";
-      case "doodad":
-        return (b.alternatives ?? []).some((a) => (a?.singles ?? []).some((x) => x?.item?.id) || (a?.composites ?? []).length) ? "" : "Add at least one item.";
-      case "carpet":
-        return has(b.parts?.c) ? "" : "Pick the center piece.";
-      case "table":
-        return has(b.parts?.alone) ? "" : "Pick the piece of a single table.";
+  async function saveDoodadFromSelection() {
+    const name = brush.name.trim();
+    if (!name || map.activeId === null) return;
+    saving = true;
+    try {
+      await MapService.DoodadFromSelection(map.activeId, name, $state.snapshot(collections));
+      await reloadPalette();
+      await loadMapData(true);
+      selectBrush({ kind: "doodad", name, label: name });
+      toast(`Doodad "${brush.name}" created. Click the map to place it.`, "success");
+      map.dialog = null;
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      saving = false;
     }
-    return "";
-  });
+  }
 
-  async function save() {
-    if (fromSelection) {
-      if (!b.name.trim() || map.activeId === null) return;
-      saving = true;
-      try {
-        await MapService.DoodadFromSelection(map.activeId, b.name.trim(), $state.snapshot(collections));
-        await reloadPalette();
-        await loadMapData(true);
-        selectBrush({ kind: "doodad", name: b.name.trim(), label: b.name.trim() });
-        toast(`Doodad "${b.name}" created. Click the map to place it.`, "success");
-        map.dialog = null;
-      } catch (e) {
-        toast(errorMessage(e), "error");
-      } finally {
-        saving = false;
-      }
-      return;
-    }
+  async function saveBrush() {
     saving = true;
     try {
       if (editBorder) {
-        const id = await saveBorder(editBorder);
+        await saveBorder(editBorder);
         editBorder = null;
-        void id;
       }
-      const snap = $state.snapshot(b) as Brush;
-      if (!snap.look) snap.look = firstItem();
-      if (snap.walls) {
-        for (const [k, v] of Object.entries(snap.walls)) if (!v || (!(v.items ?? []).some((c) => c?.id) && !(v.doors ?? []).some((d) => d?.id))) delete snap.walls[k];
-      }
-      if (snap.type !== "wall" && snap.type !== "decoration") snap.walls = {};
-      if (snap.type !== "doodad") {
-        snap.doodad = null;
-        snap.alternatives = [];
-      }
-      await MapService.SaveBrush(isNew ? "" : target.name, snap, $state.snapshot(collections));
+      const saved = normalizeBrushForSave($state.snapshot(brush) as Brush);
+      await MapService.SaveBrush(isNew ? "" : target.name, saved, $state.snapshot(collections));
       await reloadPalette();
       await loadMapData(true);
-      toast(`Saved "${snap.name}".`, "success");
+      toast(`Saved "${saved.name}".`, "success");
       map.dialog = null;
-    } catch (e) {
-      toast(errorMessage(e), "error");
+    } catch (err) {
+      toast(errorMessage(err), "error");
     } finally {
       saving = false;
     }
@@ -219,82 +175,70 @@
 
   // ----- ground -----
   function addRule() {
-    b.borders = [...(b.borders ?? []), { align: "outer", to: "all", border: 0 } as BorderRule];
+    brush.borders = [...(brush.borders ?? []), { align: "outer", to: "all", border: 0 } as BorderRule];
   }
 
-  async function createBorderFor(i: number) {
+  function createBorderFor(ruleIndex: number) {
     editBorder = { ...newBorder() };
-    pendingRule = i;
+    pendingRule = ruleIndex;
   }
   let pendingRule = $state<number | null>(null);
 
   async function finishBorder() {
     if (!editBorder) return;
     const id = await saveBorder(editBorder);
-    if (pendingRule !== null && b.borders?.[pendingRule]) b.borders[pendingRule].border = id;
-    if (pendingRule === -1) b.optional = { align: "outer", border: id } as BorderRule;
+    if (pendingRule !== null && brush.borders?.[pendingRule]) brush.borders[pendingRule].border = id;
+    if (pendingRule === -1) brush.optional = { align: "outer", border: id } as BorderRule;
     editBorder = null;
     pendingRule = null;
   }
 
   function borderById(id: number | undefined): Border | undefined {
-    return borders.find((x) => x.id === id);
+    return borders.find((border) => border.id === id);
   }
 
   // Walls and doodads edit nested objects: make sure they exist.
   $effect(() => {
     if (loading) return;
-    if (b.type === "wall" || b.type === "decoration") {
-      const walls = { ...(b.walls ?? {}) };
-      let added = false;
-      for (const a of [...MAIN_WALLS, ...MORE_WALLS]) {
-        if (!walls[a]) {
-          walls[a] = { items: [], doors: [] };
-          added = true;
-        }
-      }
-      if (added) b.walls = walls;
-    }
-    if (b.type === "doodad" && !b.doodad) b.doodad = { draggable: true } as NonNullable<Brush["doodad"]>;
-    if (b.type === "doodad" && !(b.alternatives ?? []).length) b.alternatives = [{ singles: [], composites: [] }];
+    ensureBrushShape(brush);
   });
 
   // ----- carpet and table -----
   function part(align: string): Chance[] {
-    return chances(b.parts?.[align]);
+    return chances(brush.parts?.[align]);
   }
   function setPart(align: string, id: number) {
-    b.parts ??= {};
-    b.parts[align] = id ? [{ id, chance: 10 }] : [];
+    brush.parts ??= {};
+    brush.parts[align] = id ? [{ id, chance: 10 }] : [];
   }
 </script>
 
-{#snippet chanceList(list: Chance[], set: (l: Chance[]) => void, addLabel = "Add item")}
-  {#each list as c, i}
+{#snippet chanceList(list: Chance[], set: (list: Chance[]) => void, addLabel = "Add item")}
+  {#each list as chance, i}
     <div class="row">
-      <ItemPicker value={c.id} width={250} onchange={(id) => set(list.map((x, k) => (k === i ? { ...x, id } : x)))} />
+      <ItemPicker value={chance.id} width={250} onchange={(id) => set(list.map((entry, k) => (k === i ? { ...entry, id } : entry)))} />
       <span class="t-label">chance</span>
-      <NumberField value={c.chance} min={0} max={100000} width={50} onchange={(v) => set(list.map((x, k) => (k === i ? { ...x, chance: v } : x)))} />
+      <NumberField value={chance.chance} min={0} max={100000} width={50} onchange={(value) => set(list.map((entry, k) => (k === i ? { ...entry, chance: value } : entry)))} />
       <button class="t-icon-btn danger" title="Remove" onclick={() => set(list.filter((_, k) => k !== i))}><Icon name="close" /></button>
     </div>
   {/each}
   <button class="t-btn small" class:primary={!list.length} onclick={() => set([...list, { id: 0, chance: 10 }])}>{addLabel}</button>
 {/snippet}
 
-{#snippet head(n: number, title: string, hint = "")}
-  <div class="sh"><span class="st">{n}. {title}</span>{#if hint}<span class="t-label hint">{hint}</span>{/if}</div>
+{#snippet head(step: number, title: string, hint = "")}
+  <div class="sh"><span class="st">{step}. {title}</span>{#if hint}<span class="t-label hint">{hint}</span>{/if}</div>
 {/snippet}
 
-{#snippet edgeGrid(get: (e: string) => number, sel: string, onsel: (e: string) => void, withCenter = false)}
+{#snippet edgeGrid(get: (edgeName: string) => number, selected: string, onselect: (edgeName: string) => void, withCenter = false)}
   <div class="edges">
-    {#each EDGE_GRID as [e, cx, cy]}
-      <button class="slot t-slot" class:on={sel === e} style="grid-column:{cx + 1};grid-row:{cy + 1}" title={EDGE_LABEL[e]} onclick={() => onsel(e)}>
-        <ItemIcon id={get(e)} />
-        <span class="el">{e}</span>
+    {#each EDGE_GRID as [edgeName, column, row]}
+      <button class="slot t-slot" class:on={selected === edgeName} style="grid-column:{column + 1};grid-row:{row + 1}" title={EDGE_LABEL[edgeName]} onclick={() => onselect(edgeName)}>
+        <ItemIcon id={get(edgeName)} />
+        <span class="el">{edgeName}</span>
       </button>
     {/each}
     {#if withCenter}
-      <button class="slot t-slot" class:on={sel === "c"} style="grid-column:2;grid-row:2" title="Center" onclick={() => onsel("c")}>
+      <button class="slot t-slot" class:on={selected === "c"} style="grid-column:2;grid-row:2" title="Center" onclick={() => onselect("c")}>
         <ItemIcon id={get("c")} /><span class="el">c</span>
       </button>
     {/if}
@@ -308,10 +252,10 @@
     <p class="t-label">Loading…</p>
   {:else if step === "type"}
     <div class="types">
-      {#each TYPES as t}
-        <button class="type" onclick={() => chooseType(t.value)}>
-          <span class="tname">{t.label}</span>
-          <span class="tdesc">{t.desc}</span>
+      {#each TYPES as type}
+        <button class="type" onclick={() => chooseType(type.value)}>
+          <span class="tname">{type.label}</span>
+          <span class="tdesc">{type.desc}</span>
         </button>
       {/each}
     </div>
@@ -320,7 +264,7 @@
       {@render head(1, "Name")}
       <div class="row">
         <!-- svelte-ignore a11y_autofocus -->
-        <input class="t-input grow" bind:value={b.name} placeholder={b.type === "ground" ? "e.g. grass" : b.type === "wall" ? "e.g. stone wall" : "e.g. pine trees"} autofocus />
+        <input class="t-input grow" bind:value={brush.name} placeholder={brush.type === "ground" ? "e.g. grass" : brush.type === "wall" ? "e.g. stone wall" : "e.g. pine trees"} autofocus />
         {#if isNew && !fromSelection}
           <span class="kind t-label">{typeLabel} · <button class="link" onclick={() => (step = "type")}>change</button></span>
         {/if}
@@ -329,78 +273,78 @@
       {#if fromSelection}
         <p class="t-label hint">The selected items become one doodad, placed with its top-left tile at the cursor.</p>
         {#if isNew}
-          <div class="row"><span class="t-label lbl">Collections</span><div class="grow"><TagPicker plain allowCustom value={collections} options={tilesets.map((t) => ({ tag: t }))} placeholder="none · type to add or create" onchange={(v) => (collections = v)} /></div></div>
+          <div class="row"><span class="t-label lbl">Collections</span><div class="grow"><TagPicker plain allowCustom value={collections} options={tilesets.map((tileset) => ({ tag: tileset }))} placeholder="none · type to add or create" onchange={(chosen) => (collections = chosen)} /></div></div>
         {/if}
       {:else}
-        {#if b.type === "ground"}
+        {#if brush.type === "ground"}
           {@render head(2, "Ground items", "One is picked at random for each tile; chance weighs the pick.")}
-          {@render chanceList(chances(b.items), (l) => (b.items = l))}
+          {@render chanceList(chances(brush.items), (list) => (brush.items = list))}
 
           {@render head(3, "Borders", "Optional: the edges drawn where this ground meets others.")}
-          {#each b.borders ?? [] as r, i}
-            {#if r}
-              {@const bd = borderById(r.border)}
+          {#each brush.borders ?? [] as rule, i}
+            {#if rule}
+              {@const ruleBorder = borderById(rule.border)}
               <div class="rule">
-                <Select value={r.align} width={100} options={[{ value: "outer", label: "Outside" }, { value: "inner", label: "Inside" }]} onchange={(v) => (r.align = v)} />
+                <Select value={rule.align} width={100} options={[{ value: "outer", label: "Outside" }, { value: "inner", label: "Inside" }]} onchange={(value) => (rule.align = value)} />
                 <span class="t-label">next to</span>
-                <Select value={r.to || "all"} width={130} maxItems={14} options={[{ value: "all", label: "Everything" }, { value: "none", label: "Empty tiles" }, ...brushNames.map((n) => ({ value: n, label: n }))]} onchange={(v) => (r.to = v)} />
-                <Select value={r.border ?? 0} width={150} maxItems={14} options={borderOptions} onchange={(v) => (r.border = v)} />
-                <span class="mini">{#each ["n", "cnw", "dnw"] as e}<ItemIcon id={bd?.edges?.[e] ?? 0} size={20} />{/each}</span>
-                <button class="t-icon-btn" title="Edit this border" disabled={!bd} onclick={() => ((editBorder = bd ? JSON.parse(JSON.stringify(bd)) : null), (pendingRule = null))}><Icon name="pencil" /></button>
+                <Select value={rule.to || "all"} width={130} maxItems={14} options={[{ value: "all", label: "Everything" }, { value: "none", label: "Empty tiles" }, ...brushNames.map((name) => ({ value: name, label: name }))]} onchange={(value) => (rule.to = value)} />
+                <Select value={rule.border ?? 0} width={150} maxItems={14} options={borderOptions} onchange={(value) => (rule.border = value)} />
+                <span class="mini">{#each ["n", "cnw", "dnw"] as edgeName}<ItemIcon id={ruleBorder?.edges?.[edgeName] ?? 0} size={20} />{/each}</span>
+                <button class="t-icon-btn" title="Edit this border" disabled={!ruleBorder} onclick={() => ((editBorder = ruleBorder ? JSON.parse(JSON.stringify(ruleBorder)) : null), (pendingRule = null))}><Icon name="pencil" /></button>
                 <button class="t-icon-btn" title="New border for this rule" onclick={() => createBorderFor(i)}><Icon name="plus" /></button>
-                <button class="t-icon-btn danger" title="Remove rule" onclick={() => (b.borders = (b.borders ?? []).filter((_, k) => k !== i))}><Icon name="close" /></button>
+                <button class="t-icon-btn danger" title="Remove rule" onclick={() => (brush.borders = (brush.borders ?? []).filter((_, k) => k !== i))}><Icon name="close" /></button>
               </div>
             {/if}
           {/each}
           <div class="row">
             <button class="t-btn small" onclick={addRule}>Add border</button>
-            {#if (b.borders ?? []).length}<span class="t-label hint">Outside: drawn on the neighbor tiles. Inside: drawn on this ground.</span>{/if}
+            {#if (brush.borders ?? []).length}<span class="t-label hint">Outside: drawn on the neighbor tiles. Inside: drawn on this ground.</span>{/if}
           </div>
-        {:else if b.type === "wall" || b.type === "decoration"}
+        {:else if brush.type === "wall" || brush.type === "decoration"}
           {@render head(2, "Pieces", "Walls connect by themselves. Horizontal and vertical are needed; corner and pole make them look right.")}
-          {#each (moreWalls ? [...MAIN_WALLS, ...MORE_WALLS] : MAIN_WALLS).filter((a) => !!b.walls?.[a]) as align}
-            {@const wp = b.walls![align]!}
-            <details class="wall" open={MAIN_WALLS.includes(align) && !wp.items?.length}>
+          {#each (moreWalls ? [...MAIN_WALLS, ...MORE_WALLS] : MAIN_WALLS).filter((wallAlign) => !!brush.walls?.[wallAlign]) as align}
+            {@const wall = brush.walls![align]!}
+            <details class="wall" open={MAIN_WALLS.includes(align) && !wall.items?.length}>
               <summary
-                ><span class="cap">{align}</span> <span class="t-label">{chances(wp.items).length} items · {(wp.doors ?? []).length} doors</span>
-                <span class="mini">{#each chances(wp.items).slice(0, 4) as c}<ItemIcon id={c.id} size={20} />{/each}</span></summary
+                ><span class="cap">{align}</span> <span class="t-label">{chances(wall.items).length} items · {(wall.doors ?? []).length} doors</span>
+                <span class="mini">{#each chances(wall.items).slice(0, 4) as chance}<ItemIcon id={chance.id} size={20} />{/each}</span></summary
               >
-              {@render chanceList(chances(wp.items), (l) => (wp.items = l))}
+              {@render chanceList(chances(wall.items), (list) => (wall.items = list))}
               <div class="t-label">Doors and windows in this piece</div>
-              {#each wp.doors ?? [] as d, i}
-                {#if d}
+              {#each wall.doors ?? [] as door, i}
+                {#if door}
                   <div class="row">
-                    <ItemPicker value={d.id} width={220} onchange={(id) => (d.id = id)} />
-                    <Select value={d.type} width={110} options={DOOR_TYPES.map((t) => ({ value: t, label: t }))} onchange={(v) => (d.type = v)} />
-                    <label class="row"><input class="t-check" type="checkbox" bind:checked={d.open} />open</label>
-                    <button class="t-icon-btn danger" title="Remove" onclick={() => (wp.doors = (wp.doors ?? []).filter((_, k) => k !== i))}><Icon name="close" /></button>
+                    <ItemPicker value={door.id} width={220} onchange={(id) => (door.id = id)} />
+                    <Select value={door.type} width={110} options={DOOR_TYPES.map((type) => ({ value: type, label: type }))} onchange={(value) => (door.type = value)} />
+                    <label class="row"><input class="t-check" type="checkbox" bind:checked={door.open} />open</label>
+                    <button class="t-icon-btn danger" title="Remove" onclick={() => (wall.doors = (wall.doors ?? []).filter((_, k) => k !== i))}><Icon name="close" /></button>
                   </div>
                 {/if}
               {/each}
-              <button class="t-btn small" onclick={() => (wp.doors = [...(wp.doors ?? []), { id: 0, type: "normal", open: false }])}>Add door</button>
+              <button class="t-btn small" onclick={() => (wall.doors = [...(wall.doors ?? []), { id: 0, type: "normal", open: false }])}>Add door</button>
             </details>
           {/each}
           <button class="link" onclick={() => (moreWalls = !moreWalls)}>{moreWalls ? "Fewer shapes" : "More shapes: ends, T pieces, diagonals…"}</button>
-        {:else if b.type === "carpet"}
+        {:else if brush.type === "carpet"}
           {@render head(2, "Pieces", "Click a position, then pick its item. The center fills the inside.")}
           <div class="row top">
-            {@render edgeGrid((e) => part(e)[0]?.id ?? 0, edge, (e) => (edge = e), true)}
+            {@render edgeGrid((edgeName) => part(edgeName)[0]?.id ?? 0, edge, (edgeName) => (edge = edgeName), true)}
             <div class="col">
               <span class="t-label">{EDGE_LABEL[edge]}</span>
               <ItemPicker value={part(edge)[0]?.id ?? 0} width={240} onchange={(id) => setPart(edge, id)} />
             </div>
           </div>
-        {:else if b.type === "table"}
+        {:else if brush.type === "table"}
           {@render head(2, "Pieces", "Alone is a single table; the others join their neighbors.")}
-          {#each ["alone", ...TABLE_PARTS.filter((t) => t !== "alone")] as tp}
-            <div class="row"><span class="t-label lbl cap">{tp}</span><ItemPicker value={part(tp)[0]?.id ?? 0} width={280} onchange={(id) => setPart(tp, id)} /></div>
+          {#each ["alone", ...TABLE_PARTS.filter((tablePart) => tablePart !== "alone")] as tablePart}
+            <div class="row"><span class="t-label lbl cap">{tablePart}</span><ItemPicker value={part(tablePart)[0]?.id ?? 0} width={280} onchange={(id) => setPart(tablePart, id)} /></div>
           {/each}
-        {:else if b.type === "doodad" && stamp}
-          {@const pv = previewOf(stamp.tiles, frame)}
-          {@const ct = picked.length === 1 ? tileAt(picked[0]) : null}
+        {:else if brush.type === "doodad" && stamp}
+          {@const stampPreview = previewOf(stamp.tiles, frame)}
+          {@const pickedTile = picked.length === 1 ? tileAt(picked[0]) : null}
           {@render head(2, "Group", `${(stamp.tiles ?? []).length} tiles, placed whole with the top-left tile at the cursor.`)}
           <div class="row top">
-            {#if pv}<div class="stamp"><BrushPreview preview={pv} max={24} selected={picked} onselect={selectTiles} /></div>{/if}
+            {#if stampPreview}<div class="stamp"><BrushPreview preview={stampPreview} max={24} selected={picked} onselect={selectTiles} /></div>{/if}
             <div class="col tilebox">
               {#if !picked.length}
                 <span class="t-label hint">Click a tile to see its items, or drag a box over several. Ctrl adds to the choice; Delete clears the chosen tiles.</span>
@@ -410,15 +354,15 @@
                 <span class="t-label hint">Or press Delete. Cleared tiles keep what the map has there.</span>
               {:else}
                 <span class="t-label">Tile {picked[0].x + 1}, {picked[0].y + 1}</span>
-                {#if ct && (ct.items ?? []).some((i) => !!i)}
+                {#if pickedTile && (pickedTile.items ?? []).some((item) => !!item)}
                   <div class="t-panel stack">
-                    {#each [...(ct.items ?? [])].reverse() as it, ri}
-                      {#if it}
-                        {@const k = (ct.items ?? []).length - 1 - ri}
+                    {#each [...(pickedTile.items ?? [])].reverse() as item, reverseIndex}
+                      {#if item}
+                        {@const itemIndex = (pickedTile.items ?? []).length - 1 - reverseIndex}
                         <div class="m-row">
-                          <span class="t-slot"><ItemIcon id={it.id} size={24} /></span>
-                          <span class="m-name" title="Item {it.id}">{map.items?.name(it.id) ?? `item ${it.id}`}</span>
-                          <button class="t-icon-btn danger" title="Remove from this tile" onclick={() => removeItem(ct, k)}><Icon name="close" /></button>
+                          <span class="t-slot"><ItemIcon id={item.id} size={24} /></span>
+                          <span class="m-name" title="Item {item.id}">{map.items?.name(item.id) ?? `item ${item.id}`}</span>
+                          <button class="t-icon-btn danger" title="Remove from this tile" onclick={() => removeItem(pickedTile, itemIndex)}><Icon name="close" /></button>
                         </div>
                       {/if}
                     {/each}
@@ -431,34 +375,34 @@
             </div>
           </div>
           <span class="t-label hint">Tiles with a ground replace the map tile; the others are added on top of it.</span>
-        {:else if b.type === "doodad"}
+        {:else if brush.type === "doodad"}
           {@render head(2, "Items", "One is picked at random each time you place the brush.")}
-          {#each b.alternatives ?? [] as alt, ai}
-            {#if alt}
-              {#if (b.alternatives ?? []).length > 1}<div class="t-label">Variation {ai + 1}</div>{/if}
-              {#each alt.singles ?? [] as s, si}
-                {#if s}
+          {#each brush.alternatives ?? [] as alternative, alternativeIndex}
+            {#if alternative}
+              {#if (brush.alternatives ?? []).length > 1}<div class="t-label">Variation {alternativeIndex + 1}</div>{/if}
+              {#each alternative.singles ?? [] as single, singleIndex}
+                {#if single}
                   <div class="row">
-                    <ItemPicker value={s.item.id} width={250} onchange={(id) => (s.item.id = id)} />
-                    <span class="t-label">chance</span><NumberField value={s.chance} min={0} max={100000} width={50} onchange={(v) => (s.chance = v)} />
-                    <button class="t-icon-btn danger" title="Remove" onclick={() => (alt.singles = (alt.singles ?? []).filter((_, k) => k !== si))}><Icon name="close" /></button>
+                    <ItemPicker value={single.item.id} width={250} onchange={(id) => (single.item.id = id)} />
+                    <span class="t-label">chance</span><NumberField value={single.chance} min={0} max={100000} width={50} onchange={(value) => (single.chance = value)} />
+                    <button class="t-icon-btn danger" title="Remove" onclick={() => (alternative.singles = (alternative.singles ?? []).filter((_, k) => k !== singleIndex))}><Icon name="close" /></button>
                   </div>
                 {/if}
               {/each}
-              {#each alt.composites ?? [] as c, ci}
-                {#if c}
-                  {@const pv = previewOf(c.tiles)}
+              {#each alternative.composites ?? [] as composite, compositeIndex}
+                {#if composite}
+                  {@const compositePreview = previewOf(composite.tiles)}
                   <div class="row comp">
-                    {#if pv}<span class="cpv"><BrushPreview preview={pv} max={6} /></span>{/if}
-                    <span class="t-label">group of {(c.tiles ?? []).length} tiles · chance</span>
-                    <NumberField value={c.chance} min={0} max={100000} width={50} onchange={(v) => (c.chance = v)} />
-                    <button class="t-icon-btn danger" title="Remove group" onclick={() => (alt.composites = (alt.composites ?? []).filter((_, k) => k !== ci))}><Icon name="close" /></button>
+                    {#if compositePreview}<span class="cpv"><BrushPreview preview={compositePreview} max={6} /></span>{/if}
+                    <span class="t-label">group of {(composite.tiles ?? []).length} tiles · chance</span>
+                    <NumberField value={composite.chance} min={0} max={100000} width={50} onchange={(value) => (composite.chance = value)} />
+                    <button class="t-icon-btn danger" title="Remove group" onclick={() => (alternative.composites = (alternative.composites ?? []).filter((_, k) => k !== compositeIndex))}><Icon name="close" /></button>
                   </div>
                 {/if}
               {/each}
               <div class="row">
-                <button class="t-btn small" class:primary={!(alt.singles ?? []).length && !(alt.composites ?? []).length} onclick={() => (alt.singles = [...(alt.singles ?? []), { chance: 10, item: { id: 0 } }])}>Add item</button>
-                {#if (b.alternatives ?? []).length > 1}<button class="t-btn small danger" onclick={() => (b.alternatives = (b.alternatives ?? []).filter((_, k) => k !== ai))}>Remove variation</button>{/if}
+                <button class="t-btn small" class:primary={!(alternative.singles ?? []).length && !(alternative.composites ?? []).length} onclick={() => (alternative.singles = [...(alternative.singles ?? []), { chance: 10, item: { id: 0 } }])}>Add item</button>
+                {#if (brush.alternatives ?? []).length > 1}<button class="t-btn small danger" onclick={() => (brush.alternatives = (brush.alternatives ?? []).filter((_, k) => k !== alternativeIndex))}>Remove variation</button>{/if}
               </div>
             {/if}
           {/each}
@@ -466,17 +410,17 @@
         {/if}
 
         {#if editBorder}
-          {@const eb = editBorder}
+          {@const edited = editBorder}
           <div class="borderedit t-panel">
             <div class="row">
-              <span class="h">{eb.id ? `Border ${eb.id}` : "New border"}</span><span class="t-label hint">Click a position, then pick its item.</span><span class="grow"></span>
-              <span class="t-label">Group</span><NumberField value={eb.group ?? 0} min={0} max={65535} width={46} onchange={(v) => (eb.group = v)} />
+              <span class="h">{edited.id ? `Border ${edited.id}` : "New border"}</span><span class="t-label hint">Click a position, then pick its item.</span><span class="grow"></span>
+              <span class="t-label">Group</span><NumberField value={edited.group ?? 0} min={0} max={65535} width={46} onchange={(value) => (edited.group = value)} />
             </div>
             <div class="row top">
-              {@render edgeGrid((e) => eb.edges?.[e] ?? 0, edge, (e) => (edge = e))}
+              {@render edgeGrid((edgeName) => edited.edges?.[edgeName] ?? 0, edge, (edgeName) => (edge = edgeName))}
               <div class="col">
                 <span class="t-label">{EDGE_LABEL[edge]}</span>
-                <ItemPicker value={eb.edges?.[edge] ?? 0} width={240} onchange={(id) => (eb.edges = { ...(eb.edges ?? {}), [edge]: id })} />
+                <ItemPicker value={edited.edges?.[edge] ?? 0} width={240} onchange={(id) => (edited.edges = { ...(edited.edges ?? {}), [edge]: id })} />
                 <span class="t-label hint">Empty diagonals are drawn from their two sides.</span>
               </div>
             </div>
@@ -492,49 +436,49 @@
           <summary>More options</summary>
           <div class="col advbody">
             {#if !stamp}
-              <div class="row"><span class="t-label lbl">Library icon</span><ItemPicker value={b.look ?? 0} width={260} placeholder="The first item" onchange={(id) => (b.look = id)} /></div>
+              <div class="row"><span class="t-label lbl">Library icon</span><ItemPicker value={brush.look ?? 0} width={260} placeholder="The first item" onchange={(id) => (brush.look = id)} /></div>
             {/if}
-            <div class="row"><span class="t-label lbl">Collections</span><div class="grow"><TagPicker plain allowCustom value={collections} options={tilesets.map((t) => ({ tag: t }))} placeholder="none · type to add or create" onchange={(v) => (collections = v)} /></div></div>
-            {#if b.type === "ground"}
+            <div class="row"><span class="t-label lbl">Collections</span><div class="grow"><TagPicker plain allowCustom value={collections} options={tilesets.map((tileset) => ({ tag: tileset }))} placeholder="none · type to add or create" onchange={(chosen) => (collections = chosen)} /></div></div>
+            {#if brush.type === "ground"}
               <div class="row">
-                <span class="t-label lbl">Z-order</span><NumberField value={b.zOrder ?? 0} min={-100000} max={100000} width={60} onchange={(v) => (b.zOrder = v)} />
+                <span class="t-label lbl">Z-order</span><NumberField value={brush.zOrder ?? 0} min={-100000} max={100000} width={60} onchange={(value) => (brush.zOrder = value)} />
                 <span class="t-label hint">Borders of a higher z-order lie over lower ones.</span>
               </div>
-              <label class="row"><input class="t-check" type="checkbox" checked={!b.noRandomize} onchange={(e) => (b.noRandomize = !e.currentTarget.checked)} />Mix the ground items randomly</label>
+              <label class="row"><input class="t-check" type="checkbox" checked={!brush.noRandomize} onchange={(event) => (brush.noRandomize = !event.currentTarget.checked)} />Mix the ground items randomly</label>
               <div class="row">
                 <span class="t-label lbl">Optional border</span>
-                <Select value={b.optional?.border ?? 0} width={150} options={borderOptions} onchange={(v) => (b.optional = v ? ({ align: "outer", border: v } as BorderRule) : null)} />
+                <Select value={brush.optional?.border ?? 0} width={150} options={borderOptions} onchange={(value) => (brush.optional = value ? ({ align: "outer", border: value } as BorderRule) : null)} />
                 <button class="t-icon-btn" title="New optional border" onclick={() => ((editBorder = newBorder()), (pendingRule = -1))}><Icon name="plus" /></button>
               </div>
               <div class="row">
                 <span class="t-label lbl">Friends</span>
                 <input
                   class="t-input grow"
-                  value={(b.friends ?? []).join(", ")}
+                  value={(brush.friends ?? []).join(", ")}
                   placeholder="brushes that get no border against this one"
-                  onchange={(e) =>
-                    (b.friends = e.currentTarget.value
+                  onchange={(event) =>
+                    (brush.friends = event.currentTarget.value
                       .split(",")
-                      .map((s) => s.trim())
+                      .map((name) => name.trim())
                       .filter(Boolean))}
                 />
               </div>
-            {:else if b.type === "doodad" && b.doodad}
-              {@const o = b.doodad}
+            {:else if brush.type === "doodad" && brush.doodad}
+              {@const options = brush.doodad}
               <div class="opts">
-                <label class="row"><input class="t-check" type="checkbox" bind:checked={o.draggable} />Draw by dragging</label>
-                <label class="row"><input class="t-check" type="checkbox" bind:checked={o.onBlocking} />Also on blocking tiles</label>
-                <label class="row"><input class="t-check" type="checkbox" bind:checked={o.onDuplicate} />Allow twice on a tile</label>
-                <label class="row"><input class="t-check" type="checkbox" bind:checked={o.oneSize} />One size (ignores brush size)</label>
-                <label class="row"><input class="t-check" type="checkbox" bind:checked={o.redoBorders} />Redo borders (ground doodads)</label>
+                <label class="row"><input class="t-check" type="checkbox" bind:checked={options.draggable} />Draw by dragging</label>
+                <label class="row"><input class="t-check" type="checkbox" bind:checked={options.onBlocking} />Also on blocking tiles</label>
+                <label class="row"><input class="t-check" type="checkbox" bind:checked={options.onDuplicate} />Allow twice on a tile</label>
+                <label class="row"><input class="t-check" type="checkbox" bind:checked={options.oneSize} />One size (ignores brush size)</label>
+                <label class="row"><input class="t-check" type="checkbox" bind:checked={options.redoBorders} />Redo borders (ground doodads)</label>
               </div>
               <div class="row">
                 <span class="t-label lbl">Density</span>
-                <NumberField value={o.thickness ?? 0} min={0} max={10000} width={50} onchange={(v) => (o.thickness = v)} /><span>/</span>
-                <NumberField value={o.thicknessCeiling ?? 100} min={1} max={10000} width={50} onchange={(v) => (o.thicknessCeiling = v)} />
+                <NumberField value={options.thickness ?? 0} min={0} max={10000} width={50} onchange={(value) => (options.thickness = value)} /><span>/</span>
+                <NumberField value={options.thicknessCeiling ?? 100} min={1} max={10000} width={50} onchange={(value) => (options.thicknessCeiling = value)} />
                 <span class="t-label hint">objects per tile of a big brush</span>
               </div>
-              <button class="t-btn small" onclick={() => (b.alternatives = [...(b.alternatives ?? []), { singles: [], composites: [] }])}>Add variation</button>
+              <button class="t-btn small" onclick={() => (brush.alternatives = [...(brush.alternatives ?? []), { singles: [], composites: [] }])}>Add variation</button>
             {/if}
           </div>
         </details>

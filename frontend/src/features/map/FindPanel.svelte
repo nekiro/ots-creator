@@ -75,8 +75,8 @@
       const title = ids.length ? (ids.length === 1 ? (map.items?.name(ids[0]) ?? "Found") : `${ids.length} items`) : name ? `“${name}”` : (KINDS.find((k) => k.value === kind)?.label ?? "Found");
       map.results = { title, more: r.more, items: (r.results ?? []).filter((x) => !!x).map((x) => ({ pos: x.pos, label: `${x.name} (${x.id})`, detail: x.detail })) };
       current = -1;
-    } catch (e) {
-      toast(errorMessage(e), "error");
+    } catch (err) {
+      toast(errorMessage(err), "error");
     } finally {
       busy = false;
     }
@@ -110,7 +110,7 @@
     <button class="t-icon-btn" title="Close (Esc)" onclick={close}><Icon name="close" /></button>
   {/snippet}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <div class="body" role="search" onkeydown={(e) => e.key === "Escape" && (e.stopPropagation(), close())}>
+  <div class="body" role="search" onkeydown={(event) => event.key === "Escape" && (event.stopPropagation(), close())}>
     <div class="m-form">
       <ItemPicker bind:value={pick} placeholder={ids.length ? "Add another item…" : "Item name or id…"} onchange={addId} />
       {#if ids.length}
@@ -120,12 +120,12 @@
           {/each}
         </div>
       {:else}
-        <input class="t-input" placeholder="…or any item whose name contains" bind:value={name} onkeydown={(e) => e.key === "Enter" && find()} />
+        <input class="t-input" placeholder="…or any item whose name contains" bind:value={name} onkeydown={(event) => event.key === "Enter" && find()} />
       {/if}
       <details>
         <summary class="t-label">More conditions{kind || actionId || uniqueId ? " (set)" : ""}</summary>
         <div class="m-form inner">
-          <div class="m-field"><span class="m-lbl">Kind</span><Select grow value={kind} options={KINDS} onchange={(v) => (kind = v)} /></div>
+          <div class="m-field"><span class="m-lbl">Kind</span><Select grow value={kind} options={KINDS} onchange={(value) => (kind = value)} /></div>
           <div class="m-field">
             <span class="m-lbl">Action id</span><input class="t-input n" placeholder="any" bind:value={actionId} />
             <span class="t-label">Unique</span><input class="t-input n" placeholder="any" bind:value={uniqueId} />

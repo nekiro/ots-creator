@@ -21,20 +21,20 @@
     if (!item.disabled?.()) item.action();
   }
 
-  function onmousedown(e: MouseEvent) {
-    if (contextMenu.items && !el?.contains(e.target as Node)) closeContextMenu();
+  function onmousedown(event: MouseEvent) {
+    if (contextMenu.items && !el?.contains(event.target as Node)) closeContextMenu();
   }
 </script>
 
 <svelte:window
   {onmousedown}
-  onkeydown={(e) => e.key === "Escape" && closeContextMenu()}
+  onkeydown={(event) => event.key === "Escape" && closeContextMenu()}
   onblur={closeContextMenu}
   onresize={closeContextMenu}
 />
 
 {#if contextMenu.items}
-  <div bind:this={el} class="t-menu ctx" role="menu" tabindex="-1" style="left:{pos.left}px;top:{pos.top}px" oncontextmenu={(e) => e.preventDefault()}>
+  <div bind:this={el} class="t-menu ctx" role="menu" tabindex="-1" style="left:{pos.left}px;top:{pos.top}px" oncontextmenu={(event) => event.preventDefault()}>
     <MenuEntries items={contextMenu.items} onpick={pick} />
   </div>
 {/if}

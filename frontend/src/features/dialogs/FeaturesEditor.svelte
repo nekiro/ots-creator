@@ -35,7 +35,7 @@
   {/each}
   <label class="row">
     <span class="t-label">Sprite size</span>
-    <Select value={features.spriteSize} disabled={sizeLocked} options={[32, 64, 128, 256].map((s) => ({ value: s, label: `${s}×${s}` }))} onchange={(v) => (features.spriteSize = v)} />
+    <Select value={features.spriteSize} disabled={sizeLocked} options={[32, 64, 128, 256].map((s) => ({ value: s, label: `${s}×${s}` }))} onchange={(value) => (features.spriteSize = value)} />
   </label>
 </div>
 

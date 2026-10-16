@@ -3,7 +3,10 @@
   // in both directions. Copies keep their ids (replacing, or extending the
   // target) or are appended as new objects. Objects of B can also be queued
   // and dropped into chosen slots of A (DropPanel, queue.svelte.ts).
+  import { hasImprovedAnimations } from "../../lib/thing";
   import { CATEGORIES, CATEGORY_LABELS, CATEGORY_NAMES, CompareService, Format, normalizeThing, res, ThingService, type Category, type DiffEntry, type DiffResult } from "../../lib/api";
+  import { mergeIds, mergeSummary, type MergeStep } from "../../lib/compare";
+  import { sliceBetween, toggleId } from "../../lib/selection";
   import { HoverAnim } from "../../lib/render/hoveranim.svelte";
   import { otherSpriteCache, spriteCache } from "../../lib/render/sprites";
   import { app, otherVersions, run, toast, versions } from "../../lib/state.svelte";
@@ -41,26 +44,26 @@
   // Ids that exist in one client only and show nothing there are mostly
   // padding at the end of a category.
   let hideEmpty = $state(true);
-  const visible = $derived((diff?.entries ?? []).filter((e) => !(hideEmpty && e.empty)));
+  const visible = $derived((diff?.entries ?? []).filter((entry) => !(hideEmpty && entry.empty)));
   let selected = $state<number[]>([]);
   let anchor = $state<number | null>(null);
 
-  const a = $derived(app.project?.info);
-  const b = $derived(app.other?.info);
-  const improvedA = $derived(a?.format === Format.FormatAssets || !!a?.features.improvedAnimations);
-  const improvedB = $derived(b?.format === Format.FormatAssets || !!b?.features.improvedAnimations);
+  const infoA = $derived(app.project?.info);
+  const infoB = $derived(app.other?.info);
+  const improvedA = $derived(hasImprovedAnimations(infoA));
+  const improvedB = $derived(hasImprovedAnimations(infoB));
 
   // Hovering a row animates both of its thumbnails, like the object list.
   const hoverAnim = (get: typeof ThingService.Get) => async (id: number) => {
-    const c = category;
-    const raw = await get(c, id);
-    return raw && c === category ? normalizeThing(raw) : null;
+    const requested = category;
+    const raw = await get(requested, id);
+    return raw && requested === category ? normalizeThing(raw) : null;
   };
   const hoverA = new HoverAnim(spriteCache, hoverAnim(ThingService.Get));
   const hoverB = new HoverAnim(otherSpriteCache, hoverAnim(CompareService.Thing));
-  function enter(e: DiffEntry) {
-    if (e.status !== "onlyB") hoverA.enter(e.id);
-    if (e.status !== "onlyA") hoverB.enter(e.id);
+  function enter(entry: DiffEntry) {
+    if (entry.status !== "onlyB") hoverA.enter(entry.id);
+    if (entry.status !== "onlyA") hoverB.enter(entry.id);
   }
   function leave() {
     hoverA.leave();
@@ -71,45 +74,45 @@
   // list does not shift under the cursor.
   let copied = $state<Record<number, "A" | "B">>({});
   const entries = $derived.by(() => {
-    const list: DiffEntry[] = visible.filter((e) => shown[e.status as Status]);
-    const listed = new Set((diff?.entries ?? []).map((e) => e.id));
+    const list: DiffEntry[] = visible.filter((entry) => shown[entry.status as Status]);
+    const listed = new Set((diff?.entries ?? []).map((entry) => entry.id));
     const extra = Object.entries(copied)
       .filter(([id]) => !listed.has(+id))
       .map(([id, to]) => ({ id: +id, status: "copied", changes: [`copied to ${to}`] }));
-    return extra.length ? [...list, ...extra].sort((x, y) => x.id - y.id) : list;
+    return extra.length ? [...list, ...extra].sort((first, second) => first.id - second.id) : list;
   });
   const counts = $derived.by(() => {
     const out: Record<Status, number> = { changed: 0, onlyA: 0, onlyB: 0 };
-    for (const e of visible) out[e.status as Status]++;
+    for (const entry of visible) out[entry.status as Status]++;
     return out;
   });
-  const picked = $derived(entries.filter((e) => selected.includes(e.id)));
-  const fromA = $derived(picked.filter((e) => e.status !== "onlyB" && e.status !== "copied"));
-  const fromB = $derived(picked.filter((e) => e.status !== "onlyA" && e.status !== "copied"));
-  const pickedCopies = $derived(picked.filter((e) => copied[e.id]).map((e) => e.id));
+  const picked = $derived(entries.filter((entry) => selected.includes(entry.id)));
+  const fromA = $derived(picked.filter((entry) => entry.status !== "onlyB" && entry.status !== "copied"));
+  const fromB = $derived(picked.filter((entry) => entry.status !== "onlyA" && entry.status !== "copied"));
+  const pickedCopies = $derived(picked.filter((entry) => copied[entry.id]).map((entry) => entry.id));
 
   // Compare again after every change of either client.
   let seq = 0;
   $effect(() => {
-    const c = category;
+    const compared = category;
     void app.project?.rev;
     void app.other?.rev;
-    const n = ++seq;
+    const request = ++seq;
     loading = true;
-    CompareService.Diff(c)
-      .then((d) => {
-        if (n !== seq) return;
-        diff = d;
+    CompareService.Diff(compared)
+      .then((result) => {
+        if (request !== seq) return;
+        diff = result;
         error = "";
-        const ids = new Set((d.entries ?? []).map((e) => e.id));
+        const ids = new Set((result.entries ?? []).map((entry) => entry.id));
         selected = selected.filter((id) => ids.has(id));
       })
-      .catch((e) => n === seq && ((diff = null), (error = String(e?.message ?? e))))
-      .finally(() => n === seq && (loading = false));
+      .catch((err) => request === seq && ((diff = null), (error = String(err?.message ?? err))))
+      .finally(() => request === seq && (loading = false));
   });
 
   // The last clicked object is previewed, from A or B.
-  const focused = $derived(entries.find((e) => e.id === anchor && selected.includes(e.id)) ?? null);
+  const focused = $derived(entries.find((entry) => entry.id === anchor && selected.includes(entry.id)) ?? null);
   let side = $state<"A" | "B">("B");
   const hasA = $derived(!!focused && focused.status !== "onlyB");
   const hasB = $derived(!!focused && focused.status !== "onlyA");
@@ -118,61 +121,67 @@
   let group = $state(0);
   let previewSeq = 0;
   $effect(() => {
-    const e = focused;
-    const s = shownSide;
-    const c = category;
+    const entry = focused;
+    const fromSide = shownSide;
+    const previewed = category;
     void app.project?.rev;
     void app.other?.rev;
-    const n = ++previewSeq;
-    if (!e || e.status === "copied" || (s === "A" ? !hasA : !hasB)) {
+    const request = ++previewSeq;
+    if (!entry || entry.status === "copied" || (fromSide === "A" ? !hasA : !hasB)) {
       source = null;
       return;
     }
-    const cache = s === "A" ? spriteCache : otherSpriteCache;
+    const cache = fromSide === "A" ? spriteCache : otherSpriteCache;
     void (async () => {
       try {
-        const raw = await (s === "A" ? ThingService.Get : CompareService.Thing)(c, e.id);
-        if (!raw || n !== previewSeq) return;
+        const raw = await (fromSide === "A" ? ThingService.Get : CompareService.Thing)(previewed, entry.id);
+        if (!raw || request !== previewSeq) return;
         const thing = normalizeThing(raw);
-        await cache.load(thing.frameGroups.flatMap((g) => g.sprites));
-        if (n !== previewSeq) return;
-        source = { key: `${s}:${c}:${e.id}`, thing, get: (id) => cache.get(id)?.pixels, size: cache.size, improved: s === "A" ? improvedA : improvedB };
+        await cache.load(thing.frameGroups.flatMap((frameGroup) => frameGroup.sprites));
+        if (request !== previewSeq) return;
+        source = {
+          key: `${fromSide}:${previewed}:${entry.id}`,
+          thing,
+          get: (id) => cache.get(id)?.pixels,
+          size: cache.size,
+          improved: fromSide === "A" ? improvedA : improvedB,
+        };
       } catch {
-        if (n === previewSeq) source = null;
+        if (request === previewSeq) source = null;
       }
     })();
   });
 
-  function setCategory(c: Category) {
-    category = c;
+  function setCategory(chosen: Category) {
+    category = chosen;
     copied = {};
     selected = [];
     anchor = null;
   }
 
-  function click(e: MouseEvent, id: number) {
-    if (e.shiftKey && anchor !== null) {
-      const from = entries.findIndex((x) => x.id === anchor);
-      const to = entries.findIndex((x) => x.id === id);
-      const range = entries.slice(Math.min(from, to), Math.max(from, to) + 1).map((x) => x.id);
-      selected = e.ctrlKey ? [...new Set([...selected, ...range])] : range;
+  function click(event: MouseEvent, id: number) {
+    if (event.shiftKey && anchor !== null) {
+      const from = entries.findIndex((entry) => entry.id === anchor);
+      const to = entries.findIndex((entry) => entry.id === id);
+      const range = sliceBetween(entries, from, to).map((entry) => entry.id);
+      selected = event.ctrlKey ? [...new Set([...selected, ...range])] : range;
       return;
     }
     anchor = id;
-    if (e.ctrlKey || e.metaKey) selected = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id];
+    if (event.ctrlKey || event.metaKey) selected = toggleId(selected, id);
     else selected = [id];
   }
 
   // Right click selects the row (unless it is selected) and offers the
   // actions for the selection.
-  function oncontextmenu(ev: MouseEvent, id: number) {
+  function oncontextmenu(event: MouseEvent, id: number) {
     if (!selected.includes(id)) {
       selected = [id];
       anchor = id;
     }
     const busy = () => !!app.busy;
-    const unqueued = fromB.filter((e) => !queuedIds.has(e.id)).map((e) => e.id);
-    const inQueue = picked.filter((e) => queuedIds.has(e.id)).map((e) => e.id);
+    const unqueued = fromB.filter((entry) => !queuedIds.has(entry.id)).map((entry) => entry.id);
+    const inQueue = picked.filter((entry) => queuedIds.has(entry.id)).map((entry) => entry.id);
     const items: MenuEntry[] = [
       { label: "B → A (same id)", action: () => transfer(false, false, fromB), disabled: () => !fromB.length || busy() },
       { label: "Append to A", action: () => transfer(false, true, fromB), disabled: () => !fromB.length || busy() },
@@ -184,55 +193,55 @@
       { label: "Append to B", action: () => transfer(true, true, fromA), disabled: () => !fromA.length || busy() },
       ...(pickedCopies.length ? (["-", { label: "Revert copy", action: () => revert(pickedCopies), disabled: busy }] as MenuEntry[]) : []),
       "-",
-      { label: "Copy id", action: () => navigator.clipboard?.writeText(picked.map((e) => e.id).join(", ")).then(() => toast("Copied id(s).")) },
+      { label: "Copy id", action: () => navigator.clipboard?.writeText(picked.map((entry) => entry.id).join(", ")).then(() => toast("Copied id(s).")) },
     ];
-    openContextMenu(ev, items);
+    openContextMenu(event, items);
   }
 
   // Selects an id in the list and scrolls to it (from the queue and slots).
   let scrollTo = $state<number | null>(null);
   function show(id: number) {
-    const i = entries.findIndex((e) => e.id === id);
-    if (i < 0) {
+    const position = entries.findIndex((entry) => entry.id === id);
+    if (position < 0) {
       toast(`#${id} is not listed: it is the same in both clients or hidden by the filters.`, "info", 3500, "compare-show");
       return;
     }
     selected = [id];
     anchor = id;
     scrollTo = null;
-    queueMicrotask(() => (scrollTo = i));
+    queueMicrotask(() => (scrollTo = position));
   }
 
-  function onkeydown(e: KeyboardEvent) {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
-      e.preventDefault();
-      selected = entries.map((x) => x.id);
+  function onkeydown(event: KeyboardEvent) {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
+      event.preventDefault();
+      selected = entries.map((entry) => entry.id);
     }
   }
 
-  function selectStatus(s: Status) {
-    selected = entries.filter((e) => e.status === s).map((e) => e.id);
+  function selectStatus(status: Status) {
+    selected = entries.filter((entry) => entry.status === status).map((entry) => entry.id);
   }
 
   /** Copies the picked objects; toOther copies A into B. */
   async function transfer(toOther: boolean, appendNew: boolean, list: DiffEntry[]) {
     if (!list.length) return;
-    const ids = list.map((e) => e.id);
+    const ids = list.map((entry) => entry.id);
     const target = toOther ? "B" : "A";
-    const r = await run(`Copying to ${target}`, () => CompareService.Transfer(toOther, category, ids, appendNew));
-    if (!r) return;
+    const result = await run(`Copying to ${target}`, () => CompareService.Transfer(toOther, category, ids, appendNew));
+    if (!result) return;
     if (!appendNew) for (const id of ids) copied[id] = target;
     const what = `${ids.length} ${CATEGORY_NAMES[category]}(s)`;
-    toast(`Copied ${what} to ${target}${appendNew ? ` as #${r.ids?.[0]}…` : ""}, ${r.sprites} new sprite(s).`, "success");
+    toast(`Copied ${what} to ${target}${appendNew ? ` as #${result.ids?.[0]}…` : ""}, ${result.sprites} new sprite(s).`, "success");
   }
 
   const queuedIds = $derived(new Set(compareQueue.queued(category)));
 
   // Double click queues the object of B (or takes it out of the queue).
-  function dblclick(e: DiffEntry) {
-    if (e.status === "onlyA" || e.status === "copied") return;
-    if (queuedIds.has(e.id)) compareQueue.dequeue(category, [e.id]);
-    else compareQueue.enqueue(category, [e.id]);
+  function dblclick(entry: DiffEntry) {
+    if (entry.status === "onlyA" || entry.status === "copied") return;
+    if (queuedIds.has(entry.id)) compareQueue.dequeue(category, [entry.id]);
+    else compareQueue.enqueue(category, [entry.id]);
   }
 
   /** Puts copied objects back as they were before they were copied. */
@@ -252,18 +261,18 @@
 
   /** Copies everything B has and A lacks or has differently, in every category. */
   async function mergeAll() {
-    const plan: { c: Category; ids: number[] }[] = [];
-    for (const c of CATEGORIES) {
-      const d = await run("Comparing", () => CompareService.Diff(c));
-      if (!d) return;
-      const ids = (d.entries ?? []).filter((e) => e.status !== "onlyA" && !(hideEmpty && e.empty)).map((e) => e.id);
-      if (ids.length) plan.push({ c, ids });
+    const plan: MergeStep[] = [];
+    for (const mergedCategory of CATEGORIES) {
+      const result = await run("Comparing", () => CompareService.Diff(mergedCategory));
+      if (!result) return;
+      const ids = mergeIds(result.entries, hideEmpty);
+      if (ids.length) plan.push({ category: mergedCategory, ids });
     }
     if (!plan.length) {
       toast("A already has everything B has.");
       return;
     }
-    const summary = plan.map((p) => `${p.ids.length} ${CATEGORY_LABELS[p.c].toLowerCase()}`).join(", ");
+    const summary = mergeSummary(plan);
     const ok = await ask({
       title: "Merge B into A",
       message: `Copy ${summary} from B into A? Changed objects are replaced, new ones keep their ids. Each category can be undone separately.`,
@@ -271,11 +280,11 @@
     });
     if (!ok) return;
     let sprites = 0;
-    for (const p of plan) {
-      const r = await run(`Merging ${CATEGORY_LABELS[p.c].toLowerCase()}`, () => CompareService.Transfer(false, p.c, p.ids, false));
-      if (!r) return;
-      if (p.c === category) for (const id of p.ids) copied[id] = "A";
-      sprites += r.sprites;
+    for (const step of plan) {
+      const result = await run(`Merging ${CATEGORY_LABELS[step.category].toLowerCase()}`, () => CompareService.Transfer(false, step.category, step.ids, false));
+      if (!result) return;
+      if (step.category === category) for (const id of step.ids) copied[id] = "A";
+      sprites += result.sprites;
     }
     toast(`Merged ${summary} into A, ${sprites} new sprite(s).`, "success");
   }
@@ -299,12 +308,12 @@
   }
 
   async function closeB() {
-    if (b?.changed && !(await ask({ title: "Close client B", message: "Client B has uncompiled changes. Close it anyway?", ok: "Close" }))) return;
+    if (infoB?.changed && !(await ask({ title: "Close client B", message: "Client B has uncompiled changes. Close it anyway?", ok: "Close" }))) return;
     app.dialog = null;
     await CompareService.Close();
   }
 
-  function clientName(info: typeof a): string {
+  function clientName(info: typeof infoA): string {
     if (!info) return "";
     if (!info.datPath) return "new client";
     const parts = info.datPath.split(/[\\/]/);
@@ -318,22 +327,22 @@
       <div class="client t-panel">
         <strong class="side">A</strong>
         <div class="who">
-          <span class="name" title={a?.datPath}>{clientName(a)}{a?.changed ? " *" : ""}</span>
-          <span class="t-label">{a?.version.name} · {a?.counts.sprites.toLocaleString()} sprites</span>
+          <span class="name" title={infoA?.datPath}>{clientName(infoA)}{infoA?.changed ? " *" : ""}</span>
+          <span class="t-label">{infoA?.version.name} · {infoA?.counts.sprites.toLocaleString()} sprites</span>
         </div>
         <span class="grow"></span>
-        <button class="t-icon-btn" title="Undo the last change in A" disabled={!a?.canUndo || !!app.busy} onclick={commands.undo}><Icon name="undo" /></button>
+        <button class="t-icon-btn" title="Undo the last change in A" disabled={!infoA?.canUndo || !!app.busy} onclick={commands.undo}><Icon name="undo" /></button>
       </div>
       <div class="client t-panel">
         <strong class="side">B</strong>
         <div class="who">
-          <span class="name" title={b?.datPath}>{clientName(b)}{b?.changed ? " *" : ""}</span>
-          <span class="t-label">{b?.version.name} · {b?.counts.sprites.toLocaleString()} sprites</span>
+          <span class="name" title={infoB?.datPath}>{clientName(infoB)}{infoB?.changed ? " *" : ""}</span>
+          <span class="t-label">{infoB?.version.name} · {infoB?.counts.sprites.toLocaleString()} sprites</span>
         </div>
         <span class="grow"></span>
         <button class="t-icon-btn" title="Open another client as B" onclick={change}><Icon name="open" /></button>
-        <button class="t-icon-btn" title="Undo the last change in B" disabled={!b?.canUndo || !!app.busy} onclick={undoB}><Icon name="undo" /></button>
-        <button class="t-icon-btn" title="Compile B to its files" disabled={!b?.changed || !b?.datPath || !!app.busy} onclick={compileB}><Icon name="save" /></button>
+        <button class="t-icon-btn" title="Undo the last change in B" disabled={!infoB?.canUndo || !!app.busy} onclick={undoB}><Icon name="undo" /></button>
+        <button class="t-icon-btn" title="Compile B to its files" disabled={!infoB?.changed || !infoB?.datPath || !!app.busy} onclick={compileB}><Icon name="save" /></button>
         <button class="t-icon-btn" title="Close B" onclick={closeB}><Icon name="close" /></button>
       </div>
     </div>
@@ -371,7 +380,7 @@
             <VirtualGrid count={entries.length} cellWidth={4000} cellHeight={38} gap={1} {scrollTo} {onkeydown}>
               {#snippet cell(i)}
                 {@const e = entries[i]}
-                <button class="entry" class:sel={selected.includes(e.id)} onclick={(ev) => click(ev, e.id)} oncontextmenu={(ev) => oncontextmenu(ev, e.id)} ondblclick={() => dblclick(e)} onmouseenter={() => enter(e)} onmouseleave={leave}>
+                <button class="entry" class:sel={selected.includes(e.id)} onclick={(event) => click(event, e.id)} oncontextmenu={(event) => oncontextmenu(event, e.id)} ondblclick={() => dblclick(e)} onmouseenter={() => enter(e)} onmouseleave={leave}>
                   <span class="id">{e.id}</span>
                   <span class="t-slot">
                     {#if hoverA.current?.id === e.id}
@@ -395,7 +404,7 @@
                   <span class="t-label changes" title={(e.changes ?? []).map((c) => CHANGE_LABELS[c] ?? c).join(", ")}>{(e.changes ?? []).map((c) => CHANGE_LABELS[c] ?? c).join(", ")}</span>
                   {#if copied[e.id]}
                     <!-- svelte-ignore a11y_click_events_have_key_events -->
-                    <span class="revert" role="button" tabindex="-1" title="Revert this copy" onclick={(ev) => (ev.stopPropagation(), revert([e.id]))}><Icon name="undo" /></span>
+                    <span class="revert" role="button" tabindex="-1" title="Revert this copy" onclick={(event) => (event.stopPropagation(), revert([e.id]))}><Icon name="undo" /></span>
                   {/if}
                 </button>
               {/snippet}
@@ -430,7 +439,7 @@
       <button class="t-btn" title="Add to the end of A as new objects" disabled={!fromB.length || !!app.busy} onclick={() => transfer(false, true, fromB)}
         >Append to A</button
       >
-      <button class="t-btn" title="Queue the selected objects of B, then click slots of A to drop them (double click a row queues it too)" disabled={!fromB.length} onclick={() => compareQueue.enqueue(category, fromB.map((e) => e.id))}
+      <button class="t-btn" title="Queue the selected objects of B, then click slots of A to drop them (double click a row queues it too)" disabled={!fromB.length} onclick={() => compareQueue.enqueue(category, fromB.map((event) => event.id))}
         >Queue</button
       >
       <span class="t-sep v"></span>

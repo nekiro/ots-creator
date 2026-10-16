@@ -46,6 +46,13 @@ export const ATLAS = {
   uploadsPerFrame: 1500,
 } as const;
 
+/** Floors run from 0 (highest) to MAX_FLOOR; GROUND_FLOOR is the ground level. */
+export const GROUND_FLOOR = 7;
+export const MAX_FLOOR = 15;
+
+/** Largest brush size (tiles from the center). */
+export const MAX_BRUSH_SIZE = 15;
+
 /** Chunks a side of the blocks drawn far out. */
 export const BLOCK_CHUNKS = 4;
 
@@ -97,3 +104,77 @@ export const LABEL_COLORS = {
   position: "#e8e8e8",
   tooltip: "#ffd75e",
 } as const;
+
+/** Brush kinds that paint the same item over an area (rectangle previews show it). */
+export const AREA_BRUSH_KINDS: ReadonlySet<string> = new Set(["raw", "ground", "wall", "carpet", "table", "eraser", "house", "flag", "zone", "optionalBorder"]);
+/** Brush kinds that paint along the mouse while the button is held. */
+export const SMEAR_BRUSH_KINDS: ReadonlySet<string> = new Set([...AREA_BRUSH_KINDS, "creature"]);
+/** Brush kinds that Shift+drag draws over a rectangle. */
+export const RECT_BRUSH_KINDS: ReadonlySet<string> = AREA_BRUSH_KINDS;
+
+type Rgb = [number, number, number];
+type Rgba = [number, number, number, number];
+
+/** Colors of the brush, paste and selection previews (rgba, 0 to 1). */
+export const PREVIEW_COLORS: {
+  selectionBox: { fill: Rgba; stroke: Rgba };
+  rect: { fill: Rgba; eraseFill: Rgba; stroke: Rgba };
+  pasteBounds: Rgba;
+  erasedTile: Rgba;
+  erasedCreature: Rgba;
+  spawn: { stroke: Rgba; eraseStroke: Rgba; fill: Rgba };
+  singleTile: { stroke: Rgba; fill: Rgba };
+  fill: { stroke: Rgba; fill: Rgba };
+  houseTile: Rgba;
+  markTile: Rgba;
+  brushBounds: Rgba;
+} = {
+  selectionBox: { fill: [0.4, 0.6, 1, 0.12], stroke: [0.6, 0.8, 1, 0.9] },
+  rect: { fill: [1, 1, 1, 0.12], eraseFill: [1, 0.2, 0.2, 0.25], stroke: [1, 1, 1, 0.7] },
+  pasteBounds: [1, 0.85, 0.3, 0.8],
+  erasedTile: [1, 0.2, 0.2, 0.3],
+  erasedCreature: [1, 0.2, 0.2, 0.35],
+  spawn: { stroke: [1, 0.6, 0.6, 0.9], eraseStroke: [1, 0.3, 0.3, 0.9], fill: [1, 0.5, 0.5, 0.08] },
+  singleTile: { stroke: [1, 1, 1, 0.9], fill: [1, 1, 1, 0.15] },
+  fill: { stroke: [1, 0.85, 0.3, 1], fill: [1, 0.85, 0.3, 0.25] },
+  houseTile: [0.4, 0.6, 1, 0.3],
+  markTile: [0.3, 1, 0.4, 0.25],
+  brushBounds: [1, 1, 1, 0.35],
+};
+
+/** Alpha of ghost tiles: pasted things and brush previews. */
+export const GHOST_ALPHA = { paste: 0.65, brush: 0.55 } as const;
+
+/** Largest rectangle (in tiles) whose items the rectangle brush previews. */
+export const MAX_RECT_PREVIEW_TILES = 4000;
+
+/** Marker colors (rgb): the color tells the kind, so labels carry a short name. */
+export const MARKER_COLORS: { waypoint: Rgb; houseExit: Rgb; temple: Rgb } = {
+  waypoint: [0.3, 1, 0.4],
+  houseExit: [0.4, 0.7, 1],
+  temple: [1, 0.85, 0.3],
+};
+
+/** The overlay canvas with names and texts over the map. */
+export const LABEL_FONT = {
+  /** Size of the client's name font in CSS pixels. */
+  nameSize: 14,
+  /** Size of the small pixel font in CSS pixels. */
+  smallSize: 9,
+  /** Most names drawn in a frame. */
+  maxNames: 1000,
+  /** Marker names longer than this are cut. */
+  maxMarkerChars: 18,
+} as const;
+
+/** Mouse travel in CSS pixels before a press counts as a drag. */
+export const DRAG_THRESHOLD = { pan: 3, selectionBox: 4 } as const;
+
+/** Delays before drawing again (ms). */
+export const REDRAW_DELAY = { pending: 60, animated: 90 } as const;
+
+/** Tiles the camera moves per Shift+wheel step. */
+export const WHEEL_PAN_TILES = 3;
+
+/** How often the FPS counter updates (ms). */
+export const FPS_POLL_MS = 250;

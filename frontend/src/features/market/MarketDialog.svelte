@@ -5,10 +5,13 @@
   // token, every entry) can be deleted. Share opens the share window with a
   // picker for an object or sprites.
   import { onMount } from "svelte";
-  import { MarketService, decodeBytes, errorMessage, normalizeThing, type MarketIndex, type ObjectFile, type Thing } from "../../lib/api";
+  import { MarketService, errorMessage, type MarketIndex } from "../../lib/api";
   import { commands } from "../../lib/commands";
   import { ask } from "../../lib/confirm.svelte";
-  import { filterEntries, LICENSES, sectionCounts, sectionOf, topTags, type MarketEntry, type MarketSort } from "../../lib/market";
+  import { formatDate, formatKb } from "../../lib/format";
+  import { filterEntries, licenseLabel, sectionCounts, sectionOf, topTags, type MarketEntry, type MarketSort } from "../../lib/market";
+  import { decodeObjectFile, type DecodedObject } from "../../lib/objectFile";
+  import { nextIndex } from "../../lib/ui/listNav";
   import { app, run, select, setCategory, toast } from "../../lib/state.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
@@ -48,8 +51,8 @@
   const filtered = $derived(filterEntries(entries, { section, tags, query, sort, spriteSize: sameSize ? size : 0 }));
   const counts = $derived(sectionCounts(entries));
   // Every tag used in the section, most used first, for the tag filter.
-  const tagOptions = $derived(topTags(section === "all" ? entries : entries.filter((e) => sectionOf(e) === section), 1000));
-  const selected = $derived(entries.find((e) => e.id === selectedId) ?? null);
+  const tagOptions = $derived(topTags(section === "all" ? entries : entries.filter((entry) => sectionOf(entry) === section), 1000));
+  const selected = $derived(entries.find((entry) => entry.id === selectedId) ?? null);
   const url = (path: string) => (index ? index.base + path : "");
   const canDelete = $derived(!!selected && !!index && (index.admin || (index.mine ?? []).includes(selected.id)));
 
@@ -65,63 +68,56 @@
     error = "";
     try {
       index = await MarketService.Index(refresh);
-    } catch (e) {
-      error = errorMessage(e);
+    } catch (err) {
+      error = errorMessage(err);
     } finally {
       loading = false;
     }
   }
 
-  function toggleTag(t: string) {
-    tags = tags.includes(t) ? tags.filter((x) => x !== t) : [...tags, t];
+  function toggleTag(tag: string) {
+    tags = tags.includes(tag) ? tags.filter((other) => other !== tag) : [...tags, tag];
   }
 
   // Live preview of the selected object (downloaded once per entry).
-  type Loaded = { file: ObjectFile; thing: Thing; pixels: Uint8ClampedArray[] };
-  const cache = new Map<string, Promise<Loaded>>();
-  let loaded = $state<Loaded | null>(null);
+  const cache = new Map<string, Promise<DecodedObject>>();
+  let loaded = $state<DecodedObject | null>(null);
   let previewError = $state("");
   let previewLoading = $state(false);
   let group = $state(0);
   let direction = $state(2);
   let ready = $state(0);
 
-  function read(id: string): Promise<Loaded> {
-    let p = cache.get(id);
-    if (!p) {
-      p = MarketService.Read(id).then((f) => {
-        if (!f?.thing) throw new Error("empty object");
-        return { file: f, thing: normalizeThing(f.thing), pixels: (f.sprites ?? []).map((b) => decodeBytes(b as unknown as string)) };
-      });
-      p.catch(() => cache.delete(id));
-      cache.set(id, p);
+  function read(id: string): Promise<DecodedObject> {
+    let reading = cache.get(id);
+    if (!reading) {
+      reading = MarketService.Read(id).then((file) => decodeObjectFile(file, "empty object"));
+      reading.catch(() => cache.delete(id));
+      cache.set(id, reading);
     }
-    return p;
+    return reading;
   }
 
   $effect(() => {
-    const e = selected;
+    const entry = selected;
     loaded = null;
     previewError = "";
     group = 0;
     direction = 2;
-    if (!e || e.kind !== "object") return;
+    if (!entry || entry.kind !== "object") return;
     previewLoading = true;
-    read(e.id)
-      .then((r) => {
-        if (selectedId !== e.id) return;
-        loaded = r;
+    read(entry.id)
+      .then((decoded) => {
+        if (selectedId !== entry.id) return;
+        loaded = decoded;
         ready++;
       })
-      .catch((err) => selectedId === e.id && (previewError = errorMessage(err)))
-      .finally(() => selectedId === e.id && (previewLoading = false));
+      .catch((err) => selectedId === entry.id && (previewError = errorMessage(err)))
+      .finally(() => selectedId === entry.id && (previewLoading = false));
   });
 
   const isOutfit = $derived(selected?.category === "outfit" && (loaded?.thing.frameGroups[0]?.patternX ?? 0) >= 4);
   const get = (id: number) => (id > 0 ? loaded?.pixels[id - 1] : undefined);
-  const kb = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`);
-  const date = (s: string) => new Date(s).toLocaleDateString();
-  const licenseLabel = (v: string) => LICENSES.find((l) => l.value === v)?.label ?? v;
   const sizeMismatch = $derived(!!selected && !!size && !!selected.spriteSize && selected.spriteSize !== size);
 
   async function importEntry() {
@@ -156,12 +152,12 @@
     await load(false);
   }
 
-  function onkeydown(e: KeyboardEvent) {
-    const step: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1 };
-    if (!(e.key in step) || !filtered.length || (e.target as HTMLElement).closest("input")) return;
-    e.preventDefault();
-    const i = filtered.findIndex((x) => x.id === selectedId);
-    selectedId = filtered[Math.min(Math.max(i + step[e.key], 0), filtered.length - 1)].id;
+  function onkeydown(event: KeyboardEvent) {
+    const current = filtered.findIndex((entry) => entry.id === selectedId);
+    const next = nextIndex(event.key, current, filtered.length);
+    if (next === null || !filtered.length || (event.target as HTMLElement).closest("input")) return;
+    event.preventDefault();
+    selectedId = filtered[next].id;
   }
 </script>
 
@@ -182,7 +178,7 @@
         <input placeholder="Search names, tags, authors…" bind:value={query} />
         {#if query}<button class="clear" title="Clear" onclick={() => (query = "")}><Icon name="close" /></button>{/if}
       </label>
-      <Select value={sort} options={SORTS} width={84} onchange={(v) => (sort = v)} />
+      <Select value={sort} options={SORTS} width={84} onchange={(value) => (sort = value)} />
       {#if size}
         <button class="t-btn" class:on={sameSize} title="Hide entries with other sprite sizes" onclick={() => (sameSize = !sameSize)}>{size}px only</button>
       {/if}
@@ -250,7 +246,7 @@
           {/if}
           <div class="head">
             <strong class="name" title={selected.name}>{selected.name}</strong>
-            <span class="by">by <b>{selected.author}</b> · {date(selected.created)}</span>
+            <span class="by">by <b>{selected.author}</b> · {formatDate(selected.created)}</span>
           </div>
           {#if selected.description}<p class="desc" title={selected.description}>{selected.description}</p>{/if}
           {#if selected.tags?.length}
@@ -267,7 +263,7 @@
               <span class="t-label">Sprites</span><span>{selected.sprites} · {selected.spriteSize}px</span>
             {/if}
             <span class="t-label">License</span><span title={selected.license}>{licenseLabel(selected.license)}</span>
-            <span class="t-label">File</span><span>{kb(selected.bytes)}</span>
+            <span class="t-label">File</span><span>{formatKb(selected.bytes)}</span>
           </div>
           {#if sizeMismatch}<p class="err small">Uses {selected.spriteSize}px sprites; this client uses {size}px.</p>{/if}
           <button

@@ -11,31 +11,31 @@ type PieceMap struct {
 }
 
 // NewPieceMap builds the piece numbering of a catalog.
-func NewPieceMap(c *Catalog) *PieceMap {
-	m := &PieceMap{sheets: c.Sheets, first: make([]uint32, len(c.Sheets))}
+func NewPieceMap(catalog *Catalog) *PieceMap {
+	pieceMap := &PieceMap{sheets: catalog.Sheets, first: make([]uint32, len(catalog.Sheets))}
 	next := uint32(1)
-	for i, s := range c.Sheets {
-		m.first[i] = next
-		next += uint32(s.Count() * tiles(s.SpriteType))
+	for i, sheet := range catalog.Sheets {
+		pieceMap.first[i] = next
+		next += uint32(sheet.Count() * tiles(sheet.SpriteType))
 	}
-	m.count = next - 1
-	return m
+	pieceMap.count = next - 1
+	return pieceMap
 }
 
 func tiles(spriteType int) int {
-	w, h, _ := SpriteDims(spriteType)
-	return (w / TileSize) * (h / TileSize)
+	width, height, _ := SpriteDims(spriteType)
+	return (width / TileSize) * (height / TileSize)
 }
 
 // Count returns the number of pieces.
 func (m *PieceMap) Count() uint32 { return m.count }
 
 func (m *PieceMap) sheetOf(id uint32) (int, bool) {
-	i, found := slices.BinarySearchFunc(m.sheets, id, func(s Sheet, id uint32) int {
+	i, found := slices.BinarySearchFunc(m.sheets, id, func(sheet Sheet, id uint32) int {
 		switch {
-		case s.Last < id:
+		case sheet.Last < id:
 			return -1
-		case s.First > id:
+		case sheet.First > id:
 			return 1
 		}
 		return 0
@@ -44,15 +44,15 @@ func (m *PieceMap) sheetOf(id uint32) (int, bool) {
 }
 
 // Pieces implements SpriteMap.
-func (m *PieceMap) Pieces(id uint32) (first uint32, w, h int, ok bool) {
+func (m *PieceMap) Pieces(id uint32) (first uint32, width, height int, ok bool) {
 	i, ok := m.sheetOf(id)
 	if !ok {
 		return 0, 0, 0, false
 	}
-	s := m.sheets[i]
-	pw, ph, _ := SpriteDims(s.SpriteType)
-	w, h = pw/TileSize, ph/TileSize
-	return m.first[i] + (id-s.First)*uint32(w*h), w, h, true
+	sheet := m.sheets[i]
+	pixelWidth, pixelHeight, _ := SpriteDims(sheet.SpriteType)
+	width, height = pixelWidth/TileSize, pixelHeight/TileSize
+	return m.first[i] + (id-sheet.First)*uint32(width*height), width, height, true
 }
 
 // Piece locates a piece: its sheet, the sprite index in that sheet and the
@@ -70,35 +70,40 @@ func (m *PieceMap) Locate(piece uint32) (Piece, bool) {
 	}
 	i, _ := slices.BinarySearch(m.first, piece+1)
 	i-- // last sheet starting at or before piece
-	s := m.sheets[i]
-	n := uint32(tiles(s.SpriteType))
-	off := piece - m.first[i]
-	idx, k := int(off/n), int(off%n)
-	sx, sy, sw, sh := SpriteRect(s.SpriteType, idx)
-	w, h := sw/TileSize, sh/TileSize
-	tw, th := k%w, k/w
+	sheet := m.sheets[i]
+	piecesPerSprite := uint32(tiles(sheet.SpriteType))
+	offset := piece - m.first[i]
+	spriteIndex, pieceIndex := int(offset/piecesPerSprite), int(offset%piecesPerSprite)
+	spriteX, spriteY, spriteWidth, spriteHeight := SpriteRect(sheet.SpriteType, spriteIndex)
+	tilesWide, tilesHigh := spriteWidth/TileSize, spriteHeight/TileSize
+	tileColumn, tileRow := pieceIndex%tilesWide, pieceIndex/tilesWide
 	// Tile (0,0) is the bottom-right one.
-	return Piece{Sheet: i, Sprite: s.First + uint32(idx), X: sx + (w-1-tw)*TileSize, Y: sy + (h-1-th)*TileSize}, true
+	return Piece{
+		Sheet:  i,
+		Sprite: sheet.First + uint32(spriteIndex),
+		X:      spriteX + (tilesWide-1-tileColumn)*TileSize,
+		Y:      spriteY + (tilesHigh-1-tileRow)*TileSize,
+	}, true
 }
 
 // Sprite returns the official sprite whose pieces are exactly pieces, in
-// tile order, for a w x h texture.
-func (m *PieceMap) Sprite(pieces []uint32, w, h int) (uint32, bool) {
+// tile order, for a width x height texture.
+func (m *PieceMap) Sprite(pieces []uint32, width, height int) (uint32, bool) {
 	if len(pieces) == 0 || pieces[0] == 0 {
 		return 0, false
 	}
-	p, ok := m.Locate(pieces[0])
+	located, ok := m.Locate(pieces[0])
 	if !ok {
 		return 0, false
 	}
-	first, pw, ph, _ := m.Pieces(p.Sprite)
-	if pw != w || ph != h || len(pieces) != w*h {
+	first, spriteWidth, spriteHeight, _ := m.Pieces(located.Sprite)
+	if spriteWidth != width || spriteHeight != height || len(pieces) != width*height {
 		return 0, false
 	}
-	for k, id := range pieces {
-		if id != first+uint32(k) {
+	for i, id := range pieces {
+		if id != first+uint32(i) {
 			return 0, false
 		}
 	}
-	return p.Sprite, true
+	return located.Sprite, true
 }

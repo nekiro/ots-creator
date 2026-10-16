@@ -1,0 +1,103 @@
+package app
+
+import (
+	"errors"
+	"math"
+
+	"github.com/nekiro/ots-creator/internal/mapedit"
+	"github.com/nekiro/ots-creator/internal/otmap"
+)
+
+var errNothingSelected = errors.New("nothing is selected")
+
+// selectionEdit is edit for selection changes: Count is the size of the
+// selection afterwards.
+func (ms *MapService) selectionEdit(id int, fn func(editor *mapedit.Editor)) (MapChange, error) {
+	return ms.edit(id, func(editor *mapedit.Editor, _ *mapData) (int, error) {
+		fn(editor)
+		return editor.SelectionCount(), nil
+	})
+}
+
+// SelectRect selects a rectangle.
+func (ms *MapService) SelectRect(id int, rect mapedit.Rect, floors string, add, remove, compensate bool) (MapChange, error) {
+	return ms.selectionEdit(id, func(editor *mapedit.Editor) { editor.SelectRect(rect, floors, add, remove, compensate) })
+}
+
+// SelectAt selects the top thing of a tile.
+func (ms *MapService) SelectAt(id int, p otmap.Position, toggle, creatures, spawns bool) (MapChange, error) {
+	return ms.selectionEdit(id, func(editor *mapedit.Editor) { editor.SelectAt(p, toggle, creatures, spawns) })
+}
+
+// SelectItem selects one item of a tile.
+func (ms *MapService) SelectItem(id int, p otmap.Position, index int, add bool) (MapChange, error) {
+	return ms.selectionEdit(id, func(editor *mapedit.Editor) { editor.SelectItem(p, index, add) })
+}
+
+// SelectTiles selects whole tiles.
+func (ms *MapService) SelectTiles(id int, positions []otmap.Position, add bool) (MapChange, error) {
+	return ms.selectionEdit(id, func(editor *mapedit.Editor) { editor.SelectTiles(positions, add) })
+}
+
+// ClearSelection deselects everything.
+func (ms *MapService) ClearSelection(id int) (MapChange, error) {
+	return ms.editMap(id, func(editor *mapedit.Editor) error { editor.ClearSelection(); return nil })
+}
+
+// SelectAll selects every tile of a floor.
+func (ms *MapService) SelectAll(id int, floor int) (MapChange, error) {
+	z := uint8(floor)
+	whole := mapedit.Rect{From: otmap.Position{Z: z}, To: otmap.Position{X: math.MaxUint16, Y: math.MaxUint16, Z: z}}
+	return ms.selectionEdit(id, func(editor *mapedit.Editor) {
+		editor.SelectRect(whole, mapedit.FloorsCurrent, false, false, false)
+	})
+}
+
+// Copy copies the selection to the clipboard (shared by all maps) and
+// returns the number of copied tiles.
+func (ms *MapService) Copy(id int) (tiles int, err error) {
+	err = ms.withMap(id, func(m *openMap, _ *mapData) error {
+		clip := m.editor.Copy()
+		if clip == nil {
+			return errNothingSelected
+		}
+		ms.clipboard = clip
+		tiles = len(clip.Tiles)
+		return nil
+	})
+	return tiles, err
+}
+
+// Cut copies the selection and deletes it.
+func (ms *MapService) Cut(id int) (MapChange, error) {
+	return ms.edit(id, func(editor *mapedit.Editor, _ *mapData) (int, error) {
+		clip := editor.Cut()
+		if clip == nil {
+			return 0, errNothingSelected
+		}
+		ms.clipboard = clip
+		return len(clip.Tiles), nil
+	})
+}
+
+// Clipboard returns the copied content for the paste preview.
+func (ms *MapService) Clipboard() *mapedit.Clip {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+	return ms.clipboard
+}
+
+// Paste puts the clipboard with its top-left corner at p.
+func (ms *MapService) Paste(id int, p otmap.Position) (MapChange, error) {
+	return ms.editMap(id, func(editor *mapedit.Editor) error { return editor.Paste(ms.clipboard, p) })
+}
+
+// DeleteSelection removes everything selected.
+func (ms *MapService) DeleteSelection(id int) (MapChange, error) {
+	return ms.edit(id, func(editor *mapedit.Editor, _ *mapData) (int, error) { return editor.DeleteSelection(""), nil })
+}
+
+// MoveSelection moves the selection.
+func (ms *MapService) MoveSelection(id int, dx, dy, dz int) (MapChange, error) {
+	return ms.editMap(id, func(editor *mapedit.Editor) error { return editor.MoveSelection(dx, dy, dz) })
+}

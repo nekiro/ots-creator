@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { app } from "../../lib/state.svelte";
+  import { readJson, saveJson } from "../../lib/storage";
   import { commands } from "../../lib/commands";
   import { MapService } from "../../lib/map/api";
   import { mapCommands } from "../../lib/map/commands";
@@ -47,12 +48,8 @@
   let sides = $state(loadSides());
 
   function loadSides(): { left: number; right: number } {
-    try {
-      const v = JSON.parse(localStorage.getItem(SIDES_KEY) ?? "{}");
-      return { left: Math.max(SIDE_MIN.left, Number(v.left) || 0), right: Math.max(SIDE_MIN.right, Number(v.right) || 0) };
-    } catch {
-      return { ...SIDE_MIN };
-    }
+    const stored = (readJson(SIDES_KEY) ?? {}) as { left?: unknown; right?: unknown };
+    return { left: Math.max(SIDE_MIN.left, Number(stored.left) || 0), right: Math.max(SIDE_MIN.right, Number(stored.right) || 0) };
   }
 
   function resizeSide(side: "left" | "right", dx: number) {
@@ -63,11 +60,7 @@
   }
 
   function saveSides() {
-    try {
-      localStorage.setItem(SIDES_KEY, JSON.stringify(sides));
-    } catch {
-      /* ignore */
-    }
+    saveJson(SIDES_KEY, sides);
   }
 
   // Painting houses, zones or areas belongs to the world; show it there.

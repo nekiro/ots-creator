@@ -9,36 +9,36 @@ import (
 
 func pattern(size int, seed uint64, transparent bool) []byte {
 	rng := rand.New(rand.NewPCG(seed, 1))
-	px := make([]byte, size*size*4)
+	pixels := make([]byte, size*size*4)
 	for i := 0; i < size*size; i++ {
 		if rng.IntN(3) == 0 {
 			continue // transparent run
 		}
-		p := px[i*4:]
-		p[0], p[1], p[2] = byte(rng.IntN(256)), byte(rng.IntN(256)), byte(rng.IntN(256))
+		pixel := pixels[i*4:]
+		pixel[0], pixel[1], pixel[2] = byte(rng.IntN(256)), byte(rng.IntN(256)), byte(rng.IntN(256))
 		if transparent {
-			p[3] = byte(1 + rng.IntN(255))
+			pixel[3] = byte(1 + rng.IntN(255))
 		} else {
-			p[3] = 0xFF
+			pixel[3] = 0xFF
 		}
 	}
-	return px
+	return pixels
 }
 
 func TestCompressRoundTrip(t *testing.T) {
 	for _, size := range []int{32, 64} {
-		for _, tr := range []bool{false, true} {
+		for _, transparent := range []bool{false, true} {
 			for seed := uint64(0); seed < 20; seed++ {
-				src := pattern(size, seed, tr)
-				c := Compress(src, size, tr)
-				got, err := Decompress(c, size, tr)
+				src := pattern(size, seed, transparent)
+				compressed := Compress(src, size, transparent)
+				got, err := Decompress(compressed, size, transparent)
 				if err != nil {
 					t.Fatal(err)
 				}
 				if !bytes.Equal(src, got) {
-					t.Fatalf("size=%d transparent=%v seed=%d mismatch", size, tr, seed)
+					t.Fatalf("size=%d transparent=%v seed=%d mismatch", size, transparent, seed)
 				}
-				if again := Compress(got, size, tr); !bytes.Equal(again, c) {
+				if again := Compress(got, size, transparent); !bytes.Equal(again, compressed) {
 					t.Fatal("compress is not stable")
 				}
 			}
@@ -47,11 +47,11 @@ func TestCompressRoundTrip(t *testing.T) {
 }
 
 func TestCompressKnownBytes(t *testing.T) {
-	px := make([]byte, 32*32*4)
+	pixels := make([]byte, 32*32*4)
 	// pixel 2 and 3 red, pixel 5 green; rest transparent.
-	copy(px[2*4:], []byte{255, 0, 0, 255, 255, 0, 0, 255})
-	copy(px[5*4:], []byte{0, 255, 0, 255})
-	got := Compress(px, 32, false)
+	copy(pixels[2*4:], []byte{255, 0, 0, 255, 255, 0, 0, 255})
+	copy(pixels[5*4:], []byte{0, 255, 0, 255})
+	got := Compress(pixels, 32, false)
 	want := []byte{
 		2, 0, 2, 0, 255, 0, 0, 255, 0, 0, // skip 2, 2 colored
 		1, 0, 1, 0, 0, 255, 0, // skip 1, 1 colored
@@ -59,7 +59,7 @@ func TestCompressKnownBytes(t *testing.T) {
 	if !bytes.Equal(got, want) {
 		t.Fatalf("got  %v\nwant %v", got, want)
 	}
-	gotT := Compress(px, 32, true)
+	gotT := Compress(pixels, 32, true)
 	if len(gotT) != 4+8+4+4 {
 		t.Fatalf("transparent len = %d", len(gotT))
 	}
@@ -67,24 +67,24 @@ func TestCompressKnownBytes(t *testing.T) {
 
 func TestEmptyAndFull(t *testing.T) {
 	empty := make([]byte, 32*32*4)
-	if c := Compress(empty, 32, true); len(c) != 0 {
-		t.Fatalf("empty sprite compressed to %d bytes", len(c))
+	if compressed := Compress(empty, 32, true); len(compressed) != 0 {
+		t.Fatalf("empty sprite compressed to %d bytes", len(compressed))
 	}
-	px, err := Decompress(nil, 32, false)
-	if err != nil || !bytes.Equal(px, empty) {
+	pixels, err := Decompress(nil, 32, false)
+	if err != nil || !bytes.Equal(pixels, empty) {
 		t.Fatal("decompress nil")
 	}
 	full := bytes.Repeat([]byte{1, 2, 3, 255}, 32*32)
-	c := Compress(full, 32, false)
-	if binary.LittleEndian.Uint16(c[0:]) != 0 || binary.LittleEndian.Uint16(c[2:]) != 1024 || len(c) != 4+1024*3 {
+	compressed := Compress(full, 32, false)
+	if binary.LittleEndian.Uint16(compressed[0:]) != 0 || binary.LittleEndian.Uint16(compressed[2:]) != 1024 || len(compressed) != 4+1024*3 {
 		t.Fatal("full sprite layout")
 	}
 }
 
 func TestOpaqueDropsAlpha(t *testing.T) {
-	px := make([]byte, 32*32*4)
-	copy(px, []byte{10, 20, 30, 128})
-	got, _ := Decompress(Compress(px, 32, false), 32, false)
+	pixels := make([]byte, 32*32*4)
+	copy(pixels, []byte{10, 20, 30, 128})
+	got, _ := Decompress(Compress(pixels, 32, false), 32, false)
 	if got[3] != 255 || got[0] != 10 {
 		t.Fatalf("got %v", got[:4])
 	}
@@ -106,11 +106,11 @@ func TestDecompressErrors(t *testing.T) {
 func TestTranscode(t *testing.T) {
 	src := pattern(32, 7, false)
 	opaque := Compress(src, 32, false)
-	tr, err := Transcode(opaque, 32, false, true)
+	transcoded, err := Transcode(opaque, 32, false, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	back, err := Transcode(tr, 32, true, false)
+	back, err := Transcode(transcoded, 32, true, false)
 	if err != nil || !bytes.Equal(back, opaque) {
 		t.Fatal("transcode round trip failed")
 	}
@@ -128,35 +128,35 @@ func TestFileRoundTrip(t *testing.T) {
 		if err := Encode(&buf, 0x57BBD603, src, opts); err != nil {
 			t.Fatal(err)
 		}
-		f, err := Open(buf.Bytes(), opts)
+		file, err := Open(buf.Bytes(), opts)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if f.Signature != 0x57BBD603 || f.Count != 3 {
-			t.Fatalf("header %x %d", f.Signature, f.Count)
+		if file.Signature != 0x57BBD603 || file.Count != 3 {
+			t.Fatalf("header %x %d", file.Signature, file.Count)
 		}
 		for id := uint32(1); id <= 3; id++ {
-			c, err := f.Compressed(id)
+			compressed, err := file.Compressed(id)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !bytes.Equal(c, src[id-1]) {
+			if !bytes.Equal(compressed, src[id-1]) {
 				t.Fatalf("sprite %d mismatch", id)
 			}
 		}
-		if _, err := f.Compressed(4); err == nil {
+		if _, err := file.Compressed(4); err == nil {
 			t.Fatal("out of range id must fail")
 		}
-		if _, err := f.Compressed(0); err == nil {
+		if _, err := file.Compressed(0); err == nil {
 			t.Fatal("id 0 must fail")
 		}
-		px, err := f.Pixels(1)
-		if err != nil || len(px) != size*size*4 {
+		pixels, err := file.Pixels(1)
+		if err != nil || len(pixels) != size*size*4 {
 			t.Fatal("Pixels")
 		}
 		// Empty sprites have address 0.
-		at := opts.headerSize() + 4
-		if binary.LittleEndian.Uint32(buf.Bytes()[at:]) != 0 {
+		entry := opts.headerSize() + 4
+		if binary.LittleEndian.Uint32(buf.Bytes()[entry:]) != 0 {
 			t.Fatal("empty sprite must have address 0")
 		}
 	}
@@ -180,11 +180,11 @@ func TestOpenErrors(t *testing.T) {
 	}
 	// Address points outside the file.
 	data = []byte{0, 0, 0, 0, 1, 0, 0xFF, 0, 0, 0}
-	f, err := Open(data, Options{})
+	file, err := Open(data, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.Compressed(1); err == nil {
+	if _, err := file.Compressed(1); err == nil {
 		t.Fatal("bad address")
 	}
 }

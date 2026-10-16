@@ -29,8 +29,8 @@
       {/each}
     </div>
     <div class="row">
-      <NumberField label="Minimum" value={min} min={0} max={1000000} width={60} onchange={(v) => ((min = v), (max = Math.max(max, v)))} />
-      <NumberField label="Maximum" value={max} min={min} max={1000000} width={60} onchange={(v) => (max = v)} />
+      <NumberField label="Minimum" value={min} min={0} max={1000000} width={60} onchange={(value) => ((min = value), (max = Math.max(max, value)))} />
+      <NumberField label="Maximum" value={max} min={min} max={1000000} width={60} onchange={(value) => (max = value)} />
       <span class="t-label">ms</span>
     </div>
     <div class="row">

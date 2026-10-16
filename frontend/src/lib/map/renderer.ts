@@ -1,6 +1,6 @@
 // WebGL2 map renderer. Tiles are drawn as instanced quads (one per sprite
 // piece or colored rectangle). The backend builds the quads of each 32x32
-// chunk (geo.ts, app/map_geo.go) with sprite ids; they go to a GPU buffer
+// chunk (geo.ts, app/map_http.go) with sprite ids; they go to a GPU buffer
 // as they come and are redrawn with a camera offset (chunkBuffers.ts). The
 // shader finds the atlas cell of a sprite in a cell index texture, so atlas
 // changes never rebuild chunks; only animated pieces are patched per frame.
@@ -10,7 +10,7 @@ import { Atlas } from "./atlas";
 import { ChunkBuffers } from "./chunkBuffers";
 import { chunkKey } from "./chunks";
 import { ALPHA, BLOCK_CHUNKS, COLORS, LIMITS, ZOOM } from "./constants";
-import { GEO, GEO_BLOCK, geoBits, type GeoChunk } from "./geo";
+import { GEO, GEO_BLOCK, encodeGeoSignature, geoBits, type GeoChunk } from "./geo";
 import { drawOverlays } from "./overlays";
 import { QuadBatch } from "./quadBatch";
 import type { FrameResult, Scene } from "./scene";
@@ -170,7 +170,7 @@ export class MapRenderer {
     const blockSize = farDetail ? BLOCK_CHUNKS : 1;
     let bits = geoBits(scene.opts);
     if (farDetail) bits = (bits & ~(GEO.animation | GEO.creatures | GEO.ghostItems)) | GEO.far;
-    const signature = `${bits}|${scene.opts.houses ? scene.house : 0}|${blockSize}`;
+    const signature = encodeGeoSignature({ bits, house: scene.opts.houses ? scene.house : 0, blockSize });
     return { signature, blockSize, notReady: 0, underneath: new Map() };
   }
 

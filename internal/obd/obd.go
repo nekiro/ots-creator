@@ -55,139 +55,139 @@ func Decode(file []byte) (*Data, error) {
 
 // DecodeRaw parses decompressed OBD data.
 func DecodeRaw(raw []byte) (*Data, error) {
-	r := binio.NewReader(raw)
-	v := r.U16()
-	if r.Err() != nil {
-		return nil, fmt.Errorf("obd: %w", r.Err())
+	reader := binio.NewReader(raw)
+	version := reader.U16()
+	if reader.Err() != nil {
+		return nil, fmt.Errorf("obd: %w", reader.Err())
 	}
-	var d *Data
+	var data *Data
 	var err error
 	switch {
-	case v == Version3 || v == Version2:
-		d, err = decodeV23(r, int(v))
-	case v >= 710:
-		r.Seek(0)
-		d, err = decodeV1(r)
+	case version == Version3 || version == Version2:
+		data, err = decodeV23(reader, int(version))
+	case version >= 710:
+		reader.Seek(0)
+		data, err = decodeV1(reader)
 	default:
-		return nil, fmt.Errorf("obd: unknown version %d", v)
+		return nil, fmt.Errorf("obd: unknown version %d", version)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("obd v%d: %w", max(int(v)/100, 1), err)
+		return nil, fmt.Errorf("obd v%d: %w", max(int(version)/100, 1), err)
 	}
-	return d, nil
+	return data, nil
 }
 
-func decodeV1(r *binio.Reader) (*Data, error) {
-	d := &Data{Version: Version1, ClientVersion: r.U16(), SpriteSize: client.DefaultSpriteSize}
-	cat, err := thing.ParseCategory(r.UTF())
+func decodeV1(reader *binio.Reader) (*Data, error) {
+	data := &Data{Version: Version1, ClientVersion: reader.U16(), SpriteSize: client.DefaultSpriteSize}
+	category, err := thing.ParseCategory(reader.UTF())
 	if err != nil {
 		return nil, err
 	}
-	t := &thing.Thing{Category: cat}
-	table := dat.Table(client.MetadataFormat(d.ClientVersion))
-	if err := table.ReadProperties(r, &t.Props); err != nil {
+	object := &thing.Thing{Category: category}
+	table := dat.Table(client.MetadataFormat(data.ClientVersion))
+	if err := table.ReadProperties(reader, &object.Props); err != nil {
 		return nil, err
 	}
-	g := &thing.FrameGroup{}
+	group := &thing.FrameGroup{}
 	// v1 always stores pattern Z and never stores durations.
-	if err := dat.ReadLayout(r, g, true, false, cat.DefaultDuration()); err != nil {
+	if err := dat.ReadLayout(reader, group, true, false, category.DefaultDuration()); err != nil {
 		return nil, err
 	}
-	sprites := make([]Sprite, len(g.Sprites))
+	sprites := make([]Sprite, len(group.Sprites))
 	for i := range sprites {
-		g.Sprites[i] = r.U32()
-		n := int(r.U32())
-		if r.Err() != nil {
-			return nil, r.Err()
+		group.Sprites[i] = reader.U32()
+		length := int(reader.U32())
+		if reader.Err() != nil {
+			return nil, reader.Err()
 		}
-		px, err := readARGB(r, n, d)
+		pixels, err := readARGB(reader, length, data)
 		if err != nil {
 			return nil, fmt.Errorf("sprite %d: %w", i, err)
 		}
-		sprites[i] = Sprite{ID: g.Sprites[i], Pixels: px}
+		sprites[i] = Sprite{ID: group.Sprites[i], Pixels: pixels}
 	}
-	t.FrameGroups = []*thing.FrameGroup{g}
-	d.Thing = t
-	d.Sprites = [][]Sprite{sprites}
-	return d, r.Err()
+	object.FrameGroups = []*thing.FrameGroup{group}
+	data.Thing = object
+	data.Sprites = [][]Sprite{sprites}
+	return data, reader.Err()
 }
 
-func decodeV23(r *binio.Reader, version int) (*Data, error) {
-	d := &Data{Version: version, ClientVersion: r.U16(), SpriteSize: client.DefaultSpriteSize}
-	cat := thing.Category(r.U8())
-	if !cat.Valid() {
-		return nil, fmt.Errorf("invalid category %d", cat)
+func decodeV23(reader *binio.Reader, version int) (*Data, error) {
+	data := &Data{Version: version, ClientVersion: reader.U16(), SpriteSize: client.DefaultSpriteSize}
+	category := thing.Category(reader.U8())
+	if !category.Valid() {
+		return nil, fmt.Errorf("invalid category %d", category)
 	}
-	_ = r.U32() // offset of texture patterns, redundant
-	t := &thing.Thing{Category: cat}
-	if err := dat.OBDTable.ReadProperties(r, &t.Props); err != nil {
+	_ = reader.U32() // offset of texture patterns, redundant
+	object := &thing.Thing{Category: category}
+	if err := dat.OBDTable.ReadProperties(reader, &object.Props); err != nil {
 		return nil, err
 	}
 	groupCount := 1
-	multi := version == Version3 && cat == thing.CategoryOutfit
-	if multi {
-		groupCount = int(r.U8())
+	hasGroupTypes := version == Version3 && category == thing.CategoryOutfit
+	if hasGroupTypes {
+		groupCount = int(reader.U8())
 	}
-	for gi := 0; gi < groupCount; gi++ {
-		g := &thing.FrameGroup{}
-		if multi {
-			g.Type = thing.FrameGroupType(r.U8())
+	for groupIndex := 0; groupIndex < groupCount; groupIndex++ {
+		group := &thing.FrameGroup{}
+		if hasGroupTypes {
+			group.Type = thing.FrameGroupType(reader.U8())
 		}
-		if err := dat.ReadLayout(r, g, true, true, cat.DefaultDuration()); err != nil {
+		if err := dat.ReadLayout(reader, group, true, true, category.DefaultDuration()); err != nil {
 			return nil, err
 		}
-		sprites := make([]Sprite, len(g.Sprites))
+		sprites := make([]Sprite, len(group.Sprites))
 		for i := range sprites {
-			g.Sprites[i] = r.U32()
-			n := d.SpriteSize * d.SpriteSize * 4
+			group.Sprites[i] = reader.U32()
+			length := data.SpriteSize * data.SpriteSize * 4
 			if version == Version3 {
-				n = int(r.U32())
+				length = int(reader.U32())
 			}
-			if r.Err() != nil {
-				return nil, r.Err()
+			if reader.Err() != nil {
+				return nil, reader.Err()
 			}
-			px, err := readARGB(r, n, d)
+			pixels, err := readARGB(reader, length, data)
 			if err != nil {
-				return nil, fmt.Errorf("group %d sprite %d: %w", gi, i, err)
+				return nil, fmt.Errorf("group %d sprite %d: %w", groupIndex, i, err)
 			}
-			sprites[i] = Sprite{ID: g.Sprites[i], Pixels: px}
+			sprites[i] = Sprite{ID: group.Sprites[i], Pixels: pixels}
 		}
-		t.FrameGroups = append(t.FrameGroups, g)
-		d.Sprites = append(d.Sprites, sprites)
+		object.FrameGroups = append(object.FrameGroups, group)
+		data.Sprites = append(data.Sprites, sprites)
 	}
-	d.Thing = t
-	return d, r.Err()
+	data.Thing = object
+	return data, reader.Err()
 }
 
 // readARGB reads n bytes of ARGB pixels and returns RGBA. The first sprite
 // with a non-default length fixes the sprite size of the file.
-func readARGB(r *binio.Reader, n int, d *Data) ([]byte, error) {
-	if n == 0 || n%4 != 0 || n > 1<<20 {
-		return nil, fmt.Errorf("invalid pixel data size %d", n)
+func readARGB(reader *binio.Reader, length int, data *Data) ([]byte, error) {
+	if length == 0 || length%4 != 0 || length > 1<<20 {
+		return nil, fmt.Errorf("invalid pixel data size %d", length)
 	}
-	size := int(math.Sqrt(float64(n / 4)))
-	if size*size*4 != n {
+	size := int(math.Sqrt(float64(length / 4)))
+	if size*size*4 != length {
 		// v1 allowed shorter buffers, pad them to the default size.
-		size = d.SpriteSize
-		if n > size*size*4 {
-			return nil, fmt.Errorf("invalid pixel data size %d", n)
+		size = data.SpriteSize
+		if length > size*size*4 {
+			return nil, fmt.Errorf("invalid pixel data size %d", length)
 		}
 	}
-	d.SpriteSize = size
-	src := r.Bytes(n)
-	if src == nil {
-		return nil, r.Err()
+	data.SpriteSize = size
+	argb := reader.Bytes(length)
+	if argb == nil {
+		return nil, reader.Err()
 	}
 	out := make([]byte, size*size*4)
-	for i := 0; i+3 < len(src); i += 4 {
-		out[i], out[i+1], out[i+2], out[i+3] = src[i+1], src[i+2], src[i+3], src[i]
+	for i := 0; i+3 < len(argb); i += 4 {
+		out[i], out[i+1], out[i+2], out[i+3] = argb[i+1], argb[i+2], argb[i+3], argb[i]
 	}
 	return out, nil
 }
 
 // Encode serializes and compresses data with d.Version.
-func Encode(d *Data) ([]byte, error) {
-	raw, err := EncodeRaw(d)
+func Encode(data *Data) ([]byte, error) {
+	raw, err := EncodeRaw(data)
 	if err != nil {
 		return nil, err
 	}
@@ -195,85 +195,85 @@ func Encode(d *Data) ([]byte, error) {
 }
 
 // EncodeRaw serializes data without compression.
-func EncodeRaw(d *Data) ([]byte, error) {
-	t := d.Thing
-	if err := t.Validate(); err != nil {
+func EncodeRaw(data *Data) ([]byte, error) {
+	object := data.Thing
+	if err := object.Validate(); err != nil {
 		return nil, err
 	}
-	if len(d.Sprites) < len(t.FrameGroups) {
-		return nil, fmt.Errorf("obd: pixels for %d groups, thing has %d", len(d.Sprites), len(t.FrameGroups))
+	if len(data.Sprites) < len(object.FrameGroups) {
+		return nil, fmt.Errorf("obd: pixels for %d groups, thing has %d", len(data.Sprites), len(object.FrameGroups))
 	}
-	size := d.SpriteSize
+	size := data.SpriteSize
 	if size == 0 {
 		size = client.DefaultSpriteSize
 	}
-	w := binio.NewWriter(64 << 10)
-	groups := t.FrameGroups
-	switch d.Version {
+	writer := binio.NewWriter(64 << 10)
+	groups := object.FrameGroups
+	switch data.Version {
 	case Version1:
-		w.U16(d.ClientVersion)
-		w.UTF(t.Category.String())
-		dat.Table(client.MetadataFormat(d.ClientVersion)).WriteProperties(w, &t.Props)
+		writer.U16(data.ClientVersion)
+		writer.UTF(object.Category.String())
+		dat.Table(client.MetadataFormat(data.ClientVersion)).WriteProperties(writer, &object.Props)
 		groups = groups[:1]
 	case Version2, Version3:
-		w.U16(uint16(d.Version))
-		w.U16(d.ClientVersion)
-		w.U8(uint8(t.Category))
-		pos := w.Len()
-		w.U32(0)
-		dat.OBDTable.WriteProperties(w, &t.Props)
-		w.PutU32At(pos, uint32(w.Len()))
-		if d.Version == Version2 {
+		writer.U16(uint16(data.Version))
+		writer.U16(data.ClientVersion)
+		writer.U8(uint8(object.Category))
+		offsetPos := writer.Len()
+		writer.U32(0)
+		dat.OBDTable.WriteProperties(writer, &object.Props)
+		writer.PutU32At(offsetPos, uint32(writer.Len()))
+		if data.Version == Version2 {
 			groups = groups[:1]
-		} else if t.Category == thing.CategoryOutfit {
-			w.U8(uint8(len(groups)))
+		} else if object.Category == thing.CategoryOutfit {
+			writer.U8(uint8(len(groups)))
 		}
 	default:
-		return nil, fmt.Errorf("obd: unknown version %d", d.Version)
+		return nil, fmt.Errorf("obd: unknown version %d", data.Version)
 	}
-	for gi, g := range groups {
-		if d.Version == Version3 && t.Category == thing.CategoryOutfit {
-			typ := uint8(gi)
+	for groupIndex, group := range groups {
+		if data.Version == Version3 && object.Category == thing.CategoryOutfit {
+			groupType := uint8(groupIndex)
 			if len(groups) < 2 {
-				typ = 1
+				groupType = 1
 			}
-			w.U8(typ)
+			writer.U8(groupType)
 		}
-		if err := dat.WriteLayout(w, g, true, d.Version != Version1); err != nil {
+		if err := dat.WriteLayout(writer, group, true, data.Version != Version1); err != nil {
 			return nil, err
 		}
-		sprites := d.Sprites[gi]
-		if len(sprites) != len(g.Sprites) {
-			return nil, fmt.Errorf("obd: group %d has %d sprites, layout needs %d", gi, len(sprites), len(g.Sprites))
+		sprites := data.Sprites[groupIndex]
+		if len(sprites) != len(group.Sprites) {
+			return nil, fmt.Errorf("obd: group %d has %d sprites, layout needs %d", groupIndex, len(sprites), len(group.Sprites))
 		}
-		for i, s := range sprites {
-			if len(s.Pixels) != size*size*4 {
-				return nil, fmt.Errorf("obd: group %d sprite %d has %d bytes, want %d", gi, i, len(s.Pixels), size*size*4)
+		for i, sprite := range sprites {
+			if len(sprite.Pixels) != size*size*4 {
+				return nil, fmt.Errorf("obd: group %d sprite %d has %d bytes, want %d", groupIndex, i, len(sprite.Pixels), size*size*4)
 			}
-			w.U32(g.Sprites[i])
-			if d.Version != Version2 {
-				w.U32(uint32(len(s.Pixels)))
+			writer.U32(group.Sprites[i])
+			if data.Version != Version2 {
+				writer.U32(uint32(len(sprite.Pixels)))
 			}
-			writeARGB(w, s.Pixels)
+			writeARGB(writer, sprite.Pixels)
 		}
 	}
-	return w.Bytes(), nil
+	return writer.Bytes(), nil
 }
 
-func writeARGB(w *binio.Writer, rgba []byte) {
+func writeARGB(writer *binio.Writer, rgba []byte) {
 	out := make([]byte, len(rgba))
 	for i := 0; i+3 < len(rgba); i += 4 {
 		out[i], out[i+1], out[i+2], out[i+3] = rgba[i+3], rgba[i], rgba[i+1], rgba[i+2]
 	}
-	w.Write(out)
+	writer.Write(out)
 }
 
 func decompress(file []byte) ([]byte, error) {
-	zr, err := lzma.NewReader(bytes.NewReader(file))
+	decompressor, err := lzma.NewReader(bytes.NewReader(file))
 	if err != nil {
 		return nil, fmt.Errorf("obd: not an LZMA stream: %w", err)
 	}
-	raw, err := io.ReadAll(io.LimitReader(zr, maxDecompressed+1))
+	raw, err := io.ReadAll(io.LimitReader(decompressor, maxDecompressed+1))
 	if err != nil {
 		return nil, fmt.Errorf("obd: decompress: %w", err)
 	}
@@ -285,15 +285,15 @@ func decompress(file []byte) ([]byte, error) {
 
 func compress(raw []byte) ([]byte, error) {
 	var buf bytes.Buffer
-	cfg := lzma.WriterConfig{SizeInHeader: true, Size: int64(len(raw)), EOSMarker: false}
-	zw, err := cfg.NewWriter(&buf)
+	config := lzma.WriterConfig{SizeInHeader: true, Size: int64(len(raw)), EOSMarker: false}
+	compressor, err := config.NewWriter(&buf)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := zw.Write(raw); err != nil {
+	if _, err := compressor.Write(raw); err != nil {
 		return nil, err
 	}
-	if err := zw.Close(); err != nil {
+	if err := compressor.Close(); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil

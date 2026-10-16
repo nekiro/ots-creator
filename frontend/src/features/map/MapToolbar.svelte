@@ -115,9 +115,9 @@
     <span class="t-vsep"></span>
     <div class="grp">
       <span class="t-label">Spawn time</span>
-      <input class="t-input n" type="number" min="0" placeholder={String(map.settings?.defaultSpawnTime ?? 60)} value={map.spawnTime || ""} onchange={(e) => (map.spawnTime = Math.max(0, Math.trunc(+e.currentTarget.value) || 0))} />
+      <input class="t-input n" type="number" min="0" placeholder={String(map.settings?.defaultSpawnTime ?? 60)} value={map.spawnTime || ""} onchange={(event) => (map.spawnTime = Math.max(0, Math.trunc(+event.currentTarget.value) || 0))} />
       {#if isCreature}
-        <Select value={map.direction} width={76} options={[{ value: 0, label: "North" }, { value: 1, label: "East" }, { value: 2, label: "South" }, { value: 3, label: "West" }]} onchange={(v) => (map.direction = v)} />
+        <Select value={map.direction} width={76} options={[{ value: 0, label: "North" }, { value: 1, label: "East" }, { value: 2, label: "South" }, { value: 3, label: "West" }]} onchange={(value) => (map.direction = value)} />
       {/if}
     </div>
   {/if}

@@ -1,6 +1,7 @@
 // Where the map is on screen in a frame: tile positions in device pixels,
 // the tiles in view and the floors drawn.
-import { LIMITS } from "./constants";
+import { GROUND_FLOOR, LIMITS, MAX_FLOOR } from "./constants";
+import { floorShift } from "./coords";
 import type { Scene } from "./scene";
 
 /** A rectangle of tiles (inclusive). */
@@ -36,8 +37,7 @@ export class Camera {
    * stacks floors (relative to the ground floor, or underground to the
    * floor in view). */
   shift(z: number): number {
-    const floor = this.scene.floor;
-    return floor <= 7 ? 7 - z : floor - z;
+    return floorShift(z, this.scene.floor);
   }
 
   /** Screen x of the left edge of tile x on floor z. */
@@ -80,8 +80,8 @@ export class Camera {
 export function floorsToDraw(scene: Scene, visibleTiles: number): number[] {
   const floor = scene.floor;
   let floors: number[] = [];
-  if (floor <= 7) for (let z = scene.opts.lowerFloors ? 7 : floor; z >= floor; z--) floors.push(z);
-  else for (let z = scene.opts.lowerFloors ? Math.min(15, floor + 2) : floor; z >= floor; z--) floors.push(z);
+  if (floor <= GROUND_FLOOR) for (let z = scene.opts.lowerFloors ? GROUND_FLOOR : floor; z >= floor; z--) floors.push(z);
+  else for (let z = scene.opts.lowerFloors ? Math.min(MAX_FLOOR, floor + 2) : floor; z >= floor; z--) floors.push(z);
   if (floors.length * visibleTiles > LIMITS.floorTiles) {
     const kept = Math.max(1, Math.floor(LIMITS.floorTiles / visibleTiles));
     // Keep the floor in view and the floors right under it.

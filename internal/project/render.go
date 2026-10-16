@@ -20,10 +20,10 @@ type TexturePos struct {
 
 // ThumbnailPos returns the texture shown in lists: outfits face south,
 // everything else uses the first texture.
-func ThumbnailPos(t *thing.Thing) TexturePos {
+func ThumbnailPos(object *thing.Thing) TexturePos {
 	pos := TexturePos{}
-	if t.Category == thing.CategoryOutfit {
-		if g := t.Group(thing.FrameGroupDefault); g != nil && int(g.PatternX) > int(thing.South) {
+	if object.Category == thing.CategoryOutfit {
+		if group := object.Group(thing.FrameGroupDefault); group != nil && int(group.PatternX) > int(thing.South) {
 			pos.PatternX = int(thing.South)
 		}
 	}
@@ -33,37 +33,37 @@ func ThumbnailPos(t *thing.Thing) TexturePos {
 // Render composes one texture of a thing into an image of
 // width*size x height*size pixels. Tile (0,0) is the bottom-right one, as
 // in the client.
-func (p *Project) Render(c thing.Category, id uint32, pos TexturePos) (*image.NRGBA, error) {
+func (p *Project) Render(category thing.Category, id uint32, pos TexturePos) (*image.NRGBA, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	t := p.things.Get(c, id)
-	if t == nil {
-		return nil, fmt.Errorf("%s %d does not exist", c, id)
+	object := p.things.Get(category, id)
+	if object == nil {
+		return nil, fmt.Errorf("%s %d does not exist", category, id)
 	}
-	g := t.Group(pos.Group)
-	if pos.Layer >= int(g.Layers) || pos.PatternX >= int(g.PatternX) || pos.PatternY >= int(g.PatternY) || pos.PatternZ >= int(g.PatternZ) {
+	group := object.Group(pos.Group)
+	if pos.Layer >= int(group.Layers) || pos.PatternX >= int(group.PatternX) || pos.PatternY >= int(group.PatternY) || pos.PatternZ >= int(group.PatternZ) {
 		return nil, fmt.Errorf("texture position %+v out of range", pos)
 	}
 	size := p.features.SpriteSize
-	img := image.NewNRGBA(image.Rect(0, 0, int(g.Width)*size, int(g.Height)*size))
+	img := image.NewNRGBA(image.Rect(0, 0, int(group.Width)*size, int(group.Height)*size))
 	buf := make([]byte, size*size*4)
-	for h := 0; h < int(g.Height); h++ {
-		for w := 0; w < int(g.Width); w++ {
-			sid := g.Sprites[g.SpriteIndex(w, h, pos.Layer, pos.PatternX, pos.PatternY, pos.PatternZ, pos.Frame)]
-			if sid == 0 {
+	for tileY := 0; tileY < int(group.Height); tileY++ {
+		for tileX := 0; tileX < int(group.Width); tileX++ {
+			spriteID := group.Sprites[group.SpriteIndex(tileX, tileY, pos.Layer, pos.PatternX, pos.PatternY, pos.PatternZ, pos.Frame)]
+			if spriteID == 0 {
 				continue
 			}
-			comp, err := p.sprites.compressed(sid)
-			if err != nil || len(comp) == 0 {
+			compressed, err := p.sprites.compressed(spriteID)
+			if err != nil || len(compressed) == 0 {
 				continue // missing sprites render as empty
 			}
-			if err := spr.DecompressInto(buf, comp, size, p.features.Transparency); err != nil {
+			if err := spr.DecompressInto(buf, compressed, size, p.features.Transparency); err != nil {
 				continue
 			}
-			ox := (int(g.Width) - 1 - w) * size
-			oy := (int(g.Height) - 1 - h) * size
+			originX := (int(group.Width) - 1 - tileX) * size
+			originY := (int(group.Height) - 1 - tileY) * size
 			for y := 0; y < size; y++ {
-				copy(img.Pix[(oy+y)*img.Stride+ox*4:(oy+y)*img.Stride+(ox+size)*4], buf[y*size*4:(y+1)*size*4])
+				copy(img.Pix[(originY+y)*img.Stride+originX*4:(originY+y)*img.Stride+(originX+size)*4], buf[y*size*4:(y+1)*size*4])
 			}
 		}
 	}

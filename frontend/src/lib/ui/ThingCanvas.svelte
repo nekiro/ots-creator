@@ -2,11 +2,13 @@
   // Self-contained animated rendering of one thing: used by the OBD viewer
   // and the animated list thumbnails. Pixels come from `get`; bump `ready`
   // when more sprites have loaded.
+  import { frameGroupAt } from "../thing";
   import { Category, type Thing } from "../api";
   import { Animator, guessImproved, previewDurations } from "../render/animator";
   import { compose, type PixelSource } from "../render/compose";
   import { contentBox, union, type Box } from "../render/bounds";
   import { DEFAULT_COLORS } from "../render/outfit";
+  import { clamp } from "../math";
 
   let {
     thing,
@@ -41,31 +43,31 @@
   let canvas = $state<HTMLCanvasElement>();
   let frame = $state(0);
 
-  const g = $derived(thing.frameGroups[Math.min(group, thing.frameGroups.length - 1)] ?? null);
+  const frameGroup = $derived(frameGroupAt(thing, group));
   const isOutfit = $derived(thing.category === Category.CategoryOutfit);
-  const dirX = (gr: typeof g) => (isOutfit && gr ? Math.min(direction, gr.patternX - 1) : 0);
+  const dirX = (shown: typeof frameGroup) => (isOutfit && shown ? Math.min(direction, shown.patternX - 1) : 0);
   const draw = (f: number) =>
-    compose(g!, g!.sprites, size, { pos: { layer: 0, x: dirX(g), y: 0, z: 0, frame: f }, colors: isOutfit && colorize ? DEFAULT_COLORS : null }, get);
+    compose(frameGroup!, frameGroup!.sprites, size, { pos: { layer: 0, x: dirX(frameGroup), y: 0, z: 0, frame: f }, colors: isOutfit && colorize ? DEFAULT_COLORS : null }, get);
 
   // Fit mode crops to the visible pixels of all frames, so the animation
   // does not jump and small objects in big textures are not drawn tiny.
   const crop = $derived.by(() => {
     void ready;
-    if (!fit || !g) return null;
+    if (!fit || !frameGroup) return null;
     let box: Box | null = null;
-    for (let f = 0; f < g.frames; f++) box = union(box, contentBox(draw(f)));
+    for (let f = 0; f < frameGroup.frames; f++) box = union(box, contentBox(draw(f)));
     return box;
   });
-  const w = $derived(crop ? crop.w : (g?.width ?? 1) * size);
-  const h = $derived(crop ? crop.h : (g?.height ?? 1) * size);
+  const w = $derived(crop ? crop.w : (frameGroup?.width ?? 1) * size);
+  const h = $derived(crop ? crop.h : (frameGroup?.height ?? 1) * size);
   const scale = $derived(fit ? Math.min(1, fit / Math.max(w, h)) : zoom);
 
   $effect(() => {
-    if (!g || g.frames < 2 || !playing) {
+    if (!frameGroup || frameGroup.frames < 2 || !playing) {
       frame = 0;
       return;
     }
-    const d = previewDurations(g, {
+    const d = previewDurations(frameGroup, {
       outfit: isOutfit,
       groups: thing.frameGroups.length,
       animateAlways: !!thing.props.animateAlways,
@@ -73,7 +75,7 @@
     });
     let animator: Animator;
     try {
-      animator = new Animator(Number(g.mode), 0, Math.min(Math.max(g.startFrame, 0), g.frames - 1), d, performance.now());
+      animator = new Animator(Number(frameGroup.mode), 0, clamp(frameGroup.startFrame, 0, frameGroup.frames - 1), d, performance.now());
     } catch {
       return;
     }
@@ -88,7 +90,7 @@
 
   $effect(() => {
     void ready;
-    if (!canvas || !g) return;
+    if (!canvas || !frameGroup) return;
     const img = draw(frame);
     const c = crop ?? { x: 0, y: 0, w: img.width, h: img.height };
     canvas.width = c.w;

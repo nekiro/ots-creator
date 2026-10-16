@@ -20,7 +20,7 @@
     cell: Snippet<[number]>;
     /** Index to keep visible; changes scroll the grid. */
     scrollTo?: number | null;
-    onkeydown?: (e: KeyboardEvent, columns: number) => void;
+    onkeydown?: (event: KeyboardEvent, columns: number) => void;
   } = $props();
 
   let el: HTMLDivElement;
@@ -64,7 +64,7 @@
   bind:clientHeight={height}
   onscroll={() => (scrollTop = el.scrollTop)}
   tabindex="0"
-  onkeydown={(e) => onkeydown?.(e, columns)}
+  onkeydown={(event) => onkeydown?.(event, columns)}
 >
   <div class="spacer" style="height:{rows * rowH}px">
     {#each visible as i (i)}

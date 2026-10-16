@@ -26,14 +26,14 @@ type OTFI struct {
 
 // ParseOTFI parses the DatSpr node of an OTML document.
 func ParseOTFI(data []byte) (OTFI, error) {
-	var o OTFI
-	sc := bufio.NewScanner(bytes.NewReader(data))
+	var result OTFI
+	scanner := bufio.NewScanner(bytes.NewReader(data))
 	inNode := false
 	found := false
 	line := 0
-	for sc.Scan() {
+	for scanner.Scan() {
 		line++
-		raw := sc.Text()
+		raw := scanner.Text()
 		trimmed := strings.TrimSpace(raw)
 		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") {
 			continue
@@ -49,64 +49,64 @@ func ParseOTFI(data []byte) (OTFI, error) {
 		}
 		key, value, ok := strings.Cut(trimmed, ":")
 		if !ok {
-			return o, fmt.Errorf("otfi line %d: expected key: value", line)
+			return result, fmt.Errorf("otfi line %d: expected key: value", line)
 		}
 		key = strings.TrimSpace(key)
 		value = strings.Trim(strings.TrimSpace(value), `"`)
 		switch key {
 		case "extended":
-			o.Features.Extended = parseBool(value)
+			result.Features.Extended = parseBool(value)
 		case "transparency":
-			o.Features.Transparency = parseBool(value)
+			result.Features.Transparency = parseBool(value)
 		case "frame-durations":
-			o.Features.ImprovedAnimations = parseBool(value)
+			result.Features.ImprovedAnimations = parseBool(value)
 		case "frame-groups":
-			o.Features.FrameGroups = parseBool(value)
+			result.Features.FrameGroups = parseBool(value)
 		case "metadata-file":
-			o.MetadataFile = value
+			result.MetadataFile = value
 		case "sprites-file":
-			o.SpritesFile = value
+			result.SpritesFile = value
 		case "sprite-size":
-			n, err := strconv.Atoi(value)
-			if err != nil || n <= 0 {
-				return o, fmt.Errorf("otfi line %d: bad sprite-size %q", line, value)
+			size, err := strconv.Atoi(value)
+			if err != nil || size <= 0 {
+				return result, fmt.Errorf("otfi line %d: bad sprite-size %q", line, value)
 			}
-			o.Features.SpriteSize = n
+			result.Features.SpriteSize = size
 		}
 	}
-	if err := sc.Err(); err != nil {
-		return o, err
+	if err := scanner.Err(); err != nil {
+		return result, err
 	}
 	if !found {
-		return o, fmt.Errorf("otfi: missing DatSpr node")
+		return result, fmt.Errorf("otfi: missing DatSpr node")
 	}
-	if o.Features.SpriteSize == 0 {
-		o.Features.SpriteSize = DefaultSpriteSize
+	if result.Features.SpriteSize == 0 {
+		result.Features.SpriteSize = DefaultSpriteSize
 	}
-	return o, nil
+	return result, nil
 }
 
-func parseBool(s string) bool {
-	b, _ := strconv.ParseBool(s)
-	return b
+func parseBool(text string) bool {
+	value, _ := strconv.ParseBool(text)
+	return value
 }
 
 // Marshal writes the OTFI document.
 func (o OTFI) Marshal() []byte {
-	var b strings.Builder
-	b.WriteString("DatSpr\n")
-	fmt.Fprintf(&b, "  extended: %t\n", o.Features.Extended)
-	fmt.Fprintf(&b, "  transparency: %t\n", o.Features.Transparency)
-	fmt.Fprintf(&b, "  frame-durations: %t\n", o.Features.ImprovedAnimations)
-	fmt.Fprintf(&b, "  frame-groups: %t\n", o.Features.FrameGroups)
+	var builder strings.Builder
+	builder.WriteString("DatSpr\n")
+	fmt.Fprintf(&builder, "  extended: %t\n", o.Features.Extended)
+	fmt.Fprintf(&builder, "  transparency: %t\n", o.Features.Transparency)
+	fmt.Fprintf(&builder, "  frame-durations: %t\n", o.Features.ImprovedAnimations)
+	fmt.Fprintf(&builder, "  frame-groups: %t\n", o.Features.FrameGroups)
 	if o.MetadataFile != "" {
-		fmt.Fprintf(&b, "  metadata-file: %s\n", o.MetadataFile)
+		fmt.Fprintf(&builder, "  metadata-file: %s\n", o.MetadataFile)
 	}
 	if o.SpritesFile != "" {
-		fmt.Fprintf(&b, "  sprites-file: %s\n", o.SpritesFile)
+		fmt.Fprintf(&builder, "  sprites-file: %s\n", o.SpritesFile)
 	}
 	if o.Features.SpriteSize != 0 && o.Features.SpriteSize != DefaultSpriteSize {
-		fmt.Fprintf(&b, "  sprite-size: %d\n", o.Features.SpriteSize)
+		fmt.Fprintf(&builder, "  sprite-size: %d\n", o.Features.SpriteSize)
 	}
-	return []byte(b.String())
+	return []byte(builder.String())
 }

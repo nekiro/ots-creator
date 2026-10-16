@@ -13,16 +13,17 @@
     MarketService,
     ThingService,
     ViewerService,
-    decodeBytes,
     errorMessage,
     minId,
-    normalizeThing,
     res,
     type MarketConfig,
     type Thing,
   } from "../../lib/api";
   import { formatIds, groupOptions, LICENSES, MAX_TAGS, parseIds, tagGroups, tagProblem, type TagKind } from "../../lib/market";
+  import { clamp } from "../../lib/math";
+  import { decodeObjectFile } from "../../lib/objectFile";
   import { app, applyDraft, run, toast, versions, type ShareTarget } from "../../lib/state.svelte";
+  import { readStored, writeStored } from "../../lib/storage";
   import Dialog from "../../lib/ui/Dialog.svelte";
   import NumberField from "../../lib/ui/NumberField.svelte";
   import Select from "../../lib/ui/Select.svelte";
@@ -35,12 +36,12 @@
   const initial = app.shareTarget!;
   const pick = !!initial.pick;
   let target = $state<ShareTarget>(initial);
-  let spriteText = $state(formatIds(initial.kind === "sprites" ? initial.ids : app.selectedSprites.toSorted((a, b) => a - b)));
+  let spriteText = $state(formatIds(initial.kind === "sprites" ? initial.ids : app.selectedSprites.toSorted((first, second) => first - second)));
   let nameTouched = $state(false);
   const spriteCount = $derived(app.project?.info.counts.sprites ?? 0);
 
   function pickObject(category: Category, id: number) {
-    target = { kind: "object", category, id: Math.min(Math.max(id, minId(category)), Math.max(app.maxId(category), minId(category))), pick };
+    target = { kind: "object", category, id: clamp(id, minId(category), Math.max(app.maxId(category), minId(category))), pick };
     if (!nameTouched) name = defaultName();
   }
 
@@ -61,7 +62,7 @@
   let fileThing = $state<{ thing: Thing; pixels: Uint8ClampedArray[]; size: number } | null>(null);
   let fileImage = $state<{ url: string; width: number; height: number } | null>(null);
   let fileError = $state("");
-  const fileName = (p: string) => p.replace(/^.*[\\/]/, "");
+  const fileName = (path: string) => path.replace(/^.*[\\/]/, "");
   const isObdFile = $derived(target.kind === "file" && OBD_EXT.test(target.path));
   const fileGrid = $derived(!!fileImage && fileImage.width % fileSize === 0 && fileImage.height % fileSize === 0);
   const fileGet = (id: number) => (id > 0 ? fileThing?.pixels[id - 1] : undefined);
@@ -80,16 +81,15 @@
     if (!nameTouched) name = fileName(path).replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
     try {
       if (OBD_EXT.test(path)) {
-        const f = await ThingService.ReadObject(path);
-        if (!f?.thing) throw new Error("empty object file");
-        fileThing = { thing: normalizeThing(f.thing), pixels: (f.sprites ?? []).map((b) => decodeBytes(b as unknown as string)), size: f.spriteSize };
+        const decoded = decodeObjectFile(await ThingService.ReadObject(path), "empty object file");
+        fileThing = { thing: decoded.thing, pixels: decoded.pixels, size: decoded.file.spriteSize };
       } else {
         const img = await ViewerService.ReadImage(path);
         if (!img) throw new Error("empty image");
         fileImage = { url: `data:image/png;base64,${img.png}`, width: img.width, height: img.height };
       }
-    } catch (e) {
-      fileError = errorMessage(e);
+    } catch (err) {
+      fileError = errorMessage(err);
     }
   }
 
@@ -147,24 +147,20 @@
   );
 
   function readLicense(): string {
-    try {
-      return localStorage.getItem(LICENSE_KEY) || "OTS-free";
-    } catch {
-      return "OTS-free";
-    }
+    return readStored(LICENSE_KEY) || "OTS-free";
   }
 
   onMount(() => {
     MarketService.Config()
-      .then((c) => {
-        config = c;
-        if (c && !author) author = c.author;
+      .then((loaded) => {
+        config = loaded;
+        if (loaded && !author) author = loaded.author;
       })
-      .catch((e) => (configError = errorMessage(e)));
+      .catch((err) => (configError = errorMessage(err)));
     // The captcha page posts its token; only messages from its origin count.
-    const onmessage = (e: MessageEvent) => {
-      if (!config || e.origin !== config.captchaOrigin || typeof e.data?.captcha !== "string") return;
-      captcha = e.data.captcha;
+    const onmessage = (event: MessageEvent) => {
+      if (!config || event.origin !== config.captchaOrigin || typeof event.data?.captcha !== "string") return;
+      captcha = event.data.captcha;
     };
     window.addEventListener("message", onmessage);
     return () => window.removeEventListener("message", onmessage);
@@ -174,19 +170,15 @@
 
   async function share() {
     if (target.kind === "object" && app.dirty) await applyDraft();
-    try {
-      localStorage.setItem(LICENSE_KEY, license);
-    } catch {
-      /* per viewer convenience only */
-    }
+    writeStored(LICENSE_KEY, license);
     const req = { name: name.trim(), author: author.trim(), tags, description: description.trim(), license, captcha };
-    const t = target;
+    const shared = target;
     const id = await run("Sharing to the market", () =>
-      t.kind === "object"
-        ? MarketService.ShareObject(t.category, t.id, req)
-        : t.kind === "sprites"
-          ? MarketService.ShareSprites(t.ids, req)
-          : MarketService.ShareFile(t.path, fileSize, req),
+      shared.kind === "object"
+        ? MarketService.ShareObject(shared.category, shared.id, req)
+        : shared.kind === "sprites"
+          ? MarketService.ShareSprites(shared.ids, req)
+          : MarketService.ShareFile(shared.path, fileSize, req),
     );
     if (id) {
       sharedId = id;
@@ -243,7 +235,7 @@
                   ]}
                   width={64}
                   title="Sprite size the image is cut into"
-                  onchange={(v) => (fileSize = v)}
+                  onchange={(value) => (fileSize = value)}
                 />
               {/if}
             </div>
@@ -253,9 +245,9 @@
             <div class="row pickrow">
               <Select
                 value={target.category}
-                options={CATEGORIES.map((c) => ({ value: c, label: CATEGORY_LABELS[c] }))}
+                options={CATEGORIES.map((category) => ({ value: category, label: CATEGORY_LABELS[category] }))}
                 width={96}
-                onchange={(c) => pickObject(c, minId(c))}
+                onchange={(category) => pickObject(category, minId(category))}
               />
               <NumberField
                 label="Id"
@@ -263,14 +255,14 @@
                 min={minId(target.category)}
                 max={Math.max(app.maxId(target.category), minId(target.category))}
                 width={64}
-                onchange={(v) => target.kind === "object" && pickObject(target.category, v)}
+                onchange={(value) => target.kind === "object" && pickObject(target.category, value)}
               />
               <span class="t-label">of {app.maxId(target.category)}</span>
             </div>
           {:else}
             <label class="field">
               <span class="t-label">Sprite ids, e.g. 100-120, 135 (selected sprites are filled in)</span>
-              <input class="t-input" value={spriteText} oninput={(e) => pickSprites(e.currentTarget.value)} placeholder="100-120, 135" />
+              <input class="t-input" value={spriteText} oninput={(event) => pickSprites(event.currentTarget.value)} placeholder="100-120, 135" />
             </label>
           {/if}
         </div>
@@ -299,11 +291,11 @@
         <span class="t-label">Author</span>
         <input class="t-input" maxlength="32" bind:value={author} placeholder="Your nickname" />
         <span class="t-label">Tags</span>
-        <TagPicker value={tags} options={tagOptions} max={MAX_TAGS} allowCustom placeholder="Type to search, e.g. sword, thais" onchange={(t) => (tags = t)} />
+        <TagPicker value={tags} options={tagOptions} max={MAX_TAGS} allowCustom placeholder="Type to search, e.g. sword, thais" onchange={(chosen) => (tags = chosen)} />
         <span class="t-label">About</span>
         <input class="t-input" maxlength="500" bind:value={description} placeholder="Optional description" />
         <span class="t-label">License</span>
-        <Select value={license} options={LICENSES} onchange={(v) => (license = v)} />
+        <Select value={license} options={LICENSES} onchange={(value) => (license = value)} />
       </div>
       <label class="row agree">
         <input type="checkbox" class="t-check" bind:checked={allowed} />

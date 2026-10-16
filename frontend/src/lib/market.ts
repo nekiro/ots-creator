@@ -24,6 +24,11 @@ export const LICENSES = [
   { value: "OTS-free", label: "Free for OT servers" },
 ];
 
+/** The readable name of a license id (the id itself when unknown). */
+export function licenseLabel(value: string): string {
+  return LICENSES.find((license) => license.value === value)?.label ?? value;
+}
+
 /** What a tag group applies to: an object category or "sprites". */
 export type TagKind = "item" | "outfit" | "effect" | "missile" | "sprites";
 
@@ -287,45 +292,45 @@ export function tagGroups(kind: TagKind): TagGroup[] {
 export const MAX_TAGS = 8;
 
 /** The section of an entry: "sprites" for packs, else its category. */
-export const sectionOf = (e: MarketEntry): string =>
-  e.kind === "sprites" ? "sprites" : (e.category ?? "");
+export const sectionOf = (entry: MarketEntry): string =>
+  entry.kind === "sprites" ? "sprites" : (entry.category ?? "");
 
-function matches(e: MarketEntry, words: string[]): boolean {
+function matches(entry: MarketEntry, words: string[]): boolean {
   if (words.length === 0) return true;
-  const text = [e.name, e.description ?? "", e.author, ...(e.tags ?? [])]
+  const text = [entry.name, entry.description ?? "", entry.author, ...(entry.tags ?? [])]
     .join(" ")
     .toLowerCase();
-  return words.every((w) => text.includes(w));
+  return words.every((word) => text.includes(word));
 }
 
 /** Entries matching the filter, sorted. */
 export function filterEntries(
   entries: MarketEntry[],
-  f: MarketFilter,
+  filter: MarketFilter,
 ): MarketEntry[] {
-  const words = f.query.toLowerCase().split(/\s+/).filter(Boolean);
+  const words = filter.query.toLowerCase().split(/\s+/).filter(Boolean);
   const out = entries.filter(
-    (e) =>
-      (f.section === "all" || sectionOf(e) === f.section) &&
-      (f.spriteSize === 0 || !e.spriteSize || e.spriteSize === f.spriteSize) &&
-      f.tags.every((t) => e.tags?.includes(t)) &&
-      matches(e, words),
+    (entry) =>
+      (filter.section === "all" || sectionOf(entry) === filter.section) &&
+      (filter.spriteSize === 0 || !entry.spriteSize || entry.spriteSize === filter.spriteSize) &&
+      filter.tags.every((tag) => entry.tags?.includes(tag)) &&
+      matches(entry, words),
   );
-  const byName = (a: MarketEntry, b: MarketEntry) =>
-    a.name.localeCompare(b.name, undefined, {
+  const byName = (first: MarketEntry, second: MarketEntry) =>
+    first.name.localeCompare(second.name, undefined, {
       sensitivity: "base",
       numeric: true,
     });
-  switch (f.sort) {
+  switch (filter.sort) {
     case "name":
       return out.sort(byName);
     case "old":
       return out.sort(
-        (a, b) => a.created.localeCompare(b.created) || byName(a, b),
+        (first, second) => first.created.localeCompare(second.created) || byName(first, second),
       );
     default:
       return out.sort(
-        (a, b) => b.created.localeCompare(a.created) || byName(a, b),
+        (first, second) => second.created.localeCompare(first.created) || byName(first, second),
       );
   }
 }
@@ -333,7 +338,7 @@ export function filterEntries(
 /** Entry counts per section ("all" included). */
 export function sectionCounts(entries: MarketEntry[]): Record<string, number> {
   const out: Record<string, number> = { all: entries.length };
-  for (const e of entries) out[sectionOf(e)] = (out[sectionOf(e)] ?? 0) + 1;
+  for (const entry of entries) out[sectionOf(entry)] = (out[sectionOf(entry)] ?? 0) + 1;
   return out;
 }
 
@@ -343,11 +348,11 @@ export function topTags(
   limit = 24,
 ): { tag: string; count: number }[] {
   const counts = new Map<string, number>();
-  for (const e of entries)
-    for (const t of e.tags ?? []) counts.set(t, (counts.get(t) ?? 0) + 1);
+  for (const entry of entries)
+    for (const tag of entry.tags ?? []) counts.set(tag, (counts.get(tag) ?? 0) + 1);
   return [...counts]
     .map(([tag, count]) => ({ tag, count }))
-    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
+    .sort((first, second) => second.count - first.count || first.tag.localeCompare(second.tag))
     .slice(0, limit);
 }
 
@@ -355,8 +360,8 @@ export function topTags(
 export function parseTags(text: string): string[] {
   const out: string[] = [];
   for (const raw of text.split(",")) {
-    const t = raw.trim().toLowerCase().split(/\s+/).filter(Boolean).join("-");
-    if (t && !out.includes(t)) out.push(t);
+    const tag = raw.trim().toLowerCase().split(/\s+/).filter(Boolean).join("-");
+    if (tag && !out.includes(tag)) out.push(tag);
   }
   return out;
 }
@@ -368,18 +373,18 @@ export function parseTags(text: string): string[] {
 export function parseIds(text: string, max: number, limit = 1024): number[] {
   const out = new Set<number>();
   for (const part of text.split(/[\s,;]+/)) {
-    const m = part.match(/^(\d+)(?:-(\d+))?$/);
-    if (!m) continue;
-    let [a, b] = [+m[1], +(m[2] ?? m[1])];
-    if (a > b) [a, b] = [b, a];
+    const match = part.match(/^(\d+)(?:-(\d+))?$/);
+    if (!match) continue;
+    let [from, to] = [+match[1], +(match[2] ?? match[1])];
+    if (from > to) [from, to] = [to, from];
     for (
-      let id = Math.max(a, 1);
-      id <= Math.min(b, max) && out.size < limit;
+      let id = Math.max(from, 1);
+      id <= Math.min(to, max) && out.size < limit;
       id++
     )
       out.add(id);
   }
-  return [...out].sort((x, y) => x - y);
+  return [...out].sort((first, second) => first - second);
 }
 
 /** Formats ids as ranges ("100-120, 130"), the inverse of parseIds. */
@@ -398,7 +403,7 @@ export function formatIds(ids: number[]): string {
 export function tagProblem(tags: string[]): string {
   if (tags.length > 8) return "At most 8 tags.";
   const bad = tags.find(
-    (t) => t.length > 24 || !/^[a-z0-9][a-z0-9-]*$/.test(t),
+    (tag) => tag.length > 24 || !/^[a-z0-9][a-z0-9-]*$/.test(tag),
   );
   return bad
     ? `Tag "${bad}": letters, digits and dashes only, at most 24.`
@@ -413,7 +418,7 @@ export interface TagOption {
 }
 
 /** Flattens tag groups into picker options. */
-export const groupOptions = (groups: TagGroup[]): TagOption[] => groups.flatMap((g) => g.tags.map((tag) => ({ tag, group: g.label })));
+export const groupOptions = (groups: TagGroup[]): TagOption[] => groups.flatMap((group) => group.tags.map((tag) => ({ tag, group: group.label })));
 
 /**
  * Options matching a typed query, without the picked ones: tags starting
@@ -421,10 +426,10 @@ export const groupOptions = (groups: TagGroup[]): TagOption[] => groups.flatMap(
  * An empty query lists everything.
  */
 export function matchTags(options: TagOption[], query: string, picked: string[], limit = 200): TagOption[] {
-  const q = query.trim().toLowerCase().replace(/\s+/g, "-");
-  const free = options.filter((o) => !picked.includes(o.tag));
-  if (!q) return free.slice(0, limit);
-  const starts = free.filter((o) => o.tag.startsWith(q));
-  const contains = free.filter((o) => !o.tag.startsWith(q) && (o.tag.includes(q) || (o.group ?? "").toLowerCase().startsWith(q)));
+  const typed = query.trim().toLowerCase().replace(/\s+/g, "-");
+  const free = options.filter((option) => !picked.includes(option.tag));
+  if (!typed) return free.slice(0, limit);
+  const starts = free.filter((option) => option.tag.startsWith(typed));
+  const contains = free.filter((option) => !option.tag.startsWith(typed) && (option.tag.includes(typed) || (option.group ?? "").toLowerCase().startsWith(typed)));
   return [...starts, ...contains].slice(0, limit);
 }

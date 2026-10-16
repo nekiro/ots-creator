@@ -7,15 +7,15 @@
   let { ondrag, onend, vertical = false }: { ondrag: (d: number) => void; onend?: () => void; vertical?: boolean } = $props();
   let active = $state(false);
 
-  function onpointerdown(e: PointerEvent) {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    const el = e.currentTarget as HTMLElement;
-    el.setPointerCapture(e.pointerId);
+  function onpointerdown(event: PointerEvent) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const el = event.currentTarget as HTMLElement;
+    el.setPointerCapture(event.pointerId);
     active = true;
-    let last = vertical ? e.clientX : e.clientY;
-    el.onpointermove = (ev) => {
-      const p = vertical ? ev.clientX : ev.clientY;
+    let last = vertical ? event.clientX : event.clientY;
+    el.onpointermove = (event) => {
+      const p = vertical ? event.clientX : event.clientY;
       ondrag(toCss(p - last));
       last = p;
     };
