@@ -40,145 +40,163 @@ type FindResult struct {
 }
 
 // Find searches the map.
-func (e *Editor) Find(q FindQuery) ([]FindResult, bool) {
-	limit := q.Limit
+func (e *Editor) Find(query FindQuery) ([]FindResult, bool) {
+	limit := query.Limit
 	if limit <= 0 {
-		limit = 5000
+		limit = defaultFindLimit
 	}
-	name := strings.ToLower(strings.TrimSpace(q.Name))
-	match := func(it *otmap.Item) (bool, string) {
-		typ := e.itemType(it.ID)
-		switch {
-		case len(q.IDs) > 0:
-			if !slices.Contains(q.IDs, it.ID) {
-				return false, ""
-			}
-		case name != "":
-			if typ == nil || !strings.Contains(strings.ToLower(typ.Name), name) {
-				return false, ""
-			}
-		}
-		if q.ActionID != 0 && it.ActionID() != q.ActionID {
-			return false, ""
-		}
-		if q.UniqueID != 0 && it.UniqueID() != q.UniqueID {
-			return false, ""
-		}
-		detail := ""
-		switch q.Kind {
-		case "unique":
-			if it.UniqueID() == 0 {
-				return false, ""
-			}
-			detail = "uid " + strconv.Itoa(int(it.UniqueID()))
-		case "action":
-			if it.ActionID() == 0 {
-				return false, ""
-			}
-			detail = "aid " + strconv.Itoa(int(it.ActionID()))
-		case "container":
-			if typ == nil || !typ.IsContainer() {
-				return false, ""
-			}
-			n := 0
-			if it.Ext != nil {
-				n = len(it.Ext.Items)
-			}
-			detail = strconv.Itoa(n) + " items"
-		case "writeable":
-			if typ == nil || !(typ.Flags.Has(otitems.FlagWritable) || typ.Flags.Has(otitems.FlagReadable)) {
-				return false, ""
-			}
-			if it.Ext != nil && it.Ext.Text != "" {
-				detail = strconv.Quote(truncate(it.Ext.Text, 40))
-			}
-		case "teleport":
-			if it.Ext == nil || it.Ext.Dest == nil {
-				return false, ""
-			}
-			d := it.Ext.Dest
-			detail = fmt.Sprintf("to %d, %d, %d", d.X, d.Y, d.Z)
-		case "door":
-			if typ == nil || !typ.IsDoor() {
-				return false, ""
-			}
-			if it.Ext != nil && it.Ext.DoorID != 0 {
-				detail = "door id " + strconv.Itoa(int(it.Ext.DoorID))
-			}
-		}
-		if detail == "" && q.ActionID != 0 {
-			detail = "aid " + strconv.Itoa(int(q.ActionID))
-		}
-		return true, detail
-	}
-	var out []FindResult
+	lowerName := strings.ToLower(strings.TrimSpace(query.Name))
+	var results []FindResult
 	more := false
-	visit := func(p otmap.Position, t *otmap.Tile) {
+	visit := func(pos otmap.Position, tile *otmap.Tile) {
 		if more {
 			return
 		}
-		if q.Kind == "duplicate" {
-			seen := map[uint16]bool{}
-			for _, it := range t.Items {
-				if seen[it.ID] {
-					out = append(out, FindResult{Pos: p, ID: it.ID, Name: e.name(it.ID), Detail: "duplicate"})
-					break
-				}
-				seen[it.ID] = true
+		if query.Kind == "duplicate" {
+			if duplicate, found := firstDuplicate(tile.Items); found {
+				results = append(results, FindResult{Pos: pos, ID: duplicate.ID, Name: e.name(duplicate.ID), Detail: "duplicate"})
 			}
-			more = len(out) >= limit
+			more = len(results) >= limit
 			return
 		}
 		var walk func(items []otmap.Item)
 		walk = func(items []otmap.Item) {
 			for i := range items {
-				if ok, d := match(&items[i]); ok {
-					out = append(out, FindResult{Pos: p, ID: items[i].ID, Name: e.name(items[i].ID), Detail: d})
-					if len(out) >= limit {
+				// The limit may have been reached inside a container.
+				if more {
+					return
+				}
+				if ok, detail := e.matchFindItem(query, lowerName, &items[i]); ok {
+					results = append(results, FindResult{Pos: pos, ID: items[i].ID, Name: e.name(items[i].ID), Detail: detail})
+					if len(results) >= limit {
 						more = true
 						return
 					}
 				}
-				if q.Containers && items[i].Ext != nil && len(items[i].Ext.Items) > 0 {
+				if query.Containers && items[i].Ext != nil && len(items[i].Ext.Items) > 0 {
 					walk(items[i].Ext.Items)
 				}
 			}
 		}
-		if t.Ground.ID != 0 {
-			walk([]otmap.Item{t.Ground})
+		if tile.Ground.ID != 0 {
+			walk([]otmap.Item{tile.Ground})
 		}
-		walk(t.Items)
+		walk(tile.Items)
 	}
-	if q.InSelection {
-		for _, p := range e.Selected() {
-			visit(p, e.Map.Tile(p))
-		}
-	} else {
-		e.Map.Each(visit)
-	}
-	return out, more
+	e.eachTile(query.InSelection, visit)
+	return results, more
 }
 
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
+// firstDuplicate returns the first item whose id already appeared
+// earlier in the list.
+func firstDuplicate(items []otmap.Item) (otmap.Item, bool) {
+	seen := map[uint16]bool{}
+	for _, item := range items {
+		if seen[item.ID] {
+			return item, true
+		}
+		seen[item.ID] = true
 	}
-	return s[:n] + "…"
+	return otmap.Item{}, false
+}
+
+// matchFindItem reports whether an item matches the query and returns
+// the matched attribute. lowerName is the trimmed lower-case query name.
+func (e *Editor) matchFindItem(query FindQuery, lowerName string, item *otmap.Item) (bool, string) {
+	typ := e.itemType(item.ID)
+	switch {
+	case len(query.IDs) > 0:
+		if !slices.Contains(query.IDs, item.ID) {
+			return false, ""
+		}
+	case lowerName != "":
+		if typ == nil || !strings.Contains(strings.ToLower(typ.Name), lowerName) {
+			return false, ""
+		}
+	}
+	if query.ActionID != 0 && item.ActionID() != query.ActionID {
+		return false, ""
+	}
+	if query.UniqueID != 0 && item.UniqueID() != query.UniqueID {
+		return false, ""
+	}
+	ok, detail := findKindDetail(query.Kind, typ, item)
+	if !ok {
+		return false, ""
+	}
+	if detail == "" && query.ActionID != 0 {
+		detail = "aid " + strconv.Itoa(int(query.ActionID))
+	}
+	return true, detail
+}
+
+// findKindDetail checks an item against a FindQuery kind and returns the
+// detail text for that kind (empty when there is nothing to show).
+func findKindDetail(kind string, typ *otitems.Type, item *otmap.Item) (bool, string) {
+	switch kind {
+	case "unique":
+		if item.UniqueID() == 0 {
+			return false, ""
+		}
+		return true, "uid " + strconv.Itoa(int(item.UniqueID()))
+	case "action":
+		if item.ActionID() == 0 {
+			return false, ""
+		}
+		return true, "aid " + strconv.Itoa(int(item.ActionID()))
+	case "container":
+		if typ == nil || !typ.IsContainer() {
+			return false, ""
+		}
+		contentCount := 0
+		if item.Ext != nil {
+			contentCount = len(item.Ext.Items)
+		}
+		return true, strconv.Itoa(contentCount) + " items"
+	case "writeable":
+		if typ == nil || !(typ.Flags.Has(otitems.FlagWritable) || typ.Flags.Has(otitems.FlagReadable)) {
+			return false, ""
+		}
+		if item.Ext != nil && item.Ext.Text != "" {
+			return true, strconv.Quote(truncate(item.Ext.Text, findTextPreviewLen))
+		}
+	case "teleport":
+		if item.Ext == nil || item.Ext.Dest == nil {
+			return false, ""
+		}
+		dest := item.Ext.Dest
+		return true, fmt.Sprintf("to %d, %d, %d", dest.X, dest.Y, dest.Z)
+	case "door":
+		if typ == nil || !typ.IsDoor() {
+			return false, ""
+		}
+		if item.Ext != nil && item.Ext.DoorID != 0 {
+			return true, "door id " + strconv.Itoa(int(item.Ext.DoorID))
+		}
+	}
+	return true, ""
+}
+
+func truncate(text string, maxLen int) string {
+	if len(text) <= maxLen {
+		return text
+	}
+	return text[:maxLen] + "…"
 }
 
 func (e *Editor) name(id uint16) string {
-	if t := e.itemType(id); t != nil {
-		return t.DisplayName()
+	if typ := e.itemType(id); typ != nil {
+		return typ.DisplayName()
 	}
 	return "unknown item " + strconv.Itoa(int(id))
 }
 
 // eachTile visits the selection or the whole map.
-func (e *Editor) eachTile(inSelection bool, fn func(p otmap.Position, t *otmap.Tile)) {
+func (e *Editor) eachTile(inSelection bool, fn func(pos otmap.Position, tile *otmap.Tile)) {
 	if inSelection {
-		for _, p := range e.Selected() {
-			if t := e.Map.Tile(p); t != nil {
-				fn(p, t)
+		for _, pos := range e.Selected() {
+			if tile := e.Map.Tile(pos); tile != nil {
+				fn(pos, tile)
 			}
 		}
 		return
@@ -186,42 +204,43 @@ func (e *Editor) eachTile(inSelection bool, fn func(p otmap.Position, t *otmap.T
 	e.Map.Each(fn)
 }
 
-// mapItems rewrites items of tiles matching pred, recursing into
-// containers. fn returns the new item list for one list.
+// rewriteItems rewrites items of the selection or the whole map,
+// recursing into containers. fn returns the new item list for one list;
+// items it sets to id 0 are removed.
 func (e *Editor) rewriteItems(label string, inSelection bool, fn func(items []otmap.Item) ([]otmap.Item, bool)) int {
 	tx := e.Begin(label, 0)
 	count := 0
-	var rec func(items []otmap.Item) ([]otmap.Item, bool)
-	rec = func(items []otmap.Item) ([]otmap.Item, bool) {
-		out, changed := fn(items)
-		for i := range out {
-			if out[i].Ext != nil && len(out[i].Ext.Items) > 0 {
-				if sub, ch := rec(out[i].Ext.Items); ch {
+	var rewrite func(items []otmap.Item) ([]otmap.Item, bool)
+	rewrite = func(items []otmap.Item) ([]otmap.Item, bool) {
+		rewritten, changed := fn(items)
+		for i := range rewritten {
+			if rewritten[i].Ext != nil && len(rewritten[i].Ext.Items) > 0 {
+				if contents, contentsChanged := rewrite(rewritten[i].Ext.Items); contentsChanged {
 					if !changed {
-						out = slices.Clone(out)
+						rewritten = slices.Clone(rewritten)
 						changed = true
 					}
-					out[i] = out[i].Clone()
-					out[i].Ext.Items = sub
-					out[i].Compact()
+					rewritten[i] = rewritten[i].Clone()
+					rewritten[i].Ext.Items = slices.DeleteFunc(slices.Clone(contents), func(item otmap.Item) bool { return item.ID == 0 })
+					rewritten[i].Compact()
 				}
 			}
 		}
-		return out, changed
+		return rewritten, changed
 	}
-	e.eachTile(inSelection, func(p otmap.Position, t *otmap.Tile) {
-		items := append([]otmap.Item{t.Ground}, t.Items...)
-		out, changed := rec(items)
+	e.eachTile(inSelection, func(pos otmap.Position, tile *otmap.Tile) {
+		items := append([]otmap.Item{tile.Ground}, tile.Items...)
+		rewritten, changed := rewrite(items)
 		if !changed {
 			return
 		}
 		count++
-		nt := tx.Edit(p)
-		nt.Ground = out[0]
-		if nt.Ground.ID == 0 {
-			nt.Ground = otmap.Item{}
+		editTile := tx.Edit(pos)
+		editTile.Ground = rewritten[0]
+		if editTile.Ground.ID == 0 {
+			editTile.Ground = otmap.Item{}
 		}
-		nt.Items = slices.DeleteFunc(slices.Clone(out[1:]), func(it otmap.Item) bool { return it.ID == 0 })
+		editTile.Items = slices.DeleteFunc(slices.Clone(rewritten[1:]), func(item otmap.Item) bool { return item.ID == 0 })
 	})
 	tx.Commit()
 	return count
@@ -229,131 +248,129 @@ func (e *Editor) rewriteItems(label string, inSelection bool, fn func(items []ot
 
 // ReplaceItems replaces items with one id by another (to 0 removes them).
 func (e *Editor) ReplaceItems(pairs map[uint16]uint16, inSelection bool) int {
-	n := 0
+	replaced := 0
 	label := "Replace items"
 	if len(pairs) == 1 {
-		for _, to := range pairs {
-			if to == 0 {
+		for _, toID := range pairs {
+			if toID == 0 {
 				label = "Remove items"
 			}
 		}
 	}
 	e.rewriteItems(label, inSelection, func(items []otmap.Item) ([]otmap.Item, bool) {
-		var out []otmap.Item
+		var rewritten []otmap.Item
 		changed := false
-		for i, it := range items {
-			to, ok := pairs[it.ID]
-			if !ok || it.ID == 0 {
+		for i, item := range items {
+			toID, ok := pairs[item.ID]
+			if !ok || item.ID == 0 {
 				continue
 			}
 			if !changed {
-				out = slices.Clone(items)
+				rewritten = slices.Clone(items)
 				changed = true
 			}
-			n++
-			out[i].ID = to
+			replaced++
+			rewritten[i].ID = toID
 		}
 		if !changed {
 			return items, false
 		}
-		return out, true
+		return rewritten, true
 	})
-	return n
+	return replaced
+}
+
+// removeItemsWhere clears (sets id 0) every item for which shouldRemove
+// is true and returns how many were removed.
+func (e *Editor) removeItemsWhere(label string, inSelection bool, shouldRemove func(item otmap.Item) bool) int {
+	removed := 0
+	e.rewriteItems(label, inSelection, func(items []otmap.Item) ([]otmap.Item, bool) {
+		changed := false
+		rewritten := slices.Clone(items)
+		for i, item := range items {
+			if shouldRemove(item) {
+				rewritten[i].ID = 0
+				removed++
+				changed = true
+			}
+		}
+		return rewritten, changed
+	})
+	return removed
 }
 
 // RemoveCorpses removes corpse items.
 func (e *Editor) RemoveCorpses(inSelection bool) int {
-	n := 0
-	e.rewriteItems("Remove corpses", inSelection, func(items []otmap.Item) ([]otmap.Item, bool) {
-		changed := false
-		out := slices.Clone(items)
-		for i, it := range items {
-			if typ := e.itemType(it.ID); typ != nil && typ.Flags.Has(otitems.FlagCorpse) && !it.Complex() {
-				out[i].ID = 0
-				n++
-				changed = true
-			}
-		}
-		return out, changed
+	return e.removeItemsWhere("Remove corpses", inSelection, func(item otmap.Item) bool {
+		typ := e.itemType(item.ID)
+		return typ != nil && typ.Flags.Has(otitems.FlagCorpse) && !item.Complex()
 	})
-	return n
 }
 
 // RemoveInvalid removes items the item database does not know.
 func (e *Editor) RemoveInvalid(inSelection bool) int {
-	n := 0
-	e.rewriteItems("Remove invalid items", inSelection, func(items []otmap.Item) ([]otmap.Item, bool) {
-		changed := false
-		out := slices.Clone(items)
-		for i, it := range items {
-			if it.ID != 0 && e.itemType(it.ID) == nil {
-				out[i].ID = 0
-				n++
-				changed = true
-			}
-		}
-		return out, changed
+	return e.removeItemsWhere("Remove invalid items", inSelection, func(item otmap.Item) bool {
+		return item.ID != 0 && e.itemType(item.ID) == nil
 	})
-	return n
 }
 
 // RemoveUnreachable removes tiles no player can see: tiles farther than
 // the client view (9x7 tiles) from any walkable tile within two floors.
 func (e *Editor) RemoveUnreachable() int {
-	walk := func(x, y, z int) bool {
-		t := e.Map.At(x, y, z)
-		return t != nil && !e.blocking(t)
+	walkable := func(x, y, z int) bool {
+		tile := e.Map.At(x, y, z)
+		return tile != nil && !e.blocking(tile)
 	}
-	var drop []otmap.Position
-	e.Map.Each(func(p otmap.Position, _ *otmap.Tile) {
-		x, y, z := int(p.X), int(p.Y), int(p.Z)
-		for fz := max(z-2, 0); fz <= min(z+2, otmap.MaxFloor); fz++ {
-			for dy := -7; dy <= 7; dy++ {
-				for dx := -9; dx <= 9; dx++ {
-					if walk(x+dx, y+dy, fz) {
+	var unreachable []otmap.Position
+	e.Map.Each(func(pos otmap.Position, _ *otmap.Tile) {
+		x, y, z := int(pos.X), int(pos.Y), int(pos.Z)
+		for floor := max(z-clientViewFloorsRange, 0); floor <= min(z+clientViewFloorsRange, otmap.MaxFloor); floor++ {
+			for dy := -clientViewRangeY; dy <= clientViewRangeY; dy++ {
+				for dx := -clientViewRangeX; dx <= clientViewRangeX; dx++ {
+					if walkable(x+dx, y+dy, floor) {
 						return
 					}
 				}
 			}
 		}
-		drop = append(drop, p)
+		unreachable = append(unreachable, pos)
 	})
-	if len(drop) == 0 {
+	if len(unreachable) == 0 {
 		return 0
 	}
 	tx := e.Begin("Remove unreachable tiles", 0)
-	for _, p := range drop {
-		t := tx.Edit(p)
-		*t = otmap.Tile{}
+	for _, pos := range unreachable {
+		tile := tx.Edit(pos)
+		*tile = otmap.Tile{}
 	}
 	return tx.Commit()
 }
 
 // RemoveEmptySpawns removes spawns without creatures in their area.
 func (e *Editor) RemoveEmptySpawns() int {
-	type sp struct {
-		p   otmap.Position
+	type spawnRef struct {
+		pos otmap.Position
 		npc bool
 	}
-	var empty []sp
-	e.Map.Each(func(p otmap.Position, t *otmap.Tile) {
+	var empty []spawnRef
+	e.Map.Each(func(pos otmap.Position, tile *otmap.Tile) {
 		for _, npc := range []bool{false, true} {
-			s := t.Spawn()
+			spawn := tile.Spawn()
 			if npc {
-				s = t.SpawnNPC()
+				spawn = tile.SpawnNPC()
 			}
-			if s == nil {
+			if spawn == nil {
 				continue
 			}
 			found := false
-			r := int(s.Radius)
-			e.Map.EachIn(int(p.X)-r, int(p.Y)-r, int(p.X)+r, int(p.Y)+r, int(p.Z), int(p.Z), func(_ otmap.Position, ct *otmap.Tile) {
-				if len(ct.Creatures()) > 0 {
+			radius := int(spawn.Radius)
+			e.Map.EachIn(int(pos.X)-radius, int(pos.Y)-radius, int(pos.X)+radius, int(pos.Y)+radius, int(pos.Z), int(pos.Z), func(_ otmap.Position, areaTile *otmap.Tile) {
+				if len(areaTile.Creatures()) > 0 {
 					found = true
 				}
 			})
 			if !found {
-				empty = append(empty, sp{p, npc})
+				empty = append(empty, spawnRef{pos, npc})
 			}
 		}
 	})
@@ -361,14 +378,14 @@ func (e *Editor) RemoveEmptySpawns() int {
 		return 0
 	}
 	tx := e.Begin("Remove empty spawns", 0)
-	for _, s := range empty {
-		t := tx.Edit(s.p)
-		if s.npc {
-			t.Ext.SpawnNPC = nil
+	for _, spawn := range empty {
+		tile := tx.Edit(spawn.pos)
+		if spawn.npc {
+			tile.Ext.SpawnNPC = nil
 		} else {
-			t.Ext.Spawn = nil
+			tile.Ext.Spawn = nil
 		}
-		t.Compact()
+		tile.Compact()
 	}
 	tx.Commit()
 	return len(empty)
@@ -377,34 +394,39 @@ func (e *Editor) RemoveEmptySpawns() int {
 // ClearInvalidHouses clears house ids of tiles whose house does not exist.
 func (e *Editor) ClearInvalidHouses() int {
 	tx := e.Begin("Clear invalid houses", 0)
-	n := 0
-	e.Map.Each(func(p otmap.Position, t *otmap.Tile) {
-		if t.HouseID != 0 && e.Map.Houses[t.HouseID] == nil {
-			nt := tx.Edit(p)
-			nt.HouseID = 0
-			n++
+	cleared := 0
+	e.Map.Each(func(pos otmap.Position, tile *otmap.Tile) {
+		if tile.HouseID != 0 && e.Map.Houses[tile.HouseID] == nil {
+			editTile := tx.Edit(pos)
+			editTile.HouseID = 0
+			cleared++
 		}
 	})
 	tx.Commit()
-	return n
+	return cleared
 }
 
 // ClearModified clears the modified state of all tiles (not undoable).
 func (e *Editor) ClearModified() {
 	e.Map.ClearModified()
-	for _, c := range e.Map.Chunks() {
-		e.dirty[otmap.MakeKey(c.X, c.Y, c.Z)] = true
+	for _, chunk := range e.Map.Chunks() {
+		e.dirty[otmap.MakeKey(chunk.X, chunk.Y, chunk.Z)] = true
 	}
+}
+
+// allTilePositions lists the positions of all tiles of the map.
+func (e *Editor) allTilePositions() []otmap.Position {
+	var positions []otmap.Position
+	e.Map.Each(func(pos otmap.Position, _ *otmap.Tile) { positions = append(positions, pos) })
+	return positions
 }
 
 // BorderizeMap redoes all borders and walls.
 func (e *Editor) BorderizeMap() int {
 	tx := e.Begin("Borderize map", 0)
-	var ps []otmap.Position
-	e.Map.Each(func(p otmap.Position, _ *otmap.Tile) { ps = append(ps, p) })
-	for _, p := range ps {
-		e.reborder(tx, p, true)
-		e.wallize(tx, p)
+	for _, pos := range e.allTilePositions() {
+		e.reborder(tx, pos, true)
+		e.wallize(tx, pos)
 	}
 	return tx.Commit()
 }
@@ -412,10 +434,8 @@ func (e *Editor) BorderizeMap() int {
 // RandomizeMap rerolls all grounds.
 func (e *Editor) RandomizeMap() int {
 	tx := e.Begin("Randomize map", 0)
-	var ps []otmap.Position
-	e.Map.Each(func(p otmap.Position, _ *otmap.Tile) { ps = append(ps, p) })
-	for _, p := range ps {
-		e.randomize(tx, p)
+	for _, pos := range e.allTilePositions() {
+		e.randomize(tx, pos)
 	}
 	return tx.Commit()
 }
@@ -448,66 +468,73 @@ type Statistics struct {
 
 // Stats computes map statistics.
 func (e *Editor) Stats() Statistics {
-	s := Statistics{Houses: len(e.Map.Houses), Towns: len(e.Map.Towns), Waypoints: len(e.Map.Waypoints), Floors: make([]int, otmap.MaxFloor+1)}
-	s.MinX, s.MinY, s.MaxX, s.MaxY, _ = e.Map.Bounds()
-	var count func(items []otmap.Item, nested bool)
-	count = func(items []otmap.Item, nested bool) {
-		for _, it := range items {
-			if it.ID == 0 {
-				continue
-			}
-			s.Items++
-			if nested {
-				s.ContainerItems++
-			}
-			if it.ActionID() != 0 {
-				s.ActionIDs++
-			}
-			if it.UniqueID() != 0 {
-				s.UniqueIDs++
-			}
-			if it.Ext != nil && it.Ext.Dest != nil {
-				s.Teleports++
-			}
-			if typ := e.itemType(it.ID); typ != nil && typ.IsContainer() {
-				s.Containers++
-			}
-			if it.Ext != nil {
-				count(it.Ext.Items, true)
-			}
+	stats := Statistics{Houses: len(e.Map.Houses), Towns: len(e.Map.Towns), Waypoints: len(e.Map.Waypoints), Floors: make([]int, otmap.MaxFloor+1)}
+	stats.MinX, stats.MinY, stats.MaxX, stats.MaxY, _ = e.Map.Bounds()
+	e.Map.Each(func(pos otmap.Position, tile *otmap.Tile) {
+		e.countTileStats(&stats, pos, tile)
+	})
+	return stats
+}
+
+// countTileStats adds one tile and everything on it to stats.
+func (e *Editor) countTileStats(stats *Statistics, pos otmap.Position, tile *otmap.Tile) {
+	stats.Tiles++
+	stats.Floors[pos.Z]++
+	e.countItemStats(stats, []otmap.Item{tile.Ground}, false)
+	e.countItemStats(stats, tile.Items, false)
+	if e.blocking(tile) {
+		stats.Blocking++
+	} else {
+		stats.Walkable++
+	}
+	if tile.Flags&otmap.FlagPZ != 0 {
+		stats.PZ++
+	}
+	if tile.HouseID != 0 {
+		stats.HouseTiles++
+	}
+	if tile.Spawn() != nil {
+		stats.Spawns++
+	}
+	if tile.SpawnNPC() != nil {
+		stats.Spawns++
+	}
+	for _, creature := range tile.Creatures() {
+		if creature.NPC {
+			stats.NPCs++
+		} else {
+			stats.Monsters++
 		}
 	}
-	e.Map.Each(func(p otmap.Position, t *otmap.Tile) {
-		s.Tiles++
-		s.Floors[p.Z]++
-		count([]otmap.Item{t.Ground}, false)
-		count(t.Items, false)
-		if e.blocking(t) {
-			s.Blocking++
-		} else {
-			s.Walkable++
+}
+
+// countItemStats adds items and their container contents to stats.
+// nested marks items inside a container.
+func (e *Editor) countItemStats(stats *Statistics, items []otmap.Item, nested bool) {
+	for _, item := range items {
+		if item.ID == 0 {
+			continue
 		}
-		if t.Flags&otmap.FlagPZ != 0 {
-			s.PZ++
+		stats.Items++
+		if nested {
+			stats.ContainerItems++
 		}
-		if t.HouseID != 0 {
-			s.HouseTiles++
+		if item.ActionID() != 0 {
+			stats.ActionIDs++
 		}
-		if t.Spawn() != nil {
-			s.Spawns++
+		if item.UniqueID() != 0 {
+			stats.UniqueIDs++
 		}
-		if t.SpawnNPC() != nil {
-			s.Spawns++
+		if item.Ext != nil && item.Ext.Dest != nil {
+			stats.Teleports++
 		}
-		for _, c := range t.Creatures() {
-			if c.NPC {
-				s.NPCs++
-			} else {
-				s.Monsters++
-			}
+		if typ := e.itemType(item.ID); typ != nil && typ.IsContainer() {
+			stats.Containers++
 		}
-	})
-	return s
+		if item.Ext != nil {
+			e.countItemStats(stats, item.Ext.Items, true)
+		}
+	}
 }
 
 // ItemPatch changes attributes of an item. Nil fields stay unchanged.
@@ -533,202 +560,199 @@ type ItemRef struct {
 	Path  []int          `json:"path"`
 }
 
-// ErrNoItem is returned for a reference to a missing item.
-var ErrNoItem = errors.New("item not found")
-
 // itemAt resolves a reference on a writable tile.
-func itemAt(t *otmap.Tile, r ItemRef) (*otmap.Item, []otmap.Item, int, error) {
+func itemAt(tile *otmap.Tile, ref ItemRef) (*otmap.Item, []otmap.Item, int, error) {
 	var list []otmap.Item
-	var it *otmap.Item
-	if r.Index < 0 {
-		if t.Ground.ID == 0 {
+	var item *otmap.Item
+	if ref.Index < 0 {
+		if tile.Ground.ID == 0 {
 			return nil, nil, 0, ErrNoItem
 		}
-		it = &t.Ground
+		item = &tile.Ground
 	} else {
-		if r.Index >= len(t.Items) {
+		if ref.Index >= len(tile.Items) {
 			return nil, nil, 0, ErrNoItem
 		}
-		list = t.Items
-		it = &t.Items[r.Index]
+		list = tile.Items
+		item = &tile.Items[ref.Index]
 	}
-	idx := r.Index
-	for _, i := range r.Path {
-		if it.Ext == nil || i < 0 || i >= len(it.Ext.Items) {
+	index := ref.Index
+	for _, childIndex := range ref.Path {
+		if item.Ext == nil || childIndex < 0 || childIndex >= len(item.Ext.Items) {
 			return nil, nil, 0, ErrNoItem
 		}
-		list = it.Ext.Items
-		idx = i
-		it = &it.Ext.Items[i]
+		list = item.Ext.Items
+		index = childIndex
+		item = &item.Ext.Items[childIndex]
 	}
-	return it, list, idx, nil
+	return item, list, index, nil
 }
 
 // UpdateItem applies a patch to an item.
-func (e *Editor) UpdateItem(r ItemRef, p ItemPatch) error {
-	if e.Map.Tile(r.Pos) == nil {
+func (e *Editor) UpdateItem(ref ItemRef, patch ItemPatch) error {
+	if e.Map.Tile(ref.Pos) == nil {
 		return ErrNoItem
 	}
 	tx := e.Begin("Edit item", 0)
 	defer tx.Commit()
-	t := tx.Edit(r.Pos)
-	it, _, _, err := itemAt(t, r)
+	tile := tx.Edit(ref.Pos)
+	item, _, _, err := itemAt(tile, ref)
 	if err != nil {
 		return err
 	}
-	if p.ID != nil {
-		if e.itemType(*p.ID) == nil {
-			return fmt.Errorf("unknown item %d", *p.ID)
+	if patch.ID != nil {
+		if e.itemType(*patch.ID) == nil {
+			return fmt.Errorf("unknown item %d", *patch.ID)
 		}
-		it.ID = *p.ID
+		item.ID = *patch.ID
 	}
-	if p.Subtype != nil {
-		it.Subtype = *p.Subtype
+	if patch.Subtype != nil {
+		item.Subtype = *patch.Subtype
 	}
-	ext := it.Ensure()
-	if p.ActionID != nil {
-		ext.ActionID = *p.ActionID
+	ext := item.Ensure()
+	if patch.ActionID != nil {
+		ext.ActionID = *patch.ActionID
 	}
-	if p.UniqueID != nil {
-		ext.UniqueID = *p.UniqueID
+	if patch.UniqueID != nil {
+		ext.UniqueID = *patch.UniqueID
 	}
-	if p.Text != nil {
-		ext.Text = *p.Text
+	if patch.Text != nil {
+		ext.Text = *patch.Text
 	}
-	if p.Description != nil {
-		ext.Description = *p.Description
+	if patch.Description != nil {
+		ext.Description = *patch.Description
 	}
-	if p.Dest != nil {
-		d := *p.Dest
-		ext.Dest = &d
+	if patch.Dest != nil {
+		dest := *patch.Dest
+		ext.Dest = &dest
 	}
-	if p.ClearDest {
+	if patch.ClearDest {
 		ext.Dest = nil
 	}
-	if p.DepotID != nil {
-		ext.DepotID = *p.DepotID
+	if patch.DepotID != nil {
+		ext.DepotID = *patch.DepotID
 	}
-	if p.DoorID != nil {
-		ext.DoorID = *p.DoorID
+	if patch.DoorID != nil {
+		ext.DoorID = *patch.DoorID
 	}
-	if p.Attrs != nil {
-		ext.Attrs = slices.Clone(*p.Attrs)
+	if patch.Attrs != nil {
+		ext.Attrs = slices.Clone(*patch.Attrs)
 	}
-	it.Compact()
+	item.Compact()
 	return nil
 }
 
 // RemoveItem deletes an item (or container content).
-func (e *Editor) RemoveItem(r ItemRef) error {
-	if e.Map.Tile(r.Pos) == nil {
+func (e *Editor) RemoveItem(ref ItemRef) error {
+	if e.Map.Tile(ref.Pos) == nil {
 		return ErrNoItem
 	}
 	tx := e.Begin("Remove item", 0)
 	defer tx.Commit()
-	t := tx.Edit(r.Pos)
-	if len(r.Path) == 0 {
-		if r.Index < 0 {
-			t.Ground = otmap.Item{}
+	tile := tx.Edit(ref.Pos)
+	if len(ref.Path) == 0 {
+		if ref.Index < 0 {
+			tile.Ground = otmap.Item{}
 			return nil
 		}
-		if r.Index >= len(t.Items) {
+		if ref.Index >= len(tile.Items) {
 			return ErrNoItem
 		}
-		t.Items = slices.Delete(t.Items, r.Index, r.Index+1)
+		tile.Items = slices.Delete(tile.Items, ref.Index, ref.Index+1)
 		return nil
 	}
-	parent := ItemRef{Pos: r.Pos, Index: r.Index, Path: r.Path[:len(r.Path)-1]}
-	pit, _, _, err := itemAt(t, parent)
+	parentRef := ItemRef{Pos: ref.Pos, Index: ref.Index, Path: ref.Path[:len(ref.Path)-1]}
+	parent, _, _, err := itemAt(tile, parentRef)
 	if err != nil {
 		return err
 	}
-	i := r.Path[len(r.Path)-1]
-	if pit.Ext == nil || i >= len(pit.Ext.Items) {
+	childIndex := ref.Path[len(ref.Path)-1]
+	if parent.Ext == nil || childIndex >= len(parent.Ext.Items) {
 		return ErrNoItem
 	}
-	pit.Ext.Items = slices.Delete(pit.Ext.Items, i, i+1)
-	pit.Compact()
+	parent.Ext.Items = slices.Delete(parent.Ext.Items, childIndex, childIndex+1)
+	parent.Compact()
 	return nil
 }
 
 // AddToContainer puts a new item into a container.
-func (e *Editor) AddToContainer(r ItemRef, id uint16) error {
+func (e *Editor) AddToContainer(ref ItemRef, id uint16) error {
 	if e.itemType(id) == nil {
 		return fmt.Errorf("unknown item %d", id)
 	}
-	if e.Map.Tile(r.Pos) == nil {
+	if e.Map.Tile(ref.Pos) == nil {
 		return ErrNoItem
 	}
 	tx := e.Begin("Add to container", 0)
 	defer tx.Commit()
-	t := tx.Edit(r.Pos)
-	it, _, _, err := itemAt(t, r)
+	tile := tx.Edit(ref.Pos)
+	container, _, _, err := itemAt(tile, ref)
 	if err != nil {
 		return err
 	}
-	if typ := e.itemType(it.ID); typ == nil || !typ.IsContainer() {
+	if typ := e.itemType(container.ID); typ == nil || !typ.IsContainer() {
 		return errors.New("the item is not a container")
 	}
-	ext := it.Ensure()
+	ext := container.Ensure()
 	ext.Items = append(ext.Items, e.newItem(id))
 	return nil
 }
 
 // MoveItem changes the stack position of an item on a tile.
-func (e *Editor) MoveItem(p otmap.Position, from, to int) error {
-	cur := e.Map.Tile(p)
-	if cur == nil || from < 0 || from >= len(cur.Items) || to < 0 || to >= len(cur.Items) || from == to {
+func (e *Editor) MoveItem(pos otmap.Position, from, to int) error {
+	current := e.Map.Tile(pos)
+	if current == nil || from < 0 || from >= len(current.Items) || to < 0 || to >= len(current.Items) || from == to {
 		return nil
 	}
 	tx := e.Begin("Reorder items", 0)
 	defer tx.Commit()
-	t := tx.Edit(p)
-	it := t.Items[from]
-	t.Items = slices.Delete(t.Items, from, from+1)
-	t.Items = slices.Insert(t.Items, to, it)
+	tile := tx.Edit(pos)
+	moved := tile.Items[from]
+	tile.Items = slices.Delete(tile.Items, from, from+1)
+	tile.Items = slices.Insert(tile.Items, to, moved)
 	return nil
 }
 
 // AddItem puts a new item on a tile like a raw brush.
-func (e *Editor) AddItem(p otmap.Position, id uint16) error {
+func (e *Editor) AddItem(pos otmap.Position, id uint16) error {
 	if e.itemType(id) == nil {
 		return fmt.Errorf("unknown item %d", id)
 	}
 	tx := e.Begin("Add item", 0)
 	defer tx.Commit()
-	e.addItem(tx.Edit(p), e.newItem(id))
+	e.addItem(tx.Edit(pos), e.newItem(id))
 	return nil
 }
 
 // RotateItem turns an item into its "rotateTo" item.
-func (e *Editor) RotateItem(r ItemRef) error {
-	if e.Map.Tile(r.Pos) == nil {
+func (e *Editor) RotateItem(ref ItemRef) error {
+	if e.Map.Tile(ref.Pos) == nil {
 		return ErrNoItem
 	}
 	tx := e.Begin("Rotate item", 0)
 	defer tx.Commit()
-	t := tx.Edit(r.Pos)
-	it, _, _, err := itemAt(t, r)
+	tile := tx.Edit(ref.Pos)
+	item, _, _, err := itemAt(tile, ref)
 	if err != nil {
 		return err
 	}
-	typ := e.itemType(it.ID)
+	typ := e.itemType(item.ID)
 	if typ == nil || typ.RotateTo == 0 {
 		return errors.New("the item cannot be rotated")
 	}
-	it.ID = typ.RotateTo
+	item.ID = typ.RotateTo
 	return nil
 }
 
 // SwitchDoor opens or closes a door.
-func (e *Editor) SwitchDoor(p otmap.Position, index int) error {
-	cur := e.Map.Tile(p)
-	if cur == nil || index < 0 || index >= len(cur.Items) {
+func (e *Editor) SwitchDoor(pos otmap.Position, index int) error {
+	current := e.Map.Tile(pos)
+	if current == nil || index < 0 || index >= len(current.Items) {
 		return ErrNoItem
 	}
 	tx := e.Begin("Switch door", 0)
 	defer tx.Commit()
-	if !e.switchDoor(tx.Edit(p), index) {
+	if !e.switchDoor(tx.Edit(pos), index) {
 		return errors.New("no door brush knows this door")
 	}
 	return nil
@@ -742,18 +766,18 @@ type TilePatch struct {
 }
 
 // UpdateTile applies a tile patch.
-func (e *Editor) UpdateTile(p otmap.Position, patch TilePatch) {
+func (e *Editor) UpdateTile(pos otmap.Position, patch TilePatch) {
 	tx := e.Begin("Edit tile", 0)
-	t := tx.Edit(p)
+	tile := tx.Edit(pos)
 	if patch.Flags != nil {
-		t.Flags = *patch.Flags
+		tile.Flags = *patch.Flags
 	}
 	if patch.HouseID != nil {
-		t.HouseID = *patch.HouseID
+		tile.HouseID = *patch.HouseID
 	}
 	if patch.Zones != nil {
-		t.EnsureExt().Zones = slices.Clone(*patch.Zones)
-		t.Compact()
+		tile.EnsureExt().Zones = slices.Clone(*patch.Zones)
+		tile.Compact()
 	}
 	tx.Commit()
 }
@@ -768,53 +792,53 @@ type CreaturePatch struct {
 }
 
 // UpdateCreature edits a creature of a tile.
-func (e *Editor) UpdateCreature(p otmap.Position, index int, patch CreaturePatch) error {
-	cur := e.Map.Tile(p)
-	if cur == nil || index < 0 || index >= len(cur.Creatures()) {
+func (e *Editor) UpdateCreature(pos otmap.Position, index int, patch CreaturePatch) error {
+	current := e.Map.Tile(pos)
+	if current == nil || index < 0 || index >= len(current.Creatures()) {
 		return errors.New("creature not found")
 	}
 	tx := e.Begin("Edit creature", 0)
 	defer tx.Commit()
-	t := tx.Edit(p)
-	c := &t.Ext.Creatures[index]
+	tile := tx.Edit(pos)
+	creature := &tile.Ext.Creatures[index]
 	if patch.Remove {
-		t.Ext.Creatures = slices.Delete(t.Ext.Creatures, index, index+1)
-		t.Compact()
+		tile.Ext.Creatures = slices.Delete(tile.Ext.Creatures, index, index+1)
+		tile.Compact()
 		return nil
 	}
 	if patch.SpawnTime != nil {
-		c.SpawnTime = *patch.SpawnTime
+		creature.SpawnTime = *patch.SpawnTime
 	}
 	if patch.Direction != nil {
-		c.Direction = *patch.Direction % 4
+		creature.Direction = *patch.Direction % creatureDirectionCount
 	}
 	if patch.Weight != nil {
-		c.Weight = *patch.Weight
+		creature.Weight = *patch.Weight
 	}
 	if patch.Name != nil && *patch.Name != "" {
-		c.Name = *patch.Name
+		creature.Name = *patch.Name
 	}
 	return nil
 }
 
 // UpdateSpawn sets the radius of a spawn (0 removes it).
-func (e *Editor) UpdateSpawn(p otmap.Position, npc bool, radius int32) error {
-	cur := e.Map.Tile(p)
-	if cur == nil || (npc && cur.SpawnNPC() == nil) || (!npc && cur.Spawn() == nil) {
+func (e *Editor) UpdateSpawn(pos otmap.Position, npc bool, radius int32) error {
+	current := e.Map.Tile(pos)
+	if current == nil || (npc && current.SpawnNPC() == nil) || (!npc && current.Spawn() == nil) {
 		return errors.New("spawn not found")
 	}
 	tx := e.Begin("Edit spawn", 0)
 	defer tx.Commit()
-	t := tx.Edit(p)
-	s := &t.Ext.Spawn
+	tile := tx.Edit(pos)
+	spawn := &tile.Ext.Spawn
 	if npc {
-		s = &t.Ext.SpawnNPC
+		spawn = &tile.Ext.SpawnNPC
 	}
 	if radius <= 0 {
-		*s = nil
-		t.Compact()
+		*spawn = nil
+		tile.Compact()
 		return nil
 	}
-	(*s).Radius = min(radius, maxSpawnRadius)
+	(*spawn).Radius = min(radius, maxSpawnRadius)
 	return nil
 }

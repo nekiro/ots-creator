@@ -12,27 +12,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/otmap"
 )
 
-// Brush kinds of a draw request.
-const (
-	KindRaw            = "raw"
-	KindGround         = "ground"
-	KindWall           = "wall"
-	KindDoor           = "door"
-	KindDoodad         = "doodad"
-	KindCarpet         = "carpet"
-	KindTable          = "table"
-	KindEraser         = "eraser"
-	KindHouse          = "house"
-	KindHouseExit      = "houseExit"
-	KindWaypoint       = "waypoint"
-	KindSpawn          = "spawn"
-	KindSpawnNPC       = "spawnNpc"
-	KindCreature       = "creature"
-	KindFlag           = "flag"
-	KindZone           = "zone"
-	KindOptionalBorder = "optionalBorder"
-)
-
 // Rect is a rectangle of tiles on one floor (corners in any order).
 type Rect struct {
 	From otmap.Position `json:"from"`
@@ -88,12 +67,6 @@ type DrawRequest struct {
 	Stroke int64 `json:"stroke"`
 }
 
-// ErrNoBrush is returned for an unknown brush.
-var ErrNoBrush = errors.New("unknown brush")
-
-// maxDrawTiles limits one request.
-const maxDrawTiles = 250000
-
 type posSet struct {
 	list []otmap.Position
 	seen map[otmap.Position]bool
@@ -101,174 +74,181 @@ type posSet struct {
 
 func newPosSet() *posSet { return &posSet{seen: map[otmap.Position]bool{}} }
 
-func (s *posSet) add(p otmap.Position) {
-	if !s.seen[p] {
-		s.seen[p] = true
-		s.list = append(s.list, p)
+func (s *posSet) add(pos otmap.Position) {
+	if !s.seen[pos] {
+		s.seen[pos] = true
+		s.list = append(s.list, pos)
 	}
 }
 
 func (s *posSet) addXY(x, y, z int) {
 	if inRange(x, y) {
-		s.add(pos(x, y, z))
+		s.add(posAt(x, y, z))
 	}
 }
 
 // ring returns the tiles around a set (including the set).
 func (s *posSet) ring() *posSet {
-	r := newPosSet()
-	for _, p := range s.list {
+	around := newPosSet()
+	for _, center := range s.list {
 		for dy := -1; dy <= 1; dy++ {
 			for dx := -1; dx <= 1; dx++ {
-				r.addXY(int(p.X)+dx, int(p.Y)+dy, int(p.Z))
+				around.addXY(int(center.X)+dx, int(center.Y)+dy, int(center.Z))
 			}
 		}
 	}
-	return r
+	return around
 }
 
 // BrushArea returns the tiles a brush of a size and shape covers around a
 // center.
 func BrushArea(center otmap.Position, size int, shape string) []otmap.Position {
-	s := newPosSet()
-	addArea(s, center, size, shape)
-	return s.list
+	tiles := newPosSet()
+	addArea(tiles, center, size, shape)
+	return tiles.list
 }
 
-func addArea(s *posSet, c otmap.Position, size int, shape string) {
+func addArea(tiles *posSet, center otmap.Position, size int, shape string) {
 	size = max(size, 0)
 	for dy := -size; dy <= size; dy++ {
 		for dx := -size; dx <= size; dx++ {
-			if shape == "circle" && math.Sqrt(float64(dx*dx+dy*dy)) >= float64(size)+0.005 {
+			if shape == shapeCircle && math.Sqrt(float64(dx*dx+dy*dy)) >= float64(size)+circleEdgeSlack {
 				continue
 			}
-			s.addXY(int(c.X)+dx, int(c.Y)+dy, int(c.Z))
+			tiles.addXY(int(center.X)+dx, int(center.Y)+dy, int(center.Z))
 		}
 	}
 }
 
-func addOutline(s *posSet, x0, y0, x1, y1, z int) {
+func addOutline(tiles *posSet, x0, y0, x1, y1, z int) {
 	for y := y0; y <= y1; y++ {
 		for x := x0; x <= x1; x++ {
 			if x == x0 || x == x1 || y == y0 || y == y1 {
-				s.addXY(x, y, z)
+				tiles.addXY(x, y, z)
 			}
+		}
+	}
+}
+
+// addRect adds every tile of a rectangle.
+func addRect(tiles *posSet, x0, y0, x1, y1, z int) {
+	for y := y0; y <= y1; y++ {
+		for x := x0; x <= x1; x++ {
+			tiles.addXY(x, y, z)
 		}
 	}
 }
 
 // Draw applies a brush and returns the number of changed tiles.
-func (e *Editor) Draw(r DrawRequest) (int, error) {
-	label := strings.ToUpper(r.Kind[:1]) + r.Kind[1:]
-	if r.Erase {
-		label = "Erase " + r.Kind
-	}
-	if len(r.Points) == 0 && r.Rect == nil {
+func (e *Editor) Draw(req DrawRequest) (int, error) {
+	if len(req.Points) == 0 && req.Rect == nil {
 		return 0, nil
 	}
-	tx := e.Begin(label, r.Stroke)
-	var err error
-	switch r.Kind {
-	case KindHouseExit, KindWaypoint:
-		err = e.drawMarker(tx, r)
-	case KindSpawn, KindSpawnNPC:
-		e.drawSpawn(tx, r)
-	case KindCreature:
-		err = e.drawCreature(tx, r)
-	case KindDoor:
-		e.drawDoorRequest(tx, r)
-	case KindDoodad:
-		err = e.drawDoodadRequest(tx, r)
-	default:
-		err = e.drawArea(tx, r)
+	if req.Kind == "" {
+		return 0, fmt.Errorf("%w: no brush kind", ErrNoBrush)
 	}
-	n := tx.Commit()
-	return n, err
+	label := strings.ToUpper(req.Kind[:1]) + req.Kind[1:]
+	if req.Erase {
+		label = "Erase " + req.Kind
+	}
+	tx := e.Begin(label, req.Stroke)
+	var err error
+	switch req.Kind {
+	case KindHouseExit, KindWaypoint:
+		err = e.drawMarker(tx, req)
+	case KindSpawn, KindSpawnNPC:
+		e.drawSpawn(tx, req)
+	case KindCreature:
+		err = e.drawCreature(tx, req)
+	case KindDoor:
+		e.drawDoorRequest(tx, req)
+	case KindDoodad:
+		err = e.drawDoodadRequest(tx, req)
+	default:
+		err = e.drawArea(tx, req)
+	}
+	changed := tx.Commit()
+	return changed, err
 }
 
 // area returns the tiles a request paints.
-func (e *Editor) area(r DrawRequest) *posSet {
-	s := newPosSet()
-	if r.Rect != nil {
-		x0, y0, x1, y1 := r.Rect.bounds()
+func (e *Editor) area(req DrawRequest) *posSet {
+	tiles := newPosSet()
+	if req.Rect != nil {
+		x0, y0, x1, y1 := req.Rect.bounds()
 		if (x1-x0+1)*(y1-y0+1) > maxDrawTiles {
-			return s
+			return tiles
 		}
-		z := int(r.Rect.From.Z)
-		if r.Kind == KindWall {
-			addOutline(s, x0, y0, x1, y1, z)
-			return s
+		z := int(req.Rect.From.Z)
+		if req.Kind == KindWall {
+			addOutline(tiles, x0, y0, x1, y1, z)
+			return tiles
 		}
-		for y := y0; y <= y1; y++ {
-			for x := x0; x <= x1; x++ {
-				s.addXY(x, y, z)
-			}
-		}
-		return s
+		addRect(tiles, x0, y0, x1, y1, z)
+		return tiles
 	}
-	if r.Fill && r.Kind == KindGround && len(r.Points) > 0 {
-		return e.floodFill(r.Points[0], r.Name)
+	if req.Fill && req.Kind == KindGround && len(req.Points) > 0 {
+		return e.floodFill(req.Points[0], req.Name)
 	}
-	for _, p := range r.Points {
-		if r.Kind == KindWall && r.Size > 0 {
-			addOutline(s, int(p.X)-r.Size, int(p.Y)-r.Size, int(p.X)+r.Size, int(p.Y)+r.Size, int(p.Z))
+	for _, center := range req.Points {
+		if req.Kind == KindWall && req.Size > 0 {
+			addOutline(tiles, int(center.X)-req.Size, int(center.Y)-req.Size, int(center.X)+req.Size, int(center.Y)+req.Size, int(center.Z))
 			continue
 		}
-		addArea(s, p, r.Size, r.Shape)
-		if len(s.list) > maxDrawTiles {
+		addArea(tiles, center, req.Size, req.Shape)
+		if len(tiles.list) > maxDrawTiles {
 			break
 		}
 	}
-	return s
+	return tiles
 }
 
 // floodFill returns the connected area of the ground brush under start
 // (or of empty tiles), limited to a window around it.
 func (e *Editor) floodFill(start otmap.Position, brush string) *posSet {
-	s := newPosSet()
-	const radius = 128
+	filled := newPosSet()
 	startTile := e.Map.Tile(start)
-	old := e.groundBrushOf(startTile)
-	target := e.Brushes.Ground(brush)
-	if target == nil || (old != nil && old.id == target.id) {
-		return s
+	oldBrush := e.groundBrushOf(startTile)
+	targetBrush := e.Brushes.Ground(brush)
+	if targetBrush == nil || (oldBrush != nil && oldBrush.id == targetBrush.id) {
+		return filled
 	}
-	if startTile != nil && startTile.Ground.ID != 0 && old == nil {
-		return s // a ground without brush: nothing to match
+	if startTile != nil && startTile.Ground.ID != 0 && oldBrush == nil {
+		return filled // a ground without brush: nothing to match
 	}
-	same := func(t *otmap.Tile) bool {
-		if old == nil {
-			return t == nil || t.Ground.ID == 0
+	matches := func(tile *otmap.Tile) bool {
+		if oldBrush == nil {
+			return tile == nil || tile.Ground.ID == 0
 		}
-		g := e.groundBrushOf(t)
-		return g != nil && g.id == old.id
+		ground := e.groundBrushOf(tile)
+		return ground != nil && ground.id == oldBrush.id
 	}
 	queue := []otmap.Position{start}
-	s.add(start)
-	for len(queue) > 0 && len(s.list) < maxDrawTiles {
-		p := queue[0]
+	filled.add(start)
+	for len(queue) > 0 && len(filled.list) < maxDrawTiles {
+		current := queue[0]
 		queue = queue[1:]
-		for _, d := range [4][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
-			nx, ny := int(p.X)+d[0], int(p.Y)+d[1]
-			if !inRange(nx, ny) || abs(nx-int(start.X)) > radius || abs(ny-int(start.Y)) > radius {
+		for _, step := range orthogonalSteps {
+			nextX, nextY := int(current.X)+step[0], int(current.Y)+step[1]
+			if !inRange(nextX, nextY) || abs(nextX-int(start.X)) > floodFillRadius || abs(nextY-int(start.Y)) > floodFillRadius {
 				continue
 			}
-			q := pos(nx, ny, int(p.Z))
-			if s.seen[q] || !same(e.Map.Tile(q)) {
+			next := posAt(nextX, nextY, int(current.Z))
+			if filled.seen[next] || !matches(e.Map.Tile(next)) {
 				continue
 			}
-			s.add(q)
-			queue = append(queue, q)
+			filled.add(next)
+			queue = append(queue, next)
 		}
 	}
-	return s
+	return filled
 }
 
-func abs(v int) int {
-	if v < 0 {
-		return -v
+func abs(value int) int {
+	if value < 0 {
+		return -value
 	}
-	return v
+	return value
 }
 
 // strokeReplace remembers which ground an Alt stroke replaces.
@@ -278,512 +258,555 @@ type strokeReplace struct {
 	empty  bool
 }
 
-func (e *Editor) drawArea(tx *Tx, r DrawRequest) error {
-	area := e.area(r)
+func (e *Editor) drawArea(tx *Tx, req DrawRequest) error {
+	area := e.area(req)
 	if len(area.list) == 0 {
 		return nil
 	}
-	switch r.Kind {
+	switch req.Kind {
 	case KindRaw:
-		return e.drawRaw(tx, r, area)
+		return e.drawRaw(tx, req, area)
 	case KindGround:
-		return e.drawGround(tx, r, area)
+		return e.drawGround(tx, req, area)
 	case KindEraser:
-		e.drawEraser(tx, r, area)
+		e.drawEraser(tx, req, area)
 	case KindWall:
-		return e.drawWalls(tx, r, area)
+		return e.drawWalls(tx, req, area)
 	case KindCarpet, KindTable:
-		return e.drawCarpetTable(tx, r, area)
+		return e.drawCarpetTable(tx, req, area)
 	case KindHouse:
-		return e.drawHouse(tx, r, area)
+		return e.drawHouse(tx, req, area)
 	case KindFlag:
-		for _, p := range area.list {
-			cur := tx.Get(p)
-			if cur == nil || cur.Ground.ID == 0 {
-				continue
-			}
-			has := cur.Flags&r.Flag == r.Flag
-			if has == !r.Erase {
-				continue
-			}
-			t := tx.Edit(p)
-			if r.Erase {
-				t.Flags &^= r.Flag
-			} else {
-				t.Flags |= r.Flag
-			}
-		}
+		e.drawFlag(tx, req, area)
 	case KindZone:
-		for _, p := range area.list {
-			cur := tx.Get(p)
-			if cur == nil || cur.Ground.ID == 0 {
-				continue
-			}
-			has := slices.Contains(cur.Zones(), r.Zone)
-			if has == !r.Erase {
-				continue
-			}
-			t := tx.Edit(p)
-			ext := t.EnsureExt()
-			if r.Erase {
-				ext.Zones = slices.DeleteFunc(ext.Zones, func(z uint16) bool { return z == r.Zone })
-				t.Compact()
-			} else {
-				ext.Zones = append(ext.Zones, r.Zone)
-			}
-		}
+		e.drawZone(tx, req, area)
 	case KindOptionalBorder:
-		for _, p := range area.list {
-			cur := tx.Get(p)
-			if r.Erase {
-				if cur == nil || !e.hasOptionalBorder(cur) {
-					continue
-				}
-				tx.Edit(p).State &^= otmap.StateOptionalBorder
-			} else {
-				if g := e.groundBrushOf(cur); g != nil && g.optional != nil {
-					continue // no gravel on a mountain
-				}
-				tx.Edit(p).State |= otmap.StateOptionalBorder
-			}
-			e.borderize(tx, p)
-		}
+		e.drawOptionalBorder(tx, req, area)
 	default:
-		return fmt.Errorf("%w: %s", ErrNoBrush, r.Kind)
+		return fmt.Errorf("%w: %s", ErrNoBrush, req.Kind)
 	}
 	return nil
 }
 
-func (e *Editor) drawRaw(tx *Tx, r DrawRequest, area *posSet) error {
-	typ := e.itemType(r.Item)
-	if typ == nil || r.Item == 0 {
-		return fmt.Errorf("%w: item %d", ErrNoBrush, r.Item)
-	}
-	for _, p := range area.list {
-		if r.Erase {
-			cur := tx.Get(p)
-			if cur == nil {
-				continue
-			}
-			if cur.Ground.ID != r.Item && !slices.ContainsFunc(cur.Items, func(it otmap.Item) bool { return it.ID == r.Item }) {
-				continue
-			}
-			t := tx.Edit(p)
-			if t.Ground.ID == r.Item {
-				t.Ground = otmap.Item{}
-			}
-			t.Items = slices.DeleteFunc(t.Items, func(it otmap.Item) bool { return it.ID == r.Item })
+// drawFlag sets or clears a tile flag on the grounds of an area.
+func (e *Editor) drawFlag(tx *Tx, req DrawRequest, area *posSet) {
+	for _, pos := range area.list {
+		current := tx.Get(pos)
+		if current == nil || current.Ground.ID == 0 {
 			continue
 		}
-		t := tx.Edit(p)
-		if e.Settings.RawReplaceBottom && typ.TopOrder == 2 {
-			t.Items = slices.DeleteFunc(t.Items, func(it otmap.Item) bool { return e.topOrder(it.ID) == 2 })
+		hasFlag := current.Flags&req.Flag == req.Flag
+		if hasFlag == !req.Erase {
+			continue
 		}
-		e.addItem(t, e.newItem(r.Item))
+		tile := tx.Edit(pos)
+		if req.Erase {
+			tile.Flags &^= req.Flag
+		} else {
+			tile.Flags |= req.Flag
+		}
+	}
+}
+
+// drawZone adds or removes a zone on the grounds of an area.
+func (e *Editor) drawZone(tx *Tx, req DrawRequest, area *posSet) {
+	for _, pos := range area.list {
+		current := tx.Get(pos)
+		if current == nil || current.Ground.ID == 0 {
+			continue
+		}
+		hasZone := slices.Contains(current.Zones(), req.Zone)
+		if hasZone == !req.Erase {
+			continue
+		}
+		tile := tx.Edit(pos)
+		ext := tile.EnsureExt()
+		if req.Erase {
+			ext.Zones = slices.DeleteFunc(ext.Zones, func(zoneID uint16) bool { return zoneID == req.Zone })
+			tile.Compact()
+		} else {
+			ext.Zones = append(ext.Zones, req.Zone)
+		}
+	}
+}
+
+// drawOptionalBorder marks or unmarks tiles for an optional border and
+// borderizes them.
+func (e *Editor) drawOptionalBorder(tx *Tx, req DrawRequest, area *posSet) {
+	for _, pos := range area.list {
+		current := tx.Get(pos)
+		if req.Erase {
+			if current == nil || !e.hasOptionalBorder(current) {
+				continue
+			}
+			// The pieces count as a mark too (the mark is not saved with
+			// the map), so they go with it.
+			tile := tx.Edit(pos)
+			tile.State &^= otmap.StateOptionalBorder
+			tile.Items = slices.DeleteFunc(slices.Clone(tile.Items), func(item otmap.Item) bool {
+				info := e.Brushes.info[item.ID]
+				return info != nil && info.optionalBorder
+			})
+		} else {
+			if ground := e.groundBrushOf(current); ground != nil && ground.optional != nil {
+				continue // no gravel on a mountain
+			}
+			tx.Edit(pos).State |= otmap.StateOptionalBorder
+		}
+		e.borderize(tx, pos)
+	}
+}
+
+func (e *Editor) drawRaw(tx *Tx, req DrawRequest, area *posSet) error {
+	itemType := e.itemType(req.Item)
+	if itemType == nil || req.Item == 0 {
+		return fmt.Errorf("%w: item %d", ErrNoBrush, req.Item)
+	}
+	isRawItem := func(item otmap.Item) bool { return item.ID == req.Item }
+	for _, pos := range area.list {
+		if req.Erase {
+			current := tx.Get(pos)
+			if current == nil {
+				continue
+			}
+			if current.Ground.ID != req.Item && !slices.ContainsFunc(current.Items, isRawItem) {
+				continue
+			}
+			tile := tx.Edit(pos)
+			if tile.Ground.ID == req.Item {
+				tile.Ground = otmap.Item{}
+			}
+			tile.Items = slices.DeleteFunc(tile.Items, isRawItem)
+			continue
+		}
+		tile := tx.Edit(pos)
+		if e.Settings.RawReplaceBottom && itemType.TopOrder == bottomTopOrder {
+			tile.Items = slices.DeleteFunc(tile.Items, func(item otmap.Item) bool { return e.topOrder(item.ID) == bottomTopOrder })
+		}
+		e.addItem(tile, e.newItem(req.Item))
 	}
 	return nil
 }
 
-func (e *Editor) drawGround(tx *Tx, r DrawRequest, area *posSet) error {
-	g := e.Brushes.Ground(r.Name)
-	if g == nil {
-		return fmt.Errorf("%w: ground %q", ErrNoBrush, r.Name)
+func (e *Editor) drawGround(tx *Tx, req DrawRequest, area *posSet) error {
+	brush := e.Brushes.Ground(req.Name)
+	if brush == nil {
+		return fmt.Errorf("%w: ground %q", ErrNoBrush, req.Name)
 	}
-	if r.Alt && !r.Erase && e.replace.stroke != r.Stroke && len(r.Points) > 0 {
-		start := e.Map.Tile(r.Points[0])
-		e.replace = strokeReplace{stroke: r.Stroke, brush: e.groundBrushOf(start), empty: e.groundBrushOf(start) == nil}
+	if req.Alt && !req.Erase && e.replace.stroke != req.Stroke && len(req.Points) > 0 {
+		startTile := e.Map.Tile(req.Points[0])
+		e.replace = strokeReplace{stroke: req.Stroke, brush: e.groundBrushOf(startTile), empty: e.groundBrushOf(startTile) == nil}
 	}
-	for _, p := range area.list {
-		cur := tx.Get(p)
-		if r.Erase {
-			if cur == nil || e.groundBrushOf(cur) != g {
+	for _, pos := range area.list {
+		current := tx.Get(pos)
+		if req.Erase {
+			if current == nil || e.groundBrushOf(current) != brush {
 				continue
 			}
-			t := tx.Edit(p)
-			t.Ground = otmap.Item{}
+			tile := tx.Edit(pos)
+			tile.Ground = otmap.Item{}
 			continue
 		}
-		if r.Alt {
-			other := e.groundBrushOf(cur)
+		if req.Alt {
+			currentBrush := e.groundBrushOf(current)
 			if e.replace.empty {
-				if other != nil {
+				if currentBrush != nil {
 					continue
 				}
-			} else if other != e.replace.brush {
+			} else if currentBrush != e.replace.brush {
 				continue
 			}
 		}
-		if len(g.items.ids) == 0 {
+		if len(brush.items.ids) == 0 {
 			continue
 		}
-		t := tx.Edit(p)
+		tile := tx.Edit(pos)
 		if e.Settings.Automagic {
-			e.cleanBorders(t)
+			e.cleanBorders(tile)
 		}
-		t.Ground = e.newItem(g.items.pick(e.rng))
+		tile.Ground = e.newItem(brush.items.pick(e.rng))
 	}
 	if e.Settings.Automagic {
-		for _, p := range area.ring().list {
-			e.borderize(tx, p)
+		for _, pos := range area.ring().list {
+			e.borderize(tx, pos)
 		}
 	}
 	return nil
 }
 
-func (e *Editor) drawEraser(tx *Tx, r DrawRequest, area *posSet) {
-	for _, p := range area.list {
-		cur := tx.Get(p)
-		if cur == nil || (cur.Ground.ID == 0 && len(cur.Items) == 0) {
+func (e *Editor) drawEraser(tx *Tx, req DrawRequest, area *posSet) {
+	for _, pos := range area.list {
+		current := tx.Get(pos)
+		if current == nil || (current.Ground.ID == 0 && len(current.Items) == 0) {
 			continue
 		}
-		t := tx.Edit(p)
-		leave := e.Settings.EraserLeaveUnique
-		t.Items = slices.DeleteFunc(t.Items, func(it otmap.Item) bool {
-			if leave && (it.Complex() || (!r.Erase && e.Brushes.isBorder(it.ID))) {
+		tile := tx.Edit(pos)
+		leaveUnique := e.Settings.EraserLeaveUnique
+		tile.Items = slices.DeleteFunc(tile.Items, func(item otmap.Item) bool {
+			if leaveUnique && (item.Complex() || (!req.Erase && e.Brushes.isBorder(item.ID))) {
 				return false
 			}
 			return true
 		})
-		if r.Erase && t.Ground.ID != 0 && !(leave && t.Ground.Complex()) {
-			t.Ground = otmap.Item{}
+		if req.Erase && tile.Ground.ID != 0 && !(leaveUnique && tile.Ground.Complex()) {
+			tile.Ground = otmap.Item{}
 		}
 	}
 	if e.Settings.Automagic {
-		for _, p := range area.ring().list {
-			e.borderize(tx, p)
-			e.wallize(tx, p)
-			e.tableize(tx, p)
-			e.carpetize(tx, p)
+		for _, pos := range area.ring().list {
+			e.borderize(tx, pos)
+			e.wallize(tx, pos)
+			e.tableize(tx, pos)
+			e.carpetize(tx, pos)
 		}
 	}
 }
 
-func (e *Editor) drawWalls(tx *Tx, r DrawRequest, area *posSet) error {
-	w := e.Brushes.Wall(r.Name)
-	if w == nil {
-		return fmt.Errorf("%w: wall %q", ErrNoBrush, r.Name)
+func (e *Editor) drawWalls(tx *Tx, req DrawRequest, area *posSet) error {
+	wall := e.Brushes.Wall(req.Name)
+	if wall == nil {
+		return fmt.Errorf("%w: wall %q", ErrNoBrush, req.Name)
 	}
-	if r.Alt && r.Size == 0 && r.Rect == nil && !r.Erase {
+	if req.Alt && req.Size == 0 && req.Rect == nil && !req.Erase {
 		// Alt-click changes the shape of the wall under the cursor.
-		for _, p := range area.list {
-			if tx.Get(p) != nil {
-				e.cycleWall(tx.Edit(p), w)
+		for _, pos := range area.list {
+			if tx.Get(pos) != nil {
+				e.cycleWall(tx.Edit(pos), wall)
 			}
 		}
 		return nil
 	}
-	for _, p := range area.list {
-		cur := tx.Get(p)
-		if r.Erase {
-			if cur == nil || !e.hasWall(cur) {
+	for _, pos := range area.list {
+		current := tx.Get(pos)
+		if req.Erase {
+			if current == nil || !e.hasWall(current) {
 				continue
 			}
-			e.cleanWalls(tx.Edit(p), w)
+			e.cleanWalls(tx.Edit(pos), wall)
 			continue
 		}
-		e.drawWall(tx.Edit(p), w)
+		e.drawWall(tx.Edit(pos), wall)
 	}
-	if e.Settings.Automagic && !w.decoration {
-		for _, p := range area.ring().list {
-			e.wallize(tx, p)
+	if e.Settings.Automagic && !wall.decoration {
+		for _, pos := range area.ring().list {
+			e.wallize(tx, pos)
 		}
 	}
 	return nil
 }
 
-func (e *Editor) drawCarpetTable(tx *Tx, r DrawRequest, area *posSet) error {
-	carpet := r.Kind == KindCarpet
-	c, tb := e.Brushes.Carpet(r.Name), e.Brushes.Table(r.Name)
-	if (carpet && c == nil) || (!carpet && tb == nil) {
-		return fmt.Errorf("%w: %s %q", ErrNoBrush, r.Kind, r.Name)
+func (e *Editor) drawCarpetTable(tx *Tx, req DrawRequest, area *posSet) error {
+	isCarpet := req.Kind == KindCarpet
+	carpetBrush, tableBrush := e.Brushes.Carpet(req.Name), e.Brushes.Table(req.Name)
+	if (isCarpet && carpetBrush == nil) || (!isCarpet && tableBrush == nil) {
+		return fmt.Errorf("%w: %s %q", ErrNoBrush, req.Kind, req.Name)
 	}
-	for _, p := range area.list {
-		cur := tx.Get(p)
-		if r.Erase {
-			if cur == nil || (carpet && !e.hasCarpet(cur)) || (!carpet && !e.hasTable(cur)) {
+	for _, pos := range area.list {
+		current := tx.Get(pos)
+		if req.Erase {
+			if current == nil || (isCarpet && !e.hasCarpet(current)) || (!isCarpet && !e.hasTable(current)) {
 				continue
 			}
-			t := tx.Edit(p)
-			if carpet {
-				e.removeCarpets(t)
+			tile := tx.Edit(pos)
+			if isCarpet {
+				e.removeCarpets(tile)
 			} else {
-				e.removeTables(t)
+				e.removeTables(tile)
 			}
 			continue
 		}
-		t := tx.Edit(p)
-		if carpet {
-			e.drawCarpet(t, c)
+		tile := tx.Edit(pos)
+		if isCarpet {
+			e.drawCarpet(tile, carpetBrush)
 		} else {
-			e.drawTable(t, tb)
+			e.drawTable(tile, tableBrush)
 		}
 	}
-	for _, p := range area.ring().list {
-		if carpet {
-			e.carpetize(tx, p)
+	for _, pos := range area.ring().list {
+		if isCarpet {
+			e.carpetize(tx, pos)
 		} else {
-			e.tableize(tx, p)
+			e.tableize(tx, pos)
 		}
 	}
 	return nil
 }
 
-func (e *Editor) drawDoorRequest(tx *Tx, r DrawRequest) {
-	dt := slices.Index(materials.DoorTypes, r.DoorType) + 1
-	if dt <= 0 {
-		dt = 2 // normal
+func (e *Editor) drawDoorRequest(tx *Tx, req DrawRequest) {
+	doorType := slices.Index(materials.DoorTypes, req.DoorType) + 1
+	if doorType <= 0 {
+		doorType = doorTypeNormal
 	}
-	for _, p := range r.Points {
-		if r.Erase {
-			e.removeDoor(tx, p)
+	for _, target := range req.Points {
+		if req.Erase {
+			e.removeDoor(tx, target)
 		} else {
-			e.drawDoor(tx, p, dt, r.Alt)
+			e.drawDoor(tx, target, doorType, req.Alt)
 		}
 	}
 	if e.Settings.Automagic {
-		s := newPosSet()
-		for _, p := range r.Points {
-			s.add(p)
+		points := newPosSet()
+		for _, target := range req.Points {
+			points.add(target)
 		}
-		for _, p := range s.ring().list {
-			e.wallize(tx, p)
+		for _, pos := range points.ring().list {
+			e.wallize(tx, pos)
 		}
 	}
 }
 
-func (e *Editor) drawDoodadRequest(tx *Tx, r DrawRequest) error {
-	d := e.Brushes.Doodad(r.Name)
-	if d == nil {
-		return fmt.Errorf("%w: doodad %q", ErrNoBrush, r.Name)
+func (e *Editor) drawDoodadRequest(tx *Tx, req DrawRequest) error {
+	doodad := e.Brushes.Doodad(req.Name)
+	if doodad == nil {
+		return fmt.Errorf("%w: doodad %q", ErrNoBrush, req.Name)
 	}
-	if r.Erase {
-		for _, p := range e.area(r).list {
-			if cur := tx.Get(p); cur != nil {
-				before := len(cur.Items)
-				g := cur.Ground.ID
-				probe := cur.Clone()
-				e.eraseDoodad(probe, d)
-				if len(probe.Items) != before || probe.Ground.ID != g {
-					e.eraseDoodad(tx.Edit(p), d)
+	if req.Erase {
+		for _, pos := range e.area(req).list {
+			if current := tx.Get(pos); current != nil {
+				itemsBefore := len(current.Items)
+				groundBefore := current.Ground.ID
+				probe := current.Clone()
+				e.eraseDoodad(probe, doodad)
+				if len(probe.Items) != itemsBefore || probe.Ground.ID != groundBefore {
+					e.eraseDoodad(tx.Edit(pos), doodad)
 				}
 			}
 		}
 		return nil
 	}
-	buf := e.doodad
-	if buf == nil || !strings.EqualFold(buf.Brush, r.Name) || buf.Size != r.Size || buf.Shape != r.Shape || buf.Variation != r.Variation {
-		e.GenerateDoodad(r.Name, r.Variation, r.Size, r.Shape, r.Thickness)
+	generated := e.doodad
+	if generated == nil || !strings.EqualFold(generated.Brush, req.Name) || generated.Size != req.Size || generated.Shape != req.Shape || generated.Variation != req.Variation {
+		e.GenerateDoodad(req.Name, req.Variation, req.Size, req.Shape, req.Thickness)
 	}
-	for _, p := range r.Points {
-		e.placeDoodad(tx, p, r.Alt, r.Thickness)
+	for _, center := range req.Points {
+		e.placeDoodad(tx, center, req.Alt, req.Thickness)
 	}
 	return nil
 }
 
-func (e *Editor) drawHouse(tx *Tx, r DrawRequest, area *posSet) error {
-	if r.House == 0 || (!r.Erase && e.Map.Houses[r.House] == nil) {
-		return fmt.Errorf("%w: house %d", ErrNoBrush, r.House)
+func (e *Editor) drawHouse(tx *Tx, req DrawRequest, area *posSet) error {
+	if req.House == 0 || (!req.Erase && e.Map.Houses[req.House] == nil) {
+		return fmt.Errorf("%w: house %d", ErrNoBrush, req.House)
 	}
-	for _, p := range area.list {
-		cur := tx.Get(p)
-		if cur == nil || cur.Ground.ID == 0 {
+	for _, pos := range area.list {
+		current := tx.Get(pos)
+		if current == nil || current.Ground.ID == 0 {
 			continue
 		}
-		if r.Erase {
-			if cur.HouseID == 0 || cur.HouseID != r.House {
+		if req.Erase {
+			if current.HouseID == 0 || current.HouseID != req.House {
 				continue
 			}
-			t := tx.Edit(p)
-			t.HouseID = 0
-			t.Flags &^= otmap.FlagPZ
-			for i := range t.Items {
-				if t.Items[i].Ext != nil && t.Items[i].Ext.DoorID != 0 {
-					t.Items[i].Ext.DoorID = 0
-					t.Items[i].Compact()
-				}
-			}
+			eraseHouseTile(tx.Edit(pos))
 			continue
 		}
-		if cur.HouseID == r.House {
+		if current.HouseID == req.House {
 			continue
 		}
-		t := tx.Edit(p)
-		t.HouseID = r.House
-		t.Flags |= otmap.FlagPZ
-		if e.Settings.HouseRemoveItems {
-			t.Items = slices.DeleteFunc(t.Items, func(it otmap.Item) bool {
-				typ := e.itemType(it.ID)
-				return typ != nil && typ.Flags.Has(otitems.FlagMoveable) && !it.Complex()
-			})
+		e.addHouseTile(tx, tx.Edit(pos), req.House)
+	}
+	return nil
+}
+
+// eraseHouseTile takes a tile out of its house and clears its door ids.
+func eraseHouseTile(tile *otmap.Tile) {
+	tile.HouseID = 0
+	tile.Flags &^= otmap.FlagPZ
+	for i := range tile.Items {
+		if tile.Items[i].Ext != nil && tile.Items[i].Ext.DoorID != 0 {
+			tile.Items[i].Ext.DoorID = 0
+			tile.Items[i].Compact()
 		}
-		if e.Settings.AutoDoorID {
-			for i := range t.Items {
-				if typ := e.itemType(t.Items[i].ID); typ != nil && typ.IsDoor() {
-					e.assignDoorID(tx, t, i)
-				}
+	}
+}
+
+// addHouseTile puts a tile into a house, removing loose items and giving
+// its doors ids when the settings say so.
+func (e *Editor) addHouseTile(tx *Tx, tile *otmap.Tile, houseID uint32) {
+	tile.HouseID = houseID
+	tile.Flags |= otmap.FlagPZ
+	if e.Settings.HouseRemoveItems {
+		tile.Items = slices.DeleteFunc(tile.Items, func(item otmap.Item) bool {
+			itemType := e.itemType(item.ID)
+			return itemType != nil && itemType.Flags.Has(otitems.FlagMoveable) && !item.Complex()
+		})
+	}
+	if e.Settings.AutoDoorID {
+		for i := range tile.Items {
+			if itemType := e.itemType(tile.Items[i].ID); itemType != nil && itemType.IsDoor() {
+				e.assignDoorID(tx, tile, i)
 			}
 		}
 	}
-	return nil
 }
 
 // assignDoorID gives a door on a house tile the lowest free door id of the
 // house.
-func (e *Editor) assignDoorID(tx *Tx, t *otmap.Tile, i int) {
-	if t.HouseID == 0 {
+func (e *Editor) assignDoorID(tx *Tx, tile *otmap.Tile, i int) {
+	if tile.HouseID == 0 {
 		return
 	}
-	if t.Items[i].Ext != nil && t.Items[i].Ext.DoorID != 0 {
+	if tile.Items[i].Ext != nil && tile.Items[i].Ext.DoorID != 0 {
 		return
 	}
 	used := map[uint8]bool{}
-	for _, c := range e.Map.Chunks() {
-		c.Each(func(_ otmap.Position, ot *otmap.Tile) {
-			if ot.HouseID != t.HouseID {
+	for _, chunk := range e.Map.Chunks() {
+		chunk.Each(func(_ otmap.Position, other *otmap.Tile) {
+			if other.HouseID != tile.HouseID {
 				return
 			}
-			for _, it := range ot.Items {
-				if it.Ext != nil && it.Ext.DoorID != 0 {
-					used[it.Ext.DoorID] = true
+			for _, item := range other.Items {
+				if item.Ext != nil && item.Ext.DoorID != 0 {
+					used[item.Ext.DoorID] = true
 				}
 			}
 		})
 	}
-	for id := 1; id < 256; id++ {
+	for id := 1; id <= math.MaxUint8; id++ {
 		if !used[uint8(id)] {
-			t.Items[i].Ensure().DoorID = uint8(id)
+			tile.Items[i].Ensure().DoorID = uint8(id)
 			return
 		}
 	}
 }
 
-func (e *Editor) drawMarker(tx *Tx, r DrawRequest) error {
-	p := r.Points[len(r.Points)-1]
-	switch r.Kind {
+func (e *Editor) drawMarker(tx *Tx, req DrawRequest) error {
+	target := req.Points[len(req.Points)-1]
+	switch req.Kind {
 	case KindHouseExit:
-		h := e.Map.Houses[r.House]
-		if h == nil {
-			return fmt.Errorf("%w: house %d", ErrNoBrush, r.House)
-		}
-		if r.Erase {
-			if h.Exit != p {
-				return nil
-			}
-			tx.Meta()
-			h.Exit = otmap.Position{}
-			return nil
-		}
-		cur := tx.Get(p)
-		if cur == nil || cur.Ground.ID == 0 || cur.HouseID != 0 || e.blocking(cur) {
-			return errors.New("a house exit must be on a walkable tile outside the house")
-		}
-		tx.Meta()
-		h.Exit = p
+		return e.drawHouseExit(tx, req, target)
 	case KindWaypoint:
-		if r.Erase {
-			for i, w := range e.Map.Waypoints {
-				if w.Pos == p {
-					tx.Meta()
-					e.Map.Waypoints = slices.Delete(e.Map.Waypoints, i, i+1)
-					return nil
-				}
-			}
-			return nil
-		}
-		if r.Waypoint == "" {
-			return errors.New("choose a waypoint")
-		}
-		tx.Meta()
-		if w := e.Map.Waypoint(r.Waypoint); w != nil {
-			w.Pos = p
-		} else {
-			e.Map.Waypoints = append(e.Map.Waypoints, &otmap.Waypoint{Name: r.Waypoint, Pos: p})
-		}
+		return e.drawWaypoint(tx, req, target)
 	}
 	return nil
 }
 
-func (e *Editor) drawSpawn(tx *Tx, r DrawRequest) {
-	npc := r.Kind == KindSpawnNPC
-	for _, p := range r.Points {
-		cur := tx.Get(p)
-		if r.Erase {
-			if cur == nil || (npc && cur.SpawnNPC() == nil) || (!npc && cur.Spawn() == nil) {
+// drawHouseExit moves the exit of a house to target, or clears it.
+func (e *Editor) drawHouseExit(tx *Tx, req DrawRequest, target otmap.Position) error {
+	house := e.Map.Houses[req.House]
+	if house == nil {
+		return fmt.Errorf("%w: house %d", ErrNoBrush, req.House)
+	}
+	if req.Erase {
+		if house.Exit != target {
+			return nil
+		}
+		tx.Meta()
+		house.Exit = otmap.Position{}
+		return nil
+	}
+	current := tx.Get(target)
+	if current == nil || current.Ground.ID == 0 || current.HouseID != 0 || e.blocking(current) {
+		return errors.New("a house exit must be on a walkable tile outside the house")
+	}
+	tx.Meta()
+	house.Exit = target
+	return nil
+}
+
+// drawWaypoint moves or adds a waypoint at target, or removes the waypoint
+// there.
+func (e *Editor) drawWaypoint(tx *Tx, req DrawRequest, target otmap.Position) error {
+	if req.Erase {
+		for i, waypoint := range e.Map.Waypoints {
+			if waypoint.Pos == target {
+				tx.Meta()
+				e.Map.Waypoints = slices.Delete(e.Map.Waypoints, i, i+1)
+				return nil
+			}
+		}
+		return nil
+	}
+	if req.Waypoint == "" {
+		return errors.New("choose a waypoint")
+	}
+	tx.Meta()
+	if waypoint := e.Map.Waypoint(req.Waypoint); waypoint != nil {
+		waypoint.Pos = target
+	} else {
+		e.Map.Waypoints = append(e.Map.Waypoints, &otmap.Waypoint{Name: req.Waypoint, Pos: target})
+	}
+	return nil
+}
+
+func (e *Editor) drawSpawn(tx *Tx, req DrawRequest) {
+	isNPC := req.Kind == KindSpawnNPC
+	for _, center := range req.Points {
+		current := tx.Get(center)
+		if req.Erase {
+			if current == nil || (isNPC && current.SpawnNPC() == nil) || (!isNPC && current.Spawn() == nil) {
 				continue
 			}
-			t := tx.Edit(p)
-			if npc {
-				t.Ext.SpawnNPC = nil
+			tile := tx.Edit(center)
+			if isNPC {
+				tile.Ext.SpawnNPC = nil
 			} else {
-				t.Ext.Spawn = nil
+				tile.Ext.Spawn = nil
 			}
-			t.Compact()
+			tile.Compact()
 			continue
 		}
-		t := tx.Edit(p)
-		s := &otmap.Spawn{Radius: int32(max(r.Size, 1))}
-		if npc {
-			t.EnsureExt().SpawnNPC = s
+		tile := tx.Edit(center)
+		spawn := &otmap.Spawn{Radius: int32(max(req.Size, 1))}
+		if isNPC {
+			tile.EnsureExt().SpawnNPC = spawn
 		} else {
-			t.EnsureExt().Spawn = s
+			tile.EnsureExt().Spawn = spawn
 		}
 	}
 }
 
-// maxSpawnRadius bounds the search for a spawn covering a tile.
-const maxSpawnRadius = 30
-
-// covered reports whether a spawn area covers p.
-func (e *Editor) covered(p otmap.Position, npc bool) bool {
-	x, y := int(p.X), int(p.Y)
+// covered reports whether a spawn area covers target.
+func (e *Editor) covered(target otmap.Position, npc bool) bool {
+	x, y := int(target.X), int(target.Y)
 	found := false
-	e.Map.EachIn(x-maxSpawnRadius, y-maxSpawnRadius, x+maxSpawnRadius, y+maxSpawnRadius, int(p.Z), int(p.Z), func(q otmap.Position, t *otmap.Tile) {
+	e.Map.EachIn(x-maxSpawnRadius, y-maxSpawnRadius, x+maxSpawnRadius, y+maxSpawnRadius, int(target.Z), int(target.Z), func(pos otmap.Position, tile *otmap.Tile) {
 		if found {
 			return
 		}
-		s := t.Spawn()
+		spawn := tile.Spawn()
 		if npc && e.Map.SpawnFormat == otmap.SpawnsSeparate {
-			s = t.SpawnNPC()
-		} else if s == nil {
-			s = t.SpawnNPC()
+			spawn = tile.SpawnNPC()
+		} else if spawn == nil {
+			spawn = tile.SpawnNPC()
 		}
-		if s != nil && abs(int(q.X)-x) <= int(s.Radius) && abs(int(q.Y)-y) <= int(s.Radius) {
+		if spawn != nil && abs(int(pos.X)-x) <= int(spawn.Radius) && abs(int(pos.Y)-y) <= int(spawn.Radius) {
 			found = true
 		}
 	})
 	return found
 }
 
-func (e *Editor) drawCreature(tx *Tx, r DrawRequest) error {
-	if !r.Erase && r.Creature == "" {
+func (e *Editor) drawCreature(tx *Tx, req DrawRequest) error {
+	if !req.Erase && req.Creature == "" {
 		return errors.New("choose a creature")
 	}
-	for _, p := range r.Points {
-		cur := tx.Get(p)
-		if r.Erase {
-			if cur == nil || len(cur.Creatures()) == 0 {
+	for _, target := range req.Points {
+		current := tx.Get(target)
+		if req.Erase {
+			if current == nil || len(current.Creatures()) == 0 {
 				continue
 			}
-			t := tx.Edit(p)
-			t.Ext.Creatures = nil
-			t.Compact()
+			tile := tx.Edit(target)
+			tile.Ext.Creatures = nil
+			tile.Compact()
 			continue
 		}
-		if cur == nil || cur.Ground.ID == 0 || (e.blocking(cur) && !r.Alt) {
+		if current == nil || current.Ground.ID == 0 || (e.blocking(current) && !req.Alt) {
 			continue
 		}
-		t := tx.Edit(p)
-		spawnTime := r.SpawnTime
+		tile := tx.Edit(target)
+		spawnTime := req.SpawnTime
 		if spawnTime <= 0 {
 			spawnTime = e.Settings.DefaultSpawnTime
 		}
-		c := otmap.Creature{Name: r.Creature, NPC: r.NPC, SpawnTime: spawnTime, Direction: r.Direction}
-		t.EnsureExt().Creatures = []otmap.Creature{c}
-		if e.Settings.AutoCreateSpawn && !e.covered(p, r.NPC) {
-			if r.NPC && e.Map.SpawnFormat == otmap.SpawnsSeparate {
-				t.Ext.SpawnNPC = &otmap.Spawn{Radius: 1}
+		creature := otmap.Creature{Name: req.Creature, NPC: req.NPC, SpawnTime: spawnTime, Direction: req.Direction}
+		tile.EnsureExt().Creatures = []otmap.Creature{creature}
+		if e.Settings.AutoCreateSpawn && !e.covered(target, req.NPC) {
+			if req.NPC && e.Map.SpawnFormat == otmap.SpawnsSeparate {
+				tile.Ext.SpawnNPC = &otmap.Spawn{Radius: 1}
 			} else {
-				t.Ext.Spawn = &otmap.Spawn{Radius: 1}
+				tile.Ext.Spawn = &otmap.Spawn{Radius: 1}
 			}
 		}
 	}

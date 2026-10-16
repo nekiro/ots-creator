@@ -23,20 +23,20 @@ type Properties struct {
 
 // Properties returns the map header.
 func (e *Editor) Properties() Properties {
-	m := e.Map
-	return Properties{m.Description, m.Width, m.Height, m.HouseFile, m.SpawnFile, m.NpcFile, m.ZoneFile, m.SpawnFormat}
+	gameMap := e.Map
+	return Properties{gameMap.Description, gameMap.Width, gameMap.Height, gameMap.HouseFile, gameMap.SpawnFile, gameMap.NpcFile, gameMap.ZoneFile, gameMap.SpawnFormat}
 }
 
 // SetProperties changes the map header.
-func (e *Editor) SetProperties(p Properties) error {
-	if p.SpawnFormat != otmap.SpawnsSingle && p.SpawnFormat != otmap.SpawnsSeparate {
-		p.SpawnFormat = otmap.SpawnsSingle
+func (e *Editor) SetProperties(props Properties) error {
+	if props.SpawnFormat != otmap.SpawnsSingle && props.SpawnFormat != otmap.SpawnsSeparate {
+		props.SpawnFormat = otmap.SpawnsSingle
 	}
 	tx := e.Begin("Map properties", 0)
 	tx.Meta()
-	m := e.Map
-	m.Description, m.Width, m.Height = p.Description, max(p.Width, 1), max(p.Height, 1)
-	m.HouseFile, m.SpawnFile, m.NpcFile, m.ZoneFile, m.SpawnFormat = p.HouseFile, p.SpawnFile, p.NpcFile, p.ZoneFile, p.SpawnFormat
+	gameMap := e.Map
+	gameMap.Description, gameMap.Width, gameMap.Height = props.Description, max(props.Width, 1), max(props.Height, 1)
+	gameMap.HouseFile, gameMap.SpawnFile, gameMap.NpcFile, gameMap.ZoneFile, gameMap.SpawnFormat = props.HouseFile, props.SpawnFile, props.NpcFile, props.ZoneFile, props.SpawnFormat
 	tx.Commit()
 	return nil
 }
@@ -51,32 +51,36 @@ type HouseInfo struct {
 func (e *Editor) Houses() []HouseInfo {
 	sizes := otmap.HouseSizes(e.Map)
 	var out []HouseInfo
-	for _, h := range e.Map.SortedHouses() {
-		out = append(out, HouseInfo{*h, sizes[h.ID]})
+	for _, house := range e.Map.SortedHouses() {
+		out = append(out, HouseInfo{*house, sizes[house.ID]})
 	}
 	return out
 }
 
+// firstFreeHouseID returns the lowest house id not in use.
+func (e *Editor) firstFreeHouseID() uint32 {
+	id := uint32(1)
+	for e.Map.Houses[id] != nil {
+		id++
+	}
+	return id
+}
+
 // SaveHouse creates or updates a house (ID 0 creates one with a free id).
-func (e *Editor) SaveHouse(h otmap.House) (uint32, error) {
-	if strings.TrimSpace(h.Name) == "" {
+func (e *Editor) SaveHouse(house otmap.House) (uint32, error) {
+	if strings.TrimSpace(house.Name) == "" {
 		return 0, errors.New("the house needs a name")
 	}
 	tx := e.Begin("Edit house", 0)
 	tx.Meta()
-	if h.ID == 0 {
-		for id := uint32(1); ; id++ {
-			if e.Map.Houses[id] == nil {
-				h.ID = id
-				break
-			}
-		}
+	if house.ID == 0 {
+		house.ID = e.firstFreeHouseID()
 		tx.label = "Add house"
 	}
-	cp := h
-	e.Map.Houses[h.ID] = &cp
+	stored := house
+	e.Map.Houses[house.ID] = &stored
 	tx.Commit()
-	return h.ID, nil
+	return house.ID, nil
 }
 
 // RemoveHouse deletes a house and clears its tiles.
@@ -84,11 +88,11 @@ func (e *Editor) RemoveHouse(id uint32) {
 	tx := e.Begin("Remove house", 0)
 	tx.Meta()
 	delete(e.Map.Houses, id)
-	e.Map.Each(func(p otmap.Position, t *otmap.Tile) {
-		if t.HouseID == id {
-			nt := tx.Edit(p)
-			nt.HouseID = 0
-			nt.Flags &^= otmap.FlagPZ
+	e.Map.Each(func(pos otmap.Position, tile *otmap.Tile) {
+		if tile.HouseID == id {
+			edited := tx.Edit(pos)
+			edited.HouseID = 0
+			edited.Flags &^= otmap.FlagPZ
 		}
 	})
 	tx.Commit()
@@ -97,33 +101,33 @@ func (e *Editor) RemoveHouse(id uint32) {
 // HouseTiles returns the tiles of a house.
 func (e *Editor) HouseTiles(id uint32) []otmap.Position {
 	var out []otmap.Position
-	e.Map.Each(func(p otmap.Position, t *otmap.Tile) {
-		if t.HouseID == id {
-			out = append(out, p)
+	e.Map.Each(func(pos otmap.Position, tile *otmap.Tile) {
+		if tile.HouseID == id {
+			out = append(out, pos)
 		}
 	})
 	return out
 }
 
 // SaveTown creates or updates a town (ID 0 creates one).
-func (e *Editor) SaveTown(t otmap.Town) (uint32, error) {
-	if strings.TrimSpace(t.Name) == "" {
+func (e *Editor) SaveTown(town otmap.Town) (uint32, error) {
+	if strings.TrimSpace(town.Name) == "" {
 		return 0, errors.New("the town needs a name")
 	}
 	tx := e.Begin("Edit town", 0)
 	tx.Meta()
-	if t.ID == 0 {
+	if town.ID == 0 {
 		for id := uint32(1); ; id++ {
 			if e.Map.Towns[id] == nil {
-				t.ID = id
+				town.ID = id
 				break
 			}
 		}
 	}
-	cp := t
-	e.Map.Towns[t.ID] = &cp
+	stored := town
+	e.Map.Towns[town.ID] = &stored
 	tx.Commit()
-	return t.ID, nil
+	return town.ID, nil
 }
 
 // RemoveTown deletes a town. Houses of the town keep their town id.
@@ -134,23 +138,23 @@ func (e *Editor) RemoveTown(id uint32) {
 	tx.Commit()
 }
 
-// SaveWaypoint creates, renames or moves a waypoint. old is the current
+// SaveWaypoint creates, renames or moves a waypoint. oldName is the current
 // name ("" for a new waypoint).
-func (e *Editor) SaveWaypoint(old string, w otmap.Waypoint) error {
-	w.Name = strings.TrimSpace(w.Name)
-	if w.Name == "" {
+func (e *Editor) SaveWaypoint(oldName string, waypoint otmap.Waypoint) error {
+	waypoint.Name = strings.TrimSpace(waypoint.Name)
+	if waypoint.Name == "" {
 		return errors.New("the waypoint needs a name")
 	}
-	if !strings.EqualFold(old, w.Name) && e.Map.Waypoint(w.Name) != nil {
-		return fmt.Errorf("a waypoint named %q exists", w.Name)
+	if !strings.EqualFold(oldName, waypoint.Name) && e.Map.Waypoint(waypoint.Name) != nil {
+		return fmt.Errorf("a waypoint named %q exists", waypoint.Name)
 	}
 	tx := e.Begin("Edit waypoint", 0)
 	tx.Meta()
-	if cur := e.Map.Waypoint(old); old != "" && cur != nil {
-		*cur = w
+	if existing := e.Map.Waypoint(oldName); oldName != "" && existing != nil {
+		*existing = waypoint
 	} else {
-		cp := w
-		e.Map.Waypoints = append(e.Map.Waypoints, &cp)
+		stored := waypoint
+		e.Map.Waypoints = append(e.Map.Waypoints, &stored)
 	}
 	tx.Commit()
 	return nil
@@ -160,49 +164,49 @@ func (e *Editor) SaveWaypoint(old string, w otmap.Waypoint) error {
 func (e *Editor) RemoveWaypoint(name string) {
 	tx := e.Begin("Remove waypoint", 0)
 	tx.Meta()
-	e.Map.Waypoints = slices.DeleteFunc(e.Map.Waypoints, func(w *otmap.Waypoint) bool { return w.Name == name })
+	e.Map.Waypoints = slices.DeleteFunc(e.Map.Waypoints, func(waypoint *otmap.Waypoint) bool { return waypoint.Name == name })
 	tx.Commit()
 }
 
 // SaveZone creates or renames a zone (ID 0 creates one).
-func (e *Editor) SaveZone(z otmap.Zone) (uint16, error) {
-	if strings.TrimSpace(z.Name) == "" {
+func (e *Editor) SaveZone(zone otmap.Zone) (uint16, error) {
+	if strings.TrimSpace(zone.Name) == "" {
 		return 0, errors.New("the zone needs a name")
 	}
 	tx := e.Begin("Edit zone", 0)
 	tx.Meta()
-	if z.ID == 0 {
+	if zone.ID == 0 {
 		used := map[uint16]bool{}
-		for _, x := range e.Map.Zones {
-			used[x.ID] = true
+		for _, existing := range e.Map.Zones {
+			used[existing.ID] = true
 		}
 		for id := uint16(1); ; id++ {
 			if !used[id] {
-				z.ID = id
+				zone.ID = id
 				break
 			}
 		}
 	}
-	i := slices.IndexFunc(e.Map.Zones, func(x otmap.Zone) bool { return x.ID == z.ID })
-	if i >= 0 {
-		e.Map.Zones[i] = z
+	index := slices.IndexFunc(e.Map.Zones, func(existing otmap.Zone) bool { return existing.ID == zone.ID })
+	if index >= 0 {
+		e.Map.Zones[index] = zone
 	} else {
-		e.Map.Zones = append(e.Map.Zones, z)
+		e.Map.Zones = append(e.Map.Zones, zone)
 	}
 	tx.Commit()
-	return z.ID, nil
+	return zone.ID, nil
 }
 
 // RemoveZone deletes a zone and removes it from tiles.
 func (e *Editor) RemoveZone(id uint16) {
 	tx := e.Begin("Remove zone", 0)
 	tx.Meta()
-	e.Map.Zones = slices.DeleteFunc(e.Map.Zones, func(z otmap.Zone) bool { return z.ID == id })
-	e.Map.Each(func(p otmap.Position, t *otmap.Tile) {
-		if slices.Contains(t.Zones(), id) {
-			nt := tx.Edit(p)
-			nt.Ext.Zones = slices.DeleteFunc(nt.Ext.Zones, func(z uint16) bool { return z == id })
-			nt.Compact()
+	e.Map.Zones = slices.DeleteFunc(e.Map.Zones, func(zone otmap.Zone) bool { return zone.ID == id })
+	e.Map.Each(func(pos otmap.Position, tile *otmap.Tile) {
+		if slices.Contains(tile.Zones(), id) {
+			edited := tx.Edit(pos)
+			edited.Ext.Zones = slices.DeleteFunc(edited.Ext.Zones, func(zoneID uint16) bool { return zoneID == id })
+			edited.Compact()
 		}
 	})
 	tx.Commit()
@@ -223,121 +227,133 @@ type ImportOptions struct {
 }
 
 // Import merges another map into this one.
-func (e *Editor) Import(src *otmap.Map, o ImportOptions) (int, error) {
+func (e *Editor) Import(src *otmap.Map, options ImportOptions) (int, error) {
 	tx := e.Begin("Import map", 0)
 	tx.Meta()
-	houseIDs := map[uint32]uint32{}
-	for _, h := range src.SortedHouses() {
-		switch o.Houses {
-		case "skip":
-			continue
-		case "renumber":
-			id := uint32(1)
-			for e.Map.Houses[id] != nil {
-				id++
-			}
-			houseIDs[h.ID] = id
-		default:
-			if e.Map.Houses[h.ID] != nil {
-				houseIDs[h.ID] = h.ID
-				continue
-			}
-			houseIDs[h.ID] = h.ID
-		}
-		nh := h.Clone()
-		nh.ID = houseIDs[h.ID]
-		if ex, ok := nh.Exit.Add(o.DX, o.DY, o.DZ); ok && nh.Exit != (otmap.Position{}) {
-			nh.Exit = ex
-		}
-		if e.Map.Houses[nh.ID] == nil {
-			e.Map.Houses[nh.ID] = nh
-		}
-	}
-	if o.Towns {
-		for _, t := range src.SortedTowns() {
-			if e.Map.Towns[t.ID] == nil {
-				c := *t
-				if p, ok := c.Temple.Add(o.DX, o.DY, o.DZ); ok {
-					c.Temple = p
-				}
-				e.Map.Towns[t.ID] = &c
-			}
-		}
-		for _, w := range src.Waypoints {
-			if e.Map.Waypoint(w.Name) == nil {
-				c := *w
-				if p, ok := c.Pos.Add(o.DX, o.DY, o.DZ); ok {
-					c.Pos = p
-				}
-				e.Map.Waypoints = append(e.Map.Waypoints, &c)
-			}
-		}
+	houseIDs := e.importHouses(src, options)
+	if options.Towns {
+		e.importTownsAndWaypoints(src, options)
 	}
 	var failed error
-	src.Each(func(p otmap.Position, t *otmap.Tile) {
-		q, ok := p.Add(o.DX, o.DY, o.DZ)
+	src.Each(func(sourcePos otmap.Position, sourceTile *otmap.Tile) {
+		targetPos, ok := sourcePos.Add(options.DX, options.DY, options.DZ)
 		if !ok {
 			failed = errors.New("some tiles were outside the map and were skipped")
 			return
 		}
-		nt := tx.Edit(q)
-		in := t.Clone()
-		in.SetSelected(false)
-		if o.Houses == "skip" {
-			in.HouseID = 0
-		} else if in.HouseID != 0 {
-			in.HouseID = houseIDs[in.HouseID]
-		}
-		if o.Replace || nt.Empty() {
-			state := nt.State
-			*nt = *in
-			nt.State = state | otmap.StateModified
-			return
-		}
-		if in.Ground.ID != 0 {
-			nt.Ground = in.Ground
-		}
-		for _, it := range in.Items {
-			e.addItem(nt, it)
-		}
-		if in.Ext != nil {
-			ext := nt.EnsureExt()
-			ext.Creatures = append(ext.Creatures, in.Ext.Creatures...)
-			if in.Ext.Spawn != nil {
-				ext.Spawn = in.Ext.Spawn
-			}
-			if in.Ext.SpawnNPC != nil {
-				ext.SpawnNPC = in.Ext.SpawnNPC
-			}
-			ext.Zones = append(ext.Zones, in.Ext.Zones...)
-		}
-		nt.Flags |= in.Flags
-		if in.HouseID != 0 {
-			nt.HouseID = in.HouseID
-		}
+		e.importTile(tx.Edit(targetPos), sourceTile, houseIDs, options)
 	})
-	n := tx.Commit()
-	return n, failed
+	changed := tx.Commit()
+	return changed, failed
+}
+
+// importHouses adds the houses of src that are missing and returns the new
+// id of each imported house id.
+func (e *Editor) importHouses(src *otmap.Map, options ImportOptions) map[uint32]uint32 {
+	houseIDs := map[uint32]uint32{}
+	for _, house := range src.SortedHouses() {
+		switch options.Houses {
+		case importHousesSkip:
+			continue
+		case importHousesRenumber:
+			houseIDs[house.ID] = e.firstFreeHouseID()
+		default:
+			houseIDs[house.ID] = house.ID
+			if e.Map.Houses[house.ID] != nil {
+				continue
+			}
+		}
+		imported := house.Clone()
+		imported.ID = houseIDs[house.ID]
+		if exit, ok := imported.Exit.Add(options.DX, options.DY, options.DZ); ok && imported.Exit != (otmap.Position{}) {
+			imported.Exit = exit
+		}
+		if e.Map.Houses[imported.ID] == nil {
+			e.Map.Houses[imported.ID] = imported
+		}
+	}
+	return houseIDs
+}
+
+// importTownsAndWaypoints adds the towns and waypoints of src that are
+// missing.
+func (e *Editor) importTownsAndWaypoints(src *otmap.Map, options ImportOptions) {
+	for _, town := range src.SortedTowns() {
+		if e.Map.Towns[town.ID] == nil {
+			imported := *town
+			if temple, ok := imported.Temple.Add(options.DX, options.DY, options.DZ); ok {
+				imported.Temple = temple
+			}
+			e.Map.Towns[town.ID] = &imported
+		}
+	}
+	for _, waypoint := range src.Waypoints {
+		if e.Map.Waypoint(waypoint.Name) == nil {
+			imported := *waypoint
+			if pos, ok := imported.Pos.Add(options.DX, options.DY, options.DZ); ok {
+				imported.Pos = pos
+			}
+			e.Map.Waypoints = append(e.Map.Waypoints, &imported)
+		}
+	}
+}
+
+// importTile replaces or merges target with a tile of the imported map.
+func (e *Editor) importTile(target, sourceTile *otmap.Tile, houseIDs map[uint32]uint32, options ImportOptions) {
+	imported := sourceTile.Clone()
+	imported.SetSelected(false)
+	if options.Houses == importHousesSkip {
+		imported.HouseID = 0
+	} else if imported.HouseID != 0 {
+		imported.HouseID = houseIDs[imported.HouseID]
+	}
+	if options.Replace || target.Empty() {
+		state := target.State
+		*target = *imported
+		target.State = state | otmap.StateModified
+		return
+	}
+	if imported.Ground.ID != 0 {
+		target.Ground = imported.Ground
+	}
+	for _, item := range imported.Items {
+		e.addItem(target, item)
+	}
+	if imported.Ext != nil {
+		ext := target.EnsureExt()
+		ext.Creatures = append(ext.Creatures, imported.Ext.Creatures...)
+		if imported.Ext.Spawn != nil {
+			ext.Spawn = imported.Ext.Spawn
+		}
+		if imported.Ext.SpawnNPC != nil {
+			ext.SpawnNPC = imported.Ext.SpawnNPC
+		}
+		ext.Zones = append(ext.Zones, imported.Ext.Zones...)
+	}
+	target.Flags |= imported.Flags
+	if imported.HouseID != 0 {
+		target.HouseID = imported.HouseID
+	}
 }
 
 // MinimapColor returns the minimap color index of a tile (0 = none): the
 // top item with a color, else the ground.
-func (e *Editor) MinimapColor(t *otmap.Tile) uint8 {
-	for i := len(t.Items) - 1; i >= 0; i-- {
-		if typ := e.itemType(t.Items[i].ID); typ != nil && typ.MinimapColor != 0 {
+func (e *Editor) MinimapColor(tile *otmap.Tile) uint8 {
+	for i := len(tile.Items) - 1; i >= 0; i-- {
+		if typ := e.itemType(tile.Items[i].ID); typ != nil && typ.MinimapColor != 0 {
 			return uint8(typ.MinimapColor)
 		}
 	}
-	if typ := e.itemType(t.Ground.ID); typ != nil {
+	if typ := e.itemType(tile.Ground.ID); typ != nil {
 		return uint8(typ.MinimapColor)
 	}
 	return 0
 }
 
 // MinimapRGB converts a Tibia minimap color index to RGB.
-func MinimapRGB(c uint8) (r, g, b uint8) {
-	if c >= 216 {
+func MinimapRGB(colorIndex uint8) (red, green, blue uint8) {
+	if colorIndex >= minimapColorCount {
 		return 0, 0, 0
 	}
-	return uint8(c/36%6) * 51, uint8(c/6%6) * 51, uint8(c%6) * 51
+	return uint8(colorIndex/(minimapLevels*minimapLevels)%minimapLevels) * minimapLevelStep, uint8(colorIndex/minimapLevels%minimapLevels) * minimapLevelStep, uint8(colorIndex%minimapLevels) * minimapLevelStep
 }

@@ -6,14 +6,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/otmap"
 )
 
-// Wall neighbor bits.
-const (
-	wallN = 1 << iota
-	wallW
-	wallE
-	wallS
-)
-
 // wallShape returns the wall alignment for the neighbors that hold a
 // matching wall. The full shape set is pole, ends, straight pieces,
 // corners, T pieces and the intersection; their numbers equal the mask.
@@ -34,166 +26,180 @@ func wallShape(mask int, full bool) int {
 	return wallPole
 }
 
-// matchingWall reports whether the tile holds a wall that connects to w.
-func (e *Editor) matchingWall(t *otmap.Tile, w *WallBrush) bool {
-	if t == nil {
+// matchingWall reports whether the tile holds a wall that connects to wall.
+func (e *Editor) matchingWall(tile *otmap.Tile, wall *WallBrush) bool {
+	if tile == nil {
 		return false
 	}
-	for _, it := range t.Items {
-		wb, in := e.Brushes.wallOf(it.ID)
-		if wb == nil || wb.decoration {
+	for _, item := range tile.Items {
+		wallBrush, info := e.Brushes.wallOf(item.ID)
+		if wallBrush == nil || wallBrush.decoration {
 			continue
 		}
-		if wb == w || w.friendOf(wb) || wb.friendOf(w) {
-			return !in.wallHate
+		if wallBrush == wall || wall.friendOf(wallBrush) || wallBrush.friendOf(wall) {
+			return !info.wallHate
 		}
 	}
 	return false
 }
 
-// wallize reshapes the walls of the tile at p to match their neighbors.
-func (e *Editor) wallize(tx *Tx, p otmap.Position) {
-	cur := tx.Get(p)
-	if cur == nil || !e.hasWall(cur) {
+// wallNeighborMask returns the wall neighbor bits of the tile at x, y, z
+// whose tiles hold a wall that connects to wall.
+func (e *Editor) wallNeighborMask(x, y, z int, wall *WallBrush) int {
+	mask := 0
+	for _, neighbor := range wallNeighborOffsets {
+		if e.matchingWall(e.Map.At(x+neighbor.dx, y+neighbor.dy, z), wall) {
+			mask |= neighbor.bit
+		}
+	}
+	return mask
+}
+
+// wallize reshapes the walls of the tile at pos to match their neighbors.
+func (e *Editor) wallize(tx *Tx, pos otmap.Position) {
+	current := tx.Get(pos)
+	if current == nil || !e.hasWall(current) {
 		return
 	}
-	t := tx.Edit(p)
-	x, y, z := int(p.X), int(p.Y), int(p.Z)
-	var out []otmap.Item
-	items := t.Items
+	tile := tx.Edit(pos)
+	x, y, z := int(pos.X), int(pos.Y), int(pos.Z)
+	var reshaped []otmap.Item
+	items := tile.Items
 	for i := 0; i < len(items); i++ {
-		it := items[i]
-		wb, in := e.Brushes.wallOf(it.ID)
-		if wb == nil {
-			out = append(out, it)
+		item := items[i]
+		wallBrush, info := e.Brushes.wallOf(item.ID)
+		if wallBrush == nil {
+			reshaped = append(reshaped, item)
 			continue
 		}
-		if wb.decoration {
+		if wallBrush.decoration {
 			// Decorations follow the wall below them (handled there).
-			out = append(out, it)
+			reshaped = append(reshaped, item)
 			continue
 		}
-		mask := 0
-		for bit, d := range map[int][2]int{wallN: {0, -1}, wallW: {-1, 0}, wallE: {1, 0}, wallS: {0, 1}} {
-			if e.matchingWall(e.Map.At(x+d[0], y+d[1], z), wb) {
-				mask |= bit
-			}
-		}
-		if in.wallAlign == wallUntouchable {
-			out = append(out, it)
+		mask := e.wallNeighborMask(x, y, z, wallBrush)
+		if info.wallAlign == wallUntouchable {
+			reshaped = append(reshaped, item)
 			continue
 		}
-		newAlign := -1
-		var newID uint16
-		for _, full := range []bool{true, false} {
-			shape := wallShape(mask, full)
-			if in.wallAlign == shape {
-				newAlign, newID = shape, it.ID
-				break
-			}
-			if in.door {
-				if id := wb.doorFor(shape, in.doorType, in.doorOpen); id != 0 {
-					newAlign, newID = shape, id
-					break
-				}
-				continue
-			}
-			if id := wb.pick(shape, e.rng); id != 0 {
-				newAlign, newID = shape, id
-				break
-			}
-		}
+		newAlign, newID := e.fitWall(item.ID, wallBrush, info, mask)
 		if newAlign < 0 {
-			out = append(out, it)
+			reshaped = append(reshaped, item)
 			continue
 		}
-		nw := it
-		nw.ID = newID
-		out = append(out, nw)
+		item.ID = newID
+		reshaped = append(reshaped, item)
 		// Decorations right above the wall take the same shape.
 		for i+1 < len(items) {
-			dec, din := e.Brushes.wallOf(items[i+1].ID)
-			if dec == nil || !dec.decoration {
+			decoration, decorationInfo := e.Brushes.wallOf(items[i+1].ID)
+			if decoration == nil || !decoration.decoration {
 				break
 			}
 			i++
-			d := items[i]
-			if din.wallAlign != newAlign {
-				if din.door {
-					if id := dec.doorFor(newAlign, din.doorType, din.doorOpen); id != 0 {
-						d.ID = id
-					}
-				} else if id := dec.pick(newAlign, e.rng); id != 0 {
-					d.ID = id
-				}
-			}
-			out = append(out, d)
+			reshaped = append(reshaped, e.fitDecoration(items[i], decoration, decorationInfo, newAlign))
 		}
 	}
-	t.Items = out
+	tile.Items = reshaped
+}
+
+// fitWall returns the alignment and item of a wall for the neighbor mask,
+// trying the full shape set before the reduced one. The alignment is -1
+// when the brush has no fitting piece.
+func (e *Editor) fitWall(id uint16, wall *WallBrush, info *itemInfo, mask int) (newAlign int, newID uint16) {
+	for _, full := range []bool{true, false} {
+		shape := wallShape(mask, full)
+		if info.wallAlign == shape {
+			return shape, id
+		}
+		if info.door {
+			if doorID := wall.doorFor(shape, info.doorType, info.doorOpen); doorID != 0 {
+				return shape, doorID
+			}
+			continue
+		}
+		if pickedID := wall.pick(shape, e.rng); pickedID != 0 {
+			return shape, pickedID
+		}
+	}
+	return -1, 0
+}
+
+// fitDecoration returns the decoration item reshaped to the alignment of
+// the wall below it.
+func (e *Editor) fitDecoration(item otmap.Item, decoration *WallBrush, info *itemInfo, align int) otmap.Item {
+	if info.wallAlign != align {
+		if info.door {
+			if id := decoration.doorFor(align, info.doorType, info.doorOpen); id != 0 {
+				item.ID = id
+			}
+		} else if id := decoration.pick(align, e.rng); id != 0 {
+			item.ID = id
+		}
+	}
+	return item
 }
 
 // doorFor returns a door of a type and state for an alignment, falling back
 // to the other state.
 func (w *WallBrush) doorFor(align, doorType int, open bool) uint16 {
 	var fallback uint16
-	for b, n := w, 0; b != nil && n < 8; b, n = b.redirect, n+1 {
-		for _, d := range b.nodes[align].doors {
-			if d.doorType != doorType {
+	for brush, depth := w, 0; brush != nil && depth < maxWallRedirects; brush, depth = brush.redirect, depth+1 {
+		for _, door := range brush.nodes[align].doors {
+			if door.doorType != doorType {
 				continue
 			}
-			if d.open == open {
-				return d.id
+			if door.open == open {
+				return door.id
 			}
 			if fallback == 0 {
-				fallback = d.id
+				fallback = door.id
 			}
 		}
 	}
 	return fallback
 }
 
-// cleanWalls removes the walls of a brush (all walls when w is nil).
-func (e *Editor) cleanWalls(t *otmap.Tile, w *WallBrush) {
-	t.Items = slices.DeleteFunc(t.Items, func(it otmap.Item) bool {
-		wb, _ := e.Brushes.wallOf(it.ID)
-		if wb == nil {
+// cleanWalls removes the walls of a brush (all walls when wall is nil).
+func (e *Editor) cleanWalls(tile *otmap.Tile, wall *WallBrush) {
+	tile.Items = slices.DeleteFunc(tile.Items, func(item otmap.Item) bool {
+		wallBrush, _ := e.Brushes.wallOf(item.ID)
+		if wallBrush == nil {
 			return false
 		}
-		if w == nil {
+		if wall == nil {
 			return true
 		}
-		_, in := e.Brushes.wallOf(it.ID)
-		return w.hasWall(it.ID, in.wallAlign) || wb == w
+		_, info := e.Brushes.wallOf(item.ID)
+		return wall.hasWall(item.ID, info.wallAlign) || wallBrush == wall
 	})
 }
 
 // drawWall places a wall of the brush; the alignment is fixed by wallize.
-func (e *Editor) drawWall(t *otmap.Tile, w *WallBrush) {
-	if w.decoration {
-		e.drawDecoration(t, w)
+func (e *Editor) drawWall(tile *otmap.Tile, wall *WallBrush) {
+	if wall.decoration {
+		e.drawDecoration(tile, wall)
 		return
 	}
-	e.cleanWalls(t, w)
+	e.cleanWalls(tile, wall)
 	for align := 0; align < wallAlignmentMax; align++ {
-		if id := w.pick(align, e.rng); id != 0 {
-			e.addItem(t, otmap.Item{ID: id})
+		if id := wall.pick(align, e.rng); id != 0 {
+			e.addItem(tile, otmap.Item{ID: id})
 			return
 		}
 	}
 }
 
 // cycleWall changes a wall of the brush to the next alignment (alt-click).
-func (e *Editor) cycleWall(t *otmap.Tile, w *WallBrush) bool {
-	for i := range t.Items {
-		wb, in := e.Brushes.wallOf(t.Items[i].ID)
-		if wb != w {
+func (e *Editor) cycleWall(tile *otmap.Tile, wall *WallBrush) bool {
+	for i := range tile.Items {
+		wallBrush, info := e.Brushes.wallOf(tile.Items[i].ID)
+		if wallBrush != wall {
 			continue
 		}
-		for k := 1; k < wallAlignmentMax; k++ {
-			align := (in.wallAlign + k) % wallAlignmentMax
-			if id := w.pick(align, e.rng); id != 0 {
-				t.Items[i].ID = id
+		for step := 1; step < wallAlignmentMax; step++ {
+			align := (info.wallAlign + step) % wallAlignmentMax
+			if id := wall.pick(align, e.rng); id != 0 {
+				tile.Items[i].ID = id
 				return true
 			}
 		}
@@ -203,61 +209,61 @@ func (e *Editor) cycleWall(t *otmap.Tile, w *WallBrush) bool {
 }
 
 // drawDecoration puts a decoration of the brush on every wall of the tile.
-func (e *Editor) drawDecoration(t *otmap.Tile, d *WallBrush) {
-	e.cleanWalls(t, d)
-	var out []otmap.Item
-	for _, it := range t.Items {
-		out = append(out, it)
-		wb, in := e.Brushes.wallOf(it.ID)
-		if wb == nil || wb.decoration {
+func (e *Editor) drawDecoration(tile *otmap.Tile, decoration *WallBrush) {
+	e.cleanWalls(tile, decoration)
+	var decorated []otmap.Item
+	for _, item := range tile.Items {
+		decorated = append(decorated, item)
+		wallBrush, info := e.Brushes.wallOf(item.ID)
+		if wallBrush == nil || wallBrush.decoration {
 			continue
 		}
 		var id uint16
-		if in.door {
-			id = d.doorFor(in.wallAlign, in.doorType, in.doorOpen)
+		if info.door {
+			id = decoration.doorFor(info.wallAlign, info.doorType, info.doorOpen)
 		} else {
-			id = d.nodes[in.wallAlign].items.pick(e.rng)
+			id = decoration.nodes[info.wallAlign].items.pick(e.rng)
 		}
 		if id != 0 {
-			out = append(out, otmap.Item{ID: id})
+			decorated = append(decorated, otmap.Item{ID: id})
 		}
 	}
-	t.Items = out
+	tile.Items = decorated
 }
 
 // drawDoor turns the wall of the tile into a door of a type.
-func (e *Editor) drawDoor(tx *Tx, p otmap.Position, doorType int, open bool) bool {
-	cur := tx.Get(p)
-	if cur == nil {
+func (e *Editor) drawDoor(tx *Tx, pos otmap.Position, doorType int, open bool) bool {
+	current := tx.Get(pos)
+	if current == nil {
 		return false
 	}
-	for i, it := range cur.Items {
-		wb, in := e.Brushes.wallOf(it.ID)
-		if wb == nil || wb.decoration {
+	for i, item := range current.Items {
+		wallBrush, info := e.Brushes.wallOf(item.ID)
+		if wallBrush == nil || wallBrush.decoration {
 			continue
 		}
 		state := open
-		if in.door {
-			state = in.doorOpen
+		if info.door {
+			state = info.doorOpen
 		}
-		id := wb.doorFor(in.wallAlign, doorType, state)
+		id := wallBrush.doorFor(info.wallAlign, doorType, state)
 		if id == 0 {
 			continue
 		}
-		t := tx.Edit(p)
-		t.Items[i].ID = id
+		tile := tx.Edit(pos)
+		tile.Items[i].ID = id
 		// Decorations above follow.
-		for j := i + 1; j < len(t.Items); j++ {
-			dec, din := e.Brushes.wallOf(t.Items[j].ID)
-			if dec == nil || !dec.decoration {
+		for j := i + 1; j < len(tile.Items); j++ {
+			decoration, decorationInfo := e.Brushes.wallOf(tile.Items[j].ID)
+			if decoration == nil || !decoration.decoration {
 				break
 			}
-			if did := dec.doorFor(din.wallAlign, doorType, state); did != 0 {
-				t.Items[j].ID = did
+			if decorationID := decoration.doorFor(decorationInfo.wallAlign, doorType, state); decorationID != 0 {
+				tile.Items[j].ID = decorationID
 			}
 		}
-		if e.Settings.AutoDoorID && t.HouseID != 0 {
-			e.assignDoorID(tx, t, i)
+		if e.Settings.AutoDoorID && tile.HouseID != 0 {
+			e.assignDoorID(tx, tile, i)
 		}
 		return true
 	}
@@ -265,22 +271,22 @@ func (e *Editor) drawDoor(tx *Tx, p otmap.Position, doorType int, open bool) boo
 }
 
 // removeDoor turns doors of the tile back into walls.
-func (e *Editor) removeDoor(tx *Tx, p otmap.Position) bool {
-	cur := tx.Get(p)
-	if cur == nil {
+func (e *Editor) removeDoor(tx *Tx, pos otmap.Position) bool {
+	current := tx.Get(pos)
+	if current == nil {
 		return false
 	}
-	for i, it := range cur.Items {
-		wb, in := e.Brushes.wallOf(it.ID)
-		if wb == nil || !in.door {
+	for i, item := range current.Items {
+		wallBrush, info := e.Brushes.wallOf(item.ID)
+		if wallBrush == nil || !info.door {
 			continue
 		}
-		t := tx.Edit(p)
-		if id := wb.pick(in.wallAlign, e.rng); id != 0 {
-			t.Items[i].ID = id
-			if t.Items[i].Ext != nil {
-				t.Items[i].Ext.DoorID = 0
-				t.Items[i].Compact()
+		tile := tx.Edit(pos)
+		if id := wallBrush.pick(info.wallAlign, e.rng); id != 0 {
+			tile.Items[i].ID = id
+			if tile.Items[i].Ext != nil {
+				tile.Items[i].Ext.DoorID = 0
+				tile.Items[i].Compact()
 			}
 		}
 		return true
@@ -289,14 +295,14 @@ func (e *Editor) removeDoor(tx *Tx, p otmap.Position) bool {
 }
 
 // SwitchDoor opens a closed door or closes an open one.
-func (e *Editor) switchDoor(t *otmap.Tile, i int) bool {
-	wb, in := e.Brushes.wallOf(t.Items[i].ID)
-	if wb == nil || !in.door {
+func (e *Editor) switchDoor(tile *otmap.Tile, i int) bool {
+	wallBrush, info := e.Brushes.wallOf(tile.Items[i].ID)
+	if wallBrush == nil || !info.door {
 		return false
 	}
-	for _, d := range wb.nodes[in.wallAlign].doors {
-		if d.doorType == in.doorType && d.open != in.doorOpen {
-			t.Items[i].ID = d.id
+	for _, door := range wallBrush.nodes[info.wallAlign].doors {
+		if door.doorType == info.doorType && door.open != info.doorOpen {
+			tile.Items[i].ID = door.id
 			return true
 		}
 	}
@@ -308,16 +314,16 @@ func (e *Editor) switchDoor(t *otmap.Tile, i int) bool {
 // sides give the piece of the middle one, two adjacent sides a corner, all
 // sides the center, or an inner diagonal when one corner is missing.
 func carpetPiece(mask int) int {
-	n, e, s, w := mask&bitN != 0, mask&bitE != 0, mask&bitS != 0, mask&bitW != 0
+	north, east, south, west := mask&bitN != 0, mask&bitE != 0, mask&bitS != 0, mask&bitW != 0
 	switch {
-	case n && e && s && w:
+	case north && east && south && west:
 		missing := -1
 		count := 0
-		for _, c := range []struct {
+		for _, corner := range []struct {
 			bit, piece int
 		}{{bitNW, edgeDSE}, {bitNE, edgeDSW}, {bitSW, edgeDNE}, {bitSE, edgeDNW}} {
-			if mask&c.bit == 0 {
-				missing = c.piece
+			if mask&corner.bit == 0 {
+				missing = corner.piece
 				count++
 			}
 		}
@@ -325,21 +331,21 @@ func carpetPiece(mask int) int {
 			return missing
 		}
 		return edgeCenter
-	case n && e && w && !s:
+	case north && east && west && !south:
 		return edgeN
-	case e && s && w && !n:
+	case east && south && west && !north:
 		return edgeS
-	case n && s && w && !e:
+	case north && south && west && !east:
 		return edgeW
-	case n && e && s && !w:
+	case north && east && south && !west:
 		return edgeE
-	case n && w && !e && !s:
+	case north && west && !east && !south:
 		return edgeCNW
-	case n && e && !w && !s:
+	case north && east && !west && !south:
 		return edgeCNE
-	case s && w && !n && !e:
+	case south && west && !north && !east:
 		return edgeCSW
-	case s && e && !n && !w:
+	case south && east && !north && !west:
 		return edgeCSE
 	}
 	return edgeCenter
@@ -348,143 +354,149 @@ func carpetPiece(mask int) int {
 // tablePiece returns the table piece: horizontal tables win over vertical
 // ones.
 func tablePiece(mask int) int {
-	n, e, s, w := mask&bitN != 0, mask&bitE != 0, mask&bitS != 0, mask&bitW != 0
+	north, east, south, west := mask&bitN != 0, mask&bitE != 0, mask&bitS != 0, mask&bitW != 0
 	switch {
-	case e && w:
+	case east && west:
 		return tableHorizontal
-	case e:
+	case east:
 		return tableWest
-	case w:
+	case west:
 		return tableEast
-	case n && s:
+	case north && south:
 		return tableVertical
-	case s:
+	case south:
 		return tableNorth
-	case n:
+	case north:
 		return tableSouth
 	}
 	return tableAlone
 }
 
-func (e *Editor) neighborMask(p otmap.Position, has func(*otmap.Tile) bool) int {
+func (e *Editor) neighborMask(pos otmap.Position, has func(*otmap.Tile) bool) int {
 	mask := 0
-	x, y, z := int(p.X), int(p.Y), int(p.Z)
-	for i, d := range neighbors8 {
-		if has(e.Map.At(x+d[0], y+d[1], z)) {
+	x, y, z := int(pos.X), int(pos.Y), int(pos.Z)
+	for i, offset := range neighbors8 {
+		if has(e.Map.At(x+offset[0], y+offset[1], z)) {
 			mask |= 1 << i
 		}
 	}
 	return mask
 }
 
-func tileHas(t *otmap.Tile, fn func(id uint16) bool) bool {
-	if t == nil {
+func tileHas(tile *otmap.Tile, fn func(id uint16) bool) bool {
+	if tile == nil {
 		return false
 	}
-	for _, it := range t.Items {
-		if fn(it.ID) {
+	for _, item := range tile.Items {
+		if fn(item.ID) {
 			return true
 		}
 	}
 	return false
 }
 
-// carpetize reshapes the carpets of the tile at p.
-func (e *Editor) carpetize(tx *Tx, p otmap.Position) {
-	cur := tx.Get(p)
-	if cur == nil || !e.hasCarpet(cur) {
+// carpetize reshapes the carpets of the tile at pos.
+func (e *Editor) carpetize(tx *Tx, pos otmap.Position) {
+	current := tx.Get(pos)
+	if current == nil || !e.hasCarpet(current) {
 		return
 	}
-	t := tx.Edit(p)
-	for i, it := range t.Items {
-		in := e.Brushes.info[it.ID]
-		if in == nil || in.carpet == nil {
+	tile := tx.Edit(pos)
+	for i, item := range tile.Items {
+		info := e.Brushes.info[item.ID]
+		if info == nil || info.carpet == nil {
 			continue
 		}
-		c := in.carpet
-		mask := e.neighborMask(p, func(nt *otmap.Tile) bool {
-			return tileHas(nt, func(id uint16) bool { ni := e.Brushes.info[id]; return ni != nil && ni.carpet == c })
+		carpet := info.carpet
+		mask := e.neighborMask(pos, func(neighbor *otmap.Tile) bool {
+			return tileHas(neighbor, func(id uint16) bool {
+				neighborInfo := e.Brushes.info[id]
+				return neighborInfo != nil && neighborInfo.carpet == carpet
+			})
 		})
 		piece := carpetPiece(mask)
-		if piece == in.carpetAlign {
+		if piece == info.carpetAlign {
 			continue
 		}
-		if id := c.parts[piece].pick(e.rng); id != 0 {
-			t.Items[i].ID = id
-		} else if id := c.parts[edgeCenter].pick(e.rng); id != 0 {
-			t.Items[i].ID = id
+		if id := carpet.parts[piece].pick(e.rng); id != 0 {
+			tile.Items[i].ID = id
+		} else if id := carpet.parts[edgeCenter].pick(e.rng); id != 0 {
+			tile.Items[i].ID = id
 		}
 	}
 }
 
-// tableize reshapes the tables of the tile at p.
-func (e *Editor) tableize(tx *Tx, p otmap.Position) {
-	cur := tx.Get(p)
-	if cur == nil || !e.hasTable(cur) {
+// tableize reshapes the tables of the tile at pos.
+func (e *Editor) tableize(tx *Tx, pos otmap.Position) {
+	current := tx.Get(pos)
+	if current == nil || !e.hasTable(current) {
 		return
 	}
-	t := tx.Edit(p)
-	for i, it := range t.Items {
-		in := e.Brushes.info[it.ID]
-		if in == nil || in.table == nil {
+	tile := tx.Edit(pos)
+	for i, item := range tile.Items {
+		info := e.Brushes.info[item.ID]
+		if info == nil || info.table == nil {
 			continue
 		}
-		tb := in.table
-		mask := e.neighborMask(p, func(nt *otmap.Tile) bool {
-			return tileHas(nt, func(id uint16) bool { ni := e.Brushes.info[id]; return ni != nil && ni.table == tb })
+		table := info.table
+		mask := e.neighborMask(pos, func(neighbor *otmap.Tile) bool {
+			return tileHas(neighbor, func(id uint16) bool {
+				neighborInfo := e.Brushes.info[id]
+				return neighborInfo != nil && neighborInfo.table == table
+			})
 		})
 		piece := tablePiece(mask)
-		if piece == in.tableAlign {
+		if piece == info.tableAlign {
 			continue
 		}
-		if id := tb.parts[piece].pick(e.rng); id != 0 {
-			t.Items[i].ID = id
-		} else if id := tb.parts[tableAlone].pick(e.rng); id != 0 {
-			t.Items[i].ID = id
+		if id := table.parts[piece].pick(e.rng); id != 0 {
+			tile.Items[i].ID = id
+		} else if id := table.parts[tableAlone].pick(e.rng); id != 0 {
+			tile.Items[i].ID = id
 		}
 	}
 }
 
-func (e *Editor) drawCarpet(t *otmap.Tile, c *CarpetBrush) {
-	e.removeCarpets(t)
-	id := c.parts[edgeCenter].pick(e.rng)
+func (e *Editor) drawCarpet(tile *otmap.Tile, carpet *CarpetBrush) {
+	e.removeCarpets(tile)
+	id := carpet.parts[edgeCenter].pick(e.rng)
 	if id == 0 {
-		for _, l := range c.parts {
-			if id = l.pick(e.rng); id != 0 {
+		for _, part := range carpet.parts {
+			if id = part.pick(e.rng); id != 0 {
 				break
 			}
 		}
 	}
 	if id != 0 {
-		e.addItem(t, otmap.Item{ID: id})
+		e.addItem(tile, otmap.Item{ID: id})
 	}
 }
 
-func (e *Editor) removeCarpets(t *otmap.Tile) {
-	t.Items = slices.DeleteFunc(t.Items, func(it otmap.Item) bool {
-		in := e.Brushes.info[it.ID]
-		return in != nil && in.carpet != nil
+func (e *Editor) removeCarpets(tile *otmap.Tile) {
+	tile.Items = slices.DeleteFunc(tile.Items, func(item otmap.Item) bool {
+		info := e.Brushes.info[item.ID]
+		return info != nil && info.carpet != nil
 	})
 }
 
-func (e *Editor) drawTable(t *otmap.Tile, tb *TableBrush) {
-	e.removeTables(t)
-	id := tb.parts[tableAlone].pick(e.rng)
+func (e *Editor) drawTable(tile *otmap.Tile, table *TableBrush) {
+	e.removeTables(tile)
+	id := table.parts[tableAlone].pick(e.rng)
 	if id == 0 {
-		for _, l := range tb.parts {
-			if id = l.pick(e.rng); id != 0 {
+		for _, part := range table.parts {
+			if id = part.pick(e.rng); id != 0 {
 				break
 			}
 		}
 	}
 	if id != 0 {
-		e.addItem(t, otmap.Item{ID: id})
+		e.addItem(tile, otmap.Item{ID: id})
 	}
 }
 
-func (e *Editor) removeTables(t *otmap.Tile) {
-	t.Items = slices.DeleteFunc(t.Items, func(it otmap.Item) bool {
-		in := e.Brushes.info[it.ID]
-		return in != nil && in.table != nil
+func (e *Editor) removeTables(tile *otmap.Tile) {
+	tile.Items = slices.DeleteFunc(tile.Items, func(item otmap.Item) bool {
+		info := e.Brushes.info[item.ID]
+		return info != nil && info.table != nil
 	})
 }

@@ -8,13 +8,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/otmap"
 )
 
-// Floor ranges of a selection.
-const (
-	FloorsCurrent = "current"
-	FloorsLower   = "lower"
-	FloorsVisible = "visible"
-)
-
 // floorRange returns the floors a selection mode covers from floor z.
 func floorRange(z int, mode string) (int, int) {
 	switch mode {
@@ -22,35 +15,35 @@ func floorRange(z int, mode string) (int, int) {
 		if z <= otmap.GroundFloor {
 			return z, otmap.GroundFloor
 		}
-		return z, min(otmap.MaxFloor, z+2)
+		return z, min(otmap.MaxFloor, z+lowerFloorSpan)
 	case FloorsVisible:
 		if z <= otmap.GroundFloor {
 			return 0, otmap.GroundFloor
 		}
-		return z, min(otmap.MaxFloor, z+2)
+		return z, min(otmap.MaxFloor, z+lowerFloorSpan)
 	}
 	return z, z
 }
 
 // selection tracking: positions of tiles with something selected.
-func (e *Editor) syncSel(p otmap.Position) {
+func (e *Editor) syncSel(pos otmap.Position) {
 	if e.sel == nil {
 		e.sel = map[otmap.Position]struct{}{}
 	}
-	if e.Map.Tile(p).Selected() {
-		e.sel[p] = struct{}{}
+	if e.Map.Tile(pos).Selected() {
+		e.sel[pos] = struct{}{}
 	} else {
-		delete(e.sel, p)
+		delete(e.sel, pos)
 	}
 }
 
 // RebuildSelection scans the map for selected tiles (after loading).
 func (e *Editor) RebuildSelection() {
 	e.sel = map[otmap.Position]struct{}{}
-	for _, c := range e.Map.Chunks() {
-		c.Each(func(p otmap.Position, t *otmap.Tile) {
-			if t.Selected() {
-				e.sel[p] = struct{}{}
+	for _, chunk := range e.Map.Chunks() {
+		chunk.Each(func(pos otmap.Position, tile *otmap.Tile) {
+			if tile.Selected() {
+				e.sel[pos] = struct{}{}
 			}
 		})
 	}
@@ -58,31 +51,31 @@ func (e *Editor) RebuildSelection() {
 
 // Selected returns the positions with something selected, sorted.
 func (e *Editor) Selected() []otmap.Position {
-	out := make([]otmap.Position, 0, len(e.sel))
-	for p := range e.sel {
-		out = append(out, p)
+	positions := make([]otmap.Position, 0, len(e.sel))
+	for pos := range e.sel {
+		positions = append(positions, pos)
 	}
-	slices.SortFunc(out, func(a, b otmap.Position) int {
+	slices.SortFunc(positions, func(a, b otmap.Position) int {
 		return cmp.Or(cmp.Compare(a.Z, b.Z), cmp.Compare(a.Y, b.Y), cmp.Compare(a.X, b.X))
 	})
-	return out
+	return positions
 }
 
 // SelectionCount returns the number of tiles with a selection.
 func (e *Editor) SelectionCount() int { return len(e.sel) }
 
 // SelectionBounds returns the selected area.
-func (e *Editor) SelectionBounds() (min, max otmap.Position, ok bool) {
+func (e *Editor) SelectionBounds() (lowest, highest otmap.Position, ok bool) {
 	first := true
-	for p := range e.sel {
+	for pos := range e.sel {
 		if first {
-			min, max, first = p, p, false
+			lowest, highest, first = pos, pos, false
 			continue
 		}
-		min.X, min.Y, min.Z = minU(min.X, p.X), minU(min.Y, p.Y), minU(min.Z, p.Z)
-		max.X, max.Y, max.Z = maxU(max.X, p.X), maxU(max.Y, p.Y), maxU(max.Z, p.Z)
+		lowest.X, lowest.Y, lowest.Z = minU(lowest.X, pos.X), minU(lowest.Y, pos.Y), minU(lowest.Z, pos.Z)
+		highest.X, highest.Y, highest.Z = maxU(highest.X, pos.X), maxU(highest.Y, pos.Y), maxU(highest.Z, pos.Z)
 	}
-	return min, max, !first
+	return lowest, highest, !first
 }
 
 func minU[T uint8 | uint16](a, b T) T {
@@ -105,46 +98,52 @@ func (e *Editor) ClearSelection() {
 		return
 	}
 	tx := e.BeginSelection()
-	for _, p := range e.Selected() {
-		tx.Edit(p).SetSelected(false)
-	}
+	e.deselectAll(tx)
 	tx.Commit()
+}
+
+// deselectAll deselects every selected tile within tx.
+func (e *Editor) deselectAll(tx *Tx) {
+	for _, pos := range e.Selected() {
+		tx.Edit(pos).SetSelected(false)
+	}
 }
 
 // SelectRect selects the tiles of a rectangle. add keeps the selection,
 // remove deselects instead. compensate shifts lower floors like they are
 // drawn (one tile right and down per floor).
-func (e *Editor) SelectRect(r Rect, floors string, add, remove, compensate bool) {
+func (e *Editor) SelectRect(area Rect, floors string, add, remove, compensate bool) {
 	tx := e.BeginSelection()
 	if !add && !remove {
-		for _, p := range e.Selected() {
-			tx.Edit(p).SetSelected(false)
-		}
+		e.deselectAll(tx)
 	}
-	x0, y0, x1, y1 := r.bounds()
-	z := int(r.From.Z)
-	zs, ze := floorRange(z, floors)
-	for fz := zs; fz <= ze; fz++ {
-		off := 0
+	x0, y0, x1, y1 := area.bounds()
+	z := int(area.From.Z)
+	firstFloor, lastFloor := floorRange(z, floors)
+	for floor := firstFloor; floor <= lastFloor; floor++ {
+		shift := 0
 		if compensate {
-			off = fz - z
+			shift = floor - z
 		}
-		e.Map.EachIn(x0+off, y0+off, x1+off, y1+off, fz, fz, func(p otmap.Position, t *otmap.Tile) {
-			if t.Selected() == !remove && (remove || allSelected(t)) {
+		e.Map.EachIn(x0+shift, y0+shift, x1+shift, y1+shift, floor, floor, func(pos otmap.Position, tile *otmap.Tile) {
+			if tile.Selected() == !remove && (remove || allSelected(tile)) {
 				return
 			}
-			tx.Edit(p).SetSelected(!remove)
+			tx.Edit(pos).SetSelected(!remove)
 		})
 	}
 	tx.Commit()
 }
 
-func allSelected(t *otmap.Tile) bool {
-	c := t.Clone()
-	c.SetSelected(true)
-	return equalSelection(c, t)
+// allSelected reports whether everything on a tile is already selected.
+func allSelected(tile *otmap.Tile) bool {
+	fullySelected := tile.Clone()
+	fullySelected.SetSelected(true)
+	return equalSelection(fullySelected, tile)
 }
 
+// equalSelection reports whether two tiles have the same ground and items
+// selected.
 func equalSelection(a, b *otmap.Tile) bool {
 	if a.Ground.Selected != b.Ground.Selected || len(a.Items) != len(b.Items) {
 		return false
@@ -161,80 +160,76 @@ func equalSelection(a, b *otmap.Tile) bool {
 // top item. toggle adds or removes it from the selection instead of
 // replacing it. It returns what was selected ("creature", "spawn", "item"
 // or "").
-func (e *Editor) SelectAt(p otmap.Position, toggle bool, showCreatures, showSpawns bool) string {
-	t := e.Map.Tile(p)
+func (e *Editor) SelectAt(target otmap.Position, toggle bool, showCreatures, showSpawns bool) string {
+	tile := e.Map.Tile(target)
 	tx := e.BeginSelection()
 	defer tx.Commit()
 	if !toggle {
-		for _, q := range e.Selected() {
-			if q != p {
-				tx.Edit(q).SetSelected(false)
+		for _, other := range e.Selected() {
+			if other != target {
+				tx.Edit(other).SetSelected(false)
 			}
 		}
 	}
-	if t == nil {
+	if tile == nil {
 		return ""
 	}
-	nt := tx.Edit(p)
+	edited := tx.Edit(target)
 	if !toggle {
-		nt.SetSelected(false)
+		edited.SetSelected(false)
 	}
-	if showCreatures && len(nt.Creatures()) > 0 {
-		c := &nt.Ext.Creatures[len(nt.Ext.Creatures)-1]
-		c.Selected = !toggle || !c.Selected
+	if showCreatures && len(edited.Creatures()) > 0 {
+		creature := &edited.Ext.Creatures[len(edited.Ext.Creatures)-1]
+		creature.Selected = !toggle || !creature.Selected
 		return "creature"
 	}
-	if showSpawns && nt.Spawn() != nil {
-		nt.Ext.Spawn.Selected = !toggle || !nt.Ext.Spawn.Selected
+	if showSpawns && edited.Spawn() != nil {
+		edited.Ext.Spawn.Selected = !toggle || !edited.Ext.Spawn.Selected
 		return "spawn"
 	}
-	if showSpawns && nt.SpawnNPC() != nil {
-		nt.Ext.SpawnNPC.Selected = !toggle || !nt.Ext.SpawnNPC.Selected
+	if showSpawns && edited.SpawnNPC() != nil {
+		edited.Ext.SpawnNPC.Selected = !toggle || !edited.Ext.SpawnNPC.Selected
 		return "spawn"
 	}
-	if n := len(nt.Items); n > 0 {
-		nt.Items[n-1].Selected = !toggle || !nt.Items[n-1].Selected
+	if itemCount := len(edited.Items); itemCount > 0 {
+		topItem := &edited.Items[itemCount-1]
+		topItem.Selected = !toggle || !topItem.Selected
 		return "item"
 	}
-	if nt.Ground.ID != 0 {
-		nt.Ground.Selected = !toggle || !nt.Ground.Selected
+	if edited.Ground.ID != 0 {
+		edited.Ground.Selected = !toggle || !edited.Ground.Selected
 		return "item"
 	}
 	return ""
 }
 
 // SelectItem selects one item of a tile (index -1 is the ground).
-func (e *Editor) SelectItem(p otmap.Position, index int, add bool) {
+func (e *Editor) SelectItem(pos otmap.Position, index int, add bool) {
 	tx := e.BeginSelection()
 	defer tx.Commit()
 	if !add {
-		for _, q := range e.Selected() {
-			tx.Edit(q).SetSelected(false)
-		}
+		e.deselectAll(tx)
 	}
-	t := e.Map.Tile(p)
-	if t == nil {
+	if e.Map.Tile(pos) == nil {
 		return
 	}
-	nt := tx.Edit(p)
+	edited := tx.Edit(pos)
 	if index < 0 {
-		nt.Ground.Selected = nt.Ground.ID != 0
-	} else if index < len(nt.Items) {
-		nt.Items[index].Selected = true
+		edited.Ground.Selected = edited.Ground.ID != 0
+	} else if index < len(edited.Items) {
+		edited.Items[index].Selected = true
 	}
 }
 
 // SelectTiles selects whole tiles (find results).
-func (e *Editor) SelectTiles(ps []otmap.Position, add bool) {
+func (e *Editor) SelectTiles(positions []otmap.Position, add bool) {
 	tx := e.BeginSelection()
 	if !add {
-		for _, q := range e.Selected() {
-			tx.Edit(q).SetSelected(false)
-		}
+		e.deselectAll(tx)
 	}
-	for _, p := range ps {
-		if e.Map.Tile(p) != nil {
-			tx.Edit(p).SetSelected(true)
+	for _, pos := range positions {
+		if e.Map.Tile(pos) != nil {
+			tx.Edit(pos).SetSelected(true)
 		}
 	}
 	tx.Commit()
@@ -262,101 +257,115 @@ type Clip struct {
 }
 
 // extract returns the selected parts of a tile; take also removes them.
-func extract(t *otmap.Tile, take bool) ClipTile {
-	var c ClipTile
-	if t.Ground.ID != 0 && t.Ground.Selected {
-		g := t.Ground.Clone()
-		g.Selected = false
-		c.Ground = &g
+func extract(tile *otmap.Tile, take bool) ClipTile {
+	var clipTile ClipTile
+	if tile.Ground.ID != 0 && tile.Ground.Selected {
+		ground := tile.Ground.Clone()
+		ground.Selected = false
+		clipTile.Ground = &ground
 		if take {
-			t.Ground = otmap.Item{}
+			tile.Ground = otmap.Item{}
 		}
 	}
-	keep := t.Items[:0:0]
-	for _, it := range t.Items {
-		if it.Selected {
-			cp := it.Clone()
-			cp.Selected = false
-			c.Items = append(c.Items, cp)
+	kept := tile.Items[:0:0]
+	for _, item := range tile.Items {
+		if item.Selected {
+			copied := item.Clone()
+			copied.Selected = false
+			clipTile.Items = append(clipTile.Items, copied)
 			if take {
 				continue
 			}
 		}
-		keep = append(keep, it)
+		kept = append(kept, item)
 	}
 	if take {
-		t.Items = keep
+		tile.Items = kept
 	}
-	if t.Ext != nil {
-		var cs []otmap.Creature
-		for _, cr := range t.Ext.Creatures {
-			if cr.Selected {
-				cr.Selected = false
-				c.Creatures = append(c.Creatures, cr)
-				if take {
-					continue
-				}
-			}
-			cs = append(cs, cr)
-		}
-		if take {
-			t.Ext.Creatures = cs
-		}
-		if s := t.Ext.Spawn; s != nil && s.Selected {
-			cp := *s
-			cp.Selected = false
-			c.Spawn = &cp
-			if take {
-				t.Ext.Spawn = nil
-			}
-		}
-		if s := t.Ext.SpawnNPC; s != nil && s.Selected {
-			cp := *s
-			cp.Selected = false
-			c.SpawnNPC = &cp
-			if take {
-				t.Ext.SpawnNPC = nil
-			}
-		}
-		if take {
-			t.Compact()
-		}
+	if tile.Ext != nil {
+		extractExtras(tile, &clipTile, take)
 	}
 	// A whole tile selection carries the house and flags too.
-	if c.Ground != nil {
-		c.HouseID, c.Flags = t.HouseID, t.Flags
+	if clipTile.Ground != nil {
+		clipTile.HouseID, clipTile.Flags = tile.HouseID, tile.Flags
 	}
-	return c
+	return clipTile
 }
 
-// put merges clipboard parts into a tile, selecting them when sel is set.
-func (e *Editor) put(t *otmap.Tile, c ClipTile, sel bool) {
-	if c.Ground != nil {
-		g := c.Ground.Clone()
-		g.Selected = sel
-		t.Ground = g
-		if c.HouseID != 0 || c.Flags != 0 {
-			t.HouseID, t.Flags = c.HouseID, c.Flags
+// extractExtras copies the selected creatures and spawns of a tile with
+// extras into clipTile; take also removes them.
+func extractExtras(tile *otmap.Tile, clipTile *ClipTile, take bool) {
+	var keptCreatures []otmap.Creature
+	for _, creature := range tile.Ext.Creatures {
+		if creature.Selected {
+			creature.Selected = false
+			clipTile.Creatures = append(clipTile.Creatures, creature)
+			if take {
+				continue
+			}
+		}
+		keptCreatures = append(keptCreatures, creature)
+	}
+	if take {
+		tile.Ext.Creatures = keptCreatures
+	}
+	if spawn := selectedSpawnCopy(tile.Ext.Spawn); spawn != nil {
+		clipTile.Spawn = spawn
+		if take {
+			tile.Ext.Spawn = nil
 		}
 	}
-	for _, it := range c.Items {
-		cp := it.Clone()
-		cp.Selected = sel
-		e.addItem(t, cp)
+	if spawn := selectedSpawnCopy(tile.Ext.SpawnNPC); spawn != nil {
+		clipTile.SpawnNPC = spawn
+		if take {
+			tile.Ext.SpawnNPC = nil
+		}
 	}
-	for _, cr := range c.Creatures {
-		cr.Selected = sel
-		t.EnsureExt().Creatures = append(t.EnsureExt().Creatures, cr)
+	if take {
+		tile.Compact()
 	}
-	if c.Spawn != nil {
-		s := *c.Spawn
-		s.Selected = sel
-		t.EnsureExt().Spawn = &s
+}
+
+// selectedSpawnCopy returns an unselected copy of a selected spawn, or nil
+// when the spawn is missing or not selected.
+func selectedSpawnCopy(spawn *otmap.Spawn) *otmap.Spawn {
+	if spawn == nil || !spawn.Selected {
+		return nil
 	}
-	if c.SpawnNPC != nil {
-		s := *c.SpawnNPC
-		s.Selected = sel
-		t.EnsureExt().SpawnNPC = &s
+	copied := *spawn
+	copied.Selected = false
+	return &copied
+}
+
+// put merges clipboard parts into a tile, selecting them when selected is
+// set.
+func (e *Editor) put(tile *otmap.Tile, clipTile ClipTile, selected bool) {
+	if clipTile.Ground != nil {
+		ground := clipTile.Ground.Clone()
+		ground.Selected = selected
+		tile.Ground = ground
+		if clipTile.HouseID != 0 || clipTile.Flags != 0 {
+			tile.HouseID, tile.Flags = clipTile.HouseID, clipTile.Flags
+		}
+	}
+	for _, item := range clipTile.Items {
+		copied := item.Clone()
+		copied.Selected = selected
+		e.addItem(tile, copied)
+	}
+	for _, creature := range clipTile.Creatures {
+		creature.Selected = selected
+		tile.EnsureExt().Creatures = append(tile.EnsureExt().Creatures, creature)
+	}
+	if clipTile.Spawn != nil {
+		spawn := *clipTile.Spawn
+		spawn.Selected = selected
+		tile.EnsureExt().Spawn = &spawn
+	}
+	if clipTile.SpawnNPC != nil {
+		spawn := *clipTile.SpawnNPC
+		spawn.Selected = selected
+		tile.EnsureExt().SpawnNPC = &spawn
 	}
 }
 
@@ -366,49 +375,47 @@ func (c *ClipTile) empty() bool {
 
 // Copy returns the selection relative to its top-left corner.
 func (e *Editor) Copy() *Clip {
-	min, max, ok := e.SelectionBounds()
+	lowest, highest, ok := e.SelectionBounds()
 	if !ok {
 		return nil
 	}
-	clip := &Clip{Width: int(max.X-min.X) + 1, Height: int(max.Y-min.Y) + 1}
-	for _, p := range e.Selected() {
-		ct := extract(e.Map.Tile(p).Clone(), false)
-		if ct.empty() {
+	clip := &Clip{Width: int(highest.X-lowest.X) + 1, Height: int(highest.Y-lowest.Y) + 1}
+	for _, pos := range e.Selected() {
+		clipTile := extract(e.Map.Tile(pos).Clone(), false)
+		if clipTile.empty() {
 			continue
 		}
-		ct.DX, ct.DY, ct.DZ = int(p.X-min.X), int(p.Y-min.Y), int(p.Z)-int(min.Z)
-		clip.Tiles = append(clip.Tiles, ct)
+		clipTile.DX, clipTile.DY, clipTile.DZ = int(pos.X-lowest.X), int(pos.Y-lowest.Y), int(pos.Z)-int(lowest.Z)
+		clip.Tiles = append(clip.Tiles, clipTile)
 	}
 	return clip
 }
 
 // Cut copies the selection and deletes it.
 func (e *Editor) Cut() *Clip {
-	c := e.Copy()
-	if c != nil {
+	clip := e.Copy()
+	if clip != nil {
 		e.DeleteSelection("Cut")
 	}
-	return c
+	return clip
 }
 
-// Paste puts a clip with its top-left corner at p and selects it.
-func (e *Editor) Paste(c *Clip, at otmap.Position) error {
-	if c == nil || len(c.Tiles) == 0 {
+// Paste puts a clip with its top-left corner at at and selects it.
+func (e *Editor) Paste(clip *Clip, at otmap.Position) error {
+	if clip == nil || len(clip.Tiles) == 0 {
 		return errors.New("the clipboard is empty")
 	}
 	tx := e.Begin("Paste", 0)
-	for _, q := range e.Selected() {
-		tx.Edit(q).SetSelected(false)
-	}
+	e.deselectAll(tx)
 	changed := newPosSet()
-	for _, ct := range c.Tiles {
-		p, ok := at.Add(ct.DX, ct.DY, ct.DZ)
+	for _, clipTile := range clip.Tiles {
+		target, ok := at.Add(clipTile.DX, clipTile.DY, clipTile.DZ)
 		if !ok {
 			continue
 		}
-		e.put(tx.Edit(p), ct, true)
-		if e.reshapes(ct) {
-			changed.add(p)
+		e.put(tx.Edit(target), clipTile, true)
+		if e.reshapes(clipTile) {
+			changed.add(target)
 		}
 	}
 	e.autoAround(tx, changed)
@@ -416,15 +423,15 @@ func (e *Editor) Paste(c *Clip, at otmap.Position) error {
 	return nil
 }
 
-// reshapes reports whether placing or removing c changes the borders,
-// walls, tables or carpets around it. Other items leave them alone, so
-// moving a barrel does not redo hand-placed borders.
-func (e *Editor) reshapes(c ClipTile) bool {
-	if c.Ground != nil {
+// reshapes reports whether placing or removing clipTile changes the
+// borders, walls, tables or carpets around it. Other items leave them
+// alone, so moving a barrel does not redo hand-placed borders.
+func (e *Editor) reshapes(clipTile ClipTile) bool {
+	if clipTile.Ground != nil {
 		return true
 	}
-	for _, it := range c.Items {
-		if in := e.Brushes.info[it.ID]; in != nil && (in.wall != nil || in.table != nil || in.carpet != nil) {
+	for _, item := range clipTile.Items {
+		if info := e.Brushes.info[item.ID]; info != nil && (info.wall != nil || info.table != nil || info.carpet != nil) {
 			return true
 		}
 	}
@@ -432,15 +439,15 @@ func (e *Editor) reshapes(c ClipTile) bool {
 }
 
 // autoAround redoes borders and walls around changed tiles.
-func (e *Editor) autoAround(tx *Tx, s *posSet) {
-	if !e.Settings.Automagic || len(s.list) == 0 || len(s.list) > 100000 {
+func (e *Editor) autoAround(tx *Tx, changed *posSet) {
+	if !e.Settings.Automagic || len(changed.list) == 0 || len(changed.list) > maxAutoTiles {
 		return
 	}
-	for _, p := range s.ring().list {
-		e.borderize(tx, p)
-		e.wallize(tx, p)
-		e.tableize(tx, p)
-		e.carpetize(tx, p)
+	for _, pos := range changed.ring().list {
+		e.borderize(tx, pos)
+		e.wallize(tx, pos)
+		e.tableize(tx, pos)
+		e.carpetize(tx, pos)
 	}
 }
 
@@ -454,9 +461,9 @@ func (e *Editor) DeleteSelection(label string) int {
 	}
 	tx := e.Begin(label, 0)
 	changed := newPosSet()
-	for _, p := range e.Selected() {
-		if e.reshapes(extract(tx.Edit(p), true)) {
-			changed.add(p)
+	for _, pos := range e.Selected() {
+		if e.reshapes(extract(tx.Edit(pos), true)) {
+			changed.add(pos)
 		}
 	}
 	e.autoAround(tx, changed)
@@ -468,36 +475,36 @@ func (e *Editor) MoveSelection(dx, dy, dz int) error {
 	if len(e.sel) == 0 || (dx == 0 && dy == 0 && dz == 0) {
 		return nil
 	}
-	sel := e.Selected()
-	for _, p := range sel {
-		if _, ok := p.Add(dx, dy, dz); !ok {
+	selected := e.Selected()
+	for _, pos := range selected {
+		if _, ok := pos.Add(dx, dy, dz); !ok {
 			return errors.New("the selection would leave the map")
 		}
 	}
 	tx := e.Begin("Move", 0)
-	type moved struct {
-		to otmap.Position
-		c  ClipTile
+	type movedPart struct {
+		to       otmap.Position
+		clipTile ClipTile
 	}
-	var parts []moved
+	var parts []movedPart
 	changed := newPosSet()
-	for _, p := range sel {
-		c := extract(tx.Edit(p), true)
-		if c.Ground != nil {
+	for _, from := range selected {
+		clipTile := extract(tx.Edit(from), true)
+		if clipTile.Ground != nil {
 			// The house and flags move with the ground.
-			t := tx.Edit(p)
-			t.HouseID, t.Flags = 0, 0
+			tile := tx.Edit(from)
+			tile.HouseID, tile.Flags = 0, 0
 		}
-		to, _ := p.Add(dx, dy, dz)
-		parts = append(parts, moved{to, c})
-		if e.reshapes(c) {
-			changed.add(p)
+		to, _ := from.Add(dx, dy, dz)
+		parts = append(parts, movedPart{to, clipTile})
+		if e.reshapes(clipTile) {
+			changed.add(from)
 		}
 	}
-	for _, m := range parts {
-		e.put(tx.Edit(m.to), m.c, true)
-		if e.reshapes(m.c) {
-			changed.add(m.to)
+	for _, part := range parts {
+		e.put(tx.Edit(part.to), part.clipTile, true)
+		if e.reshapes(part.clipTile) {
+			changed.add(part.to)
 		}
 	}
 	e.autoAround(tx, changed)
@@ -508,9 +515,9 @@ func (e *Editor) MoveSelection(dx, dy, dz int) error {
 // BorderizeSelection redoes borders of the selected tiles.
 func (e *Editor) BorderizeSelection() int {
 	tx := e.Begin("Borderize selection", 0)
-	for _, p := range e.Selected() {
-		e.reborder(tx, p, true)
-		e.wallize(tx, p)
+	for _, pos := range e.Selected() {
+		e.reborder(tx, pos, true)
+		e.wallize(tx, pos)
 	}
 	return tx.Commit()
 }
@@ -518,22 +525,23 @@ func (e *Editor) BorderizeSelection() int {
 // RandomizeSelection rerolls the grounds of the selected tiles.
 func (e *Editor) RandomizeSelection() int {
 	tx := e.Begin("Randomize selection", 0)
-	for _, p := range e.Selected() {
-		e.randomize(tx, p)
+	for _, pos := range e.Selected() {
+		e.randomize(tx, pos)
 	}
 	return tx.Commit()
 }
 
-func (e *Editor) randomize(tx *Tx, p otmap.Position) {
-	cur := tx.Get(p)
-	g := e.groundBrushOf(cur)
-	if g == nil || !g.randomize {
+// randomize rerolls the ground of one tile from its ground brush.
+func (e *Editor) randomize(tx *Tx, pos otmap.Position) {
+	current := tx.Get(pos)
+	brush := e.groundBrushOf(current)
+	if brush == nil || !brush.randomize {
 		return
 	}
-	id := g.items.pick(e.rng)
-	if id == 0 || id == cur.Ground.ID {
+	id := brush.items.pick(e.rng)
+	if id == 0 || id == current.Ground.ID {
 		return
 	}
-	t := tx.Edit(p)
-	t.Ground.ID = id
+	tile := tx.Edit(pos)
+	tile.Ground.ID = id
 }

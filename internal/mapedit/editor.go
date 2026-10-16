@@ -41,7 +41,7 @@ func (s Settings) Format() otmap.Format {
 
 // DefaultSettings returns the defaults.
 func DefaultSettings() Settings {
-	return Settings{Automagic: true, EraserLeaveUnique: true, HouseRemoveItems: true, AutoDoorID: true, DefaultSpawnTime: 60, AutoCreateSpawn: true}
+	return Settings{Automagic: true, EraserLeaveUnique: true, HouseRemoveItems: true, AutoDoorID: true, DefaultSpawnTime: defaultSpawnTimeSeconds, AutoCreateSpawn: true}
 }
 
 // change is one tile change of an action.
@@ -60,38 +60,40 @@ type metaState struct {
 	zones     []otmap.Zone
 }
 
-func snapshotMeta(m *otmap.Map) *metaState {
-	s := &metaState{
-		towns:     make(map[uint32]*otmap.Town, len(m.Towns)),
-		houses:    make(map[uint32]*otmap.House, len(m.Houses)),
-		waypoints: make([]*otmap.Waypoint, len(m.Waypoints)),
-		zones:     slices.Clone(m.Zones),
+// snapshotMeta copies the map data outside tiles.
+func snapshotMeta(gameMap *otmap.Map) *metaState {
+	snapshot := &metaState{
+		towns:     make(map[uint32]*otmap.Town, len(gameMap.Towns)),
+		houses:    make(map[uint32]*otmap.House, len(gameMap.Houses)),
+		waypoints: make([]*otmap.Waypoint, len(gameMap.Waypoints)),
+		zones:     slices.Clone(gameMap.Zones),
 	}
-	s.header = otmap.Map{
-		Width: m.Width, Height: m.Height, ItemsMajor: m.ItemsMajor, ItemsMinor: m.ItemsMinor,
-		Description: m.Description, SpawnFile: m.SpawnFile, NpcFile: m.NpcFile, HouseFile: m.HouseFile, ZoneFile: m.ZoneFile,
-		SpawnFormat: m.SpawnFormat,
+	snapshot.header = otmap.Map{
+		Width: gameMap.Width, Height: gameMap.Height, ItemsMajor: gameMap.ItemsMajor, ItemsMinor: gameMap.ItemsMinor,
+		Description: gameMap.Description, SpawnFile: gameMap.SpawnFile, NpcFile: gameMap.NpcFile, HouseFile: gameMap.HouseFile, ZoneFile: gameMap.ZoneFile,
+		SpawnFormat: gameMap.SpawnFormat,
 	}
-	for k, v := range m.Towns {
-		c := *v
-		s.towns[k] = &c
+	for id, town := range gameMap.Towns {
+		townCopy := *town
+		snapshot.towns[id] = &townCopy
 	}
-	for k, v := range m.Houses {
-		s.houses[k] = v.Clone()
+	for id, house := range gameMap.Houses {
+		snapshot.houses[id] = house.Clone()
 	}
-	for i, w := range m.Waypoints {
-		c := *w
-		s.waypoints[i] = &c
+	for i, waypoint := range gameMap.Waypoints {
+		waypointCopy := *waypoint
+		snapshot.waypoints[i] = &waypointCopy
 	}
-	return s
+	return snapshot
 }
 
-func (s *metaState) restore(m *otmap.Map) {
-	h := s.header
-	m.Width, m.Height, m.ItemsMajor, m.ItemsMinor = h.Width, h.Height, h.ItemsMajor, h.ItemsMinor
-	m.Description, m.SpawnFile, m.NpcFile, m.HouseFile, m.ZoneFile, m.SpawnFormat = h.Description, h.SpawnFile, h.NpcFile, h.HouseFile, h.ZoneFile, h.SpawnFormat
-	again := snapshotMeta(&otmap.Map{Towns: s.towns, Houses: s.houses, Waypoints: s.waypoints, Zones: s.zones})
-	m.Towns, m.Houses, m.Waypoints, m.Zones = again.towns, again.houses, again.waypoints, again.zones
+// restore puts a copy of the saved data back into the map.
+func (s *metaState) restore(gameMap *otmap.Map) {
+	header := s.header
+	gameMap.Width, gameMap.Height, gameMap.ItemsMajor, gameMap.ItemsMinor = header.Width, header.Height, header.ItemsMajor, header.ItemsMinor
+	gameMap.Description, gameMap.SpawnFile, gameMap.NpcFile, gameMap.HouseFile, gameMap.ZoneFile, gameMap.SpawnFormat = header.Description, header.SpawnFile, header.NpcFile, header.HouseFile, header.ZoneFile, header.SpawnFormat
+	restored := snapshotMeta(&otmap.Map{Towns: s.towns, Houses: s.houses, Waypoints: s.waypoints, Zones: s.zones})
+	gameMap.Towns, gameMap.Houses, gameMap.Waypoints, gameMap.Zones = restored.towns, restored.houses, restored.waypoints, restored.zones
 }
 
 // Action is one undo step.
@@ -134,22 +136,19 @@ type Editor struct {
 	replace strokeReplace
 }
 
-// maxHistory limits the undo stack.
-const maxHistory = 400
-
 // New returns an editor for a map.
-func New(m *otmap.Map, items *otitems.DB, brushes *Brushes) *Editor {
+func New(gameMap *otmap.Map, items *otitems.DB, brushes *Brushes) *Editor {
 	return &Editor{
-		Map: m, Items: items, Brushes: brushes, Settings: DefaultSettings(),
-		rng:   rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0x9e3779b97f4a7c15)),
+		Map: gameMap, Items: items, Brushes: brushes, Settings: DefaultSettings(),
+		rng:   rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), rngStream)),
 		dirty: map[otmap.ChunkKey]bool{},
 		sel:   map[otmap.Position]struct{}{},
 	}
 }
 
 // SetBrushes replaces the brush index (after materials change).
-func (e *Editor) SetBrushes(b *Brushes) {
-	e.Brushes = b
+func (e *Editor) SetBrushes(brushes *Brushes) {
+	e.Brushes = brushes
 	e.doodad = nil
 }
 
@@ -173,8 +172,8 @@ func (e *Editor) CanRedo() bool { return len(e.redo) > 0 }
 
 // History returns the undo steps, oldest first, and the redo steps.
 func (e *Editor) History() (undo, redo []ActionInfo) {
-	for _, a := range e.undo {
-		undo = append(undo, ActionInfo{a.Label, len(a.changes)})
+	for _, action := range e.undo {
+		undo = append(undo, ActionInfo{action.Label, len(action.changes)})
 	}
 	for i := len(e.redo) - 1; i >= 0; i-- {
 		redo = append(redo, ActionInfo{e.redo[i].Label, len(e.redo[i].changes)})
@@ -185,35 +184,35 @@ func (e *Editor) History() (undo, redo []ActionInfo) {
 // TakeDirty returns the chunks changed since the last call and whether map
 // data outside tiles changed.
 func (e *Editor) TakeDirty() (chunks []otmap.ChunkKey, meta bool) {
-	for k := range e.dirty {
-		chunks = append(chunks, k)
+	for chunk := range e.dirty {
+		chunks = append(chunks, chunk)
 	}
 	clear(e.dirty)
 	meta, e.metaDirt = e.metaDirt, false
 	return chunks, meta
 }
 
-func (e *Editor) markDirty(p otmap.Position) { e.dirty[otmap.KeyOf(p)] = true }
+func (e *Editor) markDirty(pos otmap.Position) { e.dirty[otmap.KeyOf(pos)] = true }
 
 // Undo reverts the last action and returns its label.
 func (e *Editor) Undo() string {
 	if len(e.undo) == 0 {
 		return ""
 	}
-	a := e.undo[len(e.undo)-1]
+	action := e.undo[len(e.undo)-1]
 	e.undo = e.undo[:len(e.undo)-1]
-	for i := len(a.changes) - 1; i >= 0; i-- {
-		c := a.changes[i]
-		e.Map.SetTile(c.pos, c.before.Clone())
-		e.markDirty(c.pos)
-		e.syncSel(c.pos)
+	for i := len(action.changes) - 1; i >= 0; i-- {
+		tileChange := action.changes[i]
+		e.Map.SetTile(tileChange.pos, tileChange.before.Clone())
+		e.markDirty(tileChange.pos)
+		e.syncSel(tileChange.pos)
 	}
-	if a.metaBefore != nil {
-		a.metaBefore.restore(e.Map)
+	if action.metaBefore != nil {
+		action.metaBefore.restore(e.Map)
 		e.metaDirt = true
 	}
-	e.redo = append(e.redo, a)
-	return a.Label
+	e.redo = append(e.redo, action)
+	return action.Label
 }
 
 // Redo applies the last undone action again.
@@ -221,19 +220,19 @@ func (e *Editor) Redo() string {
 	if len(e.redo) == 0 {
 		return ""
 	}
-	a := e.redo[len(e.redo)-1]
+	action := e.redo[len(e.redo)-1]
 	e.redo = e.redo[:len(e.redo)-1]
-	for _, c := range a.changes {
-		e.Map.SetTile(c.pos, c.after.Clone())
-		e.markDirty(c.pos)
-		e.syncSel(c.pos)
+	for _, tileChange := range action.changes {
+		e.Map.SetTile(tileChange.pos, tileChange.after.Clone())
+		e.markDirty(tileChange.pos)
+		e.syncSel(tileChange.pos)
 	}
-	if a.metaAfter != nil {
-		a.metaAfter.restore(e.Map)
+	if action.metaAfter != nil {
+		action.metaAfter.restore(e.Map)
 		e.metaDirt = true
 	}
-	e.undo = append(e.undo, a)
-	return a.Label
+	e.undo = append(e.undo, action)
+	return action.Label
 }
 
 // Tx collects the changes of one action. Tiles are copied on first write,
@@ -261,44 +260,44 @@ func (e *Editor) Begin(label string, stroke int64) *Tx {
 // BeginSelection starts a change that is not recorded in the history
 // (selection only).
 func (e *Editor) BeginSelection() *Tx {
-	t := e.Begin("Select", 0)
-	t.noUndo = true
-	return t
+	tx := e.Begin("Select", 0)
+	tx.noUndo = true
+	return tx
 }
 
 // Get returns the current tile (read-only).
-func (t *Tx) Get(p otmap.Position) *otmap.Tile { return t.e.Map.Tile(p) }
+func (t *Tx) Get(pos otmap.Position) *otmap.Tile { return t.e.Map.Tile(pos) }
 
-// Prior returns the tile at p as it was before this action (read-only).
-func (t *Tx) Prior(p otmap.Position) *otmap.Tile {
-	if b, seen := t.before[p]; seen {
-		return b
+// Prior returns the tile at pos as it was before this action (read-only).
+func (t *Tx) Prior(pos otmap.Position) *otmap.Tile {
+	if beforeTile, seen := t.before[pos]; seen {
+		return beforeTile
 	}
-	return t.e.Map.Tile(p)
+	return t.e.Map.Tile(pos)
 }
 
-// Edit returns a writable copy of the tile at p, creating an empty tile.
+// Edit returns a writable copy of the tile at pos, creating an empty tile.
 // The copy is stored in the map right away so neighbors see it.
-func (t *Tx) Edit(p otmap.Position) *otmap.Tile {
-	cur := t.e.Map.Tile(p)
-	if t.written[p] && cur != nil {
-		return cur
+func (t *Tx) Edit(pos otmap.Position) *otmap.Tile {
+	current := t.e.Map.Tile(pos)
+	if t.written[pos] && current != nil {
+		return current
 	}
-	if _, seen := t.before[p]; !seen {
-		t.before[p] = cur
-		t.order = append(t.order, p)
+	if _, seen := t.before[pos]; !seen {
+		t.before[pos] = current
+		t.order = append(t.order, pos)
 	}
-	nt := cur.Clone()
-	if nt == nil {
-		nt = &otmap.Tile{}
+	tile := current.Clone()
+	if tile == nil {
+		tile = &otmap.Tile{}
 	}
 	if !t.noUndo {
-		nt.State |= otmap.StateModified
+		tile.State |= otmap.StateModified
 	}
-	t.e.Map.Put(p, nt)
-	t.written[p] = true
-	t.e.markDirty(p)
-	return nt
+	t.e.Map.Put(pos, tile)
+	t.written[pos] = true
+	t.e.markDirty(pos)
+	return tile
 }
 
 // Meta records the map data outside tiles before it changes.
@@ -311,66 +310,91 @@ func (t *Tx) Meta() {
 
 // Commit finishes the action and returns the number of changed tiles.
 func (t *Tx) Commit() int {
-	e := t.e
-	var changes []change
-	for _, p := range t.order {
-		e.Map.Prune(p)
-		e.syncSel(p)
-		after := e.Map.Tile(p)
-		before := t.before[p]
-		if before == nil && after == nil {
-			continue
-		}
-		changes = append(changes, change{pos: p, before: before, after: after})
-	}
+	editor := t.e
+	changes := t.collectChanges()
 	if t.noUndo || (len(changes) == 0 && t.meta == nil) {
 		return len(changes)
 	}
 	var metaAfter *metaState
 	if t.meta != nil {
-		metaAfter = snapshotMeta(e.Map)
+		metaAfter = snapshotMeta(editor.Map)
 	}
 	// Stored tiles are clones: the map keeps editing its own copies.
 	for i := range changes {
 		changes[i].after = changes[i].after.Clone()
 	}
-	e.redo = nil
-	if top := e.top(); t.stroke != 0 && top != nil && top.stroke == t.stroke {
-		// Merge: keep the oldest "before" of each tile.
-		known := map[otmap.Position]int{}
-		for i, c := range top.changes {
-			known[c.pos] = i
+	// A saved state on the redo stack is lost with it.
+	if editor.clean > len(editor.undo) {
+		editor.clean = -1
+	}
+	editor.redo = nil
+	if top := editor.top(); t.stroke != 0 && top != nil && top.stroke == t.stroke {
+		// The saved state is the top step: merging changes it.
+		if editor.clean == len(editor.undo) {
+			editor.clean = -1
 		}
-		for _, c := range changes {
-			if i, ok := known[c.pos]; ok {
-				top.changes[i].after = c.after
-			} else {
-				top.changes = append(top.changes, c)
-			}
-		}
-		if t.meta != nil {
-			if top.metaBefore == nil {
-				top.metaBefore = t.meta
-			}
-			top.metaAfter = metaAfter
-		}
+		top.mergeStroke(changes, t.meta, metaAfter)
 		return len(changes)
 	}
-	e.undo = append(e.undo, &Action{Label: t.label, changes: changes, metaBefore: t.meta, metaAfter: metaAfter, stroke: t.stroke, at: time.Now()})
-	if len(e.undo) > maxHistory {
-		n := len(e.undo) - maxHistory
-		e.undo = slices.Delete(e.undo, 0, n)
-		if e.clean >= 0 {
-			e.clean -= n
-			if e.clean < 0 {
-				e.clean = -1
-			}
+	editor.undo = append(editor.undo, &Action{Label: t.label, changes: changes, metaBefore: t.meta, metaAfter: metaAfter, stroke: t.stroke, at: time.Now()})
+	editor.trimHistory()
+	return len(changes)
+}
+
+// collectChanges prunes the written tiles and returns the ones that changed,
+// in the order they were first written.
+func (t *Tx) collectChanges() []change {
+	editor := t.e
+	var changes []change
+	for _, pos := range t.order {
+		editor.Map.Prune(pos)
+		editor.syncSel(pos)
+		after := editor.Map.Tile(pos)
+		before := t.before[pos]
+		if before == nil && after == nil {
+			continue
+		}
+		changes = append(changes, change{pos: pos, before: before, after: after})
+	}
+	return changes
+}
+
+// mergeStroke adds the changes of a later request of the same stroke to the
+// action. It keeps the oldest "before" of each tile.
+func (a *Action) mergeStroke(changes []change, metaBefore, metaAfter *metaState) {
+	known := map[otmap.Position]int{}
+	for i, tileChange := range a.changes {
+		known[tileChange.pos] = i
+	}
+	for _, tileChange := range changes {
+		if i, ok := known[tileChange.pos]; ok {
+			a.changes[i].after = tileChange.after
+		} else {
+			a.changes = append(a.changes, tileChange)
 		}
 	}
-	if e.clean > len(e.undo) {
-		e.clean = -1 // the saved state was undone and replaced
+	if metaBefore != nil {
+		if a.metaBefore == nil {
+			a.metaBefore = metaBefore
+		}
+		a.metaAfter = metaAfter
 	}
-	return len(changes)
+}
+
+// trimHistory drops the oldest undo steps above maxHistory and moves the
+// saved mark with them.
+func (e *Editor) trimHistory() {
+	if len(e.undo) <= maxHistory {
+		return
+	}
+	dropped := len(e.undo) - maxHistory
+	e.undo = slices.Delete(e.undo, 0, dropped)
+	if e.clean >= 0 {
+		e.clean -= dropped
+		if e.clean < 0 {
+			e.clean = -1
+		}
+	}
 }
 
 func (e *Editor) top() *Action {
