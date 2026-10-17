@@ -34,7 +34,9 @@ var (
 )
 
 // ScanCreatures finds monsters and NPCs in a server data folder: TFS XML
-// (monster/*.xml, npc/*.xml) and Lua scripts (revscripts).
+// (monster/*.xml, npc/*.xml) and Lua scripts (revscripts). A registry
+// (monsters.xml, npcs.xml) names its creatures itself, as the server does:
+// a file may hold another name than the one the map spawns.
 func ScanCreatures(dir string) ([]*CreatureType, error) {
 	var out []*CreatureType
 	seen := map[string]bool{}
@@ -46,6 +48,10 @@ func ScanCreatures(dir string) ([]*CreatureType, error) {
 		seen[key] = true
 		out = append(out, creature)
 	}
+	// xmlFiles holds the creature of each xml file by its cleaned lower case
+	// path, for the registries resolved after the walk.
+	xmlFiles := map[string]*CreatureType{}
+	var registries []string
 	fileCount := 0
 	err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
@@ -75,7 +81,10 @@ func ScanCreatures(dir string) ([]*CreatureType, error) {
 			return nil
 		}
 		if ext == ".xml" {
-			if creature := xmlCreature(data); creature != nil {
+			if isCreatureRegistry(data) {
+				registries = append(registries, path)
+			} else if creature := xmlCreature(data); creature != nil {
+				xmlFiles[strings.ToLower(filepath.Clean(path))] = creature
 				add(creature)
 			}
 			return nil
@@ -85,10 +94,49 @@ func ScanCreatures(dir string) ([]*CreatureType, error) {
 		}
 		return nil
 	})
+	for _, registry := range registries {
+		for _, creature := range registryCreatures(registry, xmlFiles) {
+			add(creature)
+		}
+	}
 	slices.SortFunc(out, func(left, right *CreatureType) int {
 		return strings.Compare(strings.ToLower(left.Name), strings.ToLower(right.Name))
 	})
 	return out, err
+}
+
+// isCreatureRegistry reports whether data is a TFS monsters.xml or npcs.xml.
+func isCreatureRegistry(data []byte) bool {
+	head := strings.ToLower(string(data[:min(len(data), xmlSniffBytes)]))
+	return strings.Contains(head, "<monsters") || strings.Contains(head, "<npcs")
+}
+
+// registryCreatures lists the entries of a registry under their registered
+// names, with the outfit of the file each one points to.
+func registryCreatures(path string, xmlFiles map[string]*CreatureType) []*CreatureType {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	root, err := xmltree.Parse(data)
+	if err != nil || (root.Name != "monsters" && root.Name != "npcs") {
+		return nil
+	}
+	var out []*CreatureType
+	for _, node := range root.Children {
+		name, file := node.Str("name"), node.Str("file")
+		if name == "" || file == "" {
+			continue
+		}
+		creature := xmlFiles[strings.ToLower(filepath.Clean(filepath.Join(filepath.Dir(path), file)))]
+		if creature == nil || strings.EqualFold(creature.Name, name) {
+			continue
+		}
+		registered := *creature
+		registered.Name = name
+		out = append(out, &registered)
+	}
+	return out
 }
 
 func xmlCreature(data []byte) *CreatureType {

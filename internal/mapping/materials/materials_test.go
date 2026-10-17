@@ -148,7 +148,7 @@ func TestScanCreatures(t *testing.T) {
 		"npc/bob.xml":             `<npc name="Bob"><look type="128" head="20" body="30" legs="40" feet="50" addons="3"/></npc>`,
 		"monster/dragon.lua":      "local mType = Game.createMonsterType(\"Dragon\")\nlocal monster = {}\nmonster.outfit = {\n\tlookType = 34,\n\tlookHead = 0,\n\tlookMount = 7\n}\n",
 		"npc/sam.lua":             "local internalNpcName = \"Sam\"\nlocal npcType = Game.createNpcType(internalNpcName)\nlocal npcConfig = {}\nnpcConfig.outfit = { lookType = 131, lookBody = 5 }\n",
-		"monster/monsters.xml":    `<monsters><monster name="Rat" file="rat.xml"/></monsters>`,
+		"monster/monsters.xml":    `<monsters><monster name="Rat" file="rat.xml"/><monster name="cave rat" file="rat.xml"/><monster name="Ghost" file="missing.xml"/></monsters>`,
 		"scripts/other.lua":       "print('hi')",
 		"items/items.xml":         `<items/>`,
 		"monster/item_golem.xml":  `<monster name="Golem"><look typeex="1234"/></monster>`,
@@ -163,7 +163,7 @@ func TestScanCreatures(t *testing.T) {
 	for _, c := range got {
 		byName[c.Name] = c
 	}
-	if len(got) != 5 {
+	if len(got) != 6 {
 		names := []string{}
 		for _, c := range got {
 			names = append(names, c.Name)
@@ -184,6 +184,10 @@ func TestScanCreatures(t *testing.T) {
 	}
 	if g := byName["Golem"]; g.Outfit.LookItem != 1234 {
 		t.Fatalf("golem = %+v", g)
+	}
+	// The registry names a creature the file calls otherwise.
+	if c := byName["cave rat"]; c == nil || c.Outfit.LookType != 21 {
+		t.Fatalf("cave rat = %+v", c)
 	}
 }
 
