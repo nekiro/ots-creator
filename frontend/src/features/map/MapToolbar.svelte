@@ -37,22 +37,34 @@
   });
 
   type ViewToggle = { [Key in keyof typeof map.view]: (typeof map.view)[Key] extends boolean ? Key : never }[keyof typeof map.view];
-  const QUICK: { key: ViewToggle; icon: string; title: string }[] = [
+  type ViewButton = { key: ViewToggle; icon: string; title: string };
+  // What is drawn over the map, shown or hidden with one click, in groups:
+  // creatures, areas, marked places, texts.
+  const LAYERS: ViewButton[][] = [
+    [
+      { key: "creatures", icon: "person", title: "Creatures" },
+      { key: "spawns", icon: "target", title: "Spawn areas" },
+    ],
+    [
+      { key: "houses", icon: "home", title: "Houses" },
+      { key: "special", icon: "shield", title: "Protection zones, no PvP and other areas" },
+      { key: "zones", icon: "dashed", title: "Zones" },
+    ],
+    [
+      { key: "markers", icon: "flag", title: "Temples, house entrances and waypoints" },
+      { key: "markedItems", icon: "stairs", title: "Marked items: invisible stairs and the items of the settings" },
+    ],
+    [
+      { key: "labels", icon: "text", title: "Names of creatures, houses, temples and waypoints" },
+      { key: "coords", icon: "hash", title: "Position of the tile under the mouse" },
+    ],
+  ];
+  // How floors are shown.
+  const QUICK: ViewButton[] = [
     { key: "grid", icon: "grid", title: "Grid (G)" },
     { key: "lowerFloors", icon: "sheet", title: "Show lower floors (L)" },
     { key: "ghostHigher", icon: "film", title: "Ghost the floor above (H)" },
     { key: "lights", icon: "sun", title: "Lights (I)" },
-  ];
-  // What is drawn over the map, shown or hidden with one click.
-  const LAYERS: { key: ViewToggle; icon: string; title: string }[] = [
-    { key: "creatures", icon: "person", title: "Creatures" },
-    { key: "spawns", icon: "target", title: "Spawn areas" },
-    { key: "houses", icon: "home", title: "Houses" },
-    { key: "special", icon: "shield", title: "Protection zones, no PvP and other areas" },
-    { key: "zones", icon: "dashed", title: "Zones" },
-    { key: "markers", icon: "flag", title: "Temples, house entrances and waypoints" },
-    { key: "labels", icon: "text", title: "Names of creatures, houses, temples and waypoints" },
-    { key: "coords", icon: "hash", title: "Position of the tile under the mouse" },
   ];
 </script>
 
@@ -66,6 +78,7 @@
     <button class="t-icon-btn" class:on={map.fill} title="Fill with the ground brush (F)" disabled={brush?.kind !== "ground"} onclick={() => (map.fill = !map.fill)}>
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8l5-5 5 5-5 5z M13 10c0 2 1 3 1 4a1 1 0 0 1-2 0c0-1 1-2 1-4" /></svg>
     </button>
+    <button class="t-btn sm" class:on={!!map.settings?.automagic} title="Automatic borders and walls (A)" onclick={mapCommands.toggleAutomagic}>Auto</button>
   </div>
   <span class="t-vsep"></span>
   <div class="grp brush" title={brush ? brush.label : "No brush"}>
@@ -124,9 +137,13 @@
     </div>
   {/if}
   <span class="grow"></span>
-  <div class="grp">
-    {#each LAYERS as layer}
-      <button class="t-icon-btn" class:on={map.view[layer.key]} title="{map.view[layer.key] ? 'Hide' : 'Show'}: {layer.title}" onclick={() => (map.view[layer.key] = !map.view[layer.key])}><Icon name={layer.icon} /></button>
+  <div class="grp layers">
+    {#each LAYERS as group}
+      <div class="grp">
+        {#each group as layer}
+          <button class="t-icon-btn" class:on={map.view[layer.key]} title="{map.view[layer.key] ? 'Hide' : 'Show'}: {layer.title}" onclick={() => (map.view[layer.key] = !map.view[layer.key])}><Icon name={layer.icon} /></button>
+        {/each}
+      </div>
     {/each}
   </div>
   <span class="t-vsep"></span>
@@ -134,7 +151,6 @@
     {#each QUICK as toggle}
       <button class="t-icon-btn" class:on={map.view[toggle.key]} title={toggle.title} onclick={() => (map.view[toggle.key] = !map.view[toggle.key])}><Icon name={toggle.icon} /></button>
     {/each}
-    <button class="t-btn sm" class:on={!!map.settings?.automagic} title="Automatic borders and walls (A)" onclick={mapCommands.toggleAutomagic}>Auto</button>
   </div>
   <span class="t-vsep"></span>
   <div class="grp" class:off={!map.view.lights} title="Ambient light: how bright the map is away from lights{map.view.lights ? '' : ' (turn the lights on to see it)'}">
@@ -162,6 +178,10 @@
     align-items: center;
     gap: 3px;
     flex: none;
+  }
+  /* Groups of layer buttons stand apart without separators. */
+  .layers {
+    gap: 9px;
   }
   .t-vsep {
     align-self: center;
