@@ -165,3 +165,21 @@ func TestOptimizeMovesBaseSprites(t *testing.T) {
 	}
 	check(r, map[uint32][3]byte{1: {9, 0, 0}, 2: {0, 0, 9}})
 }
+
+// Compiling an asset folder writes every used sheet sprite back whole, its
+// empty and repeated pieces included, so those pieces are not offered for
+// removal: the offer would come back after every compile.
+func TestAnalyzeAssetsKeepsPiecesOfSheetSprites(t *testing.T) {
+	project, err := OpenAssets(buildAssets(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	all := OptimizeOptions{Duplicates: true, Empty: true, Unused: true}
+	res, err := project.AnalyzeSprites(all, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Before != res.After {
+		t.Fatalf("%+v", res)
+	}
+}

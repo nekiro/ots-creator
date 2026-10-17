@@ -1,7 +1,11 @@
 package project
 
 import (
+	"encoding/binary"
+	"slices"
+
 	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/assets"
 )
 
 // OptimizeOptions select what OptimizeSprites removes.
@@ -67,9 +71,21 @@ func (p *Project) planSprites(options OptimizeOptions, progress *counter) (sprit
 	if options.Duplicates {
 		duplicates = firstOfEachHash(hashes)
 	}
+	// Pieces of whole sheet sprites go only with their sprite (see
+	// sheetSprites): their empty or repeated pieces stay.
+	runs := p.sheetSprites()
+	whole := make([]bool, count+1)
+	for _, run := range runs {
+		for i := range run.count {
+			whole[run.first+i] = true
+		}
+	}
 	canon := make([]uint32, count+1)
 	for id := uint32(1); id <= count; id++ {
 		canon[id] = id
+		if whole[id] {
+			continue
+		}
 		if hashes[id] == (spriteHash{}) {
 			if options.Empty {
 				canon[id] = 0
@@ -80,6 +96,15 @@ func (p *Project) planSprites(options OptimizeOptions, progress *counter) (sprit
 		if options.Duplicates && duplicates[id] != 0 {
 			canon[id] = duplicates[id]
 			result.Duplicates++
+		}
+	}
+	if options.Duplicates && len(runs) > 0 {
+		result.Duplicates += mergeSheetSprites(runs, hashes, canon)
+		// A piece may point at a piece of a merged sprite.
+		for id := uint32(1); id <= count; id++ {
+			if !whole[id] && canon[id] != 0 {
+				canon[id] = canon[canon[id]]
+			}
 		}
 	}
 
@@ -96,12 +121,21 @@ func (p *Project) planSprites(options OptimizeOptions, progress *counter) (sprit
 			}
 		}
 	}
+	// A sheet sprite stays whole when any of its pieces is used.
+	for _, run := range runs {
+		pieces := used[run.first : run.first+run.count]
+		if slices.Contains(pieces, true) {
+			for i := range pieces {
+				pieces[i] = true
+			}
+		}
+	}
 
 	// Sprites that stay, in order, and their new ids.
 	newID := make([]uint32, count+1)
 	var next uint32
 	for id := uint32(1); id <= count; id++ {
-		keep := canon[id] == id && (hashes[id] != (spriteHash{}) || !options.Empty)
+		keep := canon[id] == id && (hashes[id] != (spriteHash{}) || !options.Empty || whole[id])
 		if keep && options.Unused && !used[id] {
 			keep = false
 			result.Unused++
@@ -126,6 +160,85 @@ func (p *Project) planSprites(options OptimizeOptions, progress *counter) (sprit
 	}
 	result.After = next
 	return spritePlan{result: result, canon: canon, newID: newID}, nil
+}
+
+// pieceRun is the pieces first..first+count-1 that read one sheet sprite.
+type pieceRun struct {
+	first, count uint32
+	// width is the sprite width in pieces (2 pieces are 2x1 or 1x2).
+	width int
+}
+
+// sheetSprites lists the runs of pieces that read a whole sprite of the
+// asset sheets, in order; nil outside asset folders. Compiling writes such a
+// run back as an existing sprite (see assetWriter.sameContent), empty and
+// repeated pieces included, so it can only be dropped or merged as a whole.
+func (p *Project) sheetSprites() []pieceRun {
+	if p.format != FormatAssets || p.assets == nil {
+		return nil
+	}
+	pieceMap, store := p.assets.pieces, p.sprites
+	count := store.count()
+	var runs []pieceRun
+	for id := uint32(1); id <= count; {
+		run, ok := p.sheetSpriteAt(pieceMap, id, count)
+		if !ok {
+			id++
+			continue
+		}
+		runs = append(runs, run)
+		id += run.count
+	}
+	return runs
+}
+
+// sheetSpriteAt reports whether the pieces from id read a whole sheet
+// sprite, from its first piece on.
+func (p *Project) sheetSpriteAt(pieceMap *assets.PieceMap, id, count uint32) (pieceRun, bool) {
+	baseID, ok := p.sprites.baseID(id)
+	if !ok {
+		return pieceRun{}, false
+	}
+	location, ok := pieceMap.Locate(baseID)
+	if !ok || location.Sprite == 0 {
+		return pieceRun{}, false
+	}
+	first, width, height, ok := pieceMap.Pieces(location.Sprite)
+	n := uint32(width * height)
+	if !ok || first != baseID || id+n-1 > count {
+		return pieceRun{}, false
+	}
+	for i := uint32(1); i < n; i++ {
+		if piece, ok := p.sprites.baseID(id + i); !ok || piece != first+i {
+			return pieceRun{}, false
+		}
+	}
+	return pieceRun{first: id, count: n, width: width}, true
+}
+
+// mergeSheetSprites points the pieces of every sheet sprite that looks like
+// an earlier one at that one and returns the number of merged pieces.
+func mergeSheetSprites(runs []pieceRun, hashes []spriteHash, canon []uint32) int {
+	merged := 0
+	firstRun := make(map[string]uint32, len(runs))
+	key := make([]byte, 0, 4*2*8+1)
+	for _, run := range runs {
+		key = append(key[:0], byte(run.width))
+		for _, contentHash := range hashes[run.first : run.first+run.count] {
+			key = binary.LittleEndian.AppendUint64(key, contentHash[0])
+			key = binary.LittleEndian.AppendUint64(key, contentHash[1])
+		}
+		original, ok := firstRun[string(key)]
+		if !ok {
+			firstRun[string(key)] = run.first
+			continue
+		}
+		for i := range run.count {
+			canon[run.first+i] = original + i
+		}
+		merged += int(run.count)
+	}
+	return merged
 }
 
 // OptimizeSprites removes duplicate, empty and unused sprites, renumbers
