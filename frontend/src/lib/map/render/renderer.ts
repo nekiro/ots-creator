@@ -160,7 +160,7 @@ export class MapRenderer {
     if (ghostFloor >= 0) this.drawChunks(scene, chunksByFloor.get(ghostFloor)!, ALPHA.ghostFloor, camera.shift(ghostFloor), result);
     if (scene.play) {
       this.drawPlayLights(scene, camera, floors, plan);
-      this.drawCreatureInfo(scene, camera, floors, result);
+      this.drawCreatureInfo(scene, camera, result);
     }
     else if (scene.opts.lights && tilePx >= ZOOM.detail) this.drawLights(scene, camera, floors, plan, ambientIntensity(scene.opts.ambientLight), []);
     this.things.drawGhosts(scene, camera, drawItem, drawCreature);
@@ -202,9 +202,9 @@ export class MapRenderer {
     gl.disable(gl.DEPTH_TEST);
   }
 
-  /** Names and health bars over the creatures of the drawn floors and the
+  /** Names and health bars over the creatures of the player's floor and the
    * player, over the light (Creature::drawInformation). */
-  private drawCreatureInfo(scene: Scene, camera: Camera, floors: number[], result: FrameResult): void {
+  private drawCreatureInfo(scene: Scene, camera: Camera, result: FrameResult): void {
     const play = scene.play!;
     if (!play.names && !play.healthBars) return;
     const px = wholePixelRatio(globalThis.devicePixelRatio);
@@ -232,24 +232,22 @@ export class MapRenderer {
         result.labels.push({ x: pointX, y: layout.nameTop + NAME_BASELINE * px, text: creature.name, color, clampX: true, baseline: true });
       }
     };
-    for (const z of floors) {
-      const range = camera.tiles(z, 1, 1);
-      for (let y = Math.max(0, range.y0); y <= range.y1; y++) {
-        for (let x = Math.max(0, range.x0); x <= range.x1; x++) {
-          // Requested: the play view loads tile data only around the player.
-          const tile = scene.chunks.tile(x, y, z);
-          if (!tile?.creatures) continue;
-          const elevation = this.tileElevation(scene, x, y, z);
-          for (const creature of tile.creatures) info(creature, x, y, z, 0, 0, elevation, false);
-        }
-      }
-      if (z === play.z) {
-        const look = this.displacedLook(scene, play.player);
-        const [dx, dy] = walkingTileOffset(Math.trunc(play.offsetX), Math.trunc(play.offsetY), look?.offsetX ?? 0, look?.offsetY ?? 0, scene.spriteSize);
-        const elevation = dx && dy ? this.tileElevation(scene, play.x, play.y, z) : this.tileElevation(scene, play.x + dx, play.y + dy, z);
-        info(play.player, play.x, play.y, z, play.offsetX, play.offsetY, elevation, true);
+    // Only the camera floor: MapPosInfo::isInRange rejects any other z.
+    const z = play.z;
+    const range = camera.tiles(z, 1, 1);
+    for (let y = Math.max(0, range.y0); y <= range.y1; y++) {
+      for (let x = Math.max(0, range.x0); x <= range.x1; x++) {
+        // Requested: the play view loads tile data only around the player.
+        const tile = scene.chunks.tile(x, y, z);
+        if (!tile?.creatures) continue;
+        const elevation = this.tileElevation(scene, x, y, z);
+        for (const creature of tile.creatures) info(creature, x, y, z, 0, 0, elevation, false);
       }
     }
+    const look = this.displacedLook(scene, play.player);
+    const [dx, dy] = walkingTileOffset(Math.trunc(play.offsetX), Math.trunc(play.offsetY), look?.offsetX ?? 0, look?.offsetY ?? 0, scene.spriteSize);
+    const elevation = dx && dy ? this.tileElevation(scene, play.x, play.y, z) : this.tileElevation(scene, play.x + dx, play.y + dy, z);
+    info(play.player, play.x, play.y, z, play.offsetX, play.offsetY, elevation, true);
     this.flushScreen(scene);
   }
 
