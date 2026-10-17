@@ -74,13 +74,21 @@ export const mapCommands = {
   /** Back to editing, the view on where the player stands. */
   exitPlay(position: Position) {
     map.play = null;
+    map.player = null;
     goTo(position);
+  },
+
+  /** The toolbar's Stop: back to editing where the player stands. */
+  stopPlay() {
+    const position = map.player ?? map.play;
+    if (position) mapCommands.exitPlay(position);
   },
 
   /** Moves the play view to its own window; editing goes on here. */
   popOutPlay(position: Position) {
     const id = map.activeId;
     map.play = null;
+    map.player = null;
     if (id === null) return;
     goTo(position);
     void WindowService.OpenPlayWindow(id, position.x, position.y, position.z);

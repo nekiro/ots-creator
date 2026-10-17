@@ -159,7 +159,11 @@
     <span class="val pct">{map.view.ambientLight}%</span>
   </div>
   <span class="t-vsep"></span>
-  <button class="t-btn sm play" title="Play from here (P): walk the map as the client shows it" onclick={() => mapCommands.play()}><Icon name="play" />Play</button>
+  {#if map.play}
+    <button class="t-btn sm play" title="Back to the editor where the player stands (Esc)" onclick={() => mapCommands.stopPlay()}><Icon name="stop" />Stop</button>
+  {:else}
+    <button class="t-btn sm play" title="Play from here (P): walk the map as the client shows it" onclick={() => mapCommands.play()}><Icon name="play" />Play</button>
+  {/if}
 
 </div>
 

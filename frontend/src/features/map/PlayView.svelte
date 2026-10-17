@@ -162,7 +162,11 @@
     player.footPhases = footPhases();
     const moving = player.update(now, spriteSize);
     const position = player.position;
-    if (position.x !== shown.x || position.y !== shown.y || position.z !== shown.z) shown = { ...position };
+    if (position.x !== shown.x || position.y !== shown.y || position.z !== shown.z) {
+      shown = { ...position };
+      // The editor's toolbar stops the play view where the player stands.
+      if (onpopout) map.player = { ...position };
+    }
     const [offsetX, offsetY] = player.offset(now, spriteSize);
     const firstFloor = firstVisibleFloor(floors, position);
     const creature: CreatureData = {
@@ -357,11 +361,11 @@
 
 <div class="play">
   <div class="bar t-flat">
-    <button class="t-btn sm" title="Back to the editor where the player stands (Esc)" onclick={() => onexit({ ...player.position })}>Exit</button>
+    <!-- No exit button: the editor's toolbar has Stop, the play window closes as any window. -->
     {#if onpopout}
       <button class="t-btn sm" title="Show the play view in its own window and go on editing here" onclick={() => onpopout({ ...player.position })}>Pop out</button>
+      <span class="t-vsep"></span>
     {/if}
-    <span class="t-vsep"></span>
     <div class="m-seg" title="Light of the world the server sends">
       <button class:on={playerSettings.worldLight >= PLAY.dayLight} onclick={() => (playerSettings.worldLight = PLAY.dayLight)}>Day</button>
       <button class:on={playerSettings.worldLight <= PLAY.nightLight} onclick={() => (playerSettings.worldLight = PLAY.nightLight)}>Night</button>

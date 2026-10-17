@@ -15,6 +15,7 @@
     export: "M8 10V2 M5 5l3-3 3 3 M3 12v2h10v-2",
     play: "M5 3l8 5-8 5z",
     pause: "M4 3h3v10H4z M9 3h3v10H9z",
+    stop: "M4 4h8v8H4z",
     prev: "M11 3L5 8l6 5z M4 3v10",
     next: "M5 3l6 5-6 5z M12 3v10",
     sun: "M8 5a3 3 0 1 1 0 6a3 3 0 1 1 0-6 M8 1v2 M8 13v2 M1 8h2 M13 8h2 M3 3l1.5 1.5 M11.5 11.5L13 13 M3 13l1.5-1.5 M11.5 4.5L13 3",
