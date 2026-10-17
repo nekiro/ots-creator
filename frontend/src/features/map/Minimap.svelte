@@ -3,6 +3,7 @@
   import { res } from "../../lib/map/data/api";
   import { goTo, spriteSize } from "../../lib/map/view/commands";
   import { worldToTile } from "../../lib/map/view/coords";
+  import { PLAY } from "../../lib/map/constants";
   import { clamp } from "../../lib/util/math";
   import { readPositive, writeStored } from "../../lib/state/storage";
   import { map, onMapChange } from "../../lib/map/state.svelte";
@@ -52,7 +53,10 @@
     writeStored(HEIGHT_KEY, String(chosen ?? 0));
   }
 
+  // The docked play view sets the player (a popped out one does not): the minimap follows it.
+  const player = $derived(map.play ? (map.player ?? map.play) : null);
   const center = $derived.by(() => {
+    if (player) return { x: player.x + 0.5, y: player.y + 0.5, z: player.z };
     const cam = map.cam;
     return { ...worldToTile(cam.x, cam.y, cam.floor, spriteSize()), z: cam.floor };
   });
@@ -88,6 +92,7 @@
   // The view rectangle of the map canvas.
   const view = $derived.by(() => {
     if (!image) return null;
+    if (player) return { x: center.x - PLAY.tilesWide / 2 - image.x, y: center.y - PLAY.tilesHigh / 2 - image.y, w: PLAY.tilesWide, h: PLAY.tilesHigh };
     const cam = map.cam;
     const tileSize = spriteSize();
     const canvas = document.querySelector<HTMLCanvasElement>("canvas.map-gl");
