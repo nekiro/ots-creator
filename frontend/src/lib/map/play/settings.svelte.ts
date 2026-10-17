@@ -20,6 +20,10 @@ export interface PlayerSettings {
   level: number;
   /** World light the server sends (PLAY.dayLight by day, PLAY.nightLight by night). */
   worldLight: number;
+  /** Client options: names, health bars and the player's mana bar over creatures. */
+  showNames: boolean;
+  showHealth: boolean;
+  showMana: boolean;
 }
 
 export const DEFAULT_PLAYER: PlayerSettings = {
@@ -33,6 +37,9 @@ export const DEFAULT_PLAYER: PlayerSettings = {
   mounted: false,
   level: 1,
   worldLight: PLAY.dayLight,
+  showNames: true,
+  showHealth: true,
+  showMana: true,
 };
 
 export const playerSettings = $state<PlayerSettings>(loadJson(PLAYER_KEY, DEFAULT_PLAYER));

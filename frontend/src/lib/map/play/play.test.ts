@@ -89,6 +89,16 @@ describe("Player", () => {
     expect(player.position.x).toBe(102);
   });
 
+  it("teleports to another floor without a step", () => {
+    const player = new Player({ x: 100, y: 100, z: 7 }, open, playerSpeed(1));
+    player.pressWalk(Direction.east, 0, false);
+    player.update(0, 32);
+    player.teleport({ x: 101, y: 100, z: 6 });
+    expect(player.position).toEqual({ x: 101, y: 100, z: 6 });
+    expect(player.walking).toBe(false);
+    expect(player.offset(100, 32)).toEqual([0, 0]);
+  });
+
   it("turns with Ctrl and holds walking for a moment", () => {
     const player = new Player({ x: 100, y: 100, z: 7 }, open, playerSpeed(1));
     player.turn(Direction.west, 1000, false);

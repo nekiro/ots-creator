@@ -76,6 +76,17 @@ export class Player {
     this.position = { ...start };
   }
 
+  /** Puts the player on another tile at once (no step), facing as it did. */
+  teleport(position: Position): void {
+    this.position = { ...position };
+    this.step = null;
+    this.lastStep = null;
+    this.walkedPixels = 0;
+    this.footPhase = 0;
+    this.nextWalkDirection = null;
+    this.nextWalkAt = Infinity;
+  }
+
   /** The step is being drawn (the walk animation runs). */
   get walking(): boolean {
     return this.step !== null;

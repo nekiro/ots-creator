@@ -77,6 +77,10 @@ export interface Label {
   cull?: boolean;
   /** Drawn over the others, which keep clear of it (labels under the mouse). */
   top?: boolean;
+  /** Moved sideways to stay inside the view (names over creatures in the play view). */
+  clampX?: boolean;
+  /** y is the letters' baseline instead of the text's bottom (names placed to the pixel). */
+  baseline?: boolean;
 }
 
 /** The play view: the player walking on the map as the client shows it. */
@@ -97,6 +101,12 @@ export interface PlayScene {
   lastFloor: number;
   /** Light of the world the server sends (250 day, 40 night). */
   worldLight: number;
+  /** Client options: names, health bars and the player's mana bar over creatures. */
+  names: boolean;
+  healthBars: boolean;
+  manaBar: boolean;
+  /** NPCs have health bars (clients before 11.00). */
+  npcHealthBars: boolean;
 }
 
 export interface Scene {

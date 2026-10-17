@@ -130,18 +130,24 @@ export class ThingDrawer {
       if (!look) return;
       const direction = Math.min(creature.dir, look.patternX - 1);
       let mounted = 0;
+      let outfitX = screenX - look.offsetX * scale;
+      let outfitY = screenY - look.offsetY * scale;
       if (creature.mount && look.patternZ > 1) {
         const mount = scene.looks.outfits.get(creature.mount);
         if (mount === undefined) status.pending = true;
         else if (mount) {
+          // Creature::internalDraw: the point moves back by the mount's
+          // displacement, the mount is drawn there (less its displacement
+          // again), and the rider at the point plus its own displacement,
+          // so the rider ends up back by the mount's displacement.
           const [mountFrames, mountFrame] = animationOf(mount, footPhase, Math.min(direction, mount.patternX - 1), 0);
-          this.drawLook(scene, mountFrames, Math.min(direction, mount.patternX - 1), 0, 0, mountFrame, screenX - mount.offsetX * scale, screenY - mount.offsetY * scale, tilePx, shade, shade, shade, alpha, null);
+          this.drawLook(scene, mountFrames, Math.min(direction, mount.patternX - 1), 0, 0, mountFrame, screenX - 2 * mount.offsetX * scale, screenY - 2 * mount.offsetY * scale, tilePx, shade, shade, shade, alpha, null);
           mounted = 1;
+          outfitX = screenX - mount.offsetX * scale;
+          outfitY = screenY - mount.offsetY * scale;
         }
       }
       const colors = look.layers > 1 ? creature : null;
-      const outfitX = screenX - look.offsetX * scale;
-      const outfitY = screenY - look.offsetY * scale;
       const [frames, frame] = animationOf(look, footPhase, direction, mounted);
       this.drawLook(scene, frames, direction, 0, mounted, frame, outfitX, outfitY, tilePx, shade, shade, shade, alpha, colors);
       // Addons are drawn from the next pattern rows: bit 1 row 1, bit 2 row 2.

@@ -6,12 +6,13 @@ import { TOP_ORDER, type ItemIndex } from "../data/items";
 import type { FloorItemFlags, FloorWorld } from "./floors";
 import type { WalkWorld } from "./player";
 
-/** Walking: a tile with a ground, nothing that blocks and no creature (client Tile::isWalkable). */
+/** Walking: a tile with a ground and nothing that blocks (client Tile::isWalkable). Creatures of
+ * the map stand where they spawn, not where they are in game: they do not block. */
 export function walkWorld(chunks: ChunkStore, items: ItemIndex): WalkWorld {
   return {
     isWalkable(x, y, z) {
       const tile = chunks.tile(x, y, z);
-      return !!tile && (tile.flags & TileFlags.ground) !== 0 && (tile.flags & TileFlags.blocking) === 0 && !tile.creatures?.length;
+      return !!tile && (tile.flags & TileFlags.ground) !== 0 && (tile.flags & TileFlags.blocking) === 0;
     },
     groundSpeed(x, y, z) {
       const tile = chunks.peekTile(x, y, z);

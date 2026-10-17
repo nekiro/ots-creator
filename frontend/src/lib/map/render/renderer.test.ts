@@ -174,7 +174,7 @@ function creature(seed: number): CreatureData {
 
 function fakeChunks(log: string[]): ChunkStore {
   const tiles = new Map<string, TileData | undefined>();
-  return {
+  const store = {
     get: (key: number) => {
       log.push(`chunks.get(${key})`);
       return undefined;
@@ -203,7 +203,12 @@ function fakeChunks(log: string[]): ChunkStore {
       }
       return tiles.get(tileKey);
     },
-  } as unknown as ChunkStore;
+    /** Every tile is loaded: requesting one is peeking at it. */
+    tile(x: number, y: number, z: number) {
+      return store.peekTile(x, y, z);
+    },
+  };
+  return store as unknown as ChunkStore;
 }
 
 const ALL: ViewOptions = {
@@ -235,7 +240,7 @@ const ALL: ViewOptions = {
 const PLAYING: ViewOptions = { ...ALL, grid: false, ghostHigher: false, labels: false, spawns: false, houses: false, special: false, zones: false, pathing: false, highlightItems: false, wallHooks: false, markers: false, tooltips: false, coords: false, ghostItems: false, clientBox: false, lights: true };
 
 function playScene(change: Partial<PlayScene>): PlayScene {
-  return { player: creature(4), x: 1000, y: 1000, z: 7, offsetX: 0, offsetY: 0, footPhase: 0, firstFloor: 5, lastFloor: 7, worldLight: 250, ...change };
+  return { player: creature(4), x: 1000, y: 1000, z: 7, offsetX: 0, offsetY: 0, footPhase: 0, firstFloor: 5, lastFloor: 7, worldLight: 250, names: true, healthBars: true, manaBar: true, npcHealthBars: false, ...change };
 }
 
 describe("MapRenderer", () => {

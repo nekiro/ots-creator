@@ -14,6 +14,10 @@ import { ALPHA, BLOCK_CHUNKS, COLORS, DEPTH_RANGE, GROUND_FLOOR, LIGHT_REACH, LI
 import { GEO, GEO_BLOCK, encodeGeoSignature, geoBits, type GeoChunk } from "./geo";
 import { ambientIntensity, DAYLIGHT_INTENSITY, WHITE_LIGHT_COLOR, type ExtraLight } from "./lightMap";
 import { walkingTileOffset } from "../play/walk";
+import { BAR_COLORS, healthRect, INFO_COLORS, infoLayout, manaBar, NAME_BASELINE } from "./creatureInfo";
+import { wholePixelRatio } from "./labels";
+import { AF } from "../data/appearances";
+import { TileFlags, type CreatureData } from "../data/chunks";
 import type { DrawCreature } from "../data/things";
 import { LightPass } from "./lightPass";
 import { drawOverlays } from "./overlays";
@@ -154,7 +158,10 @@ export class MapRenderer {
       }
     }
     if (ghostFloor >= 0) this.drawChunks(scene, chunksByFloor.get(ghostFloor)!, ALPHA.ghostFloor, camera.shift(ghostFloor), result);
-    if (scene.play) this.drawPlayLights(scene, camera, floors, plan);
+    if (scene.play) {
+      this.drawPlayLights(scene, camera, floors, plan);
+      this.drawCreatureInfo(scene, camera, floors, result);
+    }
     else if (scene.opts.lights && tilePx >= ZOOM.detail) this.drawLights(scene, camera, floors, plan, ambientIntensity(scene.opts.ambientLight), []);
     this.things.drawGhosts(scene, camera, drawItem, drawCreature);
     drawOverlays(scene, result, camera, this.batch);
@@ -176,7 +183,7 @@ export class MapRenderer {
     const play = scene.play!;
     const size = scene.spriteSize;
     this.flushScreen(scene);
-    const look = scene.looks.outfits.get(play.player.lookType);
+    const look = this.displacedLook(scene, play.player);
     const [dx, dy] = walkingTileOffset(Math.trunc(play.offsetX), Math.trunc(play.offsetY), look?.offsetX ?? 0, look?.offsetY ?? 0, size);
     const walkX = play.x + dx;
     const walkY = play.y + dy;
@@ -193,6 +200,86 @@ export class MapRenderer {
     gl.enable(gl.DEPTH_TEST);
     if (this.batch.flush(scene, Math.min(Math.max(rank / DEPTH_RANGE, -1), 1))) this.chunks.unbind();
     gl.disable(gl.DEPTH_TEST);
+  }
+
+  /** Names and health bars over the creatures of the drawn floors and the
+   * player, over the light (Creature::drawInformation). */
+  private drawCreatureInfo(scene: Scene, camera: Camera, floors: number[], result: FrameResult): void {
+    const play = scene.play!;
+    if (!play.names && !play.healthBars) return;
+    const px = wholePixelRatio(globalThis.devicePixelRatio);
+    const half = scene.spriteSize / 2;
+    const info = (creature: CreatureData, x: number, y: number, z: number, offsetX: number, offsetY: number, elevation: number, isPlayer: boolean) => {
+      const look = this.displacedLook(scene, creature);
+      const pointX = camera.tileX(x, z) + Math.round(offsetX * scene.scale) + (half - (look?.offsetX ?? 0) - elevation) * scene.scale;
+      const pointY = camera.tileY(y, z) + Math.round(offsetY * scene.scale) + (-(look?.offsetY ?? 0) - 2 - elevation) * scene.scale;
+      const layout = infoLayout(pointX, pointY, px, scene.width, scene.height, isPlayer);
+      const covered = !isPlayer && this.isCovered(scene, x, y, z, play.firstFloor);
+      const health = covered ? BAR_COLORS.covered : BAR_COLORS.health;
+      if (play.healthBars && (!creature.npc || play.npcHealthBars)) {
+        this.batch.rect(layout.bar.x, layout.bar.y, layout.bar.width, layout.bar.height, BAR_COLORS.background);
+        const bar = healthRect(layout.bar, px, 100);
+        this.batch.rect(bar.x, bar.y, bar.width, bar.height, health);
+        if (isPlayer && play.manaBar) {
+          const mana = manaBar(layout.bar, px);
+          this.batch.rect(mana.x, mana.y, mana.width, mana.height, BAR_COLORS.background);
+          const fill = healthRect(mana, px, 100);
+          this.batch.rect(fill.x, fill.y, fill.width, fill.height, BAR_COLORS.mana);
+        }
+      }
+      if (play.names) {
+        const color = covered ? INFO_COLORS.covered : INFO_COLORS.fullHealth;
+        result.labels.push({ x: pointX, y: layout.nameTop + NAME_BASELINE * px, text: creature.name, color, clampX: true, baseline: true });
+      }
+    };
+    for (const z of floors) {
+      const range = camera.tiles(z, 1, 1);
+      for (let y = Math.max(0, range.y0); y <= range.y1; y++) {
+        for (let x = Math.max(0, range.x0); x <= range.x1; x++) {
+          // Requested: the play view loads tile data only around the player.
+          const tile = scene.chunks.tile(x, y, z);
+          if (!tile?.creatures) continue;
+          const elevation = this.tileElevation(scene, x, y, z);
+          for (const creature of tile.creatures) info(creature, x, y, z, 0, 0, elevation, false);
+        }
+      }
+      if (z === play.z) {
+        const look = this.displacedLook(scene, play.player);
+        const [dx, dy] = walkingTileOffset(Math.trunc(play.offsetX), Math.trunc(play.offsetY), look?.offsetX ?? 0, look?.offsetY ?? 0, scene.spriteSize);
+        const elevation = dx && dy ? this.tileElevation(scene, play.x, play.y, z) : this.tileElevation(scene, play.x + dx, play.y + dy, z);
+        info(play.player, play.x, play.y, z, play.offsetX, play.offsetY, elevation, true);
+      }
+    }
+    this.flushScreen(scene);
+  }
+
+  /** The look whose displacement places a creature (Creature::getDisplacementX): its item, its mount while mounted, else its outfit. */
+  private displacedLook(scene: Scene, creature: CreatureData) {
+    if (creature.lookItem) return scene.looks.items.get(scene.items.client[creature.lookItem]);
+    const outfit = scene.looks.outfits.get(creature.lookType);
+    if (creature.mount && outfit && outfit.patternZ > 1) return scene.looks.outfits.get(creature.mount) ?? outfit;
+    return outfit;
+  }
+
+  /** A floor between the player's and a creature covers it (Map::isCovered): a fully opaque tile over it, or a two tiles wide ground right of that. */
+  private isCovered(scene: Scene, x: number, y: number, z: number, firstFloor: number): boolean {
+    if (z === 0 || z === firstFloor) return false;
+    for (let coveredZ = z - 1, coveredX = x + 1, coveredY = y + 1; coveredZ >= firstFloor; coveredZ--, coveredX++, coveredY++) {
+      const tile = scene.chunks.tile(coveredX, coveredY, coveredZ);
+      if (tile && tile.flags & TileFlags.opaque) return true;
+      const next = scene.chunks.tile(coveredX + 1, coveredY + 1, coveredZ);
+      if (next && this.hasTopGround(scene, next.ids)) return true;
+    }
+    return false;
+  }
+
+  /** Tile::hasTopGround: a ground or ground border two tiles a side. */
+  private hasTopGround(scene: Scene, ids: Uint16Array): boolean {
+    for (const id of ids) {
+      const look = scene.looks.items.get(scene.items.client[id]);
+      if (look && look.width + look.height === 4 && look.flags & (AF.ground | AF.border)) return true;
+    }
+    return false;
   }
 
   /** How far things on a tile are raised: the elevation of its items under the top ones (at most 24 pixels). */

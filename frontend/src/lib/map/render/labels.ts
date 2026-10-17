@@ -57,6 +57,7 @@ export function drawLabels(context: CanvasRenderingContext2D, width: number, hei
   context.font = nameFont;
   for (const label of names) {
     const textWidth = context.measureText(label.text).width;
+    if (label.clampX) label.x = Math.round(Math.min(Math.max(label.x, textWidth / 2), width - textWidth / 2));
     boxes.push([label.x - textWidth / 2 - pad, label.y - 15 * pixel, label.x + textWidth / 2 + pad, label.y]);
   }
   // Small labels (tile coordinates, item texts): the small pixel font, many
@@ -89,9 +90,11 @@ export function drawLabels(context: CanvasRenderingContext2D, width: number, hei
   context.textBaseline = "bottom";
   context.fillStyle = "#000";
   for (const label of names) {
+    context.textBaseline = label.baseline ? "alphabetic" : "bottom";
     for (const [dx, dy] of OUTLINE) context.fillText(label.text, label.x + dx * pixel, label.y + dy * pixel);
   }
   for (const label of names) {
+    context.textBaseline = label.baseline ? "alphabetic" : "bottom";
     context.fillStyle = label.color;
     context.fillText(label.text, label.x, label.y);
   }

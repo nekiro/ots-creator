@@ -100,17 +100,35 @@ func floorHalf(value int) int { return value >> 1 }
 // (client: Tile::canShade): a full ground, an opaque thing, or a ground or
 // ground border two tiles a side.
 func (b *geometryBuilder) canShade(tile *otmap.Tile) bool {
+	return b.isFullyOpaque(tile) || b.hasTopGround(tile)
+}
+
+// isFullyOpaque reports whether a tile has a full ground or an opaque
+// thing (client: Tile::isFullyOpaque).
+func (b *geometryBuilder) isFullyOpaque(tile *otmap.Tile) bool {
 	if tile.Ground.ID != 0 {
-		if look := b.itemLook(tile.Ground); look != nil && (look.ground && look.isTopSized() || b.isOpaqueOrFull(look)) {
+		if look := b.itemLook(tile.Ground); look != nil && b.isOpaqueOrFull(look) {
 			return true
 		}
 	}
 	for _, item := range tile.Items {
-		look := b.itemLook(item)
-		if look == nil {
-			continue
+		if look := b.itemLook(item); look != nil && b.isOpaqueOrFull(look) {
+			return true
 		}
-		if look.groundBorder && look.isTopSized() || b.isOpaqueOrFull(look) {
+	}
+	return false
+}
+
+// hasTopGround reports whether a tile has a ground or a ground border two
+// tiles a side (client: Tile::hasTopGround).
+func (b *geometryBuilder) hasTopGround(tile *otmap.Tile) bool {
+	if tile.Ground.ID != 0 {
+		if look := b.itemLook(tile.Ground); look != nil && look.ground && look.isTopSized() {
+			return true
+		}
+	}
+	for _, item := range tile.Items {
+		if look := b.itemLook(item); look != nil && look.groundBorder && look.isTopSized() {
 			return true
 		}
 	}

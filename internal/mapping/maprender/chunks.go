@@ -25,6 +25,9 @@ const (
 	tileText
 	// tileGround marks a tile whose first item is its ground.
 	tileGround
+	// tileOpaque marks a tile with a full ground or an opaque thing: it
+	// covers creatures on the floors under it (client: Tile::isFullyOpaque).
+	tileOpaque
 )
 
 // Item flags of the chunk format.
@@ -57,7 +60,11 @@ const (
 )
 
 // chunkWriter appends little endian values to a buffer.
-type chunkWriter struct{ buf []byte }
+type chunkWriter struct {
+	buf []byte
+	// looks tells the opacity of things (tileOpaque).
+	looks *geometryBuilder
+}
 
 func (w *chunkWriter) u8(value uint8)   { w.buf = append(w.buf, value) }
 func (w *chunkWriter) u16(value uint16) { w.buf = binary.LittleEndian.AppendUint16(w.buf, value) }
@@ -92,7 +99,7 @@ func (w *chunkWriter) shortString(text string) {
 //	[zones: u8 count, u16 ids],
 //	[text of the topmost item with one: u16 length, text]
 func EncodeChunks(scene *Scene, keys []otmap.ChunkKey) []byte {
-	writer := &chunkWriter{buf: make([]byte, 0, chunkBufferSize)}
+	writer := &chunkWriter{buf: make([]byte, 0, chunkBufferSize), looks: newGeometryBuilder(scene, GeometryOptions{})}
 	for _, key := range keys {
 		writer.chunk(scene, key)
 	}
@@ -120,7 +127,11 @@ func (w *chunkWriter) tile(scene *Scene, position otmap.Position, tile *otmap.Ti
 	w.u16(uint16(localY<<otmap.ChunkBits | localX))
 	creatures := tile.Creatures()
 	text := topText(tile)
-	w.u16(tileFlags(scene, tile, len(creatures) > 0, text != ""))
+	flags := tileFlags(scene, tile, len(creatures) > 0, text != "")
+	if w.looks.isFullyOpaque(tile) {
+		flags |= tileOpaque
+	}
+	w.u16(flags)
 	if tile.HouseID != 0 {
 		w.u32(tile.HouseID)
 	}

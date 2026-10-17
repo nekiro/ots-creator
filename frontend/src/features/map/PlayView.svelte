@@ -11,21 +11,19 @@
   import { GeoStore } from "../../lib/map/render/geo";
   import { MapRenderer } from "../../lib/map/render/renderer";
   import type { ViewOptions } from "../../lib/map/render/scene";
-  import { PLAY, REDRAW_DELAY } from "../../lib/map/constants";
+  import { MAX_FLOOR, PLAY, REDRAW_DELAY } from "../../lib/map/constants";
+  import { drawLabels, loadLabelFonts } from "../../lib/map/render/labels";
   import { floorOffset } from "../../lib/map/view/coords";
   import { firstVisibleFloor, lastVisibleFloor } from "../../lib/map/play/floors";
   import { Player, type Position } from "../../lib/map/play/player";
   import { playerSettings } from "../../lib/map/play/settings.svelte";
-  import { Direction, outfitDirection, playerSpeed, stepDuration } from "../../lib/map/play/walk";
+  import { Direction, outfitDirection, playerSpeed } from "../../lib/map/play/walk";
   import { floorWorld, walkWorld } from "../../lib/map/play/world";
   import { map } from "../../lib/map/state.svelte";
   import { app } from "../../lib/state/app.svelte";
-  import { Category } from "../../lib/api";
-  import NumberField from "../../lib/ui/NumberField.svelte";
   import Slider from "../../lib/ui/Slider.svelte";
   import { isTyping } from "../../lib/ui/typing";
-  import ColorPicker from "../ColorPicker.svelte";
-  import ItemIcon from "./ItemIcon.svelte";
+  import OutfitWindow, { type Outfit } from "./OutfitWindow.svelte";
 
   let {
     mapId,
@@ -50,6 +48,8 @@
 
   let host = $state<HTMLDivElement>();
   let canvas = $state<HTMLCanvasElement>();
+  /** Names over creatures, drawn as text over the map. */
+  let overlay = $state<HTMLCanvasElement>();
   let glError = $state("");
   let canvasCss = $state({ width: 0, height: 0 });
   let renderer: MapRenderer | null = null;
@@ -64,7 +64,7 @@
   const player = new Player(initial.start, walkWorld(chunks, initial.items), playerSpeed(playerSettings.level));
   const floors = floorWorld(chunks, initial.items, looks);
   let shown = $state<Position>({ ...initial.start });
-  let settingsOpen = $state(false);
+  let outfitOpen = $state(false);
 
   // Only what the client shows: no editor overlays.
   const playView = $derived<ViewOptions>({
@@ -109,11 +109,28 @@
     return playerSettings.mounted ? playerSettings.mount : 0;
   }
 
-  function toggleAddon(bit: number, on: boolean): void {
-    playerSettings.addons = on ? playerSettings.addons | bit : playerSettings.addons & ~bit;
+  function applyOutfit(outfit: Outfit): void {
+    Object.assign(playerSettings, outfit);
+    outfitOpen = false;
   }
 
-  const speed = $derived(playerSpeed(playerSettings.level));
+  /** Ctrl + right click on the player opens the outfit window, as in the
+   * client. The player stands on the middle tile; its sprite reaches up and
+   * left by the outfit's displacement. */
+  function oncontextmenu(event: MouseEvent): void {
+    event.preventDefault();
+    if (!event.ctrlKey) return;
+    const tile = canvasCss.width / PLAY.tilesWide;
+    const look = looks.outfits.get(mountLook() || playerSettings.lookType);
+    const reach = Math.max(look?.offsetX ?? 0, look?.offsetY ?? 0) * (tile / spriteSize);
+    const left = Math.floor(PLAY.tilesWide / 2) * tile;
+    const top = Math.floor(PLAY.tilesHigh / 2) * tile;
+    if (event.offsetX >= left - reach && event.offsetX < left + tile && event.offsetY >= top - reach && event.offsetY < top + tile) {
+      player.releaseAll();
+      outfitOpen = true;
+    }
+  }
+
 
   /** Outfits and mounts whose sprites were asked for, every frame and direction at once. */
   const prefetched = new Set<number>();
@@ -197,18 +214,37 @@
           firstFloor,
           lastFloor: Math.max(firstFloor, lastVisibleFloor(position.z)),
           worldLight: playerSettings.worldLight,
+          names: playerSettings.showNames,
+          healthBars: playerSettings.showHealth,
+          manaBar: playerSettings.showMana,
+          npcHealthBars: (app.project?.info.version.value ?? 0) < CLIENT_WITHOUT_NPC_BARS,
         },
       });
     } catch (err) {
       glError = errorMessage(err);
       return;
     }
+    const context = overlay?.getContext("2d");
+    if (context && overlay) drawLabels(context, overlay.width, overlay.height, result.labels, window.devicePixelRatio);
     clearTimeout(timer);
     if (moving || result.more) requestDraw();
     else if (result.pending) timer = window.setTimeout(requestDraw, REDRAW_DELAY.pending);
     else if (result.animated) timer = window.setTimeout(requestDraw, REDRAW_DELAY.animated);
     chunks.trim((key) => Math.abs((key & 15) - position.z) < 8);
     geo.trim((key) => Math.abs((key & 15) - position.z) < 8);
+  }
+
+  /** From this client version NPCs have no health bar (Creature::drawInformation). */
+  const CLIENT_WITHOUT_NPC_BARS = 1100;
+
+  void loadLabelFonts().then(() => requestDraw());
+
+  /** PageUp / PageDown: the player goes a floor up or down at once (not in the client: to look around). */
+  function changeFloor(step: number): void {
+    const z = player.position.z + step;
+    if (z < 0 || z > MAX_FLOOR) return;
+    player.teleport({ ...player.position, z });
+    requestDraw();
   }
 
   // Keys of the client (modules/game_walk): arrows and the numpad walk, Ctrl+arrows turn.
@@ -225,11 +261,21 @@
   };
 
   function onkeydown(event: KeyboardEvent) {
-    if (isTyping(event)) return;
+    if (isTyping(event) || outfitOpen) return;
     if (event.key === "Escape") {
       event.preventDefault();
-      if (settingsOpen) settingsOpen = false;
-      else onexit({ ...player.position });
+      onexit({ ...player.position });
+      return;
+    }
+    // Ctrl+R mounts and dismounts, as in the client (the mount is picked in the outfit window).
+    if (event.ctrlKey && event.code === "KeyR") {
+      event.preventDefault();
+      if (!event.repeat && playerSettings.mount) playerSettings.mounted = !playerSettings.mounted;
+      return;
+    }
+    if (event.key === "PageUp" || event.key === "PageDown") {
+      event.preventDefault();
+      changeFloor(event.key === "PageUp" ? -1 : 1);
       return;
     }
     const now = performance.now();
@@ -272,6 +318,8 @@
       height = Math.max(1, Math.round(canvasCss.height * dpr));
       canvas!.width = width;
       canvas!.height = height;
+      overlay!.width = width;
+      overlay!.height = height;
       cancelAnimationFrame(raf);
       raf = 0;
       draw();
@@ -321,50 +369,28 @@
     <Slider bind:value={map.view.ambientLight} min={0} max={100} width={70} />
     <span class="val">{map.view.ambientLight}%</span>
     <span class="t-vsep"></span>
-    <button class="t-btn sm" class:on={settingsOpen} title="Outfit and level of the player" onclick={() => (settingsOpen = !settingsOpen)}>Player</button>
+    <div class="m-seg" title="Client options: what is shown over creatures">
+      <button class:on={playerSettings.showNames} title="Names over creatures" onclick={() => (playerSettings.showNames = !playerSettings.showNames)}>Names</button>
+      <button class:on={playerSettings.showHealth} title="Health bars over creatures" onclick={() => (playerSettings.showHealth = !playerSettings.showHealth)}>Health</button>
+      <button class:on={playerSettings.showMana} title="Mana bar under the player's health bar" onclick={() => (playerSettings.showMana = !playerSettings.showMana)}>Mana</button>
+    </div>
     <span class="grow"></span>
     <span class="t-label pos">{shown.x}, {shown.y}, {shown.z}</span>
-    <span class="t-label keys">Arrows / numpad walk · Ctrl+arrows turn · Esc exits</span>
+    <span class="t-label keys">Arrows / numpad walk · Ctrl+arrows turn · PgUp/PgDn floors · Ctrl+R mount · Ctrl+right click outfit · Esc exits</span>
   </div>
-  {#if settingsOpen}
-    <div class="settings t-flat">
-      <span class="look t-frame-down" title="Outfit {playerSettings.lookType}"><ItemIcon outfit={playerSettings.lookType} size={48} /></span>
-      <div class="group">
-        <NumberField label="Outfit" value={playerSettings.lookType} min={1} max={app.maxId(Category.CategoryOutfit)} width={60} title="Looktype of the player" onchange={(value) => (playerSettings.lookType = value)} />
-        <div class="row">
-          <label class="row"><input class="t-check" type="checkbox" checked={(playerSettings.addons & 1) !== 0} onchange={(event) => toggleAddon(1, event.currentTarget.checked)} />Addon 1</label>
-          <label class="row"><input class="t-check" type="checkbox" checked={(playerSettings.addons & 2) !== 0} onchange={(event) => toggleAddon(2, event.currentTarget.checked)} />Addon 2</label>
-        </div>
-      </div>
-      <span class="t-vsep"></span>
-      <div class="colors">
-        <ColorPicker label="Head" value={playerSettings.head} onchange={(value) => (playerSettings.head = value)} />
-        <ColorPicker label="Body" value={playerSettings.body} onchange={(value) => (playerSettings.body = value)} />
-        <ColorPicker label="Legs" value={playerSettings.legs} onchange={(value) => (playerSettings.legs = value)} />
-        <ColorPicker label="Feet" value={playerSettings.feet} onchange={(value) => (playerSettings.feet = value)} />
-      </div>
-      <span class="t-vsep"></span>
-      <div class="group">
-        <label class="row" title="Ride a mount: any looktype"><input class="t-check" type="checkbox" bind:checked={playerSettings.mounted} />Mount</label>
-        {#if playerSettings.mounted}
-          <div class="row">
-            <span class="look small t-frame-down"><ItemIcon outfit={playerSettings.mount} size={32} /></span>
-            <NumberField value={playerSettings.mount} min={0} max={app.maxId(Category.CategoryOutfit)} width={60} title="Mount looktype" onchange={(value) => (playerSettings.mount = value)} />
-          </div>
-        {/if}
-      </div>
-      <span class="t-vsep"></span>
-      <div class="group">
-        <NumberField label="Level" value={playerSettings.level} min={1} max={5000} width={60} title="Sets the speed: 220 + 2 per level above 1" onchange={(value) => (playerSettings.level = value)} />
-        <span class="t-label hint">Speed {speed} · step {stepDuration(150, speed)} ms on grass</span>
-      </div>
-    </div>
-  {/if}
   <div class="stage" bind:this={host}>
-    <canvas bind:this={canvas} style="width:{canvasCss.width}px;height:{canvasCss.height}px"></canvas>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="screen" {oncontextmenu} style="width:{canvasCss.width}px;height:{canvasCss.height}px">
+      <canvas bind:this={canvas}></canvas>
+      <canvas class="labels" bind:this={overlay}></canvas>
+    </div>
     {#if glError}<div class="error">{glError}</div>{/if}
   </div>
 </div>
+
+{#if outfitOpen}
+  <OutfitWindow outfit={playerSettings} onapply={applyOutfit} onclose={() => (outfitOpen = false)} />
+{/if}
 
 <style>
   .play {
@@ -400,45 +426,17 @@
   }
   .keys {
     opacity: 0.7;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  .settings {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 4px 6px;
+  /* The bar's buttons keep their whole text; the key help gives way. */
+  .bar :global(.m-seg) {
     flex: none;
   }
-  .settings {
-    align-items: center;
-  }
-  .group {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .colors {
-    display: grid;
-    grid-template-columns: auto auto;
-    gap: 4px 12px;
-  }
-  .look {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 56px;
-    height: 56px;
-  }
-  .look.small {
-    width: 36px;
-    height: 36px;
-  }
-  .hint {
-    opacity: 0.7;
+  .bar :global(.m-seg > button) {
+    flex: none;
+    min-width: max-content;
   }
   .stage {
     flex: 1;
@@ -450,7 +448,18 @@
     overflow: hidden;
     position: relative;
   }
+  .screen {
+    position: relative;
+    flex: none;
+  }
+  .labels {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
   canvas {
+    width: 100%;
+    height: 100%;
     display: block;
     image-rendering: pixelated;
   }

@@ -22,6 +22,8 @@ export const TileFlags = {
   blocking: 4096,
   text: 8192,
   ground: 0x4000,
+  /** A full ground or an opaque thing: covers creatures on the floors under it (client Tile::isFullyOpaque). */
+  opaque: 0x8000,
 } as const;
 
 /** Item flags of the chunk format. */
