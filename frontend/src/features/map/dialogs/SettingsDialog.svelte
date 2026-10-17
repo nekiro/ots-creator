@@ -11,7 +11,7 @@
   let settings = $state<EditorSettings>(
     map.settings
       ? { ...map.settings }
-      : { automagic: true, eraserLeaveUnique: true, houseRemoveItems: true, autoDoorId: true, doodadEraseLike: false, defaultSpawnTime: 60, autoCreateSpawn: true, rawReplaceBottom: false, countU16: false },
+      : { automagic: true, eraserLeaveUnique: true, houseRemoveItems: true, autoDoorId: true, doodadEraseLike: false, defaultSpawnTime: 60, autoCreateSpawn: true, rawReplaceBottom: false, countU16: false, markedItems: null },
   );
   let tab = $state(map.settingsTab);
   onDestroy(() => (map.settingsTab = "general"));
@@ -26,6 +26,12 @@
     { key: "rawReplaceBottom", label: "Raw walls replace walls", hint: "Placing a bottom item (wall) removes the bottom items already on the tile." },
     { key: "countU16", label: "Item counts as 16-bit numbers", hint: "For servers that read the count attribute as uint16 (stacks above 255). Maps open and save in this format; standard servers cannot read them." },
   ];
+
+  /** "459, 460" -> [459, 460]: valid item ids, each once (null: none given, the defaults). */
+  function parseItemIds(text: string): number[] | null {
+    const ids = text.split(/[\s,;]+/).map(Number).filter((id) => Number.isInteger(id) && id > 0 && id <= 0xffff);
+    return ids.length ? [...new Set(ids)] : null;
+  }
 
   // Keyboard: only actions that differ from their defaults are stored.
   let keys = $state<Record<string, string[]>>({ ...map.keys });
@@ -94,6 +100,11 @@
         </label>
       {/each}
       <div class="row"><span>Default spawn time</span><NumberField value={settings.defaultSpawnTime} min={1} max={86400} width={60} onchange={(value) => (settings.defaultSpawnTime = value)} /><span class="t-label">seconds</span></div>
+      <label class="col">
+        <span>Marked items</span>
+        <input class="t-input" placeholder="Default: 459, 460 (items.otb) or 469, 470 (client ids)" value={(settings.markedItems ?? []).join(", ")} onchange={(event) => (settings.markedItems = parseItemIds(event.currentTarget.value))} />
+        <span class="t-label hint">Item ids covered with a square in their minimap color (View > Marked items), such as invisible stairs and holes. Empty: the defaults of the item data.</span>
+      </label>
     </div>
   {:else}
     <div class="t-label hint">Click + and press a key. Click a key to remove it. Esc, the arrows, 1–9 and mouse gestures cannot be changed.</div>

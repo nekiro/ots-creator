@@ -3,6 +3,7 @@ package mapedit
 import (
 	"cmp"
 	"fmt"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -543,7 +544,7 @@ func TestSettingsFormatFollowsCountU16(t *testing.T) {
 
 func TestDefaultSettings(t *testing.T) {
 	want := Settings{Automagic: true, EraserLeaveUnique: true, HouseRemoveItems: true, AutoDoorID: true, DefaultSpawnTime: 60, AutoCreateSpawn: true}
-	if got := DefaultSettings(); got != want {
+	if got := DefaultSettings(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("DefaultSettings() = %+v, want %+v", got, want)
 	}
 }

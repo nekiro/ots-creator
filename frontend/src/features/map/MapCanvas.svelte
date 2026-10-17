@@ -523,9 +523,11 @@
   });
 
   // Object edits change items and sprites: reload their appearances.
+  // Marked items are drawn into the geometry too.
   $effect(() => {
     void app.rev;
     void map.items;
+    void map.settings?.markedItems;
     looks.clear();
     for (const geoStore of geos.values()) geoStore.invalidate(null);
     requestDraw();

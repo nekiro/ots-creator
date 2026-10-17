@@ -87,6 +87,7 @@
     tooltips: false,
     coords: false,
     ghostItems: false,
+    markedItems: false,
     clientBox: false,
     lights: true,
     ambientLight: map.view.ambientLight,

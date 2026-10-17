@@ -30,6 +30,9 @@ type Scene struct {
 	IsBlocking func(tile *otmap.Tile) bool
 	// Outfit returns the look of a creature by name (zero when unknown).
 	Outfit func(creature string) materials.Outfit
+	// MarkedItems are items covered with a colored square (RGB) when
+	// ViewMarkedItems is on, by server id.
+	MarkedItems map[uint16][3]uint8
 }
 
 // MaxChunksPerRequest limits the chunks of one request.

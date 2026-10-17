@@ -80,6 +80,7 @@ export const DEFAULT_VIEW: ViewOptions = {
   tooltips: false,
   coords: false,
   ghostItems: false,
+  markedItems: true,
   clientBox: false,
   lights: false,
   ambientLight: 50,

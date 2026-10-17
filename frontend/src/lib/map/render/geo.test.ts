@@ -52,9 +52,9 @@ describe("decodeGeo", () => {
   });
 
   it("packs view options", () => {
-    const off = { pathing: false, houses: false, special: false, zones: false, spawns: false, highlightItems: false, ghostItems: false, creatures: false, onlyModified: false, animation: false };
+    const off = { pathing: false, houses: false, special: false, zones: false, spawns: false, highlightItems: false, ghostItems: false, creatures: false, onlyModified: false, animation: false, markedItems: false };
     expect(geoBits(off)).toBe(0);
-    expect(geoBits({ ...off, houses: true, animation: true })).toBe(GEO.houses | GEO.animation);
+    expect(geoBits({ ...off, houses: true, animation: true, markedItems: true })).toBe(GEO.houses | GEO.animation | GEO.markedItems);
   });
 });
 

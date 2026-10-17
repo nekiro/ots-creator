@@ -109,6 +109,32 @@ func TestBuildGeometryParts(t *testing.T) {
 	}
 }
 
+func TestMarkedItems(t *testing.T) {
+	scene := testScene(t)
+	scene.MarkedItems = map[uint16][3]uint8{100: {255, 255, 0}}
+	keys := []otmap.ChunkKey{otmap.MakeKey(0, 0, 7)}
+	quadsWith := func(viewFlags uint32) []byte {
+		parts, _, err := BuildGeometryParts(scene, keys, GeometryOptions{ViewFlags: viewFlags}, false)
+		if err != nil || len(parts) != 1 {
+			t.Fatalf("parts %d, %v", len(parts), err)
+		}
+		return parts[0][24 : 24+binary.LittleEndian.Uint32(parts[0][4:])*16]
+	}
+	// Without the view flag: ground and the red marker of the item without sprites.
+	if quads := quadsWith(0); len(quads) != 2*16 {
+		t.Fatalf("%d quads without marked items", len(quads)/16)
+	}
+	// The yellow square covers the marked ground.
+	quads := quadsWith(ViewMarkedItems)
+	if len(quads) != 3*16 {
+		t.Fatalf("%d quads with marked items", len(quads)/16)
+	}
+	mark := quads[16:32]
+	if sprite := binary.LittleEndian.Uint32(mark[4:]); sprite&spriteRect == 0 || mark[8] != 255 || mark[9] != 255 || mark[10] != 0 {
+		t.Fatalf("mark quad %v", mark)
+	}
+}
+
 // spritePixels gives sprite 7 fully opaque and every other sprite opaque
 // only in the 4x4 square from (20, 4).
 func spritePixels(id uint32) ([]byte, error) {

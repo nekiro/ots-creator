@@ -32,6 +32,10 @@ type Settings struct {
 	// CountU16 reads and writes item counts as uint16 (servers with stacks
 	// above 255).
 	CountU16 bool `json:"countU16"`
+	// MarkedItems are server ids of items the editor covers with a square
+	// in their minimap color, such as invisible stairs. Nil: the
+	// DefaultMarkedItems of the items mode.
+	MarkedItems []uint16 `json:"markedItems"`
 }
 
 // Format is the OTBM format the settings ask for.
@@ -42,6 +46,15 @@ func (s Settings) Format() otmap.Format {
 // DefaultSettings returns the defaults.
 func DefaultSettings() Settings {
 	return Settings{Automagic: true, EraserLeaveUnique: true, HouseRemoveItems: true, AutoDoorID: true, DefaultSpawnTime: defaultSpawnTimeSeconds, AutoCreateSpawn: true}
+}
+
+// DefaultMarkedItems returns the items RME marks: the invisible stairs and
+// holes, 459 and 460 in items.otb, 469 and 470 as client ids.
+func DefaultMarkedItems(mode otitems.Mode) []uint16 {
+	if mode == otitems.ModeClient {
+		return []uint16{469, 470}
+	}
+	return []uint16{459, 460}
 }
 
 // change is one tile change of an action.

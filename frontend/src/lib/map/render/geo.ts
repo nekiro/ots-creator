@@ -19,6 +19,7 @@ export const GEO = {
   animation: 512,
   /** Leave out movable and pickupable items (seen from far away). */
   far: 1024,
+  markedItems: 2048,
 } as const;
 
 /**
@@ -47,6 +48,7 @@ export interface GeoView {
   creatures: boolean;
   onlyModified: boolean;
   animation: boolean;
+  markedItems: boolean;
 }
 
 export function geoBits(view: GeoView): number {
@@ -60,7 +62,8 @@ export function geoBits(view: GeoView): number {
     (view.ghostItems ? GEO.ghostItems : 0) |
     (view.creatures ? GEO.creatures : 0) |
     (view.onlyModified ? GEO.onlyModified : 0) |
-    (view.animation ? GEO.animation : 0)
+    (view.animation ? GEO.animation : 0) |
+    (view.markedItems ? GEO.markedItems : 0)
   );
 }
 

@@ -231,6 +231,7 @@ const ALL: ViewOptions = {
   tooltips: true,
   coords: true,
   ghostItems: true,
+  markedItems: true,
   clientBox: true,
   lights: false,
   ambientLight: 50,

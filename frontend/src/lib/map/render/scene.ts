@@ -27,6 +27,8 @@ export interface ViewOptions {
   /** x, y, z written on every tile. */
   coords: boolean;
   ghostItems: boolean;
+  /** Squares over the marked items of the settings (invisible stairs...). */
+  markedItems: boolean;
   clientBox: boolean;
   /** Darken the map to the ambient light and light it with item lights, as the client does. */
   lights: boolean;

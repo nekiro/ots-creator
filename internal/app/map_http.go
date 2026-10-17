@@ -9,13 +9,19 @@ import (
 	"time"
 
 	"github.com/nekiro/ots-creator/internal/core/imaging"
+	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
 	"github.com/nekiro/ots-creator/internal/mapping/maprender"
 	"github.com/nekiro/ots-creator/internal/mapping/materials"
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-// maxMinimapSide bounds the area of one minimap request.
-const maxMinimapSide = 2048
+const (
+	// maxMinimapSide bounds the area of one minimap request.
+	maxMinimapSide = 2048
+	// markedItemDefaultColor is the minimap color (yellow) of marked items
+	// without one.
+	markedItemDefaultColor = 210
+)
 
 // mapRequest is a request for one open map, made under the read lock.
 type mapRequest struct {
@@ -76,7 +82,27 @@ func (ms *MapService) scene(opened *openMap, data *mapData) *maprender.Scene {
 			outfit, _ := data.outfit(creature)
 			return outfit
 		},
+		MarkedItems: markedItemColors(opened.editor),
 	}
+}
+
+// markedItemColors gives each marked item of the settings its minimap
+// color (yellow when it has none).
+func markedItemColors(editor *mapedit.Editor) map[uint16][3]uint8 {
+	ids := editor.Settings.MarkedItems
+	if ids == nil {
+		ids = mapedit.DefaultMarkedItems(editor.Items.Mode)
+	}
+	colors := make(map[uint16][3]uint8, len(ids))
+	for _, id := range ids {
+		colorIndex := uint8(markedItemDefaultColor)
+		if itemType := editor.Items.Get(id); itemType != nil && itemType.MinimapColor != 0 {
+			colorIndex = uint8(itemType.MinimapColor)
+		}
+		red, green, blue := mapedit.MinimapRGB(colorIndex)
+		colors[id] = [3]uint8{red, green, blue}
+	}
+	return colors
 }
 
 // chunkKeys parses the k parameter: chunk keys separated by commas,

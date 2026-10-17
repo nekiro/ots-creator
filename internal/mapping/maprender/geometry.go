@@ -27,6 +27,8 @@ const (
 	// ViewFar leaves out what does not shape the map seen from far away:
 	// movable and pickupable items.
 	ViewFar
+	// ViewMarkedItems covers Scene.MarkedItems with a colored square.
+	ViewMarkedItems
 )
 
 // Sprite values of the geometry besides sprite ids (quads of sprites are
@@ -106,6 +108,7 @@ var (
 const (
 	selectedDim         = 0.5
 	ghostItemAlpha      = 0.5
+	markedItemAlpha     = 2.0 / 3
 	emptyZoneAlpha      = 0.3
 	blockingTint        = 2.0 / 3
 	houseTint           = 0.5
@@ -322,6 +325,9 @@ func (b *geometryBuilder) item(item otmap.Item, position tilePosition, anchorX, 
 	if itemType == nil {
 		b.rect(anchorX, anchorY, spriteSize, spriteSize, unknownItemColor.withAlpha(unknownItemColor.alpha*color.alpha))
 		return 0
+	}
+	if markColor, marked := b.scene.MarkedItems[item.ID]; marked && b.view(ViewMarkedItems) {
+		defer b.rect(anchorX, anchorY, spriteSize, spriteSize, tint{float64(markColor[0]) / 255, float64(markColor[1]) / 255, float64(markColor[2]) / 255, markedItemAlpha * color.alpha})
 	}
 	if itemType.Flags.Has(otitems.FlagMeta) {
 		return 0

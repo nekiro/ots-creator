@@ -103,6 +103,7 @@ export function mapMenus(): { label: string; items: MenuEntry[] }[] {
         toggle("pathing", "Highlight blocking tiles"),
         toggle("highlightItems", "Highlight stacked items"),
         toggle("ghostItems", "Fade loose items"),
+        toggle("markedItems", "Marked items (invisible stairs…)"),
         toggle("tooltips", "Item ids and attributes"),
         toggle("coords", "Tile coordinates"),
         toggle("onlyModified", "Only changed tiles"),
