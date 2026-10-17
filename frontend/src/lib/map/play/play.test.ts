@@ -139,6 +139,11 @@ describe("visible floors", () => {
     expect(firstVisibleFloor(walled, { x: 100, y: 100, z: 7 })).toBe(0);
   });
 
+  it("waits for tiles that are not loaded yet", () => {
+    const loading: FloorWorld = { items: (x, y, z) => (z === 6 ? null : x === 100 && y === 100 && z === 7 ? [GROUND] : undefined), flags };
+    expect(firstVisibleFloor(loading, { x: 100, y: 100, z: 7 })).toBeNull();
+  });
+
   it("keeps under ground floors near the player", () => {
     expect(firstVisibleFloor(world({ "100,100,10": [GROUND] }), { x: 100, y: 100, z: 10 })).toBe(8);
     expect(lastVisibleFloor(10)).toBe(12);

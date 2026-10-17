@@ -101,6 +101,8 @@
 
   let raf = 0;
   let timer = 0;
+  /** The first floor drawn last frame and the player's floor then. */
+  let shownFloors = { z: -1, firstFloor: 0 };
   function requestDraw() {
     if (!raf) raf = requestAnimationFrame(draw);
   }
@@ -168,7 +170,9 @@
       if (onpopout) map.player = { ...position };
     }
     const [offsetX, offsetY] = player.offset(now, spriteSize);
-    const firstFloor = firstVisibleFloor(floors, position);
+    // While the tiles over the player load, the floors stay as they were (only its own floor after a floor change).
+    const firstFloor = firstVisibleFloor(floors, position) ?? (shownFloors.z === position.z ? shownFloors.firstFloor : position.z);
+    shownFloors = { z: position.z, firstFloor };
     const creature: CreatureData = {
       npc: false,
       selected: false,

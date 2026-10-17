@@ -20,15 +20,14 @@ export interface FloorItemFlags {
   blockProjectile: boolean;
 }
 
-/** The map as the floor rules see it: the items of a tile, bottom to top (undefined: no tile). */
+/** The map as the floor rules see it: the items of a tile, bottom to top (undefined: no tile, null: not loaded yet). */
 export interface FloorWorld {
-  items(x: number, y: number, z: number): number[] | undefined;
+  items(x: number, y: number, z: number): number[] | undefined | null;
   flags(id: number): FloorItemFlags;
 }
 
 /** Map::isLookPossible: a tile without items that block projectiles. */
-function isLookPossible(world: FloorWorld, x: number, y: number, z: number): boolean {
-  const items = world.items(x, y, z);
+function isLookPossible(items: number[] | undefined | null, world: FloorWorld): boolean {
   return !!items && !items.some((id) => world.flags(id).blockProjectile);
 }
 
@@ -43,15 +42,22 @@ function limitsFloorsView(world: FloorWorld, items: number[], isFreeView: boolea
   return false;
 }
 
-/** MapView::calcFirstVisibleFloor (floors are always limited by what covers the player). */
-export function firstVisibleFloor(world: FloorWorld, camera: Position): number {
+/** MapView::calcFirstVisibleFloor (floors are always limited by what covers the player).
+ * Null while a tile it reads is not loaded: an unloaded roof would show the floors above for a frame. */
+export function firstVisibleFloor(world: FloorWorld, camera: Position): number | null {
   let firstFloor = 0;
+  let unloaded = false;
+  const items = (x: number, y: number, z: number) => {
+    const tileItems = world.items(x, y, z);
+    if (tileItems === null) unloaded = true;
+    return tileItems;
+  };
   if (camera.z > GROUND_FLOOR) firstFloor = Math.max(camera.z - UNDERGROUND_RANGE, UNDERGROUND_FLOOR);
   for (let offsetX = -1; offsetX <= 1 && firstFloor < camera.z; offsetX++) {
     for (let offsetY = -1; offsetY <= 1 && firstFloor < camera.z; offsetY++) {
       const x = camera.x + offsetX;
       const y = camera.y + offsetY;
-      const lookPossible = isLookPossible(world, x, y, camera.z);
+      const lookPossible = isLookPossible(items(x, y, camera.z), world);
       if (!((offsetX === 0 && offsetY === 0) || (Math.abs(offsetX) !== Math.abs(offsetY) && lookPossible))) continue;
       // Straight up, and up the diagonal the client draws upper floors along.
       let upperZ = camera.z;
@@ -64,12 +70,12 @@ export function firstVisibleFloor(world: FloorWorld, camera: Position): number {
         coveredZ--;
         upperZ--;
         if (upperZ < firstFloor) break;
-        const upper = world.items(x, y, upperZ);
+        const upper = items(x, y, upperZ);
         if (upper && limitsFloorsView(world, upper, !lookPossible)) {
           firstFloor = upperZ + 1;
           break;
         }
-        const covered = world.items(coveredX, coveredY, coveredZ);
+        const covered = items(coveredX, coveredY, coveredZ);
         if (covered && limitsFloorsView(world, covered, lookPossible)) {
           firstFloor = coveredZ + 1;
           break;
@@ -77,6 +83,7 @@ export function firstVisibleFloor(world: FloorWorld, camera: Position): number {
       }
     }
   }
+  if (unloaded) return null;
   return Math.min(Math.max(firstFloor, 0), MAX_FLOOR);
 }
 

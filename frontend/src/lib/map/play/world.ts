@@ -1,7 +1,7 @@
 // The loaded map as the play rules see it: what can be walked on and what
 // limits the floors in view.
 import { AF, type Appearances } from "../data/appearances";
-import { TileFlags, type ChunkStore } from "../data/chunks";
+import { keyOf, TileFlags, type ChunkStore } from "../data/chunks";
 import { TOP_ORDER, type ItemIndex } from "../data/items";
 import type { FloorItemFlags, FloorWorld } from "./floors";
 import type { WalkWorld } from "./player";
@@ -27,7 +27,10 @@ export function floorWorld(chunks: ChunkStore, items: ItemIndex, looks: Appearan
   return {
     items(x, y, z) {
       const tile = chunks.tile(x, y, z);
-      return tile ? Array.from(tile.ids) : undefined;
+      if (tile) return Array.from(tile.ids);
+      // Not loaded yet: the chunk was just requested.
+      if (x >= 0 && y >= 0 && chunks.peek(keyOf(x, y, z)) === undefined) return null;
+      return undefined;
     },
     flags(id): FloorItemFlags {
       const look = looks.items.get(items.client[id]);
