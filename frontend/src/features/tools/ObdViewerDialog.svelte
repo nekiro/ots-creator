@@ -65,7 +65,7 @@
 
   const frameGroup = $derived(frameGroupAt(thing, group));
   const get = (id: number) => (id > 0 ? pixels[id - 1] : undefined);
-  const source = $derived<PreviewSource | null>(thing && file ? { key: current, thing, get, size: file.spriteSize } : null);
+  const source = $derived<PreviewSource | null>(thing && file ? { key: file.path, thing, get, size: file.spriteSize } : null);
   const index = $derived(entries.findIndex((candidate) => candidate.path === current));
   const entry = $derived(entries[index] ?? null);
   const name = $derived(basename(current));
