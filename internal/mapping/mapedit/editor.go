@@ -113,6 +113,9 @@ func (s *metaState) restore(gameMap *otmap.Map) {
 type Action struct {
 	Label   string
 	changes []change
+	// ID conversion changes the interpretation together with the tiles.
+	itemsBefore, itemsAfter     *otitems.DB
+	brushesBefore, brushesAfter *Brushes
 	// metaBefore/metaAfter are set when the map data outside tiles changed.
 	metaBefore *metaState
 	metaAfter  *metaState
@@ -239,6 +242,10 @@ func (e *Editor) Undo() string {
 		action.metaBefore.restore(e.Map)
 		e.metaDirty = true
 	}
+	if action.itemsBefore != nil {
+		e.Items = action.itemsBefore
+		e.SetBrushes(action.brushesBefore)
+	}
 	e.redo = append(e.redo, action)
 	return action.Label
 }
@@ -258,6 +265,10 @@ func (e *Editor) Redo() string {
 	if action.metaAfter != nil {
 		action.metaAfter.restore(e.Map)
 		e.metaDirty = true
+	}
+	if action.itemsAfter != nil {
+		e.Items = action.itemsAfter
+		e.SetBrushes(action.brushesAfter)
 	}
 	e.undo = append(e.undo, action)
 	return action.Label

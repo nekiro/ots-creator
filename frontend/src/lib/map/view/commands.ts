@@ -4,7 +4,7 @@ import { DialogService, WindowService, encodeBytes, errorMessage } from "../../a
 import { clamp } from "../../util/math";
 import { ask } from "../../confirm.svelte";
 import { openContextMenu, type MenuEntry } from "../../menu.svelte";
-import { app, toast } from "../../state/app.svelte";
+import { app, run, toast } from "../../state/app.svelte";
 import { MapService, SpawnFormat, type Position } from "../data/api";
 import { MAX_FLOOR } from "../constants";
 import { tileToWorld, worldToTile } from "./coords";
@@ -29,6 +29,7 @@ function needClient(): boolean {
 
 async function afterOpen(id: number, center?: Position): Promise<void> {
   map.activeId = id;
+  await loadMapData(true);
   if (!map.cams[id]) {
     const info = map.maps.find((open) => open.id === id);
     goTo(center ?? startPosition(info), id);
@@ -57,6 +58,16 @@ export function goTo(position: Position, id = map.activeId): void {
 }
 
 export const mapCommands = {
+  async convertToClientIDs() {
+    const id = map.activeId;
+    if (id === null) return;
+    const change = await run("Converting map to client IDs", () => MapService.ConvertMapToClientIDs(id), { modal: true });
+    if (!change) return;
+    applyChange(id, change);
+    await loadMapData(true);
+    toast(`Converted ${change.count.toLocaleString()} item IDs. Save the map to keep the change.`, "success");
+  },
+
   /** Walks the map as a player, from a tile (default: the one under the mouse, or the middle of the view). */
   /** With the play window open, the player there moves to the tile and the window comes to the front. */
   async play(position?: Position) {

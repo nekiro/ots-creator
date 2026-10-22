@@ -39,6 +39,16 @@
     void loadMapData();
   });
 
+  // Conversion and Undo/Redo can change one tab's ID mode.
+  let lastItemMode = "";
+  $effect(() => {
+    const key = `${map.activeId}:${map.active?.itemMode ?? ""}`;
+    if (key !== lastItemMode) {
+      lastItemMode = key;
+      void loadMapData(true);
+    }
+  });
+
   // Widths of the side panels; the splitters trade them with the map.
   const SIDES_KEY = "map:sides";
   // The panels' forms are laid out for these widths and break when narrower,
@@ -116,7 +126,7 @@
             <MapToolbar />
           </div>
           {#if map.play && map.items && map.activeId !== null}
-            {#key map.activeId}
+            {#key `${map.activeId}:${map.active?.itemMode}`}
               <PlayView mapId={map.activeId} start={map.play} items={map.items} spriteSize={spriteSize()} onexit={mapCommands.exitPlay} onpopout={mapCommands.popOutPlay} />
             {/key}
           {:else}

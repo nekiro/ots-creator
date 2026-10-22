@@ -234,28 +234,44 @@ export async function refreshTile(): Promise<void> {
   }
 }
 
-/** Loads status, the item table and the palette. */
-export async function loadMapData(force = false): Promise<void> {
+let dataRequest = 0;
+
+/** Loads the selected tab's item interpretation and palette. */
+export async function loadMapData(force = false, activate = true): Promise<void> {
+  const request = ++dataRequest;
   try {
     const status = await MapService.Status();
-    map.data = status.data;
+    if (request !== dataRequest) return;
     map.recent = status.recent ?? [];
     map.settings = status.settings;
     map.keys = Object.fromEntries(Object.entries(status.keys ?? {}).map(([key, keys]) => [key, keys ?? []]));
     map.maps = status.maps ?? [];
     if (map.activeId === null || !map.maps.some((open) => open.id === map.activeId)) map.activeId = map.maps[0]?.id ?? null;
-    if (status.data?.ready && (force || !map.items)) {
-      const [items, palette] = await Promise.all([MapService.Items(), MapService.Palette()]);
-      map.items = new ItemIndex(items);
-      map.palette = palette;
-      map.dataRev++;
-    }
+    const id = map.activeId;
     if (!status.data?.ready) {
+      map.data = status.data;
       map.items = null;
       map.palette = null;
+      return;
+    }
+    const view = await MapService.ViewData(id ?? 0, activate);
+    if (request !== dataRequest || id !== map.activeId) return;
+    const modeChanged = !!map.data && map.data.mode !== view.data.mode;
+    map.data = view.data;
+    if (force || !map.items || modeChanged) {
+      map.items = new ItemIndex(view.items);
+      map.palette = view.palette;
+      map.dataRev++;
+    }
+    if (modeChanged) {
+      map.brush = null;
+      map.tool = "select";
+      map.recentBrushes = [];
+      map.pasting = false;
+      map.results = null;
     }
   } catch (err) {
-    toast(errorMessage(err), "error");
+    if (request === dataRequest) toast(errorMessage(err), "error");
   }
 }
 

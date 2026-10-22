@@ -116,6 +116,7 @@ export function mapMenus(): { label: string; items: MenuEntry[] }[] {
       label: "Map",
       items: [
         { label: "Properties and statistics", action: () => ((map.side = "world"), mapCommands.focus({ kind: "map" })), disabled: noMap },
+        { label: "Convert map to client IDs", action: mapCommands.convertToClientIDs, disabled: () => noMap() || map.active?.itemMode !== "otb" || !!app.busy },
         { label: "Map tools…", action: () => (map.dialog = "tools"), disabled: noMap },
         {
           label: `Load warnings… (${map.activeId !== null ? warningCount(map.loadWarnings[map.activeId]).toLocaleString() : 0})`,

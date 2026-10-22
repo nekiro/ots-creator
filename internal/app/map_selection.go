@@ -62,6 +62,7 @@ func (ms *MapService) Copy(id int) (tiles int, err error) {
 			return errNothingSelected
 		}
 		ms.clipboard = clip
+		ms.clipboardMode = opened.editor.Items.Mode
 		tiles = len(clip.Tiles)
 		return nil
 	})
@@ -76,6 +77,7 @@ func (ms *MapService) Cut(id int) (MapChange, error) {
 			return 0, errNothingSelected
 		}
 		ms.clipboard = clip
+		ms.clipboardMode = editor.Items.Mode
 		return len(clip.Tiles), nil
 	})
 }
@@ -84,12 +86,20 @@ func (ms *MapService) Cut(id int) (MapChange, error) {
 func (ms *MapService) Clipboard() *mapedit.Clip {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
+	if opened := ms.maps[ms.activeID]; opened != nil && ms.clipboardMode != opened.editor.Items.Mode {
+		return nil
+	}
 	return ms.clipboard
 }
 
 // Paste puts the clipboard with its top-left corner at pos.
 func (ms *MapService) Paste(id int, pos otmap.Position) (MapChange, error) {
-	return ms.editMap(id, func(editor *mapedit.Editor) error { return editor.Paste(ms.clipboard, pos) })
+	return ms.editMap(id, func(editor *mapedit.Editor) error {
+		if ms.clipboard != nil && ms.clipboardMode != editor.Items.Mode {
+			return errors.New("the clipboard uses a different item ID mode; copy items from a map with the same mode")
+		}
+		return editor.Paste(ms.clipboard, pos)
+	})
 }
 
 // DeleteSelection removes everything selected.

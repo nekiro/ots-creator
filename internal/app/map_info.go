@@ -3,21 +3,24 @@ package app
 import (
 	"slices"
 
+	"github.com/nekiro/ots-creator/internal/core/otitems"
+
 	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
 // MapInfo describes an open map.
 type MapInfo struct {
-	ID        int    `json:"id"`
-	Path      string `json:"path"`
-	Name      string `json:"name"`
-	Changed   bool   `json:"changed"`
-	CanUndo   bool   `json:"canUndo"`
-	CanRedo   bool   `json:"canRedo"`
-	UndoLabel string `json:"undoLabel"`
-	RedoLabel string `json:"redoLabel"`
-	Tiles     int    `json:"tiles"`
+	ItemMode  otitems.Mode `json:"itemMode"`
+	ID        int          `json:"id"`
+	Path      string       `json:"path"`
+	Name      string       `json:"name"`
+	Changed   bool         `json:"changed"`
+	CanUndo   bool         `json:"canUndo"`
+	CanRedo   bool         `json:"canRedo"`
+	UndoLabel string       `json:"undoLabel"`
+	RedoLabel string       `json:"redoLabel"`
+	Tiles     int          `json:"tiles"`
 	// Floors has a bit set for every floor with tiles.
 	Floors    uint16              `json:"floors"`
 	Props     mapedit.Properties  `json:"props"`
@@ -39,7 +42,8 @@ func (ms *MapService) info(opened *openMap, meta bool) MapInfo {
 	editor := opened.editor
 	undo, redo := editor.History()
 	info := MapInfo{
-		ID: opened.id, Path: opened.path, Name: opened.name(), Changed: editor.Changed(), CanUndo: editor.CanUndo(), CanRedo: editor.CanRedo(),
+		ItemMode: editor.Items.Mode,
+		ID:       opened.id, Path: opened.path, Name: opened.name(), Changed: editor.Changed(), CanUndo: editor.CanUndo(), CanRedo: editor.CanRedo(),
 		Tiles: editor.Map.TileCount(), Props: editor.Properties(), Selection: editor.SelectionCount(), Rev: editor.Map.Rev,
 	}
 	if len(undo) > 0 {
@@ -84,6 +88,7 @@ const EventMapChanged = "map:changed"
 
 // MapChanged lists the chunks an edit changed on a map.
 type MapChanged struct {
+	All    bool     `json:"all"`
 	ID     int      `json:"id"`
 	Chunks []uint32 `json:"chunks"`
 }

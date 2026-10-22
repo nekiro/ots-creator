@@ -25,8 +25,13 @@
   }
 
   onMount(() => {
-    const offChanged = Events.On("map:changed", (event: { data: { id: number; chunks: number[] | null } | null }) => {
+    const offChanged = Events.On("map:changed", (event: { data: { id: number; chunks: number[] | null; all?: boolean } | null }) => {
       if (event.data?.id !== mapId) return;
+      if (event.data.all) {
+        map.activeId = mapId;
+        void loadMapData(true, false).then(() => session++);
+        return;
+      }
       for (const changed of listeners) changed(event.data.chunks ?? []);
     });
     // Play from the editor while this window is open: start again there.
@@ -34,12 +39,15 @@
       const move = event.data;
       if (!move) return;
       mapId = move.map;
+      map.activeId = mapId;
+      void loadMapData(true, false);
       start = { x: move.x, y: move.y, z: move.z };
       session++;
     });
     void (async () => {
       await initState();
-      await loadMapData();
+      map.activeId = mapId;
+      await loadMapData(true, false);
       ready = true;
     })();
     return () => {

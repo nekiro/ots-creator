@@ -35,9 +35,10 @@ type mapData struct {
 	brushes       *mapedit.Brushes
 	// creatures holds every known creature by lower case name; the
 	// materials file wins over the creatures scanned from the server.
-	creatures map[string]*materials.CreatureType
-	scanned   []*materials.CreatureType
-	warnings  []string
+	creatures  map[string]*materials.CreatureType
+	scanned    []*materials.CreatureType
+	warnings   []string
+	clientData *mapData
 }
 
 // projectSource reads client items for the item database.
@@ -211,9 +212,45 @@ func (ms *MapService) ensure(hint string) (*mapData, error) {
 func (ms *MapService) setData(data *mapData) {
 	ms.data = data
 	for _, opened := range ms.maps {
-		opened.editor.Items = data.items
-		opened.editor.SetBrushes(data.brushes)
+		if opened.clientData != nil {
+			opened.clientData = data.asClientIDs(ms.store.Dir())
+		}
+		resolved := ms.dataFor(opened)
+		opened.editor.Items = resolved.items
+		opened.editor.SetBrushes(resolved.brushes)
 	}
+}
+
+// dataFor resolves each map independently of the selected tab.
+func (ms *MapService) dataFor(opened *openMap) *mapData {
+	if opened.clientData != nil && opened.editor.Items.Mode == otitems.ModeClient {
+		return opened.clientData
+	}
+	return ms.data
+}
+
+// asClientIDs builds the client palette without applying server-ID XML or brushes.
+func (data *mapData) asClientIDs(storeDir string) *mapData {
+	if data.items.Mode == otitems.ModeClient {
+		return data
+	}
+	if data.clientData != nil {
+		return data.clientData
+	}
+	info := data.project.Info()
+	source := projectSource{things: map[uint32]*thing.Thing{}}
+	for _, item := range data.project.ThingRange(thing.CategoryItem, thing.CategoryItem.MinID(), info.Counts.Items) {
+		source.things[item.ID] = item
+	}
+	converted := &mapData{
+		project: data.project, client: data.client, scanned: data.scanned,
+		config: MapDataConfig{ItemsMode: itemsClient, ServerDir: data.config.ServerDir},
+		items:  otitems.FromClient(source, info.Counts.Items, data.project.Names(thing.CategoryItem)),
+	}
+	converted.loadMaterials(storeDir)
+	converted.index()
+	data.clientData = converted
+	return converted
 }
 
 // DataInfo describes the item and brush data of the map editor.

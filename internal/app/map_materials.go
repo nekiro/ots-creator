@@ -13,7 +13,11 @@ import (
 // saveMaterials writes the brush file and reindexes brushes.
 func (ms *MapService) saveMaterials(data *mapData) error {
 	data.index()
-	ms.setData(data)
+	for _, opened := range ms.maps {
+		if ms.dataFor(opened) == data {
+			opened.editor.SetBrushes(data.brushes)
+		}
+	}
 	if data.materialsPath == "" {
 		return errors.New("no materials file")
 	}
