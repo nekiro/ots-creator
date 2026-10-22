@@ -187,6 +187,46 @@ func TestAssetsWarnings(t *testing.T) {
 	}
 }
 
+// An outfit of a dat/spr client keeps idle and walking frames in one group;
+// appearances need them as separate idle and walking groups.
+func TestAssetsSplitLegacyOutfits(t *testing.T) {
+	project := New(v1098(), client.Features{})
+	ids, _ := project.AddSprites([][]byte{solid(9, 0, 0), solid(0, 9, 0), solid(0, 0, 9)})
+	outfit, _ := project.Thing(thing.CategoryOutfit, 1)
+	group := outfit.FrameGroups[0]
+	group.Resize(1, 1, 1, 1, 1, 1, 3, 300)
+	copy(group.Sprites, ids)
+	if err := project.UpdateThing(outfit); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := project.Compile(CompileOptions{Format: FormatAssets, DatPath: dir}); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := OpenAssets(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outfit, _ = reopened.Thing(thing.CategoryOutfit, 1)
+	if len(outfit.FrameGroups) != 2 {
+		t.Fatalf("%d frame groups", len(outfit.FrameGroups))
+	}
+	idle, walking := outfit.FrameGroups[0], outfit.FrameGroups[1]
+	if idle.Type != thing.FrameGroupDefault || idle.Frames != 1 || walking.Type != thing.FrameGroupWalking || walking.Frames != 2 {
+		t.Fatalf("idle %+v walking %+v", idle, walking)
+	}
+	if !bytes.Equal(piece(t, reopened, idle.Sprites[0]), solid(9, 0, 0)) || !bytes.Equal(piece(t, reopened, walking.Sprites[1]), solid(0, 0, 9)) {
+		t.Fatal("frames moved to the wrong group")
+	}
+	// Compiling the asset folder again keeps the groups.
+	if err := reopened.Compile(CompileOptions{Format: FormatAssets, DatPath: dir}); err != nil {
+		t.Fatal(err)
+	}
+	if outfit, _ = reopened.Thing(thing.CategoryOutfit, 1); len(outfit.FrameGroups) != 2 {
+		t.Fatalf("%d frame groups after a second compile", len(outfit.FrameGroups))
+	}
+}
+
 // TestOfficialAssetsEdit opens the asset folder in OTS_ASSETS, edits one
 // item and compiles to a copy.
 func TestOfficialAssetsEdit(t *testing.T) {

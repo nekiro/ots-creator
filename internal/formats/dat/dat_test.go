@@ -219,9 +219,15 @@ func TestFileLegacyDefaultsDurations(t *testing.T) {
 	if len(g.Durations) != 3 || g.Durations[0].Min != 500 || g.Durations[0].Max != 500 {
 		t.Fatalf("default item durations = %+v", g.Durations)
 	}
+	if g.Mode != thing.AnimationSync {
+		t.Fatal("legacy item animations must be synchronized")
+	}
 	eg := got.Get(thing.CategoryEffect, 1).FrameGroups[0]
 	if eg.Durations[1].Min != 100 {
 		t.Fatalf("default effect durations = %+v", eg.Durations)
+	}
+	if eg.Mode != thing.AnimationAsync {
+		t.Fatal("legacy effect animations must start when shown")
 	}
 	if got.Get(thing.CategoryOutfit, 1).FrameGroups[0].Durations[0].Min != 300 {
 		t.Fatal("default outfit duration")

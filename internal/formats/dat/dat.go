@@ -115,6 +115,11 @@ func readGroups(r *binio.Reader, object *thing.Thing, opts Options) error {
 		if err := ReadGroup(r, group, opts.hasPatternZ(), opts.Features.ImprovedAnimations, opts.Features.Extended, object.Category.DefaultDuration()); err != nil {
 			return err
 		}
+		// Clients without improved animations run every item animation on
+		// one clock, so all tiles of an animated item show the same frame.
+		if !opts.Features.ImprovedAnimations && object.Category == thing.CategoryItem && group.IsAnimation() {
+			group.Mode = thing.AnimationSync
+		}
 		object.FrameGroups = append(object.FrameGroups, group)
 	}
 	return r.Err()

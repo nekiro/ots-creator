@@ -77,6 +77,8 @@ func transfer(dst, src *Project, category thing.Category, ids []uint32, appendNe
 				return TransferResult{}, fmt.Errorf("%s %d: idle and walking layouts differ, the target client has no frame groups", category, object.ID)
 			}
 			things[i] = merged
+		} else if dst.format == FormatAssets && needsGroupSplit(object) {
+			things[i] = splitGroups(object)
 		}
 	}
 

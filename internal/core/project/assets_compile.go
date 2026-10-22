@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"maps"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -29,12 +30,12 @@ func (p *Project) compileAssets(dir string, progress func(done, total int), stat
 	}
 	base := &assets.Catalog{}
 	writer := &assetWriter{project: p, known: map[string]*newSprite{}, repacked: map[uint32]*newSprite{}}
-	file := &assets.File{Things: p.things.Things}
+	file := &assets.File{Things: assetThings(p.things.Things)}
 	if p.assets != nil {
 		base = p.assets.catalog
 		writer.pieces = p.assets.pieces
 		file = p.assets.file
-		file.Things = p.things.Things
+		file.Things = assetThings(p.things.Things)
 	}
 	appearancesData, kept, groups, err := writer.encodePasses(file, base)
 	if err != nil {
@@ -71,6 +72,32 @@ func (p *Project) compileAssets(dir string, progress func(done, total int), stat
 		}
 	}
 	return p.reloadAssets(dir)
+}
+
+// assetThings returns the things to write to an asset folder. Appearances
+// keep idle and walking in separate frame groups, so outfits of dat/spr
+// clients (one group: frame 0 is idle, the rest is walking) are split; the
+// things of the project are not changed.
+func assetThings(things map[thing.Category][]*thing.Thing) map[thing.Category][]*thing.Thing {
+	out := maps.Clone(things)
+	outfits := slices.Clone(things[thing.CategoryOutfit])
+	for i, outfit := range outfits {
+		if needsGroupSplit(outfit) {
+			outfits[i] = splitGroups(outfit)
+		}
+	}
+	out[thing.CategoryOutfit] = outfits
+	return out
+}
+
+// needsGroupSplit reports whether a thing is an outfit with one frame group
+// that did not come from an appearances file (where one group is idle only).
+func needsGroupSplit(object *thing.Thing) bool {
+	if object == nil || object.Category != thing.CategoryOutfit || len(object.FrameGroups) != 1 {
+		return false
+	}
+	_, fromAssets := object.Extra.(*assets.Original)
+	return !fromAssets
 }
 
 // encodePasses encodes the appearances twice: pass 1 finds the new sprites,
@@ -246,6 +273,10 @@ func (p *Project) assetWarnings() []string {
 	for _, category := range thing.Categories {
 		for _, object := range p.things.Things[category] {
 			if unsupported := assets.Unsupported(&object.Props); len(unsupported) > 0 {
+				// The server handles floor changes; asset clients have no such flag.
+				if index := slices.Index(unsupported, "floorChange"); index >= 0 {
+					unsupported[index] = "floorChange (server side only)"
+				}
 				out = append(out, fmt.Sprintf("%s %d: %v", category, object.ID, unsupported))
 			}
 			for _, group := range object.FrameGroups {
