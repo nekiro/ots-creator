@@ -311,6 +311,43 @@ func TestAssetsDropUnusedSheet(t *testing.T) {
 	}
 }
 
+// Compiling into a folder replaces its sheets and appearances files: ones
+// the new catalog does not list (left from an earlier compile) are removed,
+// other files stay.
+func TestAssetsRemoveStaleFiles(t *testing.T) {
+	project, err := OpenAssets(buildAssets(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	stale := []string{"sprites-stale.bmp.lzma", "appearances-stale.dat"}
+	for _, name := range append(stale, "keep.txt") {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := project.Compile(CompileOptions{Format: FormatAssets, DatPath: dir}); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range stale {
+		if _, err := os.Stat(filepath.Join(dir, name)); !os.IsNotExist(err) {
+			t.Fatalf("%s must be removed", name)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "keep.txt")); err != nil {
+		t.Fatal("other files must stay")
+	}
+	catalog, err := assets.ReadCatalog(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range catalog.Files() {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			t.Fatalf("listed %s missing", name)
+		}
+	}
+}
+
 func TestAssetsVersion(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "assets")

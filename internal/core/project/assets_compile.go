@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -51,7 +52,7 @@ func (p *Project) compileAssets(dir string, progress func(done, total int), stat
 	if err != nil {
 		return err
 	}
-	appearances, err := writeCatalog(dir, base, appearancesData, append(slices.Clone(kept), sheets...))
+	catalog, err := writeCatalog(dir, base, appearancesData, append(slices.Clone(kept), sheets...))
 	if err != nil {
 		return err
 	}
@@ -63,15 +64,31 @@ func (p *Project) compileAssets(dir string, progress func(done, total int), stat
 	if stats != nil {
 		*stats = p.compileStats(base, obsolete, addedBytes)
 	}
-	// The previous appearances file and the dropped or repacked sheets of
-	// this folder are no longer listed.
-	if p.assets != nil && fsutil.SamePath(p.assets.dir, dir) {
-		delete(obsolete, appearances)
-		for name := range obsolete {
-			os.Remove(filepath.Join(dir, name))
+	removeUnlisted(dir, catalog)
+	return p.reloadAssets(dir)
+}
+
+// removeUnlisted deletes the sheets and appearances files of dir that the
+// catalog does not list: the dropped or repacked sheets and the previous
+// appearances file, and leftovers of earlier compiles to the same folder.
+func removeUnlisted(dir string, catalog *assets.Catalog) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	listed := map[string]bool{}
+	for _, name := range catalog.Files() {
+		listed[strings.ToLower(name)] = true
+	}
+	for _, entry := range entries {
+		name := strings.ToLower(entry.Name())
+		if entry.IsDir() || listed[name] {
+			continue
+		}
+		if strings.HasSuffix(name, ".bmp.lzma") || strings.HasPrefix(name, "appearances") && strings.HasSuffix(name, ".dat") {
+			os.Remove(filepath.Join(dir, entry.Name()))
 		}
 	}
-	return p.reloadAssets(dir)
 }
 
 // assetThings returns the things to write to an asset folder. Appearances
@@ -216,20 +233,21 @@ func writeSheets(dir string, groups [][]*newSprite, done *counter) ([]assets.She
 }
 
 // writeCatalog writes the appearances file and a catalog listing it and
-// sheets. It returns the name of the appearances file.
-func writeCatalog(dir string, base *assets.Catalog, appearancesData []byte, sheets []assets.Sheet) (string, error) {
+// sheets. It returns the written catalog.
+func writeCatalog(dir string, base *assets.Catalog, appearancesData []byte, sheets []assets.Sheet) (*assets.Catalog, error) {
 	appearances := "appearances-" + hash(appearancesData) + ".dat"
 	if err := fsutil.WriteAtomic(filepath.Join(dir, appearances), appearancesData); err != nil {
-		return "", err
+		return nil, err
 	}
-	catalogData, err := base.With(appearances, sheets).Marshal()
+	catalog := base.With(appearances, sheets)
+	catalogData, err := catalog.Marshal()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if err := fsutil.WriteAtomic(filepath.Join(dir, assets.CatalogFile), catalogData); err != nil {
-		return "", err
+		return nil, err
 	}
-	return appearances, nil
+	return catalog, nil
 }
 
 // compileStats counts the obsolete sheets of base and the bytes they free,
