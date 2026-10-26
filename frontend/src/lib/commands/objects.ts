@@ -1,6 +1,6 @@
 // Adding, removing, importing and exporting objects.
-import { CATEGORY_NAMES, DialogService, ThingService, minId } from "../api";
-import { ask } from "../confirm.svelte";
+import { CATEGORY_NAMES, Category, DialogService, ThingService, minId } from "../api";
+import { ask, askText } from "../confirm.svelte";
 import { prefs } from "../state/prefs.svelte";
 import { app, run, select, toast } from "../state/app.svelte";
 import { OBJECT_FILTERS, confirmDiscard, guard } from "./shared";
@@ -27,6 +27,30 @@ export const objectCommands = {
     if (!guard() || app.selection.length === 0) return;
     const ids = await run("Duplicating", () => ThingService.Duplicate(app.category, app.selection));
     if (ids?.length) await select(ids[0]);
+  },
+
+  /**
+   * Moves the selection to the ids from an entered id on. The objects there
+   * swap places with them; item references follow the moved items.
+   */
+  async moveTo() {
+    if (!guard() || app.selection.length === 0 || !(await confirmDiscard())) return;
+    const category = app.category;
+    const ids = [...app.selection].sort((left, right) => left - right);
+    const text = await askText({ title: `Move ${ids.length} ${CATEGORY_NAMES[category]}(s)`, label: "To id", value: String(ids[0]), ok: "Move" });
+    if (text === null) return;
+    const at = Number(text.trim());
+    if (!Number.isInteger(at) || at < minId(category)) {
+      toast(`Enter an id from ${minId(category)} on.`, "error");
+      return;
+    }
+    const moved = await run("Moving", () => ThingService.Move(category, ids, at, { insert: false, updateRefs: category === Category.CategoryItem }));
+    if (!moved?.length || app.category !== category) return;
+    const sorted = [...moved].sort((left, right) => left - right);
+    await select(sorted[0]);
+    app.selection = sorted;
+    const range = sorted.length === 1 ? `#${sorted[0]}` : `#${sorted[0]}-#${sorted[sorted.length - 1]}`;
+    toast(`Moved ${ids.length} ${CATEGORY_NAMES[category]}(s) to ${range}. Ctrl+Z to undo.`, "success");
   },
 
   async remove() {

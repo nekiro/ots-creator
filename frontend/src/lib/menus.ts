@@ -62,6 +62,7 @@ export function objectMenu(context = false): MenuEntry[] {
   return [
     { label: "New object", action: commands.newThing, disabled: noProject },
     { label: "Duplicate", keys: "Ctrl+D", action: commands.duplicate, disabled: noThing },
+    { label: "Move to…", action: commands.moveTo, disabled: noThing },
     { label: "Replace with object file…", action: () => commands.importObd(true), disabled: notSingle },
     { label: "Remove", keys: "Del", action: commands.remove, disabled: noThing },
     "-",
