@@ -233,7 +233,7 @@
           >
             <span class="t-slot">
               {#if hover.current?.id === id}
-                <ThingCanvas thing={hover.current.thing} get={(sid) => spriteCache.get(sid)?.pixels} size={spriteCache.size} ready={hover.ready} group={HoverAnim.group(hover.current.thing)} fit={32} colorize={false} improved={hasImprovedAnimations(app.project?.info)} />
+                <ThingCanvas thing={hover.current.thing} get={(sid) => spriteCache.get(sid)?.pixels} size={spriteCache.size} ready={hover.ready} group={HoverAnim.group(hover.current.thing)} fit={32} colorize={false} addons improved={hasImprovedAnimations(app.project?.info)} />
               {:else}
                 {@const src = res.thumb(app.category, id, versions.thing(app.category, id))}
                 <img class="pixel" {src} alt="" loading="lazy" decoding="async" draggable="false" use:loading={src} />

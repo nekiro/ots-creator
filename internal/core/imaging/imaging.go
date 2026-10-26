@@ -294,6 +294,32 @@ func DrawOver(img *image.NRGBA, x, y, size int, pixels []byte) {
 	}
 }
 
+// BlendTile draws RGBA sprite bytes at (x, y) over the destination with
+// alpha blending (outfit addons over the base outfit).
+func BlendTile(img *image.NRGBA, x, y, size int, pixels []byte) {
+	for row := 0; row < size; row++ {
+		for col := 0; col < size; col++ {
+			source := pixels[(row*size+col)*4:]
+			sourceAlpha := int(source[3])
+			if sourceAlpha == 0 {
+				continue
+			}
+			offset := img.PixOffset(x+col, y+row)
+			destination := img.Pix[offset : offset+4]
+			if sourceAlpha == 255 || destination[3] == 0 {
+				copy(destination, source[:4])
+				continue
+			}
+			destinationAlpha := int(destination[3]) * (255 - sourceAlpha) / 255
+			outAlpha := sourceAlpha + destinationAlpha
+			for channel := range 3 {
+				destination[channel] = byte((int(source[channel])*sourceAlpha + int(destination[channel])*destinationAlpha) / outAlpha)
+			}
+			destination[3] = byte(outAlpha)
+		}
+	}
+}
+
 // SliceSheet cuts a group sheet into sprites, returning RGBA bytes indexed
 // by sprite slot. Magenta is removed. The image must match group.SheetSize.
 func SliceSheet(img *image.NRGBA, group *thing.FrameGroup, size int) ([][]byte, error) {

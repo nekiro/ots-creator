@@ -336,6 +336,10 @@ func TestThumbnailPos(t *testing.T) {
 	if ThumbnailPos(o).PatternX != 2 {
 		t.Fatal("outfit thumbnail must face south")
 	}
+	o.Group(thing.FrameGroupDefault).PatternY = 3
+	if addons := ThumbnailPos(o).Addons; len(addons) != 2 || addons[0] != 1 || addons[1] != 2 {
+		t.Fatalf("outfit thumbnail addons %v", addons)
+	}
 	if ThumbnailPos(thing.New(100, thing.CategoryItem)).PatternX != 0 {
 		t.Fatal("item thumbnail")
 	}

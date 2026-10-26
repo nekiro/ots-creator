@@ -17,15 +17,22 @@ type TexturePos struct {
 	PatternY int
 	PatternZ int
 	Frame    int
+	// Addons are extra pattern Y values drawn over the texture (outfit addons).
+	Addons []int
 }
 
-// ThumbnailPos returns the texture shown in lists: outfits face south,
-// everything else uses the first texture.
+// ThumbnailPos returns the texture shown in lists: outfits face south
+// with all their addons, everything else uses the first texture.
 func ThumbnailPos(object *thing.Thing) TexturePos {
 	pos := TexturePos{}
 	if object.Category == thing.CategoryOutfit {
-		if group := object.Group(thing.FrameGroupDefault); group != nil && int(group.PatternX) > int(thing.South) {
-			pos.PatternX = int(thing.South)
+		if group := object.Group(thing.FrameGroupDefault); group != nil {
+			if int(group.PatternX) > int(thing.South) {
+				pos.PatternX = int(thing.South)
+			}
+			for addon := 1; addon <= 2 && addon < int(group.PatternY); addon++ {
+				pos.Addons = append(pos.Addons, addon)
+			}
 		}
 	}
 	return pos
@@ -48,20 +55,33 @@ func (p *Project) Render(category thing.Category, id uint32, pos TexturePos) (*i
 	size := p.features.SpriteSize
 	img := image.NewNRGBA(image.Rect(0, 0, int(group.Width)*size, int(group.Height)*size))
 	buf := make([]byte, size*size*4)
-	for tileY := 0; tileY < int(group.Height); tileY++ {
-		for tileX := 0; tileX < int(group.Width); tileX++ {
-			spriteID := group.Sprites[group.SpriteIndex(tileX, tileY, pos.Layer, pos.PatternX, pos.PatternY, pos.PatternZ, pos.Frame)]
-			if spriteID == 0 {
-				continue
+	patternYs := []int{pos.PatternY}
+	for _, addon := range pos.Addons {
+		if addon != pos.PatternY && addon >= 0 && addon < int(group.PatternY) {
+			patternYs = append(patternYs, addon)
+		}
+	}
+	for pass, patternY := range patternYs {
+		for tileY := 0; tileY < int(group.Height); tileY++ {
+			for tileX := 0; tileX < int(group.Width); tileX++ {
+				spriteID := group.Sprites[group.SpriteIndex(tileX, tileY, pos.Layer, pos.PatternX, patternY, pos.PatternZ, pos.Frame)]
+				if spriteID == 0 {
+					continue
+				}
+				compressed, err := p.sprites.compressed(spriteID)
+				if err != nil || len(compressed) == 0 {
+					continue // missing sprites render as empty
+				}
+				if err := spr.DecompressInto(buf, compressed, size, p.features.Transparency); err != nil {
+					continue
+				}
+				x, y := (int(group.Width)-1-tileX)*size, (int(group.Height)-1-tileY)*size
+				if pass == 0 {
+					imaging.PutTile(img, x, y, size, buf)
+				} else {
+					imaging.BlendTile(img, x, y, size, buf)
+				}
 			}
-			compressed, err := p.sprites.compressed(spriteID)
-			if err != nil || len(compressed) == 0 {
-				continue // missing sprites render as empty
-			}
-			if err := spr.DecompressInto(buf, compressed, size, p.features.Transparency); err != nil {
-				continue
-			}
-			imaging.PutTile(img, (int(group.Width)-1-tileX)*size, (int(group.Height)-1-tileY)*size, size, buf)
 		}
 	}
 	return img, nil

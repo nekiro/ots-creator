@@ -21,6 +21,7 @@
     fit = 0,
     playing = true,
     colorize = true,
+    addons = false,
     improved,
   }: {
     thing: Thing;
@@ -36,6 +37,8 @@
     playing?: boolean;
     /** Paint outfits with the default colors; off shows the white template like list thumbnails. */
     colorize?: boolean;
+    /** Draw outfits with all their addons, like list thumbnails. */
+    addons?: boolean;
     /** The client stores frame durations; guessed from the thing when not given. */
     improved?: boolean;
   } = $props();
@@ -47,7 +50,7 @@
   const isOutfit = $derived(thing.category === Category.CategoryOutfit);
   const patternXOf = (shown: typeof frameGroup) => (isOutfit && shown ? Math.min(direction, shown.patternX - 1) : 0);
   const draw = (frameIndex: number) =>
-    compose(frameGroup!, frameGroup!.sprites, size, { pos: { layer: 0, x: patternXOf(frameGroup), y: 0, z: 0, frame: frameIndex }, colors: isOutfit && colorize ? DEFAULT_COLORS : null }, get);
+    compose(frameGroup!, frameGroup!.sprites, size, { pos: { layer: 0, x: patternXOf(frameGroup), y: 0, z: 0, frame: frameIndex }, addons: isOutfit && addons ? [1, 2] : [], colors: isOutfit && colorize ? DEFAULT_COLORS : null }, get);
 
   // Fit mode crops to the visible pixels of all frames, so the animation
   // does not jump and small objects in big textures are not drawn tiny.
