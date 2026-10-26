@@ -100,7 +100,7 @@ export interface GeoChunk {
   lights: DataView;
   /** Light sources in lights. */
   lightCount: number;
-  /** Tiles with a ground, one bit each row by row (null: none): they hide the light of the floors under them. */
+  /** Three bit planes of the same size, one bit per tile row by row (null: no bit set): the tiles that hide the light of the floors under them, those of them that only dim it (a translucent thing) and the tiles with a ground. */
   shades: Uint8Array | null;
   /** What it was built for. */
   signature: string;

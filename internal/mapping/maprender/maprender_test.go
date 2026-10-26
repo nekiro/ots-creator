@@ -164,12 +164,12 @@ func TestBuildGeometryLights(t *testing.T) {
 	if lights != 1 {
 		t.Fatalf("%d lights", lights)
 	}
-	// The opaque ground of tile (1, 2) hides the light under it.
-	shades := part[len(part)-128:]
-	if int(24+quads*16+sprites*4+8+4+128) != len(part) || binary.LittleEndian.Uint32(part[len(part)-132:]) != 128 || shades[(2*32+1)/8] != 1<<((2*32+1)%8) {
+	// The opaque ground of tile (1, 2) hides the light under it (the first of three planes of 128 bytes).
+	shades := part[len(part)-384:]
+	if int(24+quads*16+sprites*4+8+4+384) != len(part) || binary.LittleEndian.Uint32(part[len(part)-388:]) != 384 || shades[(2*32+1)/8] != 1<<((2*32+1)%8) {
 		t.Fatalf("part of %d bytes", len(part))
 	}
-	light := part[len(part)-140 : len(part)-132]
+	light := part[len(part)-396 : len(part)-388]
 	// The center of the torch's drawn pixels on tile (1, 2): (32 + (20 + 23) / 2, 64 + (4 + 7) / 2).
 	if x, y := int16(binary.LittleEndian.Uint16(light)), int16(binary.LittleEndian.Uint16(light[2:])); x != 53 || y != 69 || light[4] != 6 || light[5] != 206 {
 		t.Fatalf("light %v", light)
@@ -222,6 +222,28 @@ func TestCanShade(t *testing.T) {
 	} {
 		if got := builder.canShade(&test.tile); got != test.want {
 			t.Fatalf("tile %+v: %v", test.tile, got)
+		}
+	}
+}
+
+func TestShadePlanes(t *testing.T) {
+	scene := testScene(t)
+	scene.SpritePixels = spritePixels
+	ground := oneSpriteThing(7)
+	ground.Props.Ground = true
+	glass := oneSpriteThing(7)
+	glass.Props.Translucent = true
+	scene.Things = fakeThings{100: ground, 101: glass}
+	parts, _, err := BuildGeometryParts(scene, []otmap.ChunkKey{otmap.MakeKey(0, 0, 7)}, GeometryOptions{}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Tile (1, 2) hides the light under it, only dims it (the translucent item) and has a ground.
+	shades := parts[0][len(parts[0])-384:]
+	bit := 2*32 + 1
+	for plane := range shadePlanes {
+		if shades[plane*128+bit/8] != 1<<(bit%8) {
+			t.Fatalf("plane %d: %v", plane, shades[plane*128:plane*128+16])
 		}
 	}
 }

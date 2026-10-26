@@ -98,6 +98,18 @@
     requestDraw();
   });
 
+  /** The world light shown: it fades one step a second towards the one the server sends (Map::setLight). */
+  let worldLight = $state(untrack(() => playerSettings.worldLight));
+  $effect(() => {
+    const target = playerSettings.worldLight;
+    const fade = window.setInterval(() => {
+      if (worldLight === target) return window.clearInterval(fade);
+      worldLight += Math.sign(target - worldLight);
+      requestDraw();
+    }, PLAY.worldLightStepMs);
+    return () => window.clearInterval(fade);
+  });
+
 
   let raf = 0;
   let timer = 0;
@@ -222,7 +234,7 @@
           footPhase: player.footPhase,
           firstFloor,
           lastFloor: Math.max(firstFloor, lastVisibleFloor(position.z)),
-          worldLight: playerSettings.worldLight,
+          worldLight,
           names: playerSettings.showNames,
           healthBars: playerSettings.showHealth,
           manaBar: playerSettings.showMana,

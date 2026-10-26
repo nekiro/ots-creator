@@ -1,5 +1,6 @@
 // Names and texts drawn on a 2D canvas over the map.
 import { LABEL_FONT } from "../constants";
+import { nameLeft } from "./creatureInfo";
 import type { Label } from "./scene";
 
 /** Left, top, right, bottom in device pixels. */
@@ -57,7 +58,7 @@ export function drawLabels(context: CanvasRenderingContext2D, width: number, hei
   context.font = nameFont;
   for (const label of names) {
     const textWidth = context.measureText(label.text).width;
-    if (label.clampX) label.x = Math.round(Math.min(Math.max(label.x, textWidth / 2), width - textWidth / 2));
+    if (label.clampX) label.x = nameLeft(label.x, Math.round(textWidth), pixel, width) + textWidth / 2;
     boxes.push([label.x - textWidth / 2 - pad, label.y - 15 * pixel, label.x + textWidth / 2 + pad, label.y]);
   }
   // Small labels (tile coordinates, item texts): the small pixel font, many

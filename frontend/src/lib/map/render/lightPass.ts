@@ -15,6 +15,8 @@ export class LightPass {
   private texture: WebGLTexture;
   private uniforms: Record<string, WebGLUniformLocation | null> = {};
   private pixels = new Uint8Array(0);
+  /** The grid of the last light map; null when the last frame was not darkened. */
+  private grid: LightGrid | null = null;
   /** Size of the texture storage, reused while the grid keeps its size. */
   private textureWidth = 0;
   private textureHeight = 0;
@@ -44,14 +46,15 @@ export class LightPass {
   /**
    * Darkens what is drawn by the light of the grid's tiles. (left, top) is
    * the screen pixel of the grid's top-left corner, tilePx the device
-   * pixels of a tile.
+   * pixels of a tile, viewFloor the floor in view.
    */
-  draw(screenWidth: number, screenHeight: number, grid: LightGrid, left: number, top: number, tilePx: number, floors: LightFloor[], ambient: number, spriteSize: number): void {
+  draw(screenWidth: number, screenHeight: number, grid: LightGrid, left: number, top: number, tilePx: number, floors: LightFloor[], ambient: number, spriteSize: number, viewFloor: number): void {
     const gl = this.gl;
     const size = grid.width * grid.height * 4;
     if (this.pixels.length < size) this.pixels = new Uint8Array(size);
     const pixels = this.pixels.subarray(0, size);
-    buildLightMap(pixels, grid, floors, ambient, spriteSize);
+    buildLightMap(pixels, grid, floors, ambient, spriteSize, viewFloor);
+    this.grid = { ...grid };
     gl.activeTexture(gl.TEXTURE0 + LIGHT_UNIT);
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
@@ -72,6 +75,18 @@ export class LightPass {
     gl.bindVertexArray(null);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.activeTexture(gl.TEXTURE0);
+  }
+
+  /** Forgets the last light map: the frame is not darkened. */
+  clear(): void {
+    this.grid = null;
+  }
+
+  /** The red of the light of a grid tile in the last light map, 255 off the grid or when it was not darkened (client: LightView::getBrightness). */
+  brightness(gridX: number, gridY: number): number {
+    const grid = this.grid;
+    if (!grid || gridX < grid.x || gridY < grid.y || gridX >= grid.x + grid.width || gridY >= grid.y + grid.height) return 255;
+    return this.pixels[((gridY - grid.y) * grid.width + (gridX - grid.x)) * 4];
   }
 
   dispose(): void {

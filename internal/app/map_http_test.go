@@ -73,10 +73,10 @@ func TestGeoChunk(t *testing.T) {
 	if u32(24+n*16) != ids[0] {
 		t.Fatalf("sprite list %d", u32(24+n*16))
 	}
-	// The grounds hide the light under them (128 bytes of shade bits); the empty chunk follows.
+	// The grounds hide the light under them (three planes of 128 bytes of shade bits); the empty chunk follows.
 	shadeBytes := int(u32(24 + n*16 + 4))
 	rest := b[24+n*16+4+4+shadeBytes:]
-	if shadeBytes != 128 || len(rest) != 28 || binary.LittleEndian.Uint32(rest[4:]) != 0 {
+	if shadeBytes != 384 || len(rest) != 28 || binary.LittleEndian.Uint32(rest[4:]) != 0 {
 		t.Fatalf("empty chunk %v", rest)
 	}
 	// A block of 4x4 chunks from (0, 0) holds the square, placed from the block's corner.

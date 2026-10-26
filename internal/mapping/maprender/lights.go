@@ -9,8 +9,10 @@ import (
 )
 
 // What the light of the map is built from, as the client (OTClient) does:
-// item lights at the center of the item's drawn pixels, and tiles that
-// hide the light of the floors under them (Tile::canShade).
+// item lights at the center of the item's drawn pixels, tiles that hide
+// the light of the floors under them (Tile::canShade) or only dim it (a
+// translucent thing on them, Tile::hasTranslucentThing), and tiles with a
+// ground, where the light of their floor shines fully (LightView::markGround).
 
 // maxSeeThroughPixels is how many fully transparent pixels a sprite may
 // have and still count as opaque (client: Image::loadPNG, sprite sheets).
@@ -199,10 +201,45 @@ func (b *geometryBuilder) isSpriteOpaque(id uint32, spriteSize int) bool {
 	return true
 }
 
-// shade marks the tile being drawn as one that hides the light under it.
-func (b *geometryBuilder) shade() {
+// The bit planes of the shades of a chunk, one bit per tile each (see
+// geometryBuilder.shades).
+const (
+	shadePlane = iota
+	translucentPlane
+	groundPlane
+	shadePlanes
+)
+
+// shade sets the bit of the tile being drawn in a plane of the shades.
+func (b *geometryBuilder) shade(plane int) {
 	size := max(b.options.Block, 1) << otmap.ChunkBits
-	bit := int(b.tileY)*size + int(b.tileX)
+	bit := plane*size*size + int(b.tileY)*size + int(b.tileX)
 	b.shades[bit>>3] |= 1 << (bit & 7)
 	b.hasShades = true
+}
+
+// hasGround reports whether a tile's first thing is a ground (client:
+// Tile::getGround).
+func (b *geometryBuilder) hasGround(tile *otmap.Tile) bool {
+	if tile.Ground.ID == 0 {
+		return false
+	}
+	look := b.itemLook(tile.Ground)
+	return look != nil && look.ground
+}
+
+// hasTranslucentThing reports whether a tile has a translucent ground or
+// item (client: Tile::hasTranslucentThing).
+func (b *geometryBuilder) hasTranslucentThing(tile *otmap.Tile) bool {
+	if tile.Ground.ID != 0 {
+		if look := b.itemLook(tile.Ground); look != nil && look.translucent {
+			return true
+		}
+	}
+	for _, item := range tile.Items {
+		if look := b.itemLook(item); look != nil && look.translucent {
+			return true
+		}
+	}
+	return false
 }

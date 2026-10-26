@@ -148,8 +148,9 @@ type thingLook struct {
 	lightLevel, lightColor uint8
 	// lightOrigins caches lightOrigin by pattern.
 	lightOrigins map[int]lightOrigin
-	// ground, groundBorder and fullGround are client flags (see canShade).
-	ground, groundBorder, fullGround bool
+	// ground, groundBorder, fullGround and translucent are client flags
+	// (see canShade).
+	ground, groundBorder, fullGround, translucent bool
 	// opacity: opacityUnknown until isOpaque computes it.
 	opacity uint8
 }
@@ -172,8 +173,10 @@ type geometryBuilder struct {
 	composedCount int
 	lights        []byte
 	lightCount    int
-	// shades marks the tiles that hide the light of the floors under them
-	// (see canShade), row by row, one bit each.
+	// shades holds shadePlanes bit planes, each one bit per tile row by
+	// row: the tiles that hide the light of the floors under them (see
+	// canShade), those of them that only dim it (hasTranslucentThing) and
+	// the tiles with a ground (hasGround).
 	shades    []byte
 	hasShades bool
 	sprites   map[uint32]struct{}
@@ -240,7 +243,7 @@ func (b *geometryBuilder) lookOf(category thing.Category, id uint32) *thingLook 
 	if found, err := b.scene.Things.Thing(category, id); err == nil && len(found.FrameGroups) > 0 {
 		group := found.FrameGroups[0]
 		if group.PatternX > 0 && group.PatternY > 0 && group.PatternZ > 0 && group.Width > 0 && group.Height > 0 && group.Layers > 0 {
-			look = &thingLook{frameGroup: group, hangable: found.Props.Hangable, ground: found.Props.Ground, groundBorder: found.Props.GroundBorder, fullGround: found.Props.FullGround}
+			look = &thingLook{frameGroup: group, hangable: found.Props.Hangable, ground: found.Props.Ground, groundBorder: found.Props.GroundBorder, fullGround: found.Props.FullGround, translucent: found.Props.Translucent}
 			if found.Props.HasOffset {
 				look.offsetX, look.offsetY = int(found.Props.OffsetX), int(found.Props.OffsetY)
 			}
@@ -517,7 +520,13 @@ func (b *geometryBuilder) tile(tile *otmap.Tile, position tilePosition, anchorX,
 	hook := b.tileHook(tile)
 	elevation := 0
 	if b.canShade(tile) {
-		b.shade()
+		b.shade(shadePlane)
+		if b.hasTranslucentThing(tile) {
+			b.shade(translucentPlane)
+		}
+	}
+	if b.hasGround(tile) {
+		b.shade(groundPlane)
 	}
 	if tile.Ground.ID != 0 {
 		elevation += b.item(tile.Ground, position, anchorX, anchorY, color.scaled(selectionDim(tile.Ground)), hook)
@@ -588,8 +597,8 @@ func (b *geometryBuilder) skip(itemType *otitems.Type) bool {
 //	quad, u32 client item id, u32 frame 0 sprite index), composed pieces
 //	(u32 quad, u32 sprite, u32 template sprite, u8 head, body, legs, feet),
 //	sprite ids (u32 each, every plain sprite the quads use), light sources
-//	(8 bytes each, see light), then u32 shade bytes and the shade bits
-//	(see shades; none when no tile hides the light under it).
+//	(8 bytes each, see light), then u32 shade bytes and the shade bit
+//	planes (see shades; none when no tile has a bit set).
 func (b *geometryBuilder) chunk(key otmap.ChunkKey, out []byte) []byte {
 	b.quads, b.quadCount = b.quads[:0], 0
 	b.animated, b.animatedCount = b.animated[:0], 0
@@ -614,7 +623,8 @@ func (b *geometryBuilder) chunk(key otmap.ChunkKey, out []byte) []byte {
 	// the tile left of it, which the tile below-left of it (on the same
 	// diagonal) reaches too and is drawn before it.
 	size := block << otmap.ChunkBits
-	b.shades, b.hasShades = slices.Grow(b.shades[:0], size*size/8)[:size*size/8], false
+	shadeBytes := shadePlanes * size * size / 8
+	b.shades, b.hasShades = slices.Grow(b.shades[:0], shadeBytes)[:shadeBytes], false
 	clear(b.shades)
 	spriteSize := b.scene.SpriteSize
 	for diagonal := 0; found && diagonal < 2*size-1; diagonal++ {

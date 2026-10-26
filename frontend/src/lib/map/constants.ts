@@ -70,9 +70,10 @@ export const PLAY = {
   playerRank: 0.25,
   /** Most a tile raises the things on it (setup.otml max-elevation). */
   maxElevation: 24,
-  /** World light below which the player gives its own light, and that light (Creature::draw). */
-  darkWorldLight: 64,
+  /** The white light the player has when its own is weaker (Creature::drawLight). */
   playerLight: 2,
+  /** The shown world light moves one step towards the server's every this many ms (Map::fadeAmbientLight). */
+  worldLightStepMs: 1000,
   /** World light of the server by day and by night (TFS LIGHT_LEVEL_DAY / NIGHT). */
   dayLight: 250,
   nightLight: 40,

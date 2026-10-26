@@ -79,7 +79,7 @@ export interface Label {
   cull?: boolean;
   /** Drawn over the others, which keep clear of it (labels under the mouse). */
   top?: boolean;
-  /** Moved sideways to stay inside the view (names over creatures in the play view). */
+  /** Moved sideways to stay a screen pixel inside the view (names over creatures in the play view, see nameLeft). */
   clampX?: boolean;
   /** y is the letters' baseline instead of the text's bottom (names placed to the pixel). */
   baseline?: boolean;

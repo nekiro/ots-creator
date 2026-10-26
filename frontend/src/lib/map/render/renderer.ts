@@ -14,7 +14,7 @@ import { ALPHA, BLOCK_CHUNKS, COLORS, DEPTH_RANGE, GROUND_FLOOR, LIGHT_REACH, LI
 import { GEO, GEO_BLOCK, encodeGeoSignature, geoBits, type GeoChunk } from "./geo";
 import { ambientIntensity, DAYLIGHT_INTENSITY, WHITE_LIGHT_COLOR, type ExtraLight } from "./lightMap";
 import { walkingTileOffset } from "../play/walk";
-import { BAR_COLORS, healthRect, INFO_COLORS, infoLayout, manaBar, NAME_BASELINE } from "./creatureInfo";
+import { BAR_COLORS, healthRect, INFO_COLORS, infoLayout, litInfoColor, manaBar, NAME_BASELINE } from "./creatureInfo";
 import { wholePixelRatio } from "./labels";
 import { AF } from "../data/appearances";
 import { TileFlags, type CreatureData } from "../data/chunks";
@@ -209,17 +209,21 @@ export class MapRenderer {
     if (!play.names && !play.healthBars) return;
     const px = wholePixelRatio(globalThis.devicePixelRatio);
     const half = scene.spriteSize / 2;
+    const parts = { names: play.names, bars: play.healthBars, manaBar: play.manaBar };
+    const shift = camera.shift(play.z);
     const info = (creature: CreatureData, x: number, y: number, z: number, offsetX: number, offsetY: number, elevation: number, isPlayer: boolean) => {
       const look = this.displacedLook(scene, creature);
       const pointX = camera.tileX(x, z) + Math.round(offsetX * scene.scale) + (half - (look?.offsetX ?? 0) - elevation) * scene.scale;
       const pointY = camera.tileY(y, z) + Math.round(offsetY * scene.scale) + (-(look?.offsetY ?? 0) - 2 - elevation) * scene.scale;
-      const layout = infoLayout(pointX, pointY, px, scene.width, scene.height, isPlayer);
+      const layout = infoLayout(pointX, pointY, px, scene.width, scene.height, isPlayer, parts);
       const covered = !isPlayer && this.isCovered(scene, x, y, z, play.firstFloor);
-      const health = covered ? BAR_COLORS.covered : BAR_COLORS.health;
+      // The light of the creature's field (its position while it walks).
+      const brightness = this.lights.brightness(x - shift, y - shift);
+      const [red, green, blue] = litInfoColor(covered ? INFO_COLORS.covered : INFO_COLORS.fullHealth, brightness, isPlayer ? 0 : undefined);
       if (play.healthBars && (!creature.npc || play.npcHealthBars)) {
         this.batch.rect(layout.bar.x, layout.bar.y, layout.bar.width, layout.bar.height, BAR_COLORS.background);
         const bar = healthRect(layout.bar, px, 100);
-        this.batch.rect(bar.x, bar.y, bar.width, bar.height, health);
+        this.batch.rect(bar.x, bar.y, bar.width, bar.height, [red / 255, green / 255, blue / 255, 1]);
         if (isPlayer && play.manaBar) {
           const mana = manaBar(layout.bar, px);
           this.batch.rect(mana.x, mana.y, mana.width, mana.height, BAR_COLORS.background);
@@ -228,8 +232,7 @@ export class MapRenderer {
         }
       }
       if (play.names) {
-        const color = covered ? INFO_COLORS.covered : INFO_COLORS.fullHealth;
-        result.labels.push({ x: pointX, y: layout.nameTop + NAME_BASELINE * px, text: creature.name, color, clampX: true, baseline: true });
+        result.labels.push({ x: layout.nameCenter, y: layout.nameTop + NAME_BASELINE * px, text: creature.name, color: `rgb(${red}, ${green}, ${blue})`, clampX: true, baseline: true });
       }
     };
     // Only the camera floor: MapPosInfo::isInRange rejects any other z.
@@ -293,17 +296,14 @@ export class MapRenderer {
   }
 
   /** The play view's light: the world light (none under ground), at least
-   * the ambient light option, and the player's own light in the dark
-   * (MapView::updateLight, Creature::draw). */
+   * the ambient light option, and the light the player always has, as it
+   * has none of its own (MapView::updateLight, Creature::drawLight). */
   private drawPlayLights(scene: Scene, camera: Camera, floors: number[], plan: ChunkPlan): void {
     const play = scene.play!;
     const world = play.z > GROUND_FLOOR ? 0 : play.worldLight;
     const ambient = Math.max(ambientIntensity(scene.opts.ambientLight), world);
-    const extra: ExtraLight[] = [];
-    if (world < PLAY.darkWorldLight || play.z > GROUND_FLOOR) {
-      const size = scene.spriteSize;
-      extra.push({ x: play.x + 0.5 + play.offsetX / size, y: play.y + 0.5 + play.offsetY / size, intensity: PLAY.playerLight, color: WHITE_LIGHT_COLOR });
-    }
+    const size = scene.spriteSize;
+    const extra: ExtraLight[] = [{ x: play.x + 0.5 + play.offsetX / size, y: play.y + 0.5 + play.offsetY / size, intensity: PLAY.playerLight, color: WHITE_LIGHT_COLOR }];
     this.drawLights(scene, camera, floors, plan, ambient, extra);
   }
 
@@ -311,14 +311,15 @@ export class MapRenderer {
    * lights of their items (previews and overlays drawn later stay lit).
    * extra: lights of the floor in view besides the items'. */
   private drawLights(scene: Scene, camera: Camera, floors: number[], plan: ChunkPlan, ambient: number, extra: ExtraLight[]): void {
+    this.lights.clear();
     if (ambient >= DAYLIGHT_INTENSITY) return;
     this.flushScreen(scene);
     const floor = scene.floor;
     const range = camera.tiles(floor, 1, 1);
     const shift = camera.shift(floor);
     const grid = { x: range.x0 - shift, y: range.y0 - shift, width: range.x1 - range.x0 + 1, height: range.y1 - range.y0 + 1 };
-    const lightFloors = floors.map((z) => ({ chunks: this.chunksLighting(scene, camera, z, plan), shift: camera.shift(z), extra: z === floor ? extra : [] }));
-    this.lights.draw(scene.width, scene.height, grid, camera.tileX(range.x0, floor), camera.tileY(range.y0, floor), camera.tilePx, lightFloors, ambient, scene.spriteSize);
+    const lightFloors = floors.map((z) => ({ z, chunks: this.chunksLighting(scene, camera, z, plan), shift: camera.shift(z), extra: z === floor ? extra : [] }));
+    this.lights.draw(scene.width, scene.height, grid, camera.tileX(range.x0, floor), camera.tileY(range.y0, floor), camera.tilePx, lightFloors, ambient, scene.spriteSize, floor);
     this.chunks.unbind();
   }
 
