@@ -107,6 +107,46 @@ func (p *Project) DuplicateThings(category thing.Category, ids []uint32) ([]uint
 	return out, nil
 }
 
+// PasteThings puts copies of the given things at the ids from at on, in
+// order, in one undo step: things already there are replaced and ids past
+// the end of the category extend it. It returns the ids written.
+func (p *Project) PasteThings(category thing.Category, at uint32, objects []*thing.Thing) ([]uint32, error) {
+	if !category.Valid() {
+		return nil, fmt.Errorf("invalid category %d", category)
+	}
+	if at < category.MinID() {
+		return nil, fmt.Errorf("%s id %d is below %d", category, at, category.MinID())
+	}
+	for _, object := range objects {
+		if object.Category != category {
+			return nil, fmt.Errorf("a %s cannot be pasted as a %s", object.Category, category)
+		}
+		if err := object.Validate(); err != nil {
+			return nil, err
+		}
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if at > p.things.MaxID(category)+1 {
+		return nil, fmt.Errorf("%s id %d is past the end (%d)", category, at, p.things.MaxID(category)+1)
+	}
+	for _, object := range objects {
+		if err := p.checkSpriteIDs(object); err != nil {
+			return nil, err
+		}
+	}
+	edit := p.record(fmt.Sprintf("Paste %d %s(s)", len(objects), category))
+	out := make([]uint32, 0, len(objects))
+	for i, object := range objects {
+		pasted := object.Clone()
+		pasted.ID = at + uint32(i)
+		edit.setThing(category, pasted.ID, keepExtra(pasted, p.things.Get(category, pasted.ID)))
+		out = append(out, pasted.ID)
+	}
+	edit.commit()
+	return out, nil
+}
+
 // RemoveThings removes things. The last thing of a category is deleted;
 // others are replaced with empty things so ids stay stable. The first id of
 // each category always remains.

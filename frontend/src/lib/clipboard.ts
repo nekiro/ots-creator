@@ -1,21 +1,27 @@
-// Object clipboard: copy a whole object or only its properties onto other
+// Object clipboard: copy whole objects or only properties onto other
 // objects. The copy is a plain snapshot, independent of later edits.
 import type { Properties, Thing } from "./api";
 
 export type PasteMode = "object" | "properties";
 
-let copied: Thing | null = null;
+let copied: Thing[] = [];
 
-export function copyThing(thing: Thing): void {
-  copied = JSON.parse(JSON.stringify(thing));
+export function copyThings(things: Thing[]): void {
+  copied = JSON.parse(JSON.stringify(things));
 }
 
-export function clipboardThing(): Thing | null {
+/** The copied objects; empty when nothing was copied. */
+export function clipboardThings(): Thing[] {
   return copied;
 }
 
+/** The copied object when exactly one was copied. */
+export function clipboardThing(): Thing | null {
+  return copied.length === 1 ? copied[0] : null;
+}
+
 export function clearClipboard(): void {
-  copied = null;
+  copied = [];
 }
 
 /**

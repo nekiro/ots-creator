@@ -96,6 +96,16 @@ func (ts *ThingService) Duplicate(category thing.Category, ids []uint32) (copies
 	return copies, err
 }
 
+// Paste puts copies of things at the ids from at on (see
+// project.PasteThings) and returns the ids written.
+func (ts *ThingService) Paste(category thing.Category, at uint32, things []*thing.Thing) (ids []uint32, err error) {
+	err = ts.editAll(func(proj *project.Project) (err error) {
+		ids, err = proj.PasteThings(category, at, things)
+		return err
+	})
+	return ids, err
+}
+
 // Remove removes things (see project.RemoveThings).
 func (ts *ThingService) Remove(category thing.Category, ids []uint32) error {
 	return ts.editAll(func(proj *project.Project) error { return proj.RemoveThings(category, ids) })

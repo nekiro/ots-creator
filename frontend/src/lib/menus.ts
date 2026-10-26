@@ -1,5 +1,5 @@
 // Menu entries shared by the menu bar and the list context menus.
-import { clipboardThing } from "./clipboard";
+import { clipboardThing, clipboardThings } from "./clipboard";
 import { commands } from "./commands";
 import type { MenuEntry } from "./menu.svelte";
 import { app, toast } from "./state/app.svelte";
@@ -9,7 +9,8 @@ const noProject = () => !app.open;
 const noThing = () => !app.open || app.selection.length === 0;
 const notSingle = () => !app.open || app.selection.length !== 1;
 const noSprite = () => !app.open || app.selectedSprites.length === 0;
-const noClip = () => noThing() || !clipboardThing();
+const noClip = () => noThing() || clipboardThings().length === 0;
+const noPropsClip = () => noThing() || !clipboardThing();
 /** The export format of objects, as shown in menus. */
 const fmt = () => (prefs.settings.objectFormat === "obd" ? "OBD" : "OTOBJ");
 
@@ -37,7 +38,7 @@ function clipboardEntries(): MenuEntry[] {
     { label: "Copy object", keys: "Ctrl+C", action: commands.copyObject, disabled: () => !app.draft },
     { label: "Copy sprite sheet", keys: "Ctrl+Shift+C", action: () => commands.copySheet(0), disabled: notSingle },
     { label: "Paste object", keys: "Ctrl+V", action: () => commands.paste("object"), disabled: noClip },
-    { label: "Paste properties", keys: "Ctrl+Shift+V", action: () => commands.paste("properties"), disabled: noClip },
+    { label: "Paste properties", keys: "Ctrl+Shift+V", action: () => commands.paste("properties"), disabled: noPropsClip },
   ];
 }
 

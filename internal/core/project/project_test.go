@@ -521,3 +521,36 @@ func TestImportOBDsTo(t *testing.T) {
 		t.Fatal("import should be one undoable edit")
 	}
 }
+
+func TestPasteThings(t *testing.T) {
+	project := New(v1098(), client.Features{})
+	project.AddThing(thing.CategoryItem) // 101
+	item := thing.New(5, thing.CategoryItem)
+	item.Props.Stackable = true
+	ids, err := project.PasteThings(thing.CategoryItem, 100, []*thing.Thing{item, item, item})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != 3 || ids[0] != 100 || ids[2] != 102 {
+		t.Fatalf("ids %v", ids)
+	}
+	for _, id := range ids {
+		got, _ := project.Thing(thing.CategoryItem, id)
+		if !got.Props.Stackable || got.ID != id {
+			t.Fatalf("pasted %+v", got)
+		}
+	}
+	if project.Info().Counts.Items != 102 {
+		t.Fatalf("count %d", project.Info().Counts.Items)
+	}
+	project.Undo()
+	if got, _ := project.Thing(thing.CategoryItem, 100); got.Props.Stackable || project.Info().Counts.Items != 101 {
+		t.Fatal("paste not undone")
+	}
+	if _, err := project.PasteThings(thing.CategoryItem, 103, []*thing.Thing{item}); err == nil {
+		t.Fatal("paste past the end")
+	}
+	if _, err := project.PasteThings(thing.CategoryOutfit, 1, []*thing.Thing{item}); err == nil {
+		t.Fatal("paste into another category")
+	}
+}
