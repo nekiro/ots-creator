@@ -3,7 +3,7 @@
   import { keyStep } from "../lib/ui/listNav";
   import { anchoredRange, idRange } from "../lib/util/selection";
   import { CATEGORIES, CATEGORY_LABELS, Format, errorMessage, minId, normalizeThing, res, ThingService } from "../lib/api";
-  import { commands, thingDropId } from "../lib/commands";
+  import { commands, moveSelection, thingDropId } from "../lib/commands";
   import { FLAG_GROUPS, flagVisible } from "../lib/flags";
   import { openContextMenu } from "../lib/menu.svelte";
   import { objectListMenu, objectMenu } from "../lib/menus";
@@ -127,6 +127,46 @@
     openContextMenu(event, objectMenu(true));
   }
 
+  // Dragging the selection onto an object moves it there: swap by default,
+  // insert before the object with Shift.
+  const DRAG_TYPE = "application/x-ots-objects";
+  let dragCount = $state(0);
+  let over = $state<number | null>(null);
+  let insert = $state(false);
+
+  function dragstart(event: DragEvent, id: number) {
+    if (!event.dataTransfer) return;
+    if (!app.selectionSet.has(id)) void select(id);
+    dragCount = app.selectionSet.has(id) ? app.selection.length : 1;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData(DRAG_TYPE, String(id));
+  }
+
+  function dragend() {
+    dragCount = 0;
+    over = null;
+  }
+
+  function dragover(event: DragEvent, id: number) {
+    if (!dragCount) return;
+    event.preventDefault();
+    over = id;
+    insert = event.shiftKey;
+  }
+
+  function drop(event: DragEvent, id: number) {
+    if (!dragCount) return;
+    event.preventDefault();
+    const shift = event.shiftKey;
+    dragend();
+    // Swapping the selection onto its own first object changes nothing.
+    if (!shift && id === Math.min(...app.selection)) return;
+    void moveSelection(id, shift);
+  }
+
+  /** Whether id is one of the targets of the dragged selection (swap). */
+  const landing = (id: number) => dragCount > 0 && over !== null && !insert && id >= over && id < over + dragCount;
+
   /** Rows Page Up and Page Down move. */
   const PAGE_ROWS = 8;
 
@@ -177,12 +217,19 @@
             class="thing"
             class:sel={app.selectionSet.has(id)}
             class:focus={app.focused === id}
+            class:landing={landing(id)}
+            class:insert={dragCount > 0 && insert && over === id}
+            draggable="true"
             title={names[id] ? `#${id} ${names[id]}` : `#${id}`}
             onclick={(event) => click(event, id)}
             onmouseenter={() => hover.enter(id)}
             onmouseleave={() => hover.leave()}
             ondblclick={() => select(id)}
             oncontextmenu={(event) => oncontextmenu(event, id)}
+            ondragstart={(event) => dragstart(event, id)}
+            ondragend={dragend}
+            ondragover={(event) => dragover(event, id)}
+            ondrop={(event) => drop(event, id)}
           >
             <span class="t-slot">
               {#if hover.current?.id === id}
@@ -268,6 +315,15 @@
   .thing:global(.file-drop-target-active) {
     border-color: var(--gold);
     background: rgba(255, 210, 90, 0.15);
+  }
+  /* Where a dragged selection lands: the swapped objects, or the object
+     it is inserted before (Shift). */
+  .thing.landing {
+    border-color: #8fd18f;
+    background: rgba(143, 209, 143, 0.15);
+  }
+  .thing.insert {
+    border-left: 3px solid var(--gold);
   }
   .t-slot img {
     max-width: 32px;

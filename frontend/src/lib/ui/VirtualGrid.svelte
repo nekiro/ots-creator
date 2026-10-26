@@ -53,6 +53,19 @@
     if (top < scroller.scrollTop) scroller.scrollTop = top;
     else if (top + rowHeight > scroller.scrollTop + scroller.clientHeight) scroller.scrollTop = top + rowHeight - scroller.clientHeight;
   });
+
+  /** Distance from the top or bottom edge that scrolls during a drag. */
+  const DRAG_EDGE = 40;
+
+  // Dragging near an edge scrolls, faster closer to it, so a drag can reach
+  // cells outside the view.
+  function ondragover(event: DragEvent) {
+    const bounds = scroller.getBoundingClientRect();
+    const fromTop = event.clientY - bounds.top;
+    const fromBottom = bounds.bottom - event.clientY;
+    if (fromTop < DRAG_EDGE) scroller.scrollTop -= Math.ceil((DRAG_EDGE - fromTop) / 2);
+    else if (fromBottom < DRAG_EDGE) scroller.scrollTop += Math.ceil((DRAG_EDGE - fromBottom) / 2);
+  }
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -63,6 +76,7 @@
   bind:clientWidth={width}
   bind:clientHeight={height}
   onscroll={() => (scrollTop = scroller.scrollTop)}
+  {ondragover}
   tabindex="0"
   onkeydown={(event) => onkeydown?.(event, columns)}
 >

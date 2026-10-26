@@ -13,6 +13,7 @@ import { spriteCommands } from "./commands/sprites";
 export { PREVIEW_DROP, thingDropId } from "./commands/classifyDrop";
 export { offerOptimize, openedNote, otbNote, sheetsNote } from "./commands/compile";
 export { handlePaste } from "./commands/objectClipboard";
+export { moveSelection } from "./commands/objects";
 
 export const commands = {
   ...projectCommands,
