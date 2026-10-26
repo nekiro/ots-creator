@@ -69,7 +69,9 @@ body {
   font: var(--fs) / 16px var(--font);
   font-synthesis: none;
   color: var(--text);
-  background: #232323 url("./assets/ui/background_dark.png") repeat;
+  /* Smaller than the 96px tile: at 2x the client shows it at ~135 screen pixels,
+     where a full-size tile makes the pattern stand out. */
+  background: #232323 url("./assets/ui/background.png") 0 0 / 67.5px repeat;
   user-select: none;
   -webkit-font-smoothing: none;
   text-rendering: optimizeSpeed;
