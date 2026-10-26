@@ -36,6 +36,7 @@
   import Splitter from "./lib/ui/Splitter.svelte";
   import ContextMenu from "./lib/ui/ContextMenu.svelte";
   import ConfirmDialog from "./lib/ui/ConfirmDialog.svelte";
+  import PromptDialog from "./lib/ui/PromptDialog.svelte";
   import { WindowService, type FilesDropped } from "./lib/api";
   import Toasts from "./lib/ui/Toasts.svelte";
   import MapEditor from "./features/map/MapEditor.svelte";
@@ -184,6 +185,7 @@
 {#if app.dialog === "itemsOtb" && app.open}<ItemsOtbDialog />{/if}
 {#if app.dialog === "share" && app.shareTarget && (app.open || app.shareTarget.kind === "file")}<ShareDialog />{/if}
 <ConfirmDialog />
+<PromptDialog />
 <BusyOverlay />
 <Toasts />
 <ContextMenu />

@@ -8,7 +8,6 @@
   import { loadMapData, map } from "../../lib/map/state.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import MiniWindow from "../../lib/ui/MiniWindow.svelte";
-  import PromptDialog from "../../lib/ui/PromptDialog.svelte";
   import Splitter from "../../lib/ui/Splitter.svelte";
   import CommandPalette from "./CommandPalette.svelte";
   import FindPanel from "./FindPanel.svelte";
@@ -181,7 +180,6 @@
 </main>
 
 <MapDialogs />
-<PromptDialog />
 {#if map.loading}<LoadingMap />{/if}
 {#if map.command !== null}<CommandPalette />{/if}
 
