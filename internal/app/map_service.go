@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 
 	"github.com/nekiro/ots-creator/internal/core/otitems"
 	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
+	"github.com/nekiro/ots-creator/internal/mapping/suggest"
 )
 
 var ErrNoMap = errors.New("the map is not open")
@@ -20,6 +22,10 @@ type openMap struct {
 	editor *mapedit.Editor
 	// clientData is retained across Undo/Redo of ID conversion.
 	clientData *mapData
+	// suggestions counts which items go together (see map_suggest.go);
+	// indexing is set while a goroutine counts the changed chunks.
+	suggestions *suggest.Index
+	indexing    atomic.Bool
 }
 
 func (m *openMap) name() string {
@@ -45,6 +51,8 @@ type MapService struct {
 	clipboard     *mapedit.Clip
 	clipboardMode otitems.Mode
 	activeID      int
+	// looks keeps the sprite looks of items for finding look-alikes.
+	looks lookCache
 }
 
 func NewMapService(session *Session, store *MapStore) *MapService {

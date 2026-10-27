@@ -2,6 +2,7 @@
   import { commands } from "../lib/commands";
   import { app } from "../lib/state/app.svelte";
   import { map, warningCount } from "../lib/map/state.svelte";
+  import { keyLabel } from "../lib/map/view/keys";
   import { plural } from "../lib/util/format";
 
   let { mapHover = "" }: { mapHover?: string } = $props();
@@ -28,6 +29,7 @@
       {#if activeMap.selection}<span>Selected <b>{activeMap.selection.toLocaleString()}</b>{#if activeMap.selection > 1} <span class="t-label">({activeMap.selMax.x - activeMap.selMin.x + 1}×{activeMap.selMax.y - activeMap.selMin.y + 1})</span>{/if}</span>{/if}
       <span class="sep"></span>
       <span class="hover">{mapHover}</span>
+      {#if mapHover}<span class="t-label keys">{keyLabel("suggest")}: suggestions · Tab: variants</span>{/if}
     {:else if map.mode === "map"}
       <span class="t-label">{app.open ? "No map open" : "No client loaded"}</span>
     {:else if info && app.open}

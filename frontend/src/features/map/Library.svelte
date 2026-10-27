@@ -14,6 +14,7 @@
   import VirtualGrid from "../../lib/ui/VirtualGrid.svelte";
   import BrushPreview from "./BrushPreview.svelte";
   import ItemIcon from "./ItemIcon.svelte";
+  import SuggestStrip from "./SuggestStrip.svelte";
 
   type View = "terrain" | "decor" | "items" | "creatures";
   const VIEWS: { id: View; label: string; title: string }[] = [
@@ -352,6 +353,7 @@
     </div>
   {/if}
 
+  <SuggestStrip />
   {#if map.recentBrushes.length}
     <div class="recent" title="Recently used: keys 1-9">
       {#each map.recentBrushes.slice(0, 9) as brush, i}

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { mapCommands } from "../../lib/map/view/commands";
+  import { keyLabel } from "../../lib/map/view/keys";
   import { creatureOutfit, map, selectBrush, type BrushSel } from "../../lib/map/state.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import Select from "../../lib/ui/Select.svelte";
@@ -7,6 +8,7 @@
   import ItemIcon from "./ItemIcon.svelte";
 
   const brush = $derived(map.brush);
+  const SUGGEST_PICK = "Click a tile to see what fits there";
   const isDoodad = $derived(brush?.kind === "doodad");
   const isCreature = $derived(brush?.kind === "creature");
   const sized = $derived(!!brush && !["door", "houseExit", "waypoint", "creature"].includes(brush.kind));
@@ -73,6 +75,12 @@
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8l5-5 5 5-5 5z M13 10c0 2 1 3 1 4a1 1 0 0 1-2 0c0-1 1-2 1-4" /></svg>
     </button>
     <button class="t-btn sm" class:on={!!map.settings?.automagic} title="Automatic borders and walls (A)" onclick={mapCommands.toggleAutomagic}>Auto</button>
+    <button
+      class="t-btn sm"
+      class:on={!!map.suggest || map.pick?.label === SUGGEST_PICK}
+      title="Suggest items for a tile ({keyLabel('suggest')} over the map): what the map shows in places like it. Tab over an item swaps it for its variants."
+      onclick={() => (map.pick = { label: SUGGEST_PICK, done: (position) => (map.suggest = position) })}>Suggest</button
+    >
   </div>
   <span class="t-vsep"></span>
   <div class="grp brush" title={brush ? brush.label : "No brush"}>

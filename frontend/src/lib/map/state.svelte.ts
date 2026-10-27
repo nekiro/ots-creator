@@ -115,6 +115,8 @@ class MapState {
   view = $state<ViewOptions>(loadJson(VIEW_KEY, DEFAULT_VIEW));
   cams = $state<Record<number, Camera>>({});
   hover = $state.raw<Position | null>(null);
+  /** Tile the suggestion popup suggests items for; null closed. */
+  suggest = $state.raw<Position | null>(null);
   inspect = $state.raw<Position | null>(null);
   tile = $state.raw<TileInfo | null>(null);
   /** Inspector content; null shows the map. */

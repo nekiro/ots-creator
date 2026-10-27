@@ -15,6 +15,7 @@ import (
 	"github.com/nekiro/ots-creator/internal/fsutil"
 	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
+	"github.com/nekiro/ots-creator/internal/mapping/suggest"
 )
 
 const (
@@ -84,7 +85,7 @@ func (ms *MapService) add(gameMap *otmap.Map, path string, data *mapData) *openM
 	editor := mapedit.New(gameMap, data.items, data.brushes)
 	editor.Settings = ms.store.EditorSettings()
 	editor.RebuildSelection()
-	opened := &openMap{id: ms.lastID, path: path, editor: editor}
+	opened := &openMap{id: ms.lastID, path: path, editor: editor, suggestions: suggest.New()}
 	ms.maps[opened.id] = opened
 	return opened
 }

@@ -31,6 +31,7 @@ export const KEY_ACTIONS: KeyAction[] = [
   { id: "sizeDown", group: "Drawing", label: "Smaller brush", keys: ["["], run: () => (map.size = Math.max(0, map.size - 1)), repeat: true },
   { id: "sizeUp", group: "Drawing", label: "Bigger brush", keys: ["]"], run: () => (map.size = Math.min(MAX_BRUSH_SIZE, map.size + 1)), repeat: true },
   { id: "shape", group: "Drawing", label: "Square or round brush", keys: ["Q"], run: () => (map.shape = map.shape === "square" ? "circle" : "square") },
+  { id: "suggest", group: "Drawing", label: "Suggest items for the tile under the cursor", keys: ["W"], run: () => (map.suggest = map.hover) },
   { id: "automagic", group: "Drawing", label: "Automatic borders and walls", keys: ["A"], run: mapCommands.toggleAutomagic },
 
   { id: "select", group: "Selection", label: "Selection tool", keys: ["S"], run: () => ((map.tool = "select"), (map.pasting = false)) },
@@ -76,6 +77,9 @@ export const FIXED_KEYS: { group: KeyGroup; keys: string; label: string }[] = [
   { group: "Drawing", keys: "Alt + wheel", label: "Brush size" },
   { group: "Drawing", keys: "Right click", label: "Drop the brush, back to selection (with selection: the tile menu)" },
   { group: "Drawing", keys: "1 – 9", label: "Recent brushes" },
+  { group: "Drawing", keys: "Tab / Shift + Tab", label: "Swap the item under the cursor for its next / previous variant" },
+  { group: "Drawing", keys: "Ctrl + click (suggestions)", label: "Pick several suggestions, Enter paints a mix of them" },
+  { group: "Drawing", keys: "Enter (after a part)", label: "Add the rest of an object made of several items" },
   { group: "Selection", keys: "Drag", label: "Select a box (drag the selection to move it)" },
   { group: "Selection", keys: "Ctrl + click", label: "Add or remove the top thing" },
   { group: "Selection", keys: "Shift + drag", label: "Box selection; Ctrl adds, Alt removes" },

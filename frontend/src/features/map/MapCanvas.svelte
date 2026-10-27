@@ -4,13 +4,13 @@
   import { openContextMenu, type MenuEntry } from "../../lib/menu.svelte";
   import { spriteCache } from "../../lib/render/sprites";
   import { app, toast } from "../../lib/state/app.svelte";
-  import { MapService, type Clip, type DoodadBuffer, type DrawRequest, type Position } from "../../lib/map/data/api";
+  import { MapService, samePos, type Clip, type DoodadBuffer, type DrawRequest, type PlacedItem, type Position } from "../../lib/map/data/api";
   import { Appearances } from "../../lib/map/data/appearances";
   import { ChunkStore, TileFlags } from "../../lib/map/data/chunks";
   import { GeoStore } from "../../lib/map/render/geo";
   import { rendered } from "../../lib/map/render/rendered";
   import { mapCommands, spriteSize } from "../../lib/map/view/commands";
-  import { DRAG_THRESHOLD, FPS_POLL_MS, GHOST_ALPHA, MAX_BRUSH_SIZE, RECT_BRUSH_KINDS, REDRAW_DELAY, SMEAR_BRUSH_KINDS, WHEEL_PAN_TILES } from "../../lib/map/constants";
+  import { DRAG_THRESHOLD, FPS_POLL_MS, GHOST_ALPHA, MAX_BRUSH_SIZE, PREVIEW_COLORS, RECT_BRUSH_KINDS, REDRAW_DELAY, SMEAR_BRUSH_KINDS, WHEEL_PAN_TILES } from "../../lib/map/constants";
   import { computePreview, type MapDrag } from "../../lib/map/editor/ghostPreview";
   import { describeTile } from "../../lib/map/editor/hoverText";
   import { drawLabels, loadLabelFonts } from "../../lib/map/render/labels";
@@ -21,8 +21,11 @@
   import { isTyping } from "../../lib/ui/typing";
   import { applyChange, edit, map, onMapChange, selectBrush, setCam, useCreature, type BrushSel } from "../../lib/map/state.svelte";
   import { mapContextMenu, openText, readableIndex } from "../../lib/map/view/menus";
+  import { TOP_ORDER } from "../../lib/map/data/items";
+  import { toCss } from "../../lib/pixelscale";
   import FloorLadder from "./FloorLadder.svelte";
   import SelectionBar from "./SelectionBar.svelte";
+  import SuggestPopup from "./SuggestPopup.svelte";
   import ZoomControl from "./ZoomControl.svelte";
 
   let { hoverText = $bindable("") }: { hoverText?: string } = $props();
@@ -112,6 +115,12 @@
       creatures: map.palette?.creatures,
       direction: map.direction,
     });
+    if (completion) {
+      for (const part of completion.parts) {
+        ghosts.push({ x: part.pos.x, y: part.pos.y, z: part.pos.z, ids: [part.item] });
+        rects.push({ x0: part.pos.x, y0: part.pos.y, x1: part.pos.x, y1: part.pos.y, z: part.pos.z, ...PREVIEW_COLORS.singleTile });
+      }
+    }
     let result;
     try {
       result = renderer.render({
@@ -250,6 +259,7 @@
     if (map.activeId === null) return;
     canvas!.setPointerCapture(event.pointerId);
     readModifiers(event);
+    if (completion && event.button === 0) setCompletion(null);
     const tile = tileAt(event);
     if (event.button === 1 || event.button === 2 || (event.button === 0 && spaceHeld)) {
       event.preventDefault();
@@ -306,10 +316,15 @@
     }
     const smear = SMEAR_BRUSH_KINDS.has(brush.kind) || (brush.kind === "doodad" && !!map.palette);
     if (smear) {
+      paintStart = tile;
       drag = { kind: "paint", last: tile, stroke: ++strokeSeq, pending: [tile], erase: modifiers.ctrl, alt: modifiers.alt, inflight: false };
       void flushPaint();
     } else {
-      void send(request(brush, { points: [tile], erase: modifiers.ctrl, alt: modifiers.alt, stroke: ++strokeSeq }));
+      const erase = modifiers.ctrl;
+      const stroke = ++strokeSeq;
+      void send(request(brush, { points: [tile], erase, alt: modifiers.alt, stroke })).then((change) => {
+        if (change && !erase) offerCompletions(brush, tile, stroke);
+      });
     }
   }
 
@@ -333,6 +348,7 @@
       requestDraw();
       return;
     }
+    pointer = { x: event.clientX, y: event.clientY };
     const tile = tileAt(event);
     const changed = !map.hover || map.hover.x !== tile.x || map.hover.y !== tile.y || map.hover.z !== tile.z;
     if (changed) {
@@ -368,6 +384,10 @@
         else if (map.tool === "brush") map.tool = "select";
         else showMenu(event, tile);
       }
+    } else if (ended.kind === "paint" && !ended.erase && map.brush && samePos(paintStart, ended.last)) {
+      const brush = map.brush;
+      // The last request of the stroke may still be on its way.
+      void waitPaint(ended).then(() => offerCompletions(brush, ended.last, ended.stroke));
     } else if (ended.kind === "rect" && map.brush) {
       void send(request(map.brush, { rect: { from: ended.start, to: ended.cur }, erase: ended.erase, alt: ended.alt, stroke: ++strokeSeq }));
     } else if (ended.kind === "box") {
@@ -406,11 +426,146 @@
   function onkey(event: KeyboardEvent) {
     const was = { ...modifiers };
     readModifiers(event);
+    if (event.type === "keydown" && event.key === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey && !isTyping(event) && map.mode === "map" && !map.dialog && map.hover) {
+      event.preventDefault();
+      cycleVariant(event.shiftKey ? -1 : 1);
+    }
     if (event.code === "Space" && !isTyping(event)) {
       spaceHeld = event.type === "keydown";
       if (map.mode === "map" && map.activeId !== null) event.preventDefault();
     }
     if (was.ctrl !== modifiers.ctrl || was.shift !== modifiers.shift) requestDraw();
+  }
+
+  // Tab swaps the top item of the tile under the cursor (the ground when
+  // only borders lie on it) for the next item of its family. The family of
+  // the first item is kept while stepping, and the swaps of one tile are one
+  // undo step.
+  let cycle: { key: string; family: number[]; at: number; stroke: number } | null = null;
+  let cycleSteps = 0;
+  let cycling = false;
+  let variantHint = $state("");
+  let variantHintTimer = 0;
+  const VARIANT_HINT_MS = 1500;
+
+  function swapTarget(tile: Position): { index: number; id: number } | null {
+    const id = map.activeId;
+    const items = map.items;
+    if (id === null || !items) return null;
+    const tileData = store(id).peekTile(tile.x, tile.y, tile.z);
+    if (!tileData || !tileData.ids.length) return null;
+    const ground = tileData.flags & TileFlags.ground ? 1 : 0;
+    for (let i = tileData.ids.length - 1; i >= ground; i--) {
+      if (items.top[tileData.ids[i]] !== TOP_ORDER.border) return { index: i - ground, id: tileData.ids[i] };
+    }
+    return ground ? { index: -1, id: tileData.ids[0] } : null;
+  }
+
+  function showVariantHint(text: string) {
+    variantHint = text;
+    clearTimeout(variantHintTimer);
+    variantHintTimer = window.setTimeout(() => (variantHint = ""), VARIANT_HINT_MS);
+  }
+
+  function cycleVariant(step: number) {
+    cycleSteps += step;
+    if (!cycling) void runCycle();
+  }
+
+  async function runCycle() {
+    cycling = true;
+    try {
+      while (cycleSteps !== 0) {
+        const step = cycleSteps;
+        cycleSteps = 0;
+        const id = map.activeId;
+        const tile = map.hover;
+        const target = tile && swapTarget(tile);
+        if (id === null || !tile || !target) return;
+        const key = `${id}:${tile.x}:${tile.y}:${tile.z}:${target.index}`;
+        if (!cycle || cycle.key !== key || !cycle.family.includes(target.id)) {
+          const family = (await MapService.Variants(id, target.id)) ?? [];
+          if (family.length < 2) {
+            showVariantHint(`${map.items?.name(target.id) ?? target.id}: no variants`);
+            return;
+          }
+          cycle = { key, family, at: 0, stroke: ++strokeSeq };
+        }
+        const length = cycle.family.length;
+        cycle.at = (((cycle.at + step) % length) + length) % length;
+        const next = cycle.family[cycle.at];
+        const stroke = cycle.stroke;
+        const change = await edit((mapId) => MapService.SwapItem(mapId, { pos: tile, index: target.index, path: [] }, next, stroke));
+        if (!change) return;
+        showVariantHint(`${cycle.at + 1}/${length} · ${map.items?.name(next) ?? next}`);
+      }
+    } finally {
+      cycling = false;
+      cycleSteps = 0;
+    }
+  }
+
+  // Placing one part of an object made of several items (a raw item, on
+  // one tile) shows the other parts as the map has them, as ghosts: Enter
+  // adds them to the same undo step, anything else drops them.
+  let completion: { parts: PlacedItem[]; stroke: number } | null = null;
+  let completionShown = $state(false);
+  let paintStart: Position | null = null;
+
+  function setCompletion(next: typeof completion) {
+    completion = next;
+    completionShown = !!next;
+    requestDraw();
+  }
+
+  async function waitPaint(paint: { inflight: boolean; pending: Position[] }) {
+    while (paint.inflight || paint.pending.length) await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+
+  async function offerCompletions(brush: BrushSel, tile: Position, stroke: number) {
+    const id = map.activeId;
+    if (id === null || brush.kind !== "raw" || !brush.item || map.size !== 0) return;
+    try {
+      const parts = (await MapService.Completions(id, tile, brush.item)) ?? [];
+      if (parts.length && map.activeId === id) setCompletion({ parts, stroke });
+    } catch {
+      // Completions are a hint: without them nothing changes.
+    }
+  }
+
+  async function acceptCompletion() {
+    const accepted = completion;
+    setCompletion(null);
+    if (accepted) await edit((id) => MapService.PlaceItems(id, accepted.parts, accepted.stroke));
+  }
+
+  // While the ghosts show, Enter and Esc are theirs, before the map
+  // shortcuts (Esc would also drop the brush).
+  $effect(() => {
+    if (!completionShown) return;
+    const onkeydown = (event: KeyboardEvent) => {
+      if (isTyping(event) || (event.key !== "Enter" && event.key !== "Escape")) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.key === "Enter") void acceptCompletion();
+      else setCompletion(null);
+    };
+    window.addEventListener("keydown", onkeydown, true);
+    return () => window.removeEventListener("keydown", onkeydown, true);
+  });
+
+  // The suggestion popup opens at the pointer.
+  let pointer = { x: 0, y: 0 };
+  let suggestAnchor = $state({ x: 0, y: 0 });
+  $effect(() => {
+    if (map.suggest) suggestAnchor = { x: toCss(pointer.x), y: toCss(pointer.y) };
+  });
+
+  function placeSuggestion(brush: BrushSel, tile: Position) {
+    const stroke = ++strokeSeq;
+    void send(request(brush, { points: [tile], size: 0, stroke })).then((change) => {
+      if (change) offerCompletions(brush, tile, stroke);
+    });
   }
 
   function updateHoverText(tile: Position) {
@@ -481,6 +636,7 @@
     });
     resizeObserver.observe(host!);
     const offChange = onMapChange((id, change) => {
+      if (completion) setCompletion(null);
       stores.get(id)?.invalidate(change.all ? null : (change.chunks ?? []), change.info?.rev ?? 0);
       geos.get(id)?.invalidate(change.all ? null : (change.chunks ?? []));
       if (id === map.activeId) requestDraw();
@@ -546,6 +702,14 @@
   <FloorLadder />
   <ZoomControl />
   <SelectionBar />
+  {#if map.suggest}
+    <SuggestPopup tile={map.suggest} x={suggestAnchor.x} y={suggestAnchor.y} place={placeSuggestion} />
+  {/if}
+  {#if completionShown}
+    <div class="varianthint">Enter adds the rest of the object · Esc drops it</div>
+  {:else if variantHint}
+    <div class="varianthint">{variantHint}</div>
+  {/if}
   {#if map.pick}
     <div class="pickhint">{map.pick.label} · Esc cancels</div>
   {:else if map.pasting}
@@ -581,6 +745,17 @@
     display: block;
   }
   .labels {
+    pointer-events: none;
+  }
+  .varianthint {
+    position: absolute;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 3px 10px;
+    background: rgba(0, 0, 0, 0.75);
+    border: 1px solid var(--gold);
+    color: var(--gold);
     pointer-events: none;
   }
   .pickhint {

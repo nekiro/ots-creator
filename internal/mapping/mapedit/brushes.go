@@ -243,7 +243,9 @@ type Brushes struct {
 	doodads   map[string]*DoodadBrush
 	info      map[uint16]*itemInfo
 	nextID    int
-	Warnings  []string
+	// mixes counts the brushes made from suggestions (see AddMix).
+	mixes    int
+	Warnings []string
 }
 
 func lower(text string) string { return strings.ToLower(strings.TrimSpace(text)) }
