@@ -151,7 +151,7 @@
 {#if app.dialog === "obd"}<ObdViewerDialog />{/if}
 {#if app.dialog === "sheet" && app.open && app.focused !== null}<SheetExportDialog />{/if}
 {#if app.dialog === "market"}<MarketDialog />{/if}
-{#if app.dialog === "compare" && app.open && app.other?.open}<CompareDialog />{/if}
+{#if app.dialog === "compare" && app.open}<CompareDialog />{/if}
 {#if app.dialog === "reorder" && app.open}<ReorderDialog />{/if}
 {#if app.dialog === "replaceRefs" && app.open && app.selectedSprites.length}<ReplaceRefsDialog />{/if}
 {#if app.dialog === "exportSprites" && app.open}<ExportSpritesDialog />{/if}

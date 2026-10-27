@@ -46,7 +46,9 @@
   let anchor = $state<number | null>(null);
 
   const infoA = $derived(app.project?.info);
-  const infoB = $derived(app.other?.info);
+  // Closing B keeps the window open, so A can be compared with another client.
+  const otherOpen = $derived(!!app.other?.open);
+  const infoB = $derived(otherOpen ? app.other?.info : undefined);
   const improvedA = $derived(hasImprovedAnimations(infoA));
   const improvedB = $derived(hasImprovedAnimations(infoB));
 
@@ -93,6 +95,12 @@
     void app.project?.rev;
     void app.other?.rev;
     const request = ++seq;
+    if (!otherOpen) {
+      diff = null;
+      error = "";
+      loading = false;
+      return;
+    }
     loading = true;
     CompareService.Diff(compared)
       .then((result) => {
@@ -293,8 +301,15 @@
 
   async function closeB() {
     if (infoB?.changed && !(await ask({ title: "Close client B", message: "Client B has uncompiled changes. Close it anyway?", ok: "Close" }))) return;
-    app.dialog = null;
-    await CompareService.Close();
+    const ok = await run("Closing B", async () => {
+      await CompareService.Close();
+      return true;
+    });
+    if (!ok) return;
+    for (const queued of CATEGORIES) compareQueue.clear(queued);
+    copied = {};
+    selected = [];
+    anchor = null;
   }
 
   function clientName(info: typeof infoA): string {
@@ -320,14 +335,19 @@
       <div class="client t-panel">
         <strong class="side">B</strong>
         <div class="who">
-          <span class="name" title={infoB?.datPath}>{clientName(infoB)}{infoB?.changed ? " *" : ""}</span>
-          <span class="t-label">{infoB?.version.name} · {infoB?.counts.sprites.toLocaleString()} sprites</span>
+          {#if infoB}
+            <span class="name" title={infoB.datPath}>{clientName(infoB)}{infoB.changed ? " *" : ""}</span>
+            <span class="t-label">{infoB.version.name} · {infoB.counts.sprites.toLocaleString()} sprites</span>
+          {:else}
+            <span class="name">No client</span>
+            <span class="t-label">Open a client to compare it with A.</span>
+          {/if}
         </div>
         <span class="grow"></span>
-        <button class="t-icon-btn" title="Open another client as B" onclick={change}><Icon name="open" /></button>
+        <button class="t-icon-btn" title={infoB ? "Open another client as B" : "Open a client as B"} onclick={change}><Icon name="open" /></button>
         <button class="t-icon-btn" title="Undo the last change in B" disabled={!infoB?.canUndo || !!app.busy} onclick={undoB}><Icon name="undo" /></button>
         <button class="t-icon-btn" title="Compile B to its files" disabled={!infoB?.changed || !infoB?.datPath || !!app.busy} onclick={compileB}><Icon name="save" /></button>
-        <button class="t-icon-btn" title="Close B" onclick={closeB}><Icon name="close" /></button>
+        <button class="t-icon-btn" title="Close B" disabled={!infoB || !!app.busy} onclick={closeB}><Icon name="close" /></button>
       </div>
     </div>
 
@@ -352,7 +372,9 @@
     <div class="body">
       <div class="col main">
         <div class="list t-panel">
-          {#if error}
+          {#if !otherOpen}
+            <div class="msg t-label">Open a client as B to compare it with A.</div>
+          {:else if error}
             <div class="msg err">{error}</div>
           {:else if !diff}
             <div class="msg loading t-label"><span class="t-spinner"></span>Comparing clients…</div>
@@ -436,7 +458,7 @@
     </div>
   </div>
   {#snippet footer()}
-    <button class="t-btn" title="Copy every changed object and every object only B has into A, in all categories" disabled={!!app.busy} onclick={mergeAll}
+    <button class="t-btn" title="Copy every changed object and every object only B has into A, in all categories" disabled={!otherOpen || !!app.busy} onclick={mergeAll}
       >Merge all B into A…</button
     >
     <span class="t-label status">{diff ? `${diff.same.toLocaleString()} same` : ""}</span>
