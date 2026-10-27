@@ -1,5 +1,5 @@
 <script lang="ts">
-  // The map as a player sees it in the voidcores client: 17 x 13 tiles
+  // The map as a player sees it in the Tibia client: 17 x 13 tiles
   // around the player, the floors the client shows, its light, and the
   // player walking with the client's keys and timing.
   import { onMount, untrack } from "svelte";

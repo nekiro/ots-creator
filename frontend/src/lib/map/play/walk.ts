@@ -1,4 +1,4 @@
-// Walking rules of the voidcores client and server (OTClient Creature,
+// Walking rules of the Tibia client and server (OTClient Creature,
 // LocalPlayer, game_walk; TFS Creature, Player): step durations from the
 // player's speed and the ground, the walk offset while a step is drawn and
 // the foot animation.

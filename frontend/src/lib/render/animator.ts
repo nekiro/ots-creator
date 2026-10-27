@@ -149,7 +149,7 @@ export class Animator {
 export const WALK_STEP_MS = 700;
 
 /**
- * Delay between walking frames in the client (OTClient / voidcores
+ * Delay between walking frames in the client (OTClient
  * Creature::updateWalkAnimation): one walk cycle takes a bit longer than a
  * step, and outfits with more than 2 walking frames show a whole stride per
  * cycle, so they cycle 1.5x slower.

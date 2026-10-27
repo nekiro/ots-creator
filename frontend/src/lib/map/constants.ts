@@ -54,7 +54,7 @@ export const LIGHT_REACH = 16;
 /** Chunk quads are ranked in depth from -DEPTH_RANGE to DEPTH_RANGE (also in chunk.vert). */
 export const DEPTH_RANGE = 524288;
 
-/** The play view, as the voidcores client shows the game. */
+/** The play view, as the Tibia client shows the game. */
 export const PLAY = {
   /** Tiles in view (client zoom 13 at a 15:11 aspect: 17 x 13). */
   tilesWide: 17,

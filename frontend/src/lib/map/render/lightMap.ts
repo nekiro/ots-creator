@@ -1,5 +1,5 @@
-// The light of the map as the client computes it (OTClient LightView, as
-// voidcores makes it work like the 7.72 client): one color per tile, the
+// The light of the map as the client computes it (OTClient LightView,
+// working like the 7.72 Tibia client): one color per tile, the
 // brightest of the ambient light and the lights reaching the tile's
 // center. Floors add their lights bottom up; a tile that shades hides the
 // light of the floors under it, or dims it to 4/5 when a translucent thing

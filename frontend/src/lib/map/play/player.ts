@@ -1,5 +1,5 @@
 // The local player of the play view: walking and turning from the keys as
-// the voidcores client does (modules/game_walk, LocalPlayer, Creature).
+// the Tibia client does (OTClient modules/game_walk, LocalPlayer, Creature).
 // The map is local, so every step the client would send succeeds.
 import { combineDirections, Direction, directionOffset, footPhaseDelay, isDiagonal, PLAYER_DIAGONAL_COST, stepDuration, walkOffset } from "./walk";
 

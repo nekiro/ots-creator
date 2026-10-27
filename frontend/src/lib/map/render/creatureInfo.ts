@@ -1,5 +1,5 @@
 // Names and health bars over creatures in the play view, laid out as the
-// voidcores client does (Creature::drawInformation): in screen pixels at a
+// Tibia client does (OTClient Creature::drawInformation): in screen pixels at a
 // fixed size, kept inside the view, dimmed by the light of the creature's
 // field.
 
