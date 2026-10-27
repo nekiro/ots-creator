@@ -709,9 +709,7 @@
     min-width: 96px;
   }
   .controls > .playback {
-    flex-wrap: nowrap;
     min-width: 0;
-    overflow: hidden;
   }
   /* Fixed widths so a changing frame count or zoom never moves the buttons. */
   .frame {
