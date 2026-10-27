@@ -1,4 +1,3 @@
-// User actions of the map editor, shared by menus, toolbars and shortcuts.
 import { Events } from "@wailsio/runtime";
 import { DialogService, WindowService, encodeBytes, errorMessage } from "../../api";
 import { clamp } from "../../util/math";
@@ -14,7 +13,6 @@ import { applyChange, edit, loadMapData, map, refreshTile, selectBrush, setCam, 
 
 const MAPS = [{ name: "OTBM maps (*.otbm)", pattern: "*.otbm" }];
 
-/** Sprite size of the open client (world pixels per tile). */
 export function spriteSize(): number {
   return app.project?.info.features.spriteSize || 32;
 }
@@ -36,7 +34,6 @@ async function afterOpen(id: number, center?: Position): Promise<void> {
   }
 }
 
-/** Find and replace in the selection when there is one. */
 export function selectionScope(): { inSelection: boolean } {
   return { inSelection: !!map.active?.selection };
 }
@@ -50,7 +47,6 @@ function trackProgress(name: string, title?: string): () => void {
   });
 }
 
-/** Centers the view of a map on a position. */
 export function goTo(position: Position, id = map.activeId): void {
   if (id === null) return;
   const center = tileToWorld(position, spriteSize());
@@ -68,8 +64,6 @@ export const mapCommands = {
     toast(`Converted ${change.count.toLocaleString()} item IDs. Save the map to keep the change.`, "success");
   },
 
-  /** Walks the map as a player, from a tile (default: the one under the mouse, or the middle of the view). */
-  /** With the play window open, the player there moves to the tile and the window comes to the front. */
   async play(position?: Position) {
     const id = map.activeId;
     if (id === null || !map.items) return;
@@ -82,20 +76,17 @@ export const mapCommands = {
     map.play = start;
   },
 
-  /** Back to editing, the view on where the player stands. */
   exitPlay(position: Position) {
     map.play = null;
     map.player = null;
     goTo(position);
   },
 
-  /** The toolbar's Stop: back to editing where the player stands. */
   stopPlay() {
     const position = map.player ?? map.play;
     if (position) mapCommands.exitPlay(position);
   },
 
-  /** Moves the play view to its own window; editing goes on here. */
   popOutPlay(position: Position) {
     const id = map.activeId;
     map.play = null;
@@ -110,7 +101,6 @@ export const mapCommands = {
     if (mode === "map") await loadMapData();
   },
 
-  /** Creates an empty map right away; its properties are in the inspector. */
   async newMap() {
     if (!needClient()) return;
     try {
@@ -145,7 +135,6 @@ export const mapCommands = {
       await whenRendered(opened.info.id);
       const warnings = (opened.warnings ?? []).filter((warning): warning is string => !!warning);
       map.loadWarnings = { ...map.loadWarnings, [opened.info.id]: warnings };
-      // Whole open: reading the file, the item data and the first view.
       const took = `${((performance.now() - started) / 1000).toFixed(1)} s`;
       if (warnings.length) {
         const show = () => ((map.activeId = opened.info.id), (map.dialog = "warnings"));
@@ -208,7 +197,6 @@ export const mapCommands = {
     map.focus = null;
   },
 
-  /** Lists the undo history at the mouse; a click goes back or forward to that step. */
   async historyMenu(event: MouseEvent) {
     const id = map.activeId;
     if (id === null) return;
@@ -276,7 +264,6 @@ export const mapCommands = {
     const camera = map.cam;
     const next = stepZoom(camera.zoom, step);
     if (anchor) {
-      // Keep the point under the cursor in place.
       const pixelRatio = window.devicePixelRatio || 1;
       const offsetX = (anchor.x - anchor.w / 2) / pixelRatio;
       const offsetY = (anchor.y - anchor.h / 2) / pixelRatio;
@@ -285,7 +272,6 @@ export const mapCommands = {
   },
   zoomReset: () => map.activeId !== null && setCam(map.activeId, { zoom: 1 }),
 
-  /** Moves the view by about dx, dy tiles at normal zoom: the further out, the more tiles (the same distance on screen). */
   pan(dx: number, dy: number) {
     const id = map.activeId;
     if (id === null) return;
@@ -313,7 +299,6 @@ export const mapCommands = {
     void refreshTile();
   },
 
-  /** Shows a part of the world (or the map with null) in the inspector. */
   focus(focus: Focus | null) {
     map.focus = focus;
   },

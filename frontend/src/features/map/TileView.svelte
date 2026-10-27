@@ -15,7 +15,6 @@
   let selection = $state<{ index: number; path: number[] } | null>(null);
   let addId = $state("");
 
-  // A different tile resets the item selection.
   let lastPos = "";
   $effect(() => {
     const key = fmtPos(map.inspect);

@@ -1,6 +1,3 @@
-// Package imaging converts between sprites and images: sprite sheets of
-// frame groups (ObjectBuilder compatible layout) and tiles of arbitrary
-// images.
 package imaging
 
 import (
@@ -26,7 +23,6 @@ import (
 // treated as transparent on import.
 var Magenta = color.NRGBA{R: 0xFF, G: 0x00, B: 0xFF, A: 0xFF}
 
-// Decode reads an image (PNG, or any registered format) as NRGBA.
 func Decode(reader io.Reader) (*image.NRGBA, error) {
 	img, _, err := image.Decode(reader)
 	if err != nil {
@@ -35,7 +31,6 @@ func Decode(reader io.Reader) (*image.NRGBA, error) {
 	return ToNRGBA(img), nil
 }
 
-// Load reads an image file as NRGBA.
 func Load(path string) (*image.NRGBA, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -45,7 +40,6 @@ func Load(path string) (*image.NRGBA, error) {
 	return Decode(file)
 }
 
-// EncodePNG encodes an image as PNG.
 func EncodePNG(img image.Image) ([]byte, error) {
 	var buf bytes.Buffer
 	encoder := png.Encoder{CompressionLevel: png.BestSpeed}
@@ -55,10 +49,8 @@ func EncodePNG(img image.Image) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// Formats lists the image formats Encode writes, by file extension.
 var Formats = []string{"png", "bmp", "jpg"}
 
-// FormatOf returns the export format for a file name ("png" when unknown).
 func FormatOf(path string) string {
 	switch strings.ToLower(strings.TrimPrefix(filepath.Ext(path), ".")) {
 	case "bmp":
@@ -92,7 +84,6 @@ func Encode(img *image.NRGBA, format string, background color.NRGBA) ([]byte, er
 	return buf.Bytes(), err
 }
 
-// ToNRGBA converts any image to NRGBA with origin (0,0).
 func ToNRGBA(img image.Image) *image.NRGBA {
 	if nrgba, ok := img.(*image.NRGBA); ok && nrgba.Rect.Min == (image.Point{}) {
 		return nrgba
@@ -124,8 +115,6 @@ func ContentBounds(img *image.NRGBA) image.Rectangle {
 	return image.Rect(minX, minY, maxX+1, maxY+1)
 }
 
-// CropToContent returns a copy cropped to ContentBounds. Fully transparent
-// images are returned unchanged.
 func CropToContent(img *image.NRGBA) *image.NRGBA {
 	content := ContentBounds(img)
 	if content.Empty() || content == img.Rect {
@@ -136,7 +125,6 @@ func CropToContent(img *image.NRGBA) *image.NRGBA {
 	return out
 }
 
-// RemoveMagenta makes opaque magenta pixels fully transparent in place.
 func RemoveMagenta(img *image.NRGBA) {
 	pixels := img.Pix
 	for i := 0; i+3 < len(pixels); i += 4 {
@@ -163,8 +151,6 @@ func Normalize(img *image.NRGBA) {
 	}
 }
 
-// Tile copies a size x size block at (x, y) into RGBA bytes. Pixels outside
-// the image are transparent.
 func Tile(img *image.NRGBA, x, y, size int) []byte {
 	out := make([]byte, size*size*4)
 	bounds := img.Rect
@@ -183,7 +169,6 @@ func Tile(img *image.NRGBA, x, y, size int) []byte {
 	return out
 }
 
-// PutTile draws RGBA sprite bytes at (x, y), replacing destination pixels.
 func PutTile(img *image.NRGBA, x, y, size int, pixels []byte) {
 	CopyRect(img.Pix, img.Stride/4, x-img.Rect.Min.X, y-img.Rect.Min.Y, pixels, size, 0, 0, size, size)
 }
@@ -234,14 +219,12 @@ func Shift(img *image.NRGBA, offsetX, offsetY int) (*image.NRGBA, bool) {
 	return out, true
 }
 
-// textureOrigin returns the pixel position of a texture in a group sheet.
 func textureOrigin(group *thing.FrameGroup, size, layer, patternX, patternY, patternZ, frame int) (int, int) {
 	totalX := int(group.PatternZ) * int(group.PatternX) * int(group.Layers)
 	index := group.TextureIndex(layer, patternX, patternY, patternZ, frame)
 	return (index % totalX) * int(group.Width) * size, (index / totalX) * int(group.Height) * size
 }
 
-// eachSprite calls fn for every sprite slot with its sheet position.
 func eachSprite(group *thing.FrameGroup, size int, fn func(slot, x, y int)) {
 	for frame := 0; frame < int(group.Frames); frame++ {
 		for z := 0; z < int(group.PatternZ); z++ {
@@ -294,8 +277,6 @@ func DrawOver(img *image.NRGBA, x, y, size int, pixels []byte) {
 	}
 }
 
-// BlendTile draws RGBA sprite bytes at (x, y) over the destination with
-// alpha blending (outfit addons over the base outfit).
 func BlendTile(img *image.NRGBA, x, y, size int, pixels []byte) {
 	for row := 0; row < size; row++ {
 		for col := 0; col < size; col++ {

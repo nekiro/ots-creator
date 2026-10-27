@@ -1,4 +1,3 @@
-// The status line text of the tile under the mouse.
 import { fmtPos, type HouseInfo, type Position } from "../data/api";
 import { TileFlags, type TileData } from "../data/chunks";
 

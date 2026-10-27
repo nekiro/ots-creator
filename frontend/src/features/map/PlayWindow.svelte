@@ -13,7 +13,6 @@
   const params = new URLSearchParams(location.search);
   let mapId = $state(Number(params.get("play")));
   let start = $state<Position>({ x: Number(params.get("x")), y: Number(params.get("y")), z: Number(params.get("z")) });
-  /** Bumped when the editor sends the player somewhere else: the view starts again. */
   let session = $state(0);
 
   let ready = $state(false);
@@ -34,7 +33,6 @@
       }
       for (const changed of listeners) changed(event.data.chunks ?? []);
     });
-    // Play from the editor while this window is open: start again there.
     const offMove = Events.On("play:move", (event: { data: { map: number; x: number; y: number; z: number } | null }) => {
       const move = event.data;
       if (!move) return;

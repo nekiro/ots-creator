@@ -51,7 +51,6 @@
   const url = $derived(res.sheet(category, id, effective, transparentBackground, versions.thing(category, id)));
   const columns = $derived(frameGroup ? frameGroup.patternZ * frameGroup.patternX * frameGroup.layers : 0);
   const rows = $derived(frameGroup ? frameGroup.frames * frameGroup.patternY : 0);
-  // Whole pixels when the sheet fits; big sheets shrink to fit.
   const fit = $derived(fitZoom(natural[0], natural[1], stageSize[0], stageSize[1]));
   const scale = $derived(zoom || fit);
 
@@ -65,7 +64,6 @@
     zoom = stepZoom(scale, direction);
   }
 
-  // Fit also centers the sheet again.
   let centered = $state(0);
   function zoomFit() {
     zoom = 0;

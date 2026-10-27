@@ -12,10 +12,8 @@ import (
 	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
-// ResourcePrefix is the URL prefix served by Resources.
 const ResourcePrefix = "/res/"
 
-// maxBatch limits sprites per /res/sprites request.
 const maxBatch = 4096
 
 // Resources serves binary data to the webview without JSON/base64:
@@ -35,14 +33,11 @@ const maxBatch = 4096
 // should include ?r={rev} so cached responses are invalidated on change.
 type Resources struct {
 	session *Session
-	// Maps serves /res/map/ (map chunks and minimaps).
-	Maps *MapService
+	Maps    *MapService
 }
 
-// NewResources returns the handler.
 func NewResources(session *Session) *Resources { return &Resources{session: session} }
 
-// Middleware routes /res/ requests to the handler and everything else to next.
 func (h *Resources) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, ResourcePrefix) {
@@ -97,8 +92,6 @@ func parseID(text string) (uint32, error) {
 	return uint32(id), err
 }
 
-// parseThing parses the category and id of a thing URL, answering bad
-// requests itself; ok is false then.
 func parseThing(w http.ResponseWriter, categoryText, idText string) (category thing.Category, id uint32, ok bool) {
 	category, err := thing.ParseCategory(categoryText)
 	if err != nil {
@@ -112,8 +105,6 @@ func parseThing(w http.ResponseWriter, categoryText, idText string) (category th
 	return category, id, true
 }
 
-// spritePixels reads the sprite of an id URL part, answering errors
-// itself; ok is false then.
 func spritePixels(w http.ResponseWriter, proj *project.Project, idText string) (pixels []byte, ok bool) {
 	id, err := parseID(idText)
 	if err != nil {
@@ -128,7 +119,6 @@ func spritePixels(w http.ResponseWriter, proj *project.Project, idText string) (
 	return pixels, true
 }
 
-// servePNG answers with an image as PNG.
 func servePNG(w http.ResponseWriter, img image.Image) {
 	data, err := imaging.EncodePNG(img)
 	if err != nil {

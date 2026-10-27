@@ -13,7 +13,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/fsutil"
 )
 
-// Object file formats for export (settings.Settings.ObjectFormat).
 const (
 	ObjectOTOBJ = "otobj" // native format, see docs/otobj.md
 	ObjectOBD   = "obd"   // ObjectBuilder, version 3
@@ -23,13 +22,11 @@ const (
 // version.
 var Generator = "OTS Creator"
 
-// isObjectFile reports whether path is an object file (.otobj or .obd).
 func isObjectFile(path string) bool {
 	ext := strings.ToLower(filepath.Ext(path))
 	return ext == otobj.Ext || ext == ".obd"
 }
 
-// readObject reads an .otobj or .obd file, chosen by the extension.
 func readObject(path string) (*obd.Data, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -47,8 +44,6 @@ func readObject(path string) (*obd.Data, error) {
 	return objectData, nil
 }
 
-// encodeObject writes objectData in format (ObjectOTOBJ or ObjectOBD) and returns
-// the data and the file extension.
 func encodeObject(objectData *obd.Data, format string) ([]byte, string, error) {
 	if format == ObjectOBD {
 		data, err := obd.Encode(objectData)
@@ -62,8 +57,7 @@ func encodeObject(objectData *obd.Data, format string) ([]byte, string, error) {
 // Sprite ids of Thing are rewritten to 1..len(Sprites); Sprites[id-1]
 // holds RGBA pixels.
 type ObjectFile struct {
-	Path string `json:"path"`
-	// Format is ObjectOTOBJ or ObjectOBD; Version the version of that format.
+	Path          string       `json:"path"`
 	Format        string       `json:"format"`
 	Version       int          `json:"version"`
 	ClientVersion uint16       `json:"clientVersion"`
@@ -72,7 +66,6 @@ type ObjectFile struct {
 	Sprites       [][]byte     `json:"sprites"`
 }
 
-// newObjectFile prepares decoded object data for the frontend.
 func newObjectFile(path string, data *obd.Data) *ObjectFile {
 	format := ObjectOBD
 	if strings.EqualFold(filepath.Ext(path), otobj.Ext) {
@@ -91,7 +84,6 @@ func newObjectFile(path string, data *obd.Data) *ObjectFile {
 	return file
 }
 
-// exportObject writes one thing of proj into dir as {category}_{id}.{ext}.
 func exportObject(proj *project.Project, category thing.Category, id uint32, dir, format string) (string, error) {
 	objectData, err := proj.ExportOBD(category, id, obd.Version3)
 	if err != nil {

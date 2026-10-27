@@ -7,11 +7,8 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
 )
 
-// mapTool is a whole map or selection tool; it returns the number of
-// affected tiles or items.
 type mapTool struct {
-	run func(editor *mapedit.Editor, inSelection bool) int
-	// redrawAll is set for tools that change how every tile is drawn.
+	run       func(editor *mapedit.Editor, inSelection bool) int
 	redrawAll bool
 }
 
@@ -53,7 +50,6 @@ type FindResult struct {
 	More    bool                 `json:"more"`
 }
 
-// Find searches items on the map.
 func (ms *MapService) Find(id int, query mapedit.FindQuery) (found FindResult, err error) {
 	err = ms.withMap(id, func(opened *openMap, _ *mapData) error {
 		found.Results, found.More = opened.editor.Find(query)
@@ -76,7 +72,6 @@ func (ms *MapService) Replace(id int, from, to []uint16, inSelection bool) (MapC
 	})
 }
 
-// Stats returns map statistics.
 func (ms *MapService) Stats(id int) (stats mapedit.Statistics, err error) {
 	err = ms.withMap(id, func(opened *openMap, _ *mapData) error {
 		stats = opened.editor.Stats()

@@ -11,12 +11,10 @@ import (
 	"github.com/nekiro/ots-creator/internal/fsutil"
 )
 
-// SpriteService edits sprites.
 type SpriteService struct {
 	session *Session
 }
 
-// NewSpriteService returns the service.
 func NewSpriteService(session *Session) *SpriteService { return &SpriteService{session: session} }
 
 // ImportImages slices images into sprites and appends them. Magenta is
@@ -48,8 +46,6 @@ func (ss *SpriteService) ImportImages(paths []string) ([]uint32, error) {
 	return ids, err
 }
 
-// loadSpriteImage loads an image to cut into sprites: magenta becomes
-// transparent and transparent pixels are normalized.
 func loadSpriteImage(path string) (*image.NRGBA, error) {
 	img, err := imaging.Load(path)
 	if err != nil {
@@ -60,7 +56,6 @@ func loadSpriteImage(path string) (*image.NRGBA, error) {
 	return img, nil
 }
 
-// isTransparent reports whether every pixel of RGBA pixels has alpha 0.
 func isTransparent(pixels []byte) bool {
 	for alpha := 3; alpha < len(pixels); alpha += 4 {
 		if pixels[alpha] != 0 {
@@ -70,7 +65,6 @@ func isTransparent(pixels []byte) bool {
 	return true
 }
 
-// Replace overwrites a sprite with the first tile of an image.
 func (ss *SpriteService) Replace(id uint32, path string) error {
 	proj, err := ss.session.Project()
 	if err != nil {
@@ -120,8 +114,6 @@ func (ss *SpriteService) Export(ids []uint32, dir, format string) ([]string, err
 	return out, nil
 }
 
-// writeSpriteFile writes one sprite as {id}.{format} into dir and returns
-// its path.
 func writeSpriteFile(proj *project.Project, id uint32, size int, dir, format string) (string, error) {
 	pixels, err := proj.SpritePixels(id)
 	if err != nil {
@@ -158,8 +150,6 @@ func (ss *SpriteService) AddPixels(sprites [][]byte) ([]uint32, error) {
 	return ids, err
 }
 
-// Optimize removes duplicate, empty and unused sprites and renumbers the
-// rest (see project.OptimizeSprites).
 func (ss *SpriteService) Optimize(options project.OptimizeOptions) (project.OptimizeResult, error) {
 	proj, err := ss.session.Project()
 	if err != nil {
@@ -172,7 +162,6 @@ func (ss *SpriteService) Optimize(options project.OptimizeOptions) (project.Opti
 	return result, err
 }
 
-// Analyze reports what Optimize would remove without changing anything.
 func (ss *SpriteService) Analyze(options project.OptimizeOptions) (project.OptimizeResult, error) {
 	proj, err := ss.session.Project()
 	if err != nil {
@@ -181,7 +170,6 @@ func (ss *SpriteService) Analyze(options project.OptimizeOptions) (project.Optim
 	return proj.AnalyzeSprites(options, ss.session.reporter("Checking sprites"))
 }
 
-// Find returns the ids of sprites matching a filter (see project.FindSprites).
 func (ss *SpriteService) Find(filter string) ([]uint32, error) {
 	proj, err := ss.session.Project()
 	if err != nil {
@@ -190,7 +178,6 @@ func (ss *SpriteService) Find(filter string) ([]uint32, error) {
 	return proj.FindSprites(filter)
 }
 
-// Users lists the objects that use a sprite.
 func (ss *SpriteService) Users(id uint32) ([]project.ThingRef, error) {
 	proj, err := ss.session.Project()
 	if err != nil {

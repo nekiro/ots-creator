@@ -3,7 +3,6 @@
   import { map } from "../../../lib/map/state.svelte";
   import Dialog from "../../../lib/ui/Dialog.svelte";
 
-  // Changeable keys first (as currently set), then the fixed mouse gestures.
   const groups = $derived(
     KEY_GROUPS.map((group) => ({
       title: group,
@@ -16,7 +15,6 @@
 </script>
 
 <Dialog title="Map editor shortcuts" width={880} onclose={() => (map.dialog = null)}>
-  <!-- Key and action on one line, groups flowing over two balanced columns. -->
   <div class="cols">
     {#each groups as group}
       <div class="grp">

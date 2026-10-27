@@ -87,7 +87,6 @@ func TestEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Resources: raw sprite, batch and thumbnail.
 	h := NewResources(s).Middleware(http.NotFoundHandler())
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, httptest.NewRequest("GET", "/res/sprite/2?r=1", nil))
@@ -136,7 +135,6 @@ func TestEndToEnd(t *testing.T) {
 		t.Fatal("non-resource must go to next handler")
 	}
 
-	// OBD export + import.
 	paths, err := ts.ExportObjects(thing.CategoryItem, []uint32{100}, dir, ObjectOBD)
 	if err != nil || len(paths) != 1 {
 		t.Fatalf("export %v %v", paths, err)
@@ -160,7 +158,6 @@ func TestEndToEnd(t *testing.T) {
 		t.Fatalf("import %+v %v", res, err)
 	}
 
-	// OTOBJ export + import.
 	paths, err = ts.ExportObjects(thing.CategoryItem, []uint32{100}, dir, ObjectOTOBJ)
 	if err != nil || len(paths) != 1 || filepath.Ext(paths[0]) != ".otobj" {
 		t.Fatalf("export otobj %v %v", paths, err)
@@ -194,7 +191,6 @@ func TestEndToEnd(t *testing.T) {
 		t.Fatal("import to another category must fail")
 	}
 
-	// Sheet export + import.
 	sheet := filepath.Join(dir, "sheet.png")
 	if err := ts.ExportSheet(thing.CategoryItem, 100, 0, sheet, false); err != nil {
 		t.Fatal(err)
@@ -202,7 +198,6 @@ func TestEndToEnd(t *testing.T) {
 	if err := ts.ImportSheet(thing.CategoryItem, 101, 0, sheet); err != nil {
 		t.Fatal(err)
 	}
-	// The same sheet from the clipboard; garbage is an error.
 	data, _ := os.ReadFile(sheet)
 	if err := ts.PasteSheet(thing.CategoryItem, 101, 0, data); err != nil {
 		t.Fatal(err)
@@ -211,7 +206,6 @@ func TestEndToEnd(t *testing.T) {
 		t.Fatal("pasting text must fail")
 	}
 
-	// Compile, then reopen via Inspect.
 	datPath, sprPath := filepath.Join(dir, "Tibia.dat"), filepath.Join(dir, "Tibia.spr")
 	if _, err := ps.Compile(); err == nil {
 		t.Fatal("compile without paths must fail")
@@ -281,7 +275,6 @@ func TestWholeOutfitSheet(t *testing.T) {
 	if err != nil || img.Rect.Dx() != 256 || img.Rect.Dy() != 576 {
 		t.Fatalf("whole sheet %v %v", img.Rect, err)
 	}
-	// Importing it back keeps the idle/walking split.
 	if err := ts.ImportSheet(thing.CategoryOutfit, 1, 0, out); err != nil {
 		t.Fatal(err)
 	}

@@ -13,7 +13,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
-// thingEnv opens a new client with at least the items 100 to 102.
 func thingEnv(t *testing.T) (*Session, *ThingService, *SpriteService) {
 	t.Helper()
 	session, projects, things, sprites, _ := newEnv(t)

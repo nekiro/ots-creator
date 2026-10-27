@@ -28,7 +28,6 @@ func TestChunkPacking(t *testing.T) {
 	if m.Tile(plain) != w || m.Tile(plain).Items[0].ID != 201 || c.dead != 1 {
 		t.Fatalf("working copy not kept (dead %d)", c.dead)
 	}
-	// Removing and counting.
 	m.SetTile(rich, nil)
 	if m.Has(rich) || m.TileCount() != 1 || len(c.freePtrs) != 0 && c.ptrs[c.freePtrs[0]] != nil {
 		t.Fatal("removal")

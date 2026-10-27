@@ -8,7 +8,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
-// MoveOptions controls MoveThings.
 type MoveOptions struct {
 	// Insert puts the things before id at and shifts the things between;
 	// otherwise the things at the targets swap places with them.
@@ -49,7 +48,6 @@ func (p *Project) MoveThings(category thing.Category, ids []uint32, at uint32, o
 	return newIDs, nil
 }
 
-// sortedMoveIDs checks a move request and returns ids sorted.
 func sortedMoveIDs(category thing.Category, ids []uint32, at uint32) ([]uint32, error) {
 	if !category.Valid() {
 		return nil, fmt.Errorf("invalid category %d", category)
@@ -68,8 +66,6 @@ func sortedMoveIDs(category thing.Category, ids []uint32, at uint32) ([]uint32, 
 	return sorted, nil
 }
 
-// planMoves maps the ids that change to their new ids. The caller holds
-// the lock.
 func (p *Project) planMoves(category thing.Category, sorted []uint32, at uint32, insert bool) (map[uint32]uint32, error) {
 	last := p.things.MaxID(category)
 	for _, id := range sorted {
@@ -123,7 +119,6 @@ func (p *Project) movedThings(category thing.Category, moves map[uint32]uint32, 
 	return next
 }
 
-// recordMoves stores the moved things as one undoable edit.
 func (p *Project) recordMoves(label string, category thing.Category, moves map[uint32]uint32, next map[uint32]*thing.Thing) {
 	edit := p.record(label)
 	if category == thing.CategoryItem {
@@ -202,7 +197,6 @@ func insertMoves(sorted []uint32, at uint32) map[uint32]uint32 {
 	return moves
 }
 
-// refs returns pointers to the item ids stored in an item.
 func refs(object *thing.Thing) (small []*uint16, big []*uint32) {
 	small = []*uint16{&object.Props.Market.TradeAs, &object.Props.Market.ShowAs, &object.Props.FormerObjectID}
 	for i := range object.NpcSales {

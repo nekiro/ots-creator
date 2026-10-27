@@ -17,7 +17,6 @@ func (ms *MapService) ConvertMapToClientIDs(id int) (MapChange, error) {
 	})
 }
 
-// MapViewData is the item interpretation of one map tab.
 type MapViewData struct {
 	Data    DataInfo  `json:"data"`
 	Items   ItemTable `json:"items"`

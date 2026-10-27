@@ -26,7 +26,6 @@ func wallShape(mask int, full bool) int {
 	return wallPole
 }
 
-// matchingWall reports whether the tile holds a wall that connects to wall.
 func (e *Editor) matchingWall(tile *otmap.Tile, wall *WallBrush) bool {
 	if tile == nil {
 		return false
@@ -43,14 +42,10 @@ func (e *Editor) matchingWall(tile *otmap.Tile, wall *WallBrush) bool {
 	return false
 }
 
-// wallNeighborMask returns the wall neighbor bits of the tile at x, y, z
-// whose tiles hold a wall that connects to wall.
 func (e *Editor) wallNeighborMask(x, y, z int, wall *WallBrush) int {
 	return e.neighborMask(x, y, z, wallNeighborOffsets[:], func(neighbor *otmap.Tile) bool { return e.matchingWall(neighbor, wall) })
 }
 
-// neighborMask returns the bits of the neighbors of the tile at x, y, z
-// whose tiles have what has looks for.
 func (e *Editor) neighborMask(x, y, z int, neighbors []neighborOffset, has func(*otmap.Tile) bool) int {
 	mask := 0
 	for _, neighbor := range neighbors {
@@ -61,7 +56,6 @@ func (e *Editor) neighborMask(x, y, z int, neighbors []neighborOffset, has func(
 	return mask
 }
 
-// fitWalls reshapes the walls of the tile at pos to match their neighbors.
 func (e *Editor) fitWalls(tx *Tx, pos otmap.Position) {
 	current := tx.Get(pos)
 	if current == nil || !e.hasWall(current) {
@@ -95,13 +89,11 @@ func (e *Editor) fitWalls(tx *Tx, pos otmap.Position) {
 	applyPieceChanges(tx, pos, changes)
 }
 
-// pieceChange is a new item id for the item at index of a tile.
 type pieceChange struct {
 	index int
 	id    uint16
 }
 
-// appendPieceChange records id for items[index] when it differs.
 func appendPieceChange(changes []pieceChange, items []otmap.Item, index int, id uint16) []pieceChange {
 	if items[index].ID == id {
 		return changes
@@ -178,7 +170,6 @@ func (w *WallBrush) doorFor(align, doorType int, open bool) uint16 {
 	return fallback
 }
 
-// cleanWalls removes the walls of a brush (all walls when wall is nil).
 func (e *Editor) cleanWalls(tile *otmap.Tile, wall *WallBrush) {
 	tile.Items = slices.DeleteFunc(tile.Items, func(item otmap.Item) bool {
 		wallBrush, info := e.Brushes.wallOf(item.ID)
@@ -207,7 +198,6 @@ func (e *Editor) drawWall(tile *otmap.Tile, wall *WallBrush) {
 	}
 }
 
-// cycleWall changes a wall of the brush to the next alignment (alt-click).
 func (e *Editor) cycleWall(tile *otmap.Tile, wall *WallBrush) bool {
 	for i := range tile.Items {
 		wallBrush, info := e.Brushes.wallOf(tile.Items[i].ID)
@@ -226,7 +216,6 @@ func (e *Editor) cycleWall(tile *otmap.Tile, wall *WallBrush) bool {
 	return false
 }
 
-// drawDecoration puts a decoration of the brush on every wall of the tile.
 func (e *Editor) drawDecoration(tile *otmap.Tile, decoration *WallBrush) {
 	e.cleanWalls(tile, decoration)
 	var decorated []otmap.Item
@@ -249,7 +238,6 @@ func (e *Editor) drawDecoration(tile *otmap.Tile, decoration *WallBrush) {
 	tile.Items = decorated
 }
 
-// drawDoor turns the wall of the tile into a door of a type.
 func (e *Editor) drawDoor(tx *Tx, pos otmap.Position, doorType int, open bool) bool {
 	current := tx.Get(pos)
 	if current == nil {
@@ -288,7 +276,6 @@ func (e *Editor) drawDoor(tx *Tx, pos otmap.Position, doorType int, open bool) b
 	return false
 }
 
-// removeDoor turns doors of the tile back into walls.
 func (e *Editor) removeDoor(tx *Tx, pos otmap.Position) bool {
 	current := tx.Get(pos)
 	if current == nil {
@@ -312,7 +299,6 @@ func (e *Editor) removeDoor(tx *Tx, pos otmap.Position) bool {
 	return false
 }
 
-// SwitchDoor opens a closed door or closes an open one.
 func (e *Editor) switchDoor(tile *otmap.Tile, i int) bool {
 	wallBrush, info := e.Brushes.wallOf(tile.Items[i].ID)
 	if wallBrush == nil || !info.door {
@@ -405,20 +391,15 @@ func tileHas(tile *otmap.Tile, fn func(id uint16) bool) bool {
 // joinedBrush is a carpet or table brush: its items join with neighbors
 // that hold the same brush.
 type joinedBrush interface {
-	// pieces returns the items of each piece of the brush.
 	pieces() []chanceList
 }
 
 func (c *CarpetBrush) pieces() []chanceList { return c.parts[:] }
 func (t *TableBrush) pieces() []chanceList  { return t.parts[:] }
 
-// joinedKind holds what differs between carpets and tables.
 type joinedKind struct {
-	// brushOf returns the brush of the kind an item belongs to and the
-	// piece it is; the brush is nil for other items.
 	brushOf func(info *itemInfo) (joinedBrush, int)
-	// piece returns the piece for the neighbors holding the same brush.
-	piece func(mask int) int
+	piece   func(mask int) int
 	// fallback is the piece drawn first and used when the brush lacks the
 	// piece a shape wants.
 	fallback int
@@ -446,13 +427,10 @@ var tableKind = joinedKind{
 	fallback: tableAlone,
 }
 
-// joinedBrushOf returns the brush of the kind the item id belongs to (nil
-// for other items) and the piece it is.
 func (e *Editor) joinedBrushOf(kind *joinedKind, id uint16) (joinedBrush, int) {
 	return kind.brushOf(e.Brushes.info[id])
 }
 
-// hasJoined reports whether the tile holds an item of the kind.
 func (e *Editor) hasJoined(tile *otmap.Tile, kind *joinedKind) bool {
 	return tileHas(tile, func(id uint16) bool {
 		brush, _ := e.joinedBrushOf(kind, id)
@@ -460,13 +438,10 @@ func (e *Editor) hasJoined(tile *otmap.Tile, kind *joinedKind) bool {
 	})
 }
 
-// fitCarpets reshapes the carpets of the tile at pos.
 func (e *Editor) fitCarpets(tx *Tx, pos otmap.Position) { e.fitJoined(tx, pos, &carpetKind) }
 
-// fitTables reshapes the tables of the tile at pos.
 func (e *Editor) fitTables(tx *Tx, pos otmap.Position) { e.fitJoined(tx, pos, &tableKind) }
 
-// fitJoined reshapes the carpets or tables of the tile at pos.
 func (e *Editor) fitJoined(tx *Tx, pos otmap.Position, kind *joinedKind) {
 	current := tx.Get(pos)
 	if current == nil || !e.hasJoined(current, kind) {
@@ -517,7 +492,6 @@ func (e *Editor) drawJoined(tile *otmap.Tile, kind *joinedKind, brush joinedBrus
 	}
 }
 
-// removeJoined removes the carpets or tables of the tile.
 func (e *Editor) removeJoined(tile *otmap.Tile, kind *joinedKind) {
 	tile.Items = slices.DeleteFunc(tile.Items, func(item otmap.Item) bool {
 		brush, _ := e.joinedBrushOf(kind, item.ID)

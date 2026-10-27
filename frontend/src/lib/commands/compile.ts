@@ -1,20 +1,15 @@
-// Messages after opening and compiling a client, and the sprite
-// optimization offered before a compile.
 import { SpriteService, type CompileStats, type State } from "../api";
 import { choose } from "../confirm.svelte";
 import { app, run, toast } from "../state/app.svelte";
 import { formatSize, plural } from "../util/format";
 import { savedNote } from "./shared";
 
-/** " Removed 3 unused sheets (1.2 MB freed)." after an asset compilation. */
 export function sheetsNote(stats: CompileStats): string {
   if (!stats.sheetsRemoved) return "";
   const freed = stats.freed > 0 ? ` (${formatSize(stats.freed)} freed)` : "";
   return ` Removed ${plural(stats.sheetsRemoved, "unused sheet")}${freed}.`;
 }
 
-/** " Updated items.otb (2 moved, 1 reloaded)." after a compile; problems
- * with the items.otb get their own toast (the client was compiled anyway). */
 export function otbNote(stats: CompileStats): string {
   const otb = stats.otb;
   if (!otb) return "";
@@ -28,16 +23,10 @@ export function otbNote(stats: CompileStats): string {
   return ` Updated items.otb${parts.length ? ` (${parts.join(", ")})` : ""}.`;
 }
 
-/** After opening a client: the remembered items.otb is optional, so a
- * failure only shows a toast. */
 export function openedNote(state: State | undefined) {
   if (state?.otbError) toast(`items.otb was not loaded: ${state.otbError}`, "error");
 }
 
-/**
- * Before a compile: when sprites can be optimized, asks whether to do it
- * first. False when the user cancelled the compile.
- */
 export async function offerOptimize(): Promise<boolean> {
   const options = { duplicates: true, empty: true, unused: true };
   const plan = await run("Checking sprites", () => SpriteService.Analyze(options), { modal: true });

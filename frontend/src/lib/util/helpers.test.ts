@@ -1,4 +1,3 @@
-// Small shared helpers: selection, list navigation, caches, formatting.
 import { describe, expect, it } from "vitest";
 import { Category, type DiffEntry, type ObjectFile } from "../api";
 import { mergeIds, mergeSummary } from "../compare";

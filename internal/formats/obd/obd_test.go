@@ -166,7 +166,7 @@ func TestDecodeErrors(t *testing.T) {
 		}
 	}
 	bad := bytes.Clone(raw)
-	bad[4] = 9 // category
+	bad[4] = 9
 	if _, err := DecodeRaw(bad); err == nil {
 		t.Fatal("bad category must fail")
 	}

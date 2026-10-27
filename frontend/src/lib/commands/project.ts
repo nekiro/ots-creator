@@ -1,4 +1,3 @@
-// Opening, compiling and closing clients, undo and the app's windows.
 import { CompareService, DialogService, Format, ProjectService, WindowService, type Recent } from "../api";
 import { ask } from "../confirm.svelte";
 import { map } from "../map/state.svelte";
@@ -38,7 +37,6 @@ export const projectCommands = {
     toast(`Loaded ${files.detected.name}: ${state.info.counts.items - 99} items, ${state.info.counts.sprites} sprites.`, "success");
   },
   create: () => (app.dialog = "new"),
-  /** Opens the compare window; without a second client it asks for one first. */
   compare: () => {
     if (!guard()) return;
     app.openOther = !app.other?.open;
@@ -63,7 +61,6 @@ export const projectCommands = {
     await ProjectService.Close();
   },
 
-  /** Reopens a recent client with the version and features it was saved with. */
   async openRecent(recent: Recent) {
     if (app.open && !(await confirmLeave("Open client", "Open"))) return;
     const state = await run("Loading client", () =>
@@ -110,12 +107,10 @@ export const projectCommands = {
   apply: () => applyDraft(),
   revert: () => revertDraft(),
 
-  /** Opens the market browser. */
   market() {
     app.dialog = "market";
   },
 
-  /** Opens the object viewer, optionally with an object or image file. */
   viewObd(path = "") {
     app.obdPath = path;
     app.dialog = "obd";

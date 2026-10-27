@@ -1,8 +1,4 @@
 <script lang="ts">
-  // Moves objects to other ids within the open client: drag selected
-  // objects onto a slot, or cut them (Ctrl+X) and click a slot. They swap
-  // places with the objects there, or are inserted before the slot and the
-  // objects between shift.
   import { CATEGORIES, CATEGORY_LABELS, CATEGORY_NAMES, Category, minId, res, ThingService } from "../../lib/api";
   import { app, run, toast, versions } from "../../lib/state/app.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
@@ -17,7 +13,6 @@
   let insert = $state(false);
   let updateRefs = $state(true);
 
-  // Slots: every id and one past the end.
   const first = $derived(minId(category));
   const end = $derived(app.maxId(category) + 1);
   const count = $derived(end - first + 1);
@@ -25,9 +20,7 @@
 
   let selected = $state<number[]>([]);
   let anchor: number | null = null;
-  // Cut objects wait for a click on the slot they go to.
   let held = $state<number[]>([]);
-  // Slot under a dragged selection, or under the cursor while objects are held.
   let over = $state<number | null>(null);
   let dragging = $state<number[]>([]);
   let recent = $state<Set<number>>(new Set());
@@ -36,7 +29,6 @@
   const moving = $derived(dragging.length ? dragging : held);
   const selectedSet = $derived(new Set(selected));
   const heldSet = $derived(new Set(held));
-  // Where the moving objects would land (swap mode).
   const landing = $derived.by(() => {
     const out = new Set<number>();
     if (over === null || insert) return out;
@@ -124,7 +116,6 @@
     toast(`Moved ${movedCount} ${CATEGORY_NAMES[category]}(s) to ${low === high ? `#${low}` : `#${low}-#${high}`}. Ctrl+Z undoes it.`, "success", 3500, "reorder");
   }
 
-  /** Swaps the two selected objects. */
   function swapTwo() {
     if (selected.length !== 2) return;
     const [firstId, secondId] = selected;
@@ -147,7 +138,6 @@
     scrollTo = clamp(id, first, end) - first;
   }
 
-  // Thumbnails follow undo and other edits made while the window is open.
   $effect(() => {
     void app.rev;
     if (selected.some((id) => id >= end)) selected = selected.filter((id) => id < end);

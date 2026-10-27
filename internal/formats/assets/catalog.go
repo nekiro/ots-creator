@@ -11,10 +11,8 @@ import (
 	"strings"
 )
 
-// CatalogFile is the index of an asset folder.
 const CatalogFile = "catalog-content.json"
 
-// Sheet is one sprite sheet of the catalog.
 type Sheet struct {
 	File       string `json:"file"`
 	SpriteType int    `json:"spritetype"`
@@ -23,7 +21,6 @@ type Sheet struct {
 	Area       int    `json:"area"`
 }
 
-// Count returns the number of sprites in the sheet.
 func (s Sheet) Count() int { return int(s.Last-s.First) + 1 }
 
 // Catalog is a parsed catalog-content.json. Entries other than sprite
@@ -40,7 +37,6 @@ type entryHead struct {
 	File string `json:"file"`
 }
 
-// ParseCatalog parses catalog-content.json.
 func ParseCatalog(data []byte) (*Catalog, error) {
 	var raw []json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -80,7 +76,6 @@ func ParseCatalog(data []byte) (*Catalog, error) {
 	return catalog, nil
 }
 
-// ReadCatalog reads the catalog of an asset folder.
 func ReadCatalog(dir string) (*Catalog, error) {
 	data, err := os.ReadFile(filepath.Join(dir, CatalogFile))
 	if err != nil {
@@ -89,13 +84,10 @@ func ReadCatalog(dir string) (*Catalog, error) {
 	return ParseCatalog(data)
 }
 
-// Find returns the index of the sheet holding a sprite id.
 func (c *Catalog) Find(id uint32) (int, bool) {
 	return findSheet(c.Sheets, id)
 }
 
-// findSheet returns the index of the sheet in sheets (sorted by id) that
-// holds sprite id.
 func findSheet(sheets []Sheet, id uint32) (int, bool) {
 	i, found := slices.BinarySearchFunc(sheets, id, func(sheet Sheet, id uint32) int {
 		switch {
@@ -121,7 +113,6 @@ func (c *Catalog) NextSpriteID() uint32 {
 	return c.Sheets[len(c.Sheets)-1].Last + 1
 }
 
-// Files lists every file the catalog references.
 func (c *Catalog) Files() []string {
 	out := []string{c.Appearances}
 	for _, entry := range c.others {
@@ -193,15 +184,10 @@ func FindDir(path string) (string, error) {
 	return "", errors.New("no " + CatalogFile + " found")
 }
 
-// With returns a copy of the catalog with another appearances file and
-// these sprite sheets in place of the current ones.
 func (c *Catalog) With(appearances string, sheets []Sheet) *Catalog {
 	return &Catalog{Appearances: appearances, Sheets: slices.Clone(sheets), others: c.others}
 }
 
-// ClientVersion reads the client version ("15.33") from the package.json
-// of the Tibia package that holds an asset folder. It returns "" when there
-// is none.
 func ClientVersion(dir string) string {
 	data, err := os.ReadFile(filepath.Join(filepath.Dir(dir), "package.json"))
 	if err != nil {

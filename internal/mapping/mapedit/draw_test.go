@@ -8,14 +8,12 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-// drawSetGround puts bare tiles with a ground item, bypassing brushes.
 func drawSetGround(e *Editor, ground uint16, positions ...otmap.Position) {
 	for _, pos := range positions {
 		e.Map.SetTile(pos, &otmap.Tile{Ground: otmap.Item{ID: ground}})
 	}
 }
 
-// drawGroundAt is the ground item id at pos (0 without a tile).
 func drawGroundAt(e *Editor, pos otmap.Position) uint16 {
 	tile := e.Map.Tile(pos)
 	if tile == nil {
@@ -26,7 +24,6 @@ func drawGroundAt(e *Editor, pos otmap.Position) uint16 {
 
 func drawIsGrass(id uint16) bool { return id == grassA || id == grassB }
 
-// drawAddHouse creates a house and fails the test on error.
 func drawAddHouse(t *testing.T, e *Editor, name string) uint32 {
 	t.Helper()
 	id, err := e.SaveHouse(otmap.House{Name: name, TownID: 1})
@@ -43,8 +40,6 @@ func drawLastLabel(e *Editor) string {
 	}
 	return undo[len(undo)-1].Label
 }
-
-// --- dispatch, labels, empty and unknown requests ---
 
 func TestDrawLabelsUndoStepAfterKind(t *testing.T) {
 	cases := []struct {
@@ -132,8 +127,6 @@ func TestDrawUnknownBrushReturnsErrNoBrush(t *testing.T) {
 		})
 	}
 }
-
-// --- brush area ---
 
 func TestBrushAreaCoversShapeAndSize(t *testing.T) {
 	cases := []struct {
@@ -306,8 +299,6 @@ func TestDrawAreaStopsAddingPointsAboveMaxDrawTiles(t *testing.T) {
 	}
 }
 
-// --- flood fill ---
-
 func TestFloodFillReplacesConnectedGround(t *testing.T) {
 	e := testEditor(t)
 	e.Draw(DrawRequest{Kind: KindGround, Name: "sand", Rect: rect(10, 10, 12, 12)})
@@ -386,8 +377,6 @@ func TestFloodFillOfEmptyTilesStaysInsideRadius(t *testing.T) {
 	}
 }
 
-// --- Alt ground replace ---
-
 func TestAltGroundReplacesOnlyStartingGround(t *testing.T) {
 	e := testEditor(t)
 	drawSetGround(e, sandID, at(10, 10), at(11, 10))
@@ -439,8 +428,6 @@ func TestDrawGroundEraseRemovesOnlyThatBrush(t *testing.T) {
 		t.Fatalf("ground at (11,10) = %d, want grass kept: erasing sand leaves other grounds", drawGroundAt(e, at(11, 10)))
 	}
 }
-
-// --- raw items ---
 
 func TestDrawRawAddsItemOnTop(t *testing.T) {
 	e := testEditor(t)
@@ -534,8 +521,6 @@ func TestDrawRawEraseSkipsTilesWithoutItem(t *testing.T) {
 	}
 }
 
-// --- eraser ---
-
 // drawEraserTile is a tile with a ground, a border, a plain stone and a
 // stone with an action id.
 func drawEraserTile(groundActionID uint16) *otmap.Tile {
@@ -622,8 +607,6 @@ func TestEraserReborders(t *testing.T) {
 	}
 }
 
-// --- flags and zones ---
-
 func TestDrawFlagSetsFlagOnGroundTiles(t *testing.T) {
 	e := testEditor(t)
 	drawSetGround(e, sandID, at(10, 10))
@@ -690,8 +673,6 @@ func TestDrawZoneEraseSkipsTilesWithoutZone(t *testing.T) {
 	}
 }
 
-// --- optional border ---
-
 func TestDrawOptionalBorderMarksTile(t *testing.T) {
 	e := testEditor(t)
 	drawSetGround(e, sandID, at(10, 10))
@@ -713,8 +694,6 @@ func TestDrawOptionalBorderEraseUnmarksTile(t *testing.T) {
 		t.Fatalf("Draw changed %d tiles, want 1: the unmarked tile is skipped", changed)
 	}
 }
-
-// --- houses ---
 
 func TestDrawHouseAssignsTilesToHouse(t *testing.T) {
 	e := testEditor(t)
@@ -888,8 +867,6 @@ func TestRemoveHouseClearsPaintedTiles(t *testing.T) {
 	}
 }
 
-// --- house exit and waypoint markers ---
-
 func TestDrawHouseExitSetsExit(t *testing.T) {
 	e := testEditor(t)
 	id := drawAddHouse(t, e, "Villa")
@@ -1009,8 +986,6 @@ func TestDrawWaypointEraseElsewhereAddsNoUndoStep(t *testing.T) {
 	}
 }
 
-// --- spawns ---
-
 func TestDrawSpawnUsesSizeAsRadius(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -1072,8 +1047,6 @@ func TestDrawSpawnEraseRemovesEmptyTile(t *testing.T) {
 		t.Fatalf("Draw changed %d, tile %+v; want 1 change and the empty tile removed", changed, e.Map.Tile(at(10, 10)))
 	}
 }
-
-// --- creatures ---
 
 func TestDrawCreaturePlacesCreatureWithDefaults(t *testing.T) {
 	e := testEditor(t)
@@ -1253,8 +1226,6 @@ func TestCoveredFindsSpawnAround(t *testing.T) {
 		})
 	}
 }
-
-// --- walls, doors, carpets, tables and doodads dispatch ---
 
 func TestDrawWallEraseRemovesWall(t *testing.T) {
 	e := testEditor(t)

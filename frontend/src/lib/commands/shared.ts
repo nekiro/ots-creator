@@ -1,4 +1,3 @@
-// Checks and dialog filters shared by the commands.
 import { formatSize } from "../util/format";
 import { ask } from "../confirm.svelte";
 import { prefs } from "../state/prefs.svelte";
@@ -14,7 +13,6 @@ export const OTB_FILTERS = [{ name: "Server items (items.otb)", pattern: "*.otb"
 
 export const IMAGE_FILTERS = [{ name: "Images (*.png, *.bmp, *.gif, *.jpg)", pattern: "*.png;*.bmp;*.gif;*.jpg;*.jpeg" }];
 
-/** Save dialog filters with the preferred format first. */
 export function imageFilters(preferred = prefs.settings.exportFormat) {
   const all = [
     { value: "png", filter: { name: "PNG image (*.png)", pattern: "*.png" } },
@@ -24,10 +22,8 @@ export function imageFilters(preferred = prefs.settings.exportFormat) {
   return [...all.filter((entry) => entry.value === preferred), ...all.filter((entry) => entry.value !== preferred)].map((entry) => entry.filter);
 }
 
-/** A deep copy of plain data. */
 export const snapshot = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
-/** False (with a hint) when no client is open. */
 export function guard(): boolean {
   if (!app.open) {
     toast("Open or create a client first.");
@@ -41,14 +37,12 @@ export async function confirmDiscard(): Promise<boolean> {
   return ask({ title: "Unapplied changes", message: "The selected object has unapplied changes. Discard them?", ok: "Discard" });
 }
 
-/** Asks before the open client is replaced or closed with unsaved work. */
 export async function confirmLeave(title: string, ok: string): Promise<boolean> {
   if (!(await confirmDiscard())) return false;
   if (!app.project?.info.changed) return true;
   return ask({ title, message: "The client has uncompiled changes. Continue anyway?", ok });
 }
 
-/** ", saves 12.3 MB" for a spr file; asset folders free space when compiled. */
 export const savedNote = (bytes: number) => (bytes > 0 ? `, saves ${formatSize(bytes)}` : "");
 
 /** Text put on the system clipboard by Copy object, so a later paste does

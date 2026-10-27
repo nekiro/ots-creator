@@ -9,7 +9,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/spr"
 )
 
-// TexturePos selects one texture of a frame group.
 type TexturePos struct {
 	Group    thing.FrameGroupType
 	Layer    int

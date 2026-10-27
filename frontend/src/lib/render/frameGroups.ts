@@ -10,7 +10,6 @@ const FALLBACK_DURATION = 100;
 
 export type LayoutKey = keyof Layout | "exactSize";
 
-/** Gives the group one duration per frame: new frames get the category's default. */
 export function syncDurations(group: FrameGroup, category: number): void {
   if (group.frames <= 1) {
     group.durations = [];
@@ -23,13 +22,11 @@ export function syncDurations(group: FrameGroup, category: number): void {
   if (group.startFrame >= group.frames) group.startFrame = 0;
 }
 
-/** Sets every frame to the same duration range (max at least min). */
 export function setAllDurations(group: FrameGroup, min: number, max: number): void {
   if (!group.durations) return;
   group.durations = group.durations.map(() => ({ min, max: Math.max(min, max) }));
 }
 
-/** Changes one layout value of the group, moving its sprites to match. */
 export function setLayout(group: FrameGroup, key: LayoutKey, value: number, category: number): void {
   if (key === "exactSize") {
     group.exactSize = value;

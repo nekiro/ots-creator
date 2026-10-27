@@ -61,7 +61,6 @@ func TestMapServiceRoundTrip(t *testing.T) {
 	if _, err := ms.Draw(info.ID, mapedit.DrawRequest{Kind: mapedit.KindRaw, Item: 101, Points: []otmap.Position{{X: 10, Y: 10, Z: 7}}}); err != nil {
 		t.Fatal(err)
 	}
-	// Chunk endpoint.
 	rec := httptest.NewRecorder()
 	ms.serveMap(rec, httptest.NewRequest("GET", fmt.Sprintf("/res/map/%d/chunks?k=%d", info.ID, ch.Chunks[0]), nil), []string{fmt.Sprint(info.ID), "chunks"})
 	body := rec.Body.Bytes()
@@ -74,13 +73,11 @@ func TestMapServiceRoundTrip(t *testing.T) {
 	if n := binary.LittleEndian.Uint16(body[4:]); n != 9 {
 		t.Fatalf("%d tiles in chunk", n)
 	}
-	// Minimap endpoint.
 	rec = httptest.NewRecorder()
 	ms.serveMap(rec, httptest.NewRequest("GET", "/res/map/1/minimap?x=0&y=0&z=7&w=32&h=32", nil), []string{fmt.Sprint(info.ID), "minimap"})
 	if rec.Code != 200 || rec.Header().Get("Content-Type") != "image/png" {
 		t.Fatalf("minimap %d", rec.Code)
 	}
-	// Inspector.
 	tile, err := ms.Tile(info.ID, otmap.Position{X: 10, Y: 10, Z: 7})
 	if err != nil || tile.Ground == nil || len(tile.Items) != 1 || tile.Items[0].ID != 101 {
 		t.Fatalf("tile = %+v %v", tile, err)
@@ -89,7 +86,6 @@ func TestMapServiceRoundTrip(t *testing.T) {
 	if _, err := ms.UpdateItem(info.ID, mapedit.ItemRef{Pos: otmap.Position{X: 10, Y: 10, Z: 7}, Index: 0}, mapedit.ItemPatch{ActionID: &aid}); err != nil {
 		t.Fatal(err)
 	}
-	// Save and reopen.
 	path := filepath.Join(t.TempDir(), "test.otbm")
 	if _, err := ms.SaveMap(info.ID, path); err != nil {
 		t.Fatal(err)
@@ -112,12 +108,10 @@ func TestMapServiceRoundTrip(t *testing.T) {
 	if recent := ms.Status().Recent; len(recent) != 1 || recent[0].Path != path {
 		t.Fatalf("recent = %+v", recent)
 	}
-	// Undo of a draw after reopening.
 	ms.Draw(res.Info.ID, mapedit.DrawRequest{Kind: mapedit.KindRaw, Item: 101, Points: []otmap.Position{{X: 50, Y: 50, Z: 7}}})
 	if u, _ := ms.Undo(res.Info.ID); u.Info.Tiles != 9 || u.Info.Changed {
 		t.Fatalf("undo = %+v", u.Info)
 	}
-	// Table, appearances and palette.
 	tab, err := ms.Items()
 	if err != nil || len(tab.IDs) != 3 || tab.Flags[0]&tab.Flagbits["ground"] == 0 {
 		t.Fatalf("items = %+v", tab)

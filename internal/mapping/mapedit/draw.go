@@ -12,7 +12,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-// Rect is a rectangle of tiles on one floor (corners in any order).
 type Rect struct {
 	From otmap.Position `json:"from"`
 	To   otmap.Position `json:"to"`
@@ -24,42 +23,29 @@ func (r Rect) bounds() (x0, y0, x1, y1 int) {
 	return
 }
 
-// DrawRequest applies a brush.
 type DrawRequest struct {
-	Kind string `json:"kind"`
-	// Name is the brush name (ground, wall, doodad, carpet, table).
-	Name string `json:"name"`
-	// Item is the item of a raw brush.
-	Item uint16 `json:"item"`
-	// House is the house of house and house exit brushes.
-	House uint32 `json:"house"`
-	// Waypoint is the waypoint name.
-	Waypoint string `json:"waypoint"`
-	// Creature and NPC select the creature type.
+	Kind      string `json:"kind"`
+	Name      string `json:"name"`
+	Item      uint16 `json:"item"`
+	House     uint32 `json:"house"`
+	Waypoint  string `json:"waypoint"`
 	Creature  string `json:"creature"`
 	NPC       bool   `json:"npc"`
 	SpawnTime int32  `json:"spawnTime"`
 	Direction uint8  `json:"direction"`
-	// Flag is the tile flag of flag brushes, Zone the zone id.
-	Flag uint32 `json:"flag"`
-	Zone uint16 `json:"zone"`
-	// DoorType is the door type of door brushes.
-	DoorType string `json:"doorType"`
+	Flag      uint32 `json:"flag"`
+	Zone      uint16 `json:"zone"`
+	DoorType  string `json:"doorType"`
 
-	// Points are the brush centers (a stroke may send several).
 	Points []otmap.Position `json:"points"`
 	Size   int              `json:"size"`
-	// Shape is "square" or "circle".
-	Shape string `json:"shape"`
-	// Erase removes what the brush places (Ctrl).
-	Erase bool `json:"erase"`
+	Shape  string           `json:"shape"`
+	Erase  bool             `json:"erase"`
 	// Alt: ground brushes only replace the ground they started on, walls
 	// change shape on click, doors are placed open, doodads ignore
 	// blocking tiles and duplicates.
-	Alt bool `json:"alt"`
-	// Fill flood fills the ground area under Points[0].
-	Fill bool `json:"fill"`
-	// Rect paints a rectangle (Shift+drag).
+	Alt       bool    `json:"alt"`
+	Fill      bool    `json:"fill"`
 	Rect      *Rect   `json:"rect"`
 	Variation int     `json:"variation"`
 	Thickness float64 `json:"thickness"`
@@ -87,7 +73,6 @@ func (s *posSet) addXY(x, y, z int) {
 	}
 }
 
-// ring returns the tiles around a set (including the set).
 func (s *posSet) ring() *posSet {
 	around := newPosSet()
 	for _, center := range s.list {
@@ -100,8 +85,6 @@ func (s *posSet) ring() *posSet {
 	return around
 }
 
-// BrushArea returns the tiles a brush of a size and shape covers around a
-// center.
 func BrushArea(center otmap.Position, size int, shape string) []otmap.Position {
 	tiles := newPosSet()
 	addArea(tiles, center, size, shape)
@@ -138,7 +121,6 @@ func addOutline(tiles *posSet, x0, y0, x1, y1, z int) {
 	}
 }
 
-// addRect adds every tile of a rectangle.
 func addRect(tiles *posSet, x0, y0, x1, y1, z int) {
 	for y := y0; y <= y1; y++ {
 		for x := x0; x <= x1; x++ {
@@ -147,7 +129,6 @@ func addRect(tiles *posSet, x0, y0, x1, y1, z int) {
 	}
 }
 
-// Draw applies a brush and returns the number of changed tiles.
 func (e *Editor) Draw(req DrawRequest) (int, error) {
 	if len(req.Points) == 0 && req.Rect == nil {
 		return 0, nil
@@ -179,7 +160,6 @@ func (e *Editor) Draw(req DrawRequest) (int, error) {
 	return changed, err
 }
 
-// area returns the tiles a request paints.
 func (e *Editor) area(req DrawRequest) *posSet {
 	tiles := newPosSet()
 	if req.Rect != nil {
@@ -259,7 +239,6 @@ func abs(value int) int {
 	return value
 }
 
-// strokeReplace remembers which ground an Alt stroke replaces.
 type strokeReplace struct {
 	stroke int64
 	brush  *GroundBrush
@@ -296,7 +275,6 @@ func (e *Editor) drawArea(tx *Tx, req DrawRequest) error {
 	return nil
 }
 
-// drawFlag sets or clears a tile flag on the grounds of an area.
 func (e *Editor) drawFlag(tx *Tx, req DrawRequest, area *posSet) {
 	for _, pos := range area.list {
 		current := tx.Get(pos)
@@ -316,7 +294,6 @@ func (e *Editor) drawFlag(tx *Tx, req DrawRequest, area *posSet) {
 	}
 }
 
-// drawZone adds or removes a zone on the grounds of an area.
 func (e *Editor) drawZone(tx *Tx, req DrawRequest, area *posSet) {
 	for _, pos := range area.list {
 		current := tx.Get(pos)
@@ -338,8 +315,6 @@ func (e *Editor) drawZone(tx *Tx, req DrawRequest, area *posSet) {
 	}
 }
 
-// drawOptionalBorder marks or unmarks tiles for an optional border and
-// borderizes them.
 func (e *Editor) drawOptionalBorder(tx *Tx, req DrawRequest, area *posSet) {
 	for _, pos := range area.list {
 		current := tx.Get(pos)
@@ -607,7 +582,6 @@ func (e *Editor) drawHouse(tx *Tx, req DrawRequest, area *posSet) error {
 	return nil
 }
 
-// eraseHouseTile takes a tile out of its house and clears its door ids.
 func eraseHouseTile(tile *otmap.Tile) {
 	tile.HouseID = 0
 	tile.Flags &^= otmap.FlagPZ
@@ -639,8 +613,6 @@ func (e *Editor) addHouseTile(tx *Tx, tile *otmap.Tile, houseID uint32) {
 	}
 }
 
-// assignDoorID gives a door on a house tile the lowest free door id of the
-// house.
 func (e *Editor) assignDoorID(tx *Tx, tile *otmap.Tile, i int) {
 	if tile.HouseID == 0 {
 		return
@@ -680,7 +652,6 @@ func (e *Editor) drawMarker(tx *Tx, req DrawRequest) error {
 	return nil
 }
 
-// drawHouseExit moves the exit of a house to target, or clears it.
 func (e *Editor) drawHouseExit(tx *Tx, req DrawRequest, target otmap.Position) error {
 	house := e.Map.Houses[req.House]
 	if house == nil {
@@ -703,8 +674,6 @@ func (e *Editor) drawHouseExit(tx *Tx, req DrawRequest, target otmap.Position) e
 	return nil
 }
 
-// drawWaypoint moves or adds a waypoint at target, or removes the waypoint
-// there.
 func (e *Editor) drawWaypoint(tx *Tx, req DrawRequest, target otmap.Position) error {
 	if req.Erase {
 		for i, waypoint := range e.Map.Waypoints {
@@ -755,7 +724,6 @@ func (e *Editor) drawSpawn(tx *Tx, req DrawRequest) {
 	}
 }
 
-// covered reports whether a spawn area covers target.
 func (e *Editor) covered(target otmap.Position, npc bool) bool {
 	x, y := int(target.X), int(target.Y)
 	found := false

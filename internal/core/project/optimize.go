@@ -8,31 +8,25 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/assets"
 )
 
-// OptimizeOptions select what OptimizeSprites removes.
 type OptimizeOptions struct {
-	// Duplicates merges sprites with identical pixels into one.
 	Duplicates bool `json:"duplicates"`
-	// Unused drops sprites no thing references.
-	Unused bool `json:"unused"`
+	Unused     bool `json:"unused"`
 	// Empty points references to fully transparent sprites at id 0.
 	Empty bool `json:"empty"`
 }
 
-// OptimizeResult reports what OptimizeSprites did.
 type OptimizeResult struct {
 	Before     uint32 `json:"before"`
 	After      uint32 `json:"after"`
 	Duplicates int    `json:"duplicates"`
 	Unused     int    `json:"unused"`
 	Empty      int    `json:"empty"`
-	// Things counts things whose sprite ids were rewritten.
-	Things int `json:"things"`
+	Things     int    `json:"things"`
 	// Bytes is how much smaller the spr file gets. Asset folders keep their
 	// sheets, so it is 0 there.
 	Bytes int64 `json:"bytes"`
 }
 
-// spritePlan is what OptimizeSprites would change.
 type spritePlan struct {
 	result OptimizeResult
 	// canon maps every id to the id that replaces it (0 = empty).
@@ -131,7 +125,6 @@ func (p *Project) planSprites(options OptimizeOptions, progress *counter) (sprit
 		}
 	}
 
-	// Sprites that stay, in order, and their new ids.
 	newID := make([]uint32, count+1)
 	var next uint32
 	for id := uint32(1); id <= count; id++ {
@@ -162,7 +155,6 @@ func (p *Project) planSprites(options OptimizeOptions, progress *counter) (sprit
 	return spritePlan{result: result, canon: canon, newID: newID}, nil
 }
 
-// pieceRun is the pieces first..first+count-1 that read one sheet sprite.
 type pieceRun struct {
 	first, count uint32
 	// width is the sprite width in pieces (2 pieces are 2x1 or 1x2).
@@ -192,8 +184,6 @@ func (p *Project) sheetSprites() []pieceRun {
 	return runs
 }
 
-// sheetSpriteAt reports whether the pieces from id read a whole sheet
-// sprite, from its first piece on.
 func (p *Project) sheetSpriteAt(pieceMap *assets.PieceMap, id, count uint32) (pieceRun, bool) {
 	baseID, ok := p.sprites.baseID(id)
 	if !ok {
@@ -216,8 +206,6 @@ func (p *Project) sheetSpriteAt(pieceMap *assets.PieceMap, id, count uint32) (pi
 	return pieceRun{first: id, count: n, width: width}, true
 }
 
-// mergeSheetSprites points the pieces of every sheet sprite that looks like
-// an earlier one at that one and returns the number of merged pieces.
 func mergeSheetSprites(runs []pieceRun, hashes []spriteHash, canon []uint32) int {
 	merged := 0
 	firstRun := make(map[string]uint32, len(runs))
@@ -280,8 +268,6 @@ func (p *Project) OptimizeSprites(options OptimizeOptions, progress func(done, t
 	return result, nil
 }
 
-// remapSpriteRefs points every sprite reference of every thing at
-// remap(id), records the changed things in edit and returns their number.
 func (p *Project) remapSpriteRefs(edit *recorder, remap func(id uint32) uint32) int {
 	changed := 0
 	for _, category := range thing.Categories {

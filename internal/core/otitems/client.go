@@ -6,7 +6,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
-// ThingSource gives the client items an item database reads flags from.
 type ThingSource interface {
 	Thing(category thing.Category, id uint32) (*thing.Thing, error)
 }
@@ -93,7 +92,6 @@ func applyHookFlags(itemType *Type, props *thing.Properties) {
 	}
 }
 
-// applyServerFlags sets the flags items.otb would provide.
 func applyServerFlags(itemType *Type, props *thing.Properties) {
 	set := func(on bool, flag Flags) {
 		if on {
@@ -122,8 +120,6 @@ func applyServerFlags(itemType *Type, props *thing.Properties) {
 	set(props.IgnoreLook, FlagIgnoreLook)
 }
 
-// applyServerGroup sets the top order, group, ground speed and container
-// kind items.otb would provide.
 func applyServerGroup(itemType *Type, props *thing.Properties) {
 	switch {
 	case props.GroundBorder:

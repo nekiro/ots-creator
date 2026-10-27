@@ -8,7 +8,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-// Item ids of the test materials.
 const (
 	grassA, grassB        = 100, 101
 	sandID                = 110
@@ -106,16 +105,12 @@ func itemIDs(t *otmap.Tile) []uint16 {
 	return ids
 }
 
-// rect is a rectangle on floor 7.
 func rect(x0, y0, x1, y1 int) *Rect { return &Rect{From: at(x0, y0), To: at(x1, y1)} }
 
-// points lists brush centers.
 func points(positions ...otmap.Position) []otmap.Position { return positions }
 
-// ptr returns a pointer to a copy of value (for patches).
 func ptr[T any](value T) *T { return &value }
 
-// errText is an error's message, or nil, for comparing results.
 func errText(err error) any {
 	if err == nil {
 		return nil

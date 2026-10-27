@@ -1,5 +1,3 @@
-// The image of the object preview: the texture at a position with addons
-// and outfit colors, and a rider stacked on its mount.
 import type { FrameGroup } from "../api";
 import { compose, stackBottomRight, type PixelSource } from "./compose";
 import type { TexturePos } from "./layout";
@@ -7,16 +5,13 @@ import type { OutfitColors } from "./outfit";
 
 export interface PreviewImageInput {
   frameGroup: FrameGroup;
-  /** The mount's frame group when the outfit rides one. */
   mountGroup: FrameGroup | null;
   size: number;
   pos: TexturePos;
   isOutfit: boolean;
-  /** Mounted is chosen (drawn only when the outfit has a mounted pattern). */
   mount: boolean;
   addon1: boolean;
   addon2: boolean;
-  /** Outfit colors, null for the raw template colors. */
   colors: OutfitColors | null;
   get: PixelSource;
 }
@@ -26,7 +21,6 @@ export function mountedPattern(frameGroup: FrameGroup, isOutfit: boolean, mount:
   return isOutfit && mount && frameGroup.patternZ > 1;
 }
 
-/** The preview image and where the rider sits in it. */
 export function renderPreviewImage(input: PreviewImageInput): { image: ImageData; riderOffset: [number, number] } {
   const { frameGroup, mountGroup, size, pos, isOutfit, colors, get } = input;
   const addons = isOutfit ? [input.addon1 ? 1 : -1, input.addon2 ? 2 : -1].filter((y) => y > 0) : [];

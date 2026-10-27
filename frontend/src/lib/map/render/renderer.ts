@@ -26,25 +26,20 @@ import type { FrameResult, Scene } from "./scene";
 import { ThingDrawer } from "../data/things";
 import { Camera, floorsToDraw, type TileRange } from "../view/view";
 
-/** Floors of the play view, bottom up. */
 function playFloors(play: { firstFloor: number; lastFloor: number }): number[] {
   const floors: number[] = [];
   for (let z = Math.max(play.lastFloor, play.firstFloor); z >= play.firstFloor; z--) floors.push(z);
   return floors;
 }
 
-/** The chunks a tile range covers (tiles before 0 count as tile 0). */
 function chunkRange(range: TileRange): TileRange {
   return { x0: chunkOfTile(Math.max(0, range.x0)), y0: chunkOfTile(Math.max(0, range.y0)), x1: chunkOfTile(Math.max(0, range.x1)), y1: chunkOfTile(Math.max(0, range.y1)) };
 }
 
-/** The chunks a frame draws, and how many of them are still loading. */
 interface ChunkPlan {
-  /** What the chunk quads are built for (view options, house, block size). */
   signature: string;
   /** Chunks a side of what is drawn: 1, or BLOCK_CHUNKS far out. */
   blockSize: number;
-  /** Chunks of the floor in view still loading or not uploaded yet. */
   notReady: number;
   /** Per floor: blocks loaded before, drawn under chunks still loading (right after zooming in). */
   underneath: Map<number, GeoChunk[]>;
@@ -57,14 +52,12 @@ export class MapRenderer {
   private things: ThingDrawer;
   private lights: LightPass;
   atlas: Atlas | null = null;
-  /** Sprites drawn this frame that are not loaded yet. */
   private missing = new Set<number>();
 
   constructor(readonly canvas: HTMLCanvasElement) {
     const gl = canvas.getContext("webgl2", { alpha: false, antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: true });
     if (!gl) throw new Error("WebGL 2 is not available");
     this.gl = gl;
-    // The unit square every quad is drawn from.
     const corners = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, corners);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]), gl.STATIC_DRAW);
@@ -115,7 +108,6 @@ export class MapRenderer {
     const floors = scene.play ? playFloors(scene.play) : floorsToDraw(scene, camera.visibleTiles);
     result.far = tilePx < ZOOM.sprites || camera.visibleTiles > LIMITS.visibleTiles;
     if (result.far) {
-      // Overlays only.
       drawOverlays(scene, result, camera, this.batch);
       this.flushScreen(scene);
       return result;
@@ -123,13 +115,11 @@ export class MapRenderer {
 
     const { drawItem, drawCreature } = this.things.drawers(scene, scene.scale, tilePx, result);
     const plan = this.planChunks(scene, tilePx);
-    // The floor in view requests first.
     const chunksByFloor = new Map<number, GeoChunk[]>();
     chunksByFloor.set(floor, this.chunksInView(scene, camera, floor, plan));
     for (const z of floors) if (z !== floor) chunksByFloor.set(z, this.chunksInView(scene, camera, z, plan));
     const ghostFloor = scene.opts.ghostHigher && floor > 0 && floor !== 8 ? floor - 1 : -1;
     if (ghostFloor >= 0) chunksByFloor.set(ghostFloor, this.chunksInView(scene, camera, ghostFloor, plan));
-    // The current floor uploads first.
     for (const chunk of chunksByFloor.get(floor) ?? []) if (!this.chunks.upload(chunk)) plan.notReady++;
     // What is in view has upload time first; the floors above and below take what is left.
     for (const z of floors) for (const chunk of chunksByFloor.get(z)!) this.chunks.upload(chunk);
@@ -141,7 +131,6 @@ export class MapRenderer {
       }
     }
 
-    // Draw floors from the bottom up.
     for (const z of floors) {
       const isFloorInView = z === floor;
       // Over the floor right under the one in view and what is under it (client: shadowFloorIntensity).
@@ -430,7 +419,6 @@ export class MapRenderer {
     return out;
   }
 
-  /** Draws the screen-space quads pushed so far. */
   private flushScreen(scene: Scene): void {
     if (!this.batch.flush(scene)) return;
     this.chunks.unbind();

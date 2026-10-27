@@ -4,7 +4,6 @@ import (
 	"strconv"
 )
 
-// Group is the item group stored in items.otb.
 type Group uint8
 
 const (
@@ -25,7 +24,6 @@ const (
 	GroupDeprecated
 )
 
-// Kind is the item type declared in items.xml ("type" attribute).
 type Kind uint8
 
 const (
@@ -49,7 +47,6 @@ var kindNames = map[string]Kind{
 	"podium": KindPodium, "rune": KindRune,
 }
 
-// String returns the items.xml name of the kind.
 func (k Kind) String() string {
 	for name, kind := range kindNames {
 		if kind == k {
@@ -59,7 +56,6 @@ func (k Kind) String() string {
 	return ""
 }
 
-// Flags are item properties relevant to editing and drawing.
 type Flags uint32
 
 const (
@@ -90,10 +86,8 @@ const (
 	FlagLight
 )
 
-// Has reports whether all bits of flags are set.
 func (f Flags) Has(flags Flags) bool { return f&flags == flags }
 
-// Type is one item type.
 type Type struct {
 	ID       uint16 `json:"id"`
 	ClientID uint16 `json:"clientId"`
@@ -115,29 +109,22 @@ type Type struct {
 	EditorSuffix string `json:"editorSuffix,omitempty"`
 }
 
-// IsGround reports whether the item is a ground tile.
 func (t *Type) IsGround() bool { return t.Flags.Has(FlagGround) }
 
-// IsBorder reports whether the item is a ground border.
 func (t *Type) IsBorder() bool { return t.TopOrder == 1 }
 
-// HasSubtype reports whether the item stores a count or fluid subtype.
 func (t *Type) HasSubtype() bool {
 	return t.Flags&(FlagStackable|FlagFluidContainer|FlagSplash|FlagCharges) != 0
 }
 
-// IsContainer reports whether the item can hold other items.
 func (t *Type) IsContainer() bool {
 	return t.Flags.Has(FlagContainer) || t.Kind == KindContainer || t.Group == GroupContainer
 }
 
-// IsDoor reports whether the item is a door.
 func (t *Type) IsDoor() bool { return t.Kind == KindDoor || t.Group == GroupDoor }
 
-// IsTeleport reports whether the item has a teleport destination.
 func (t *Type) IsTeleport() bool { return t.Kind == KindTeleport || t.Group == GroupTeleport }
 
-// IsDepot reports whether the item is a depot locker.
 func (t *Type) IsDepot() bool { return t.Kind == KindDepot }
 
 // KindName names what the item is for the inspector: its items.xml type,
@@ -165,8 +152,6 @@ func (t *Type) KindName() string {
 	return ""
 }
 
-// FlagNames maps the name of every flag to its bit, for clients that test
-// flags by name.
 func FlagNames() map[string]Flags {
 	return map[string]Flags{
 		"ground": FlagGround, "unpassable": FlagUnpassable, "blockMissile": FlagBlockMissile,
@@ -180,7 +165,6 @@ func FlagNames() map[string]Flags {
 	}
 }
 
-// DisplayName returns the name or a placeholder.
 func (t *Type) DisplayName() string {
 	if t.Name != "" {
 		return t.Name

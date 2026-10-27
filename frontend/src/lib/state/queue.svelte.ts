@@ -1,8 +1,3 @@
-// Queues of objects waiting to be dropped into the open client (A) under
-// ids chosen in its slots (DropPanel). Each drop takes the first queued
-// object of the category. The compare window queues objects of the second
-// client (B) by id; the object viewer queues object files by path.
-
 import { CATEGORY_NAMES, CompareService, res, ThingService, type Category } from "../api";
 import { ask } from "../confirm.svelte";
 import { formatIdList } from "../util/format";
@@ -11,44 +6,35 @@ import { app, hasToast, otherVersions, run, toast } from "./app.svelte";
 export interface QueueItem<K extends number | string = number | string> {
   category: Category;
   key: K;
-  /** Thumbnail URL; the queue's thumb() is used when missing. */
   thumb?: string;
-  /** Text shown for the item; "#key" when missing. */
   label?: string;
 }
 
-/** What a dropped batch got: ids in A, and new sprites when known. */
 export interface DropResult {
   ids: number[];
   sprites?: number;
 }
 
 export interface QueueSource<K extends number | string> {
-  /** Where the queued objects come from, for texts ("from B"). */
   from: string;
-  /** Hint shown while the queue is empty. */
   hint: string;
   items: () => QueueItem<K>[];
   setItems: (items: QueueItem<K>[]) => void;
   thumb?: (category: Category, key: K) => string;
-  /** Puts keys into A at targets, or at the end of A when targets is null. */
   put: (category: Category, keys: K[], targets: number[] | null) => Promise<DropResult>;
 }
 
 export class DropQueue<K extends number | string = number | string> {
   constructor(readonly src: QueueSource<K>) {}
 
-  /** Queued items of category category, in queue order. */
   list(category: Category): QueueItem<K>[] {
     return this.src.items().filter((item) => item.category === category);
   }
 
-  /** Queued keys of category category, in queue order. */
   queued(category: Category): K[] {
     return this.list(category).map((item) => item.key);
   }
 
-  /** Total number of queued items per category. */
   counts(): Map<Category, number> {
     const counts = new Map<Category, number>();
     for (const item of this.src.items()) counts.set(item.category, (counts.get(item.category) ?? 0) + 1);
@@ -63,7 +49,6 @@ export class DropQueue<K extends number | string = number | string> {
     return item.thumb ?? this.src.thumb?.(item.category, item.key) ?? "";
   }
 
-  /** Adds items to the end of the queue (each one once). */
   enqueue(category: Category, items: (K | Omit<QueueItem<K>, "category">)[]): void {
     const have = new Set(this.queued(category));
     const add = items
@@ -80,7 +65,6 @@ export class DropQueue<K extends number | string = number | string> {
     this.src.setItems(this.src.items().filter((item) => item.category !== category));
   }
 
-  /** Moves a queued item to the front, so it is dropped next. */
   toFront(category: Category, key: K): void {
     const all = this.src.items();
     const index = all.findIndex((item) => item.category === category && item.key === key);
@@ -128,7 +112,6 @@ export class DropQueue<K extends number | string = number | string> {
 const DROP_TOAST = "queue-drop";
 let streak: { queue: unknown; category: Category; ids: number[]; sprites: number } = { queue: null, category: 0 as Category, ids: [], sprites: 0 };
 
-/** Objects of B queued in the compare window. */
 export const compareQueue = new DropQueue<number>({
   from: "from B",
   hint: "Queue objects of B first (double click a row).",
@@ -141,7 +124,6 @@ export const compareQueue = new DropQueue<number>({
   },
 });
 
-/** Object files queued in the object viewer. */
 export const fileQueue = new DropQueue<string>({
   from: "files",
   hint: "Queue object files first (double click a file).",

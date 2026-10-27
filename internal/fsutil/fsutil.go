@@ -1,5 +1,3 @@
-// Package fsutil holds the small file system helpers shared by the
-// packages that read and write client, map and settings files.
 package fsutil
 
 import (
@@ -14,25 +12,20 @@ import (
 )
 
 const (
-	// FileMode is the permission of every file the app writes.
 	FileMode fs.FileMode = 0o644
-	// DirMode is the permission of every directory the app creates.
-	DirMode fs.FileMode = 0o755
+	DirMode  fs.FileMode = 0o755
 )
 
-// FileExists reports whether path is an existing regular file.
 func FileExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
 }
 
-// DirExists reports whether path is an existing directory.
 func DirExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
 }
 
-// ReadOptional reads a file, treating "" and a missing file as no data.
 func ReadOptional(path string) ([]byte, error) {
 	if path == "" {
 		return nil, nil
@@ -138,12 +131,10 @@ func PathKey(path string) string {
 	return path
 }
 
-// SamePath reports whether two paths name the same file.
 func SamePath(first, second string) bool {
 	return PathKey(first) == PathKey(second)
 }
 
-// TrimExt returns name without its extension.
 func TrimExt(name string) string { return strings.TrimSuffix(name, filepath.Ext(name)) }
 
 // EnsureExt returns path ending with ext (".otbm"), adding it when path

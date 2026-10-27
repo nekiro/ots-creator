@@ -23,7 +23,6 @@
   let mode = $state<"all" | "object">("object");
   let jump = $state("");
   let filter = $state("");
-  // Ids matching the filter of the All tab; refreshed after every change.
   let found = $state.raw<number[] | null>(null);
   $effect(() => {
     const searched = filter;

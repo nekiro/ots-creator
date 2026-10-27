@@ -1,7 +1,6 @@
 <script lang="ts" generics="T">
   import type { Snippet } from "svelte";
 
-  // Renders only the visible cells of a large uniform grid.
   let {
     count,
     cellWidth,
@@ -18,7 +17,6 @@
     gap?: number;
     overscan?: number;
     cell: Snippet<[number]>;
-    /** Index to keep visible; changes scroll the grid. */
     scrollTo?: number | null;
     onkeydown?: (event: KeyboardEvent, columns: number) => void;
   } = $props();
@@ -54,7 +52,6 @@
     else if (top + rowHeight > scroller.scrollTop + scroller.clientHeight) scroller.scrollTop = top + rowHeight - scroller.clientHeight;
   });
 
-  /** Distance from the top or bottom edge that scrolls during a drag. */
   const DRAG_EDGE = 40;
 
   // Dragging near an edge scrolls, faster closer to it, so a drag can reach

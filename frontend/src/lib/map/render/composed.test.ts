@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { SpriteCache } from "../../render/sprites";
 import { composedKey, composeOutfit, packColors, unpackColors } from "./composed";
 
-/** A sprite cache holding solid 1x1 sprites (rgba) by id. */
 function sprites(pixels: Record<number, number[]>): SpriteCache {
   const entries = new Map(Object.entries(pixels).map(([id, rgba]) => [Number(id), { pixels: new Uint8ClampedArray(rgba) }]));
   return { get: (id: number) => entries.get(id) } as unknown as SpriteCache;

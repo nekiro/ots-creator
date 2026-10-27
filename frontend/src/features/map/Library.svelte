@@ -1,6 +1,4 @@
 <script lang="ts">
-  // What to draw with: brushes, items and creatures. The search field filters
-  // the open tab; the tabs show how many of theirs match.
   import { untrack } from "svelte";
   import { errorMessage } from "../../lib/api";
   import { ask, askText } from "../../lib/confirm.svelte";
@@ -55,7 +53,6 @@
   $effect(() => saveJson(PREFS_KEY, { view, collection }));
 
   const palette = $derived(map.palette);
-  /** A client is open and its item table or palette is still loading. */
   const loadingData = $derived(app.open && (!map.items || !map.palette));
   const sets = $derived(palette?.tilesets?.filter((tileset) => !!tileset) ?? []);
   const set = $derived(sets.find((tileset) => tileset.name === collection) ?? null);
@@ -63,17 +60,14 @@
   const allBrushes = $derived((palette?.brushes ?? []).filter((brush): brush is PaletteBrush => !!brush));
   const creatures = $derived((palette?.creatures ?? []).filter((creature): creature is CreatureType => !!creature));
 
-  // ----- search -----
   const search = $derived(query.trim().toLowerCase());
   const named = <T extends { name: string }>(list: T[]) => (search ? list.filter((entry) => entry.name.toLowerCase().includes(search)) : list);
 
-  // ----- terrain and decor -----
   const terrainAll = $derived(set ? ((set.terrain ?? []) as PaletteBrush[]) : allBrushes.filter((brush) => brush.kind !== "doodad"));
   const decorAll = $derived(set ? ((set.doodads ?? []) as PaletteBrush[]) : allBrushes.filter((brush) => brush.kind === "doodad"));
   const terrain = $derived(named(terrainAll));
   const decor = $derived(named(decorAll));
 
-  // ----- items -----
   const collectionItems = $derived.by<number[]>(() => {
     if (set) return [...new Set([...(set.items ?? []), ...(set.raw ?? [])])];
     return map.items?.ids ?? [];
@@ -138,12 +132,10 @@
     return index >= 0 ? index : null;
   });
 
-  // ----- creatures -----
   const matchedCreatures = $derived(named(creatures));
   const shownCreatures = $derived(matchedCreatures.filter((creature) => who === "all" || (who === "npc") === !!creature.npc));
   const separate = $derived(map.active?.props.spawnFormat === SpawnFormat.SpawnsSeparate);
 
-  // Matches per tab while searching.
   const counts = $derived<Record<View, number>>({ terrain: terrain.length, decor: decor.length, items: baseItems.length, creatures: matchedCreatures.length });
 
   function brushSel(brush: PaletteBrush): BrushSel {
@@ -217,7 +209,6 @@
   </button>
 {/snippet}
 
-<!-- Groups of tiles (stamps): shown whole in a grid of cards, an icon tells too little. -->
 {#snippet stampCards(list: PaletteBrush[])}
   {#if list.length}
     <div class="m-sect">Groups<span class="grow"></span>{list.length}</div>

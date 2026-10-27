@@ -1,4 +1,3 @@
-// Adding, removing, importing and exporting objects.
 import { CATEGORY_NAMES, Category, DialogService, ThingService, minId } from "../api";
 import { ask, askText } from "../confirm.svelte";
 import { prefs } from "../state/prefs.svelte";
@@ -7,7 +6,6 @@ import { OBJECT_FILTERS, confirmDiscard, guard } from "./shared";
 
 type ImportResults = NonNullable<Awaited<ReturnType<typeof ThingService.ImportObjects>>>;
 
-/** Toasts what an object import did and selects the last imported object. */
 export async function reportImported(results: ImportResults): Promise<void> {
   const imported = results.filter((result) => !result.error);
   if (imported.length) toast(`Imported ${imported.length} object(s).`, "success");
@@ -47,7 +45,6 @@ export const objectCommands = {
     if (ids?.length) await select(ids[0]);
   },
 
-  /** Asks for an id and moves the selection there (see moveSelection). */
   async moveTo() {
     if (!guard() || app.selection.length === 0 || !(await confirmDiscard())) return;
     const category = app.category;
@@ -90,7 +87,6 @@ export const objectCommands = {
     if (files) toast(`Exported ${files.length} file(s).`, "success");
   },
 
-  /** Exports every object with sprites, one folder per category. */
   async exportAllObjects() {
     if (!guard()) return;
     const dir = await DialogService.PickDirectory("exportAllObjects", "Export all objects to");
@@ -111,21 +107,18 @@ export const objectCommands = {
     toast(`Converted ${result.converted} outfit(s).${skipped}`, result.converted ? "success" : "info");
   },
 
-  /** Opens the share window for the focused object. */
   shareObject() {
     if (!guard() || app.focused === null) return;
     app.shareTarget = { kind: "object", category: app.category, id: app.focused };
     app.dialog = "share";
   },
 
-  /** Opens the share window for the selected sprites. */
   shareSprites() {
     if (!guard() || app.selectedSprites.length === 0) return;
     app.shareTarget = { kind: "sprites", ids: [...app.selectedSprites].sort((first, second) => first - second) };
     app.dialog = "share";
   },
 
-  /** Opens the share window with a picker, starting from the selection. */
   sharePick() {
     app.shareTarget = !app.open
       ? { kind: "file", path: "", pick: true }

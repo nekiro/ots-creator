@@ -10,11 +10,8 @@ export const ZOOM = {
   detail: 4,
   /** Tile data for overlays and previews is loaded. */
   tileData: 8,
-  /** Grid lines. */
   grid: 8,
-  /** Marker names. */
   markerNames: 12,
-  /** Creature names, item texts and tooltips. */
   labels: 24,
 } as const;
 
@@ -35,9 +32,7 @@ export const LIMITS = {
   spawnSearch: 30,
 } as const;
 
-/** The sprite atlas: a texture array of square cells. */
 export const ATLAS = {
-  /** Width and height of each layer in pixels. */
   size: 1024,
   startLayers: 4,
   /** Past this many layers the least recently used cells are reused. */
@@ -82,7 +77,6 @@ export const PLAY = {
 /** Chunks a side of the blocks drawn far out. */
 export const BLOCK_CHUNKS = 4;
 
-/** The data the shaders read. */
 export const GPU = {
   /** Floats per screen quad: rectangle (4), atlas cell (2), color (4). */
   floatsPerQuad: 10,
@@ -102,7 +96,6 @@ export const COLORS = {
   clientBox: [1, 1, 1, 0.6],
   hoverTile: [1, 1, 1, 0.12],
   positionTag: [0, 0, 0, 0.75],
-  /** Over tiles of a dragged selection. */
   movedTile: [0.4, 0.7, 1, 0.15],
   /** Things that cannot be drawn: alpha is multiplied by the thing's alpha. */
   unknownItem: [0.8, 0, 0, 0.6],
@@ -114,11 +107,8 @@ export const COLORS = {
 export const ALPHA = {
   /** The floor above drawn over the floor in view (ghostHigher). */
   ghostFloor: 0.3,
-  /** The tile a spawn is on. */
   spawnCenter: 0.25,
-  /** Marker outlines. */
   marker: 0.9,
-  /** Things of a dragged selection. */
   moved: 0.6,
   /** Shade (rgb multiplier) of selected creatures. */
   selectedShade: 0.5,
@@ -135,7 +125,6 @@ export const LABEL_COLORS = {
 export const AREA_BRUSH_KINDS: ReadonlySet<string> = new Set(["raw", "ground", "wall", "carpet", "table", "eraser", "house", "flag", "zone", "optionalBorder"]);
 /** Brush kinds that paint along the mouse while the button is held. */
 export const SMEAR_BRUSH_KINDS: ReadonlySet<string> = new Set([...AREA_BRUSH_KINDS, "creature"]);
-/** Brush kinds that Shift+drag draws over a rectangle. */
 export const RECT_BRUSH_KINDS: ReadonlySet<string> = AREA_BRUSH_KINDS;
 
 type Rgb = [number, number, number];
@@ -168,10 +157,8 @@ export const PREVIEW_COLORS: {
   brushBounds: [1, 1, 1, 0.35],
 };
 
-/** Alpha of ghost tiles: pasted things and brush previews. */
 export const GHOST_ALPHA = { paste: 0.65, brush: 0.55 } as const;
 
-/** Largest rectangle (in tiles) whose items the rectangle brush previews. */
 export const MAX_RECT_PREVIEW_TILES = 4000;
 
 /** Marker colors (rgb): the color tells the kind, so labels carry a short name. */
@@ -181,15 +168,11 @@ export const MARKER_COLORS: { waypoint: Rgb; houseExit: Rgb; temple: Rgb } = {
   temple: [1, 0.85, 0.3],
 };
 
-/** The overlay canvas with names and texts over the map. */
 export const LABEL_FONT = {
   /** Size of the client's name font in CSS pixels. */
   nameSize: 14,
-  /** Size of the small pixel font in CSS pixels. */
   smallSize: 9,
-  /** Most names drawn in a frame. */
   maxNames: 1000,
-  /** Marker names longer than this are cut. */
   maxMarkerChars: 18,
 } as const;
 
@@ -199,8 +182,6 @@ export const DRAG_THRESHOLD = { pan: 3, selectionBox: 4 } as const;
 /** Delays before drawing again (ms). */
 export const REDRAW_DELAY = { pending: 60, animated: 90 } as const;
 
-/** Tiles the camera moves per Shift+wheel step. */
 export const WHEEL_PAN_TILES = 3;
 
-/** How often the FPS counter updates (ms). */
 export const FPS_POLL_MS = 250;

@@ -1,6 +1,3 @@
-// Package thing contains the version-independent model of client objects
-// (items, outfits, effects and missiles). Codecs translate between this
-// model and concrete file formats.
 package thing
 
 import (
@@ -19,10 +16,8 @@ const (
 	CategoryMissile Category = 4
 )
 
-// Categories lists all valid categories in file order.
 var Categories = []Category{CategoryItem, CategoryOutfit, CategoryEffect, CategoryMissile}
 
-// String returns the lowercase name used by ObjectBuilder ("item", "outfit"...).
 func (c Category) String() string {
 	switch c {
 	case CategoryItem:
@@ -37,7 +32,6 @@ func (c Category) String() string {
 	return "invalid"
 }
 
-// ParseCategory converts a name produced by String back to a Category.
 func ParseCategory(name string) (Category, error) {
 	for _, category := range Categories {
 		if category.String() == name {
@@ -47,10 +41,8 @@ func ParseCategory(name string) (Category, error) {
 	return CategoryInvalid, fmt.Errorf("invalid thing category %q", name)
 }
 
-// Valid reports whether c is one of the four known categories.
 func (c Category) Valid() bool { return c >= CategoryItem && c <= CategoryMissile }
 
-// MinID returns the first id used by a category in Tibia.dat.
 func (c Category) MinID() uint32 {
 	if c == CategoryItem {
 		return 100
@@ -74,7 +66,6 @@ func (c Category) DefaultDuration() uint32 {
 	return 100
 }
 
-// FrameGroupType identifies an outfit frame group.
 type FrameGroupType uint8
 
 const (
@@ -92,13 +83,11 @@ const (
 	West  Direction = 3
 )
 
-// Point is a signed 2D offset.
 type Point struct {
 	X int16 `json:"x"`
 	Y int16 `json:"y"`
 }
 
-// Market holds the market flag payload.
 type Market struct {
 	Category           uint16 `json:"category"`
 	TradeAs            uint16 `json:"tradeAs"`
@@ -231,7 +220,6 @@ type NpcSale struct {
 	CurrencyQuestFlag string `json:"currencyQuestFlag"`
 }
 
-// AnimationMode controls how an animation starts.
 type AnimationMode uint8
 
 const (
@@ -239,13 +227,11 @@ const (
 	AnimationSync  AnimationMode = 1
 )
 
-// FrameDuration is the duration range of one animation frame in milliseconds.
 type FrameDuration struct {
 	Min uint32 `json:"min"`
 	Max uint32 `json:"max"`
 }
 
-// FrameGroup holds the sprite layout and animation of one frame group.
 type FrameGroup struct {
 	Type       FrameGroupType  `json:"type"`
 	Width      uint8           `json:"width"`
@@ -263,22 +249,18 @@ type FrameGroup struct {
 	Sprites    []uint32        `json:"sprites"`
 }
 
-// NewFrameGroup returns a 1x1 group with one empty sprite slot.
 func NewFrameGroup() *FrameGroup {
 	group := &FrameGroup{Width: 1, Height: 1, ExactSize: 32, Layers: 1, PatternX: 1, PatternY: 1, PatternZ: 1, Frames: 1}
 	group.Sprites = make([]uint32, 1)
 	return group
 }
 
-// IsAnimation reports whether the group has more than one frame.
 func (g *FrameGroup) IsAnimation() bool { return g.Frames > 1 }
 
-// TotalSprites returns the number of sprite slots described by the layout.
 func (g *FrameGroup) TotalSprites() int {
 	return int(g.Width) * int(g.Height) * int(g.Layers) * int(g.PatternX) * int(g.PatternY) * int(g.PatternZ) * int(g.Frames)
 }
 
-// TotalTextures returns the number of composed textures (sprites per tile area).
 func (g *FrameGroup) TotalTextures() int {
 	return int(g.Layers) * int(g.PatternX) * int(g.PatternY) * int(g.PatternZ) * int(g.Frames)
 }
@@ -290,7 +272,6 @@ func (g *FrameGroup) SpriteIndex(tileX, tileY, layer, patternX, patternY, patter
 	return ((((((frame%frames)*int(g.PatternZ)+patternZ)*int(g.PatternY)+patternY)*int(g.PatternX)+patternX)*int(g.Layers)+layer)*int(g.Height)+tileY)*int(g.Width) + tileX
 }
 
-// TextureIndex returns the index of a composed texture.
 func (g *FrameGroup) TextureIndex(layer, patternX, patternY, patternZ, frame int) int {
 	frames := max(int(g.Frames), 1)
 	return ((((frame%frames)*int(g.PatternZ)+patternZ)*int(g.PatternY)+patternY)*int(g.PatternX)+patternX)*int(g.Layers) + layer
@@ -304,7 +285,6 @@ func (g *FrameGroup) SheetSize(spriteSize int) (width, height int) {
 	return
 }
 
-// Clone returns a deep copy.
 func (g *FrameGroup) Clone() *FrameGroup {
 	clone := *g
 	clone.Durations = slices.Clone(g.Durations)
@@ -354,7 +334,6 @@ func (g *FrameGroup) Resize(width, height, layers, patternX, patternY, patternZ,
 	}
 }
 
-// Validate checks internal consistency.
 func (g *FrameGroup) Validate() error {
 	if g.Width == 0 || g.Height == 0 || g.Layers == 0 || g.PatternX == 0 || g.PatternY == 0 || g.PatternZ == 0 || g.Frames == 0 {
 		return fmt.Errorf("frame group has a zero dimension")
@@ -368,7 +347,6 @@ func (g *FrameGroup) Validate() error {
 	return nil
 }
 
-// Thing is one client object.
 type Thing struct {
 	ID       uint32   `json:"id"`
 	Category Category `json:"category"`
@@ -407,7 +385,6 @@ func (t *Thing) Group(groupType FrameGroupType) *FrameGroup {
 	return nil
 }
 
-// Clone returns a deep copy.
 func (t *Thing) Clone() *Thing {
 	clone := *t
 	clone.NpcSales = slices.Clone(t.NpcSales)
@@ -418,7 +395,6 @@ func (t *Thing) Clone() *Thing {
 	return &clone
 }
 
-// SpriteIDs returns every sprite id referenced by all frame groups.
 func (t *Thing) SpriteIDs() []uint32 {
 	var ids []uint32
 	for _, group := range t.FrameGroups {
@@ -427,7 +403,6 @@ func (t *Thing) SpriteIDs() []uint32 {
 	return ids
 }
 
-// Validate checks the thing and its frame groups.
 func (t *Thing) Validate() error {
 	if !t.Category.Valid() {
 		return fmt.Errorf("thing %d: invalid category %d", t.ID, t.Category)

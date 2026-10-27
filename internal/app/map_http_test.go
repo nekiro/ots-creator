@@ -123,7 +123,6 @@ func TestGeoConcurrent(t *testing.T) {
 	wg.Wait()
 }
 
-// inflate reads a geometry response (raw deflate).
 func inflate(t *testing.T, b []byte) []byte {
 	t.Helper()
 	out, err := io.ReadAll(flate.NewReader(bytes.NewReader(b)))

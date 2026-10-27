@@ -34,7 +34,6 @@ export function tileOffset(layout: Layout, tileX: number, tileY: number, size: n
   return [(layout.width - 1 - tileX) * size, (layout.height - 1 - tileY) * size];
 }
 
-/** All sprite slot indices of one texture with their pixel offsets. */
 export function textureSlots(layout: Layout, pos: TexturePos, size: number): { slot: number; x: number; y: number }[] {
   const out: { slot: number; x: number; y: number }[] = [];
   for (let tileY = 0; tileY < layout.height; tileY++) {
@@ -83,7 +82,6 @@ export function sheetGrid(layout: Layout): { columns: number; rows: number } {
   return { columns: layout.patternZ * layout.patternX * layout.layers, rows: layout.frames * layout.patternY };
 }
 
-/** Texture shown at a sheet cell. */
 export function sheetCellPos(layout: Layout, column: number, row: number): TexturePos {
   return {
     layer: column % layout.layers,

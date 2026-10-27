@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { FrameGroup } from "../api";
 import { mountedPattern, renderPreviewImage, type PreviewImageInput } from "./previewImage";
 
-// ImageData stand-in for node.
 class FakeImageData {
   data: Uint8ClampedArray;
   constructor(

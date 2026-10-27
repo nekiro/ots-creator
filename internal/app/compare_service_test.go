@@ -21,7 +21,6 @@ func TestCompareService(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 
-	// B: a saved client with one red item.
 	ps.New(v1098(), client.Features{})
 	img := filepath.Join(dir, "red.png")
 	writePNG(t, img, 32, 32, [4]byte{200, 10, 10, 255})
@@ -46,7 +45,6 @@ func TestCompareService(t *testing.T) {
 		t.Fatalf("events %v", rec.events)
 	}
 
-	// A: a new empty client.
 	ps.New(v1098(), client.Features{})
 	d, err := cs.Diff(thing.CategoryItem)
 	if err != nil || len(d.Entries) != 1 || d.Entries[0].Status != project.DiffOnlyB {
@@ -59,7 +57,6 @@ func TestCompareService(t *testing.T) {
 		t.Fatalf("b sprite: %d %d", rr.Code, rr.Body.Len())
 	}
 
-	// B -> A appends, A -> B replaces.
 	res, err := cs.Transfer(false, thing.CategoryItem, []uint32{100}, true)
 	if err != nil || !slices.Equal(res.IDs, []uint32{101}) {
 		t.Fatalf("transfer %+v %v", res, err)

@@ -1,5 +1,3 @@
-// Towns, houses, waypoints and zones: actions shared by the world outline,
-// the inspector and the command palette.
 import { ask, askText } from "../../confirm.svelte";
 import { toast } from "../../state/app.svelte";
 import { MapService, type HouseInfo, type Position, type Town } from "../data/api";
@@ -7,7 +5,6 @@ import { goTo, mapCommands, spriteSize } from "../view/commands";
 import { worldToPosition } from "../view/coords";
 import { edit, map, selectBrush } from "../state.svelte";
 
-/** Tile at the center of the view. */
 export function viewCenter(): Position {
   const camera = map.cam;
   return worldToPosition(camera.x, camera.y, camera.floor, spriteSize());
@@ -32,7 +29,6 @@ export function houses(): HouseInfo[] {
   return present(map.active?.houses);
 }
 
-/** Town names by id, kept per towns list. */
 const townNamesCache = new WeakMap<object, Map<number, string>>();
 
 export function townName(id: number): string {
@@ -48,7 +44,6 @@ export function townName(id: number): string {
   return names.get(id) ?? "No town";
 }
 
-/** Adds a town with its temple at the view center and shows it. */
 export async function addTown(): Promise<void> {
   const name = await askText({ title: "New town", label: "Name", value: `Town ${towns().length + 1}`, ok: "Add" });
   if (!name) return;
@@ -71,7 +66,6 @@ export async function removeTown(town: Town): Promise<void> {
   map.focus = null;
 }
 
-/** Adds a house and starts painting its tiles. */
 export async function addHouse(townId = 0): Promise<void> {
   const number = houses().length + 1;
   const change = await edit((id) => MapService.SaveHouse(id, { id: 0, name: `House ${number}`, townId: townId || towns()[0]?.id || 0, rent: 0, guildhall: false, exit: { x: 0, y: 0, z: 0 } }));
@@ -98,7 +92,6 @@ export async function removeHouse(house: HouseInfo): Promise<void> {
   map.focus = null;
 }
 
-/** Centers the view on the exit of a house, or on its first tile. */
 export async function goHouse(house: HouseInfo): Promise<void> {
   if (house.exit?.x) return goTo(house.exit);
   const tiles = await MapService.HouseTiles(map.activeId!, house.id);
@@ -113,7 +106,6 @@ export async function selectHouseTiles(house: HouseInfo): Promise<void> {
   goTo(tiles[0]);
 }
 
-/** Asks for a name and lets the next click place the waypoint. */
 export async function addWaypoint(): Promise<void> {
   const name = await askText({ title: "New waypoint", label: "Name", ok: "Place on the map" });
   if (!name) return;
@@ -150,7 +142,6 @@ export async function removeZone(zoneId: number): Promise<void> {
   map.focus = null;
 }
 
-/** Lets the next click on the map choose a position. */
 export function pickPosition(label: string, done: (position: Position) => void): void {
   map.pick = { label, done };
 }

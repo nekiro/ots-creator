@@ -10,8 +10,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/spr"
 )
 
-// ErrShiftCut is returned by ShiftPixels when visible pixels would be moved
-// out of a texture.
 var ErrShiftCut = errors.New("visible pixels would be moved out of the texture")
 
 // SetSlotPixels replaces the pixels of sprite slots of one frame group, for
@@ -47,7 +45,6 @@ func (p *Project) SetSlotPixels(category thing.Category, id uint32, groupIndex i
 	return nil
 }
 
-// groupForEdit returns a copy of a thing and its frame group to change.
 func (p *Project) groupForEdit(category thing.Category, id uint32, groupIndex int) (*thing.Thing, *thing.FrameGroup, error) {
 	current := p.things.Get(category, id)
 	if current == nil {
@@ -60,8 +57,6 @@ func (p *Project) groupForEdit(category thing.Category, id uint32, groupIndex in
 	return object, object.FrameGroups[groupIndex], nil
 }
 
-// setSlotsLocked stores pixels in slots of group (see SetSlotPixels) and
-// reports whether any slot changed.
 func (p *Project) setSlotsLocked(edit *recorder, group *thing.FrameGroup, slots []int, pixels [][]byte) bool {
 	changed := false
 	added := map[string]uint32{}
@@ -141,7 +136,6 @@ func (p *Project) ShiftPixels(category thing.Category, id uint32, groupIndex int
 	return nil
 }
 
-// textureImage composes one texture (one layer) of a frame group.
 func (p *Project) textureImage(group *thing.FrameGroup, layer, x, y, z, frame int) (*image.NRGBA, error) {
 	size := p.features.SpriteSize
 	img := image.NewNRGBA(image.Rect(0, 0, int(group.Width)*size, int(group.Height)*size))

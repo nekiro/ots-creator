@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { Scene, ViewOptions } from "../render/scene";
 import { Camera, floorsToDraw } from "./view";
 
-/** A scene with only what the camera reads: 32 px sprites, an 800x600 view. */
 function scene(change: Partial<Scene> = {}, opts: Partial<ViewOptions> = {}): Scene {
   return {
     width: 800,

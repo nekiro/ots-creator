@@ -12,7 +12,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/dat"
 )
 
-// Format is the file format of a client.
 type Format string
 
 const (
@@ -27,7 +26,6 @@ const (
 // durations and outfit frame groups.
 var assetFeatures = client.Features{Extended: true, Transparency: true, ImprovedAnimations: true, FrameGroups: true, SpriteSize: client.DefaultSpriteSize}
 
-// assetState is what an assets project needs to write the folder back.
 type assetState struct {
 	dir     string
 	catalog *assets.Catalog
@@ -35,7 +33,6 @@ type assetState struct {
 	file    *assets.File
 }
 
-// AssetsVersion returns the version shown for an asset folder.
 func AssetsVersion(dir string) client.Version {
 	version := client.Version{Value: 1200, Name: "12+ (assets)"}
 	if name := assets.ClientVersion(dir); name != "" {
@@ -49,8 +46,6 @@ func AssetsVersion(dir string) client.Version {
 	return version
 }
 
-// OpenAssets loads an asset folder (or its catalog, or a Tibia install
-// folder).
 func OpenAssets(path string) (*Project, error) {
 	dir, err := assets.FindDir(path)
 	if err != nil {

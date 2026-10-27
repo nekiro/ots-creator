@@ -14,9 +14,7 @@
 
   const recent = $derived((prefs.settings.recent ?? []).slice(0, 5));
 
-  /** Fills the form with a recent client, so its version and features can be changed before opening. */
   async function pickRecent(client: Recent) {
-    // Assets have nothing to choose.
     if (client.format === Format.FormatAssets) return openRecent(client);
     await inspect(client.datPath);
     if (!files) return;
@@ -27,7 +25,6 @@
     }
   }
 
-  /** Opens a recent client right away with the version and features it was saved with. */
   function openRecent(client: Recent) {
     if (other) {
       void openOther(client);
@@ -48,7 +45,6 @@
   let versionKey = $state("");
   let features = $state<Features>({ extended: false, transparency: false, improvedAnimations: false, frameGroups: false, spriteSize: 32 });
   let error = $state("");
-  /** Optional items.otb kept in sync with the client ("" = none). */
   let otbPath = $state("");
   /** Set once the user picked or cleared the items.otb; until then the one
    * remembered for the client is used. */
@@ -70,7 +66,6 @@
     if (dir) await inspectAndOpen(dir);
   }
 
-  /** Inspects a folder and opens it right away when there is nothing to choose: assets, or a known version with an .otfi. */
   async function inspectAndOpen(dir: string) {
     await inspect(dir);
     if (files?.detected && (isAssets || files.hasOtfi)) await open();

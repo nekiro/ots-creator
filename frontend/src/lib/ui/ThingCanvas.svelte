@@ -29,17 +29,13 @@
     size?: number;
     ready?: number;
     group?: number;
-    /** Outfit direction (pattern X), south by default. */
     direction?: number;
     zoom?: number;
-    /** When set, the visible pixels are cropped and scaled down to fit this many pixels. */
     fit?: number;
     playing?: boolean;
     /** Paint outfits with the default colors; off shows the white template like list thumbnails. */
     colorize?: boolean;
-    /** Draw outfits with all their addons, like list thumbnails. */
     addons?: boolean;
-    /** The client stores frame durations; guessed from the thing when not given. */
     improved?: boolean;
   } = $props();
 

@@ -18,7 +18,6 @@
   }: {
     preview: BrushPreview;
     max?: number;
-    /** Tiles outlined as chosen (preview coordinates). */
     selected?: { x: number; y: number }[];
     /** Makes tiles selectable: a click picks one, a drag a box; add keeps
         (Ctrl toggles a clicked tile, Ctrl+drag adds a box). */
@@ -63,7 +62,6 @@
       const rect = boxOf(area);
       const single = rect.x0 === rect.x1 && rect.y0 === rect.y1;
       if (single && area.add) {
-        // Ctrl+click toggles one tile.
         const on = selected.some((chosen) => chosen.x === rect.x0 && chosen.y === rect.y0);
         onselect?.(on ? selected.filter((chosen) => chosen.x !== rect.x0 || chosen.y !== rect.y0) : [...selected, { x: rect.x0, y: rect.y0 }], false);
         return;
@@ -76,7 +74,6 @@
     window.addEventListener("mouseup", up);
   }
 
-  /** Pixels per tile of the drawn canvas. */
   const TILE_PIXELS = 32;
   let width = $state(0);
   let canvas = $state<HTMLCanvasElement>();

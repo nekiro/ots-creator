@@ -1,6 +1,4 @@
 <script lang="ts">
-  // OTClient HorizontalScrollBar used as a value slider: arrow buttons,
-  // scrollbar track and slider thumb. Drag, click, wheel and arrow keys.
   import { toCss } from "../pixelscale";
   import { clamp, thumbOffset, thumbWidth, valueAt } from "./slider";
 
@@ -105,7 +103,6 @@
   .inc:disabled {
     cursor: default;
   }
-  /* slider-texture: 1px bevel top and bottom, tiled along. */
   .track {
     position: relative;
     flex: 1;
@@ -115,7 +112,6 @@
     margin: 0;
     cursor: pointer;
   }
-  /* The horizontal scrollbar handle: 6px rounded ends, the middle stretches. */
   .thumb {
     position: absolute;
     top: -1px;

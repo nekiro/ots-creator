@@ -110,7 +110,6 @@ func TestImportRME(t *testing.T) {
 		t.Fatal("meta items lost")
 	}
 
-	// JSON round trip.
 	p := filepath.Join(t.TempDir(), "m.json")
 	if err := m.Save(p); err != nil {
 		t.Fatal(err)
@@ -123,7 +122,6 @@ func TestImportRME(t *testing.T) {
 		t.Fatal("round trip lost data")
 	}
 
-	// Merge renumbers clashing border ids.
 	other := New()
 	other.Borders = []*Border{{ID: 2, Edges: map[string]uint16{"n": 50}}}
 	other.Brushes = []*Brush{{Name: "sand", Type: TypeGround, Items: []Chance{{ID: 900, Chance: 1}}, Borders: []BorderRule{{Align: "outer", Border: 2}}}}

@@ -1,4 +1,3 @@
-// Tile shapes of brushes and strokes, and the tile under a screen point.
 import { pos, type Position } from "../data/api";
 import { worldToPosition } from "../view/coords";
 
@@ -47,7 +46,6 @@ export function bresenhamLine(from: Position, to: Position): Position[] {
 }
 
 export interface ViewTransform {
-  /** Canvas size in device pixels. */
   width: number;
   height: number;
   /** Camera center in world pixels. */
@@ -59,7 +57,6 @@ export interface ViewTransform {
   tileSize: number;
 }
 
-/** Tile of the floor in view under a canvas point in device pixels (never below 0). */
 export function screenToTile(x: number, y: number, view: ViewTransform): Position {
   const worldX = (x - view.width / 2) / view.scale + view.camX;
   const worldY = (y - view.height / 2) / view.scale + view.camY;

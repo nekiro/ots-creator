@@ -30,7 +30,6 @@
   // Text in the search box filters by name; a number jumps to an id.
   let jump = $state("");
   const name = $derived(/^\s*\d*\s*$/.test(jump) ? "" : jump.trim());
-  // Names of the named objects of the category (asset clients).
   let names = $state.raw<Record<number, string>>({});
   // Matching ids while a filter is active; null shows the whole range.
   let ids = $state.raw<number[] | null>(null);
@@ -43,7 +42,6 @@
   ]);
   const filtered = $derived(content !== "" || flag !== "" || name !== "");
 
-  // A flag hidden for the new category no longer applies.
   $effect(() => {
     if (flag && !flagOptions.some((option) => option.value === flag)) flag = "";
   });
@@ -103,7 +101,6 @@
     if (Number.isFinite(typed)) go(typed);
   }
 
-  // Animated thumbnail of the hovered object (animated objects only).
   const hover = new HoverAnim(spriteCache, async (id) => {
     const cat = app.category;
     const raw = await ThingService.Get(cat, id);
@@ -159,15 +156,12 @@
     event.preventDefault();
     const shift = event.shiftKey;
     dragend();
-    // Swapping the selection onto its own first object changes nothing.
     if (!shift && id === Math.min(...app.selection)) return;
     void moveSelection(id, shift);
   }
 
-  /** Whether id is one of the targets of the dragged selection (swap). */
   const landing = (id: number) => dragCount > 0 && over !== null && !insert && id >= over && id < over + dragCount;
 
-  /** Rows Page Up and Page Down move. */
   const PAGE_ROWS = 8;
 
   function onkeydown(event: KeyboardEvent, columns: number) {
@@ -311,13 +305,10 @@
     border-color: #b6b6b6;
     color: #fff;
   }
-  /* A file dragged over an object (Wails marks the drop target). */
   .thing:global(.file-drop-target-active) {
     border-color: var(--gold);
     background: rgba(255, 210, 90, 0.15);
   }
-  /* Where a dragged selection lands: the swapped objects, or the object
-     it is inserted before (Shift). */
   .thing.landing {
     border-color: #8fd18f;
     background: rgba(143, 209, 143, 0.15);

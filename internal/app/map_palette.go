@@ -7,7 +7,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/materials"
 )
 
-// PaletteBrush is a brush shown in the palette.
 type PaletteBrush struct {
 	Name string `json:"name"`
 	Kind string `json:"kind"`
@@ -26,7 +25,6 @@ type BrushPreview struct {
 	Tiles []PreviewTile `json:"tiles"`
 }
 
-// PreviewTile is one tile of a BrushPreview.
 type PreviewTile struct {
 	X     int      `json:"x"`
 	Y     int      `json:"y"`
@@ -64,7 +62,6 @@ func brushPreview(brush *materials.Brush) *BrushPreview {
 	return preview
 }
 
-// PaletteTileset is a tileset with resolved brushes.
 type PaletteTileset struct {
 	Name    string         `json:"name"`
 	Auto    bool           `json:"auto"`
@@ -74,7 +71,6 @@ type PaletteTileset struct {
 	Raw     []uint16       `json:"raw"`
 }
 
-// Palette is everything the brush palette shows.
 type Palette struct {
 	Tilesets  []PaletteTileset          `json:"tilesets"`
 	Brushes   []PaletteBrush            `json:"brushes"`
@@ -82,7 +78,6 @@ type Palette struct {
 	DoorTypes []string                  `json:"doorTypes"`
 }
 
-// Palette returns tilesets, brushes and creatures.
 func (ms *MapService) Palette() (palette Palette, err error) {
 	err = ms.withData(func(data *mapData) error {
 		palette = data.palette()
@@ -108,7 +103,6 @@ func (data *mapData) palette() Palette {
 	return palette
 }
 
-// paletteBrushes resolves brush names, leaving out unknown ones.
 func (data *mapData) paletteBrushes(names []string) []PaletteBrush {
 	var out []PaletteBrush
 	for _, name := range names {

@@ -23,7 +23,6 @@ export class Atlas {
   pending = false;
   /** Bumped whenever a cell is freed: cells remembered from before may hold other pixels now. */
   epoch = 0;
-  /** Called with the key of every freed cell. */
   onRelease: (key: AtlasKey) => void = () => {};
 
   constructor(
@@ -62,14 +61,12 @@ export class Atlas {
     this.gl.bindTexture(this.gl.TEXTURE_2D_ARRAY, this.texture);
   }
 
-  /** Marks cells used this frame without looking them up (cached geometry). */
   touch(cells: Int32Array): void {
     const used = this.used;
     const frame = this.frame;
     for (let i = 0; i < cells.length; i++) used[cells[i]] = frame;
   }
 
-  /** Marks one cell used this frame. */
   use(cell: number): void {
     this.used[cell] = this.frame;
   }

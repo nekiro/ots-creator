@@ -9,7 +9,6 @@ const KEEP = 32;
 export class PanView {
   x = $state(0);
   y = $state(0);
-  /** Space is held over the stage: a left drag pans. */
   ready = $state(false);
   dragging = $state(false);
 
@@ -31,7 +30,6 @@ export class PanView {
     this.y = 0;
   }
 
-  /** Moves to x, y, keeping a corner of the content inside the stage. */
   set(x: number, y: number): void {
     const { width, height, stageWidth, stageHeight } = this.size();
     const maxX = Math.max(0, (width + stageWidth) / 2 - KEEP);
@@ -50,7 +48,6 @@ export class PanView {
     return `translate(calc(-50% + ${this.x}px), calc(-50% + ${this.y}px))`;
   }
 
-  /** Attach to the window: space toggles pan mode while over the stage. */
   key = (event: KeyboardEvent): void => {
     if (event.code !== "Space" || isTyping(event)) return;
     if (event.type === "keyup") {
@@ -66,7 +63,6 @@ export class PanView {
     this.ready = false;
   };
 
-  /** Spread onto the stage element. */
   readonly handlers = {
     onmouseenter: () => (this.over = true),
     onmouseleave: () => (this.over = false),

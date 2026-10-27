@@ -1,5 +1,3 @@
-// Bounding boxes of visible (alpha > 0) pixels, for cropping thumbnails.
-
 export interface Box {
   x: number;
   y: number;

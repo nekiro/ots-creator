@@ -12,13 +12,11 @@ import (
 	"strings"
 )
 
-// API writes to the market through its HTTP API.
 type API struct {
 	Base string // API URL, ending in "/"
 	HTTP *http.Client
 }
 
-// NewAPI returns the API at a base URL.
 func NewAPI(base string) *API { return &API{Base: strings.TrimSuffix(base, "/") + "/"} }
 
 func (a *API) client() *http.Client {
@@ -47,7 +45,6 @@ type Shared struct {
 	DeleteToken string `json:"deleteToken"`
 }
 
-// maxReplyBytes bounds a reply of the API.
 const maxReplyBytes = 1 << 20
 
 func (a *API) do(req *http.Request, out any) error {
@@ -75,7 +72,6 @@ func (a *API) do(req *http.Request, out any) error {
 	return json.Unmarshal(data, out)
 }
 
-// Submit publishes an entry.
 func (a *API) Submit(ctx context.Context, submission Submission) (*Shared, error) {
 	if err := submission.Meta.Validate(); err != nil {
 		return nil, err
@@ -123,7 +119,6 @@ func (a *API) Submit(ctx context.Context, submission Submission) (*Shared, error
 	return &out, nil
 }
 
-// Delete removes an entry with its delete token or the admin token.
 func (a *API) Delete(ctx context.Context, id, token string) error {
 	if !ValidID(id) {
 		return fmt.Errorf("bad entry id %q", id)

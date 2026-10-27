@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { changedSlots, drawLine, getPixel, hexToRGBA, rgbaToHex } from "./paint";
 
-// jsdom-free ImageData stand-in for node.
 class FakeImageData {
   data: Uint8ClampedArray;
   constructor(
@@ -19,9 +18,9 @@ describe("paint", () => {
     drawLine(img, 0, 0, 7, 3, [255, 0, 0, 255]);
     let n = 0;
     for (let i = 3; i < img.data.length; i += 4) if (img.data[i]) n++;
-    expect(n).toBe(8); // one pixel per column
+    expect(n).toBe(8);
     expect(getPixel(img, 7, 3)).toEqual([255, 0, 0, 255]);
-    drawLine(img, -5, 0, 2, 0, [0, 255, 0, 255]); // clipped, no throw
+    drawLine(img, -5, 0, 2, 0, [0, 255, 0, 255]);
     expect(getPixel(img, 0, 0)).toEqual([0, 255, 0, 255]);
   });
 
@@ -29,7 +28,7 @@ describe("paint", () => {
     const g = { width: 2, height: 1, layers: 1, patternX: 1, patternY: 1, patternZ: 1, frames: 1 };
     const before = image(4, 2);
     const after = image(4, 2);
-    after.data.set([9, 9, 9, 255], (1 * 4 + 0) * 4); // pixel (0, 1): left tile
+    after.data.set([9, 9, 9, 255], (1 * 4 + 0) * 4);
     const { slots, pixels } = changedSlots(before, after, g, { layer: 0, x: 0, y: 0, z: 0, frame: 0 }, 2);
     // Tile (0,0) is the bottom-right one, so the left tile is slot 1.
     expect(slots).toEqual([1]);

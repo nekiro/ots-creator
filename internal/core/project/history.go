@@ -26,8 +26,7 @@ type historyEntry struct {
 	things       []thingChange
 	sprites      []spriteChange
 	spritesCount [2]uint32 // before, after
-	// itemMoves maps item ids to the ids the edit moved them to.
-	itemMoves map[uint32]uint32
+	itemMoves    map[uint32]uint32
 }
 
 type history struct {
@@ -65,7 +64,6 @@ func (h *history) top() *historyEntry {
 	return h.undo[len(h.undo)-1]
 }
 
-// atClean reports whether the undo stack is back at the saved state.
 func (h *history) atClean() bool { return h.top() == h.clean }
 
 func (h *history) canUndo() bool { return len(h.undo) > 0 }
@@ -118,7 +116,6 @@ func setSlot(project *Project, category thing.Category, id uint32, object *thing
 		list = append(list, nil)
 	}
 	list[i] = object
-	// Trim trailing nil slots (removed last things).
 	for len(list) > 0 && list[len(list)-1] == nil {
 		list = list[:len(list)-1]
 	}
@@ -218,8 +215,6 @@ func (p *Project) applyEdit(entry *historyEntry, forward bool) {
 	}
 }
 
-// Undo reverts the last edit. It returns the edit label, or "" when there
-// is nothing to undo.
 func (p *Project) Undo() string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -233,7 +228,6 @@ func (p *Project) Undo() string {
 	return entry.label
 }
 
-// Redo re-applies the last undone edit.
 func (p *Project) Redo() string {
 	p.mu.Lock()
 	defer p.mu.Unlock()

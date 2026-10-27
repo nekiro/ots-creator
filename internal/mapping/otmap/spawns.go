@@ -105,7 +105,6 @@ func spawnAreas(gameMap *Map, npc bool) []spawnArea {
 	return out
 }
 
-// creatureRef is a creature by its tile and index on the tile.
 type creatureRef struct {
 	pos   Position
 	index int

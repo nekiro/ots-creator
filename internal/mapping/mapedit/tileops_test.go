@@ -9,7 +9,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-// Item ids the tileops tests add to the test editor.
 const (
 	tileopsTopA, tileopsTopB = 780, 781 // top items (top order 3)
 	tileopsMaterialBorder    = 782      // border by materials, top order 0

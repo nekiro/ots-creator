@@ -1,5 +1,3 @@
-// Camera math of the map view: zoom steps, zooming around a point, panning
-// and where a newly opened map is first shown.
 import { clamp } from "../../util/math";
 import { pos, type MapInfo, type Position } from "../data/api";
 import { GROUND_FLOOR } from "../constants";
@@ -24,7 +22,6 @@ export function panTiles(count: number, zoom: number): number {
   return count ? Math.sign(count) * Math.max(1, Math.round(Math.abs(count) * (1 / zoom))) : 0;
 }
 
-/** Furthest a new map is first shown from the origin, for maps without bounds. */
 const MAX_START = 1000;
 const DEFAULT_MAP_SIZE = 2048;
 
@@ -32,7 +29,6 @@ const DEFAULT_MAP_SIZE = 2048;
 export function startPosition(info: Pick<MapInfo, "hasBounds" | "bounds" | "towns" | "props"> | undefined): Position {
   if (info?.hasBounds) {
     const [x0, y0, x1, y1] = info.bounds;
-    // Prefer a temple: towns are where people start.
     const town = info.towns?.[0];
     if (town && town.temple.x) return town.temple;
     return pos(Math.round((x0 + x1) / 2), Math.round((y0 + y1) / 2), GROUND_FLOOR);

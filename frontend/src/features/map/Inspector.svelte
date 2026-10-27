@@ -1,6 +1,4 @@
 <script lang="ts">
-  // Shows whatever is in focus: a tile, a town, a house, a waypoint, a zone,
-  // or the map itself when nothing is.
   import { fmtPos } from "../../lib/map/data/api";
   import { mapCommands } from "../../lib/map/view/commands";
   import { map } from "../../lib/map/state.svelte";
@@ -19,7 +17,6 @@
   const house = $derived(focus?.kind === "house" ? (activeMap?.houses?.find((candidate) => candidate?.id === focus.id) ?? null) : null);
   const waypoint = $derived(focus?.kind === "waypoint" ? (activeMap?.waypoints?.find((candidate) => candidate?.name === focus.name) ?? null) : null);
   const zone = $derived(focus?.kind === "zone" ? (activeMap?.zones?.find((candidate) => candidate.id === focus.id) ?? null) : null);
-  /** A waypoint named but not placed yet. */
   const pendingWaypoint = $derived(focus?.kind === "waypoint" && !waypoint ? { name: focus.name, pos: { x: 0, y: 0, z: 0 } } : null);
 
   const view = $derived.by(() => {

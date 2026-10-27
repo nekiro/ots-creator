@@ -1,5 +1,3 @@
-// User actions shared by the menu bar, toolbar, context menus and shortcuts.
-// Each topic lives in lib/commands/; `commands` gathers them.
 import { errorMessage } from "./api";
 import { app, toast } from "./state/app.svelte";
 import { isTyping } from "./ui/typing";
@@ -24,7 +22,6 @@ export const commands = {
   ...dropCommands,
 };
 
-/** Global keyboard shortcuts. Inputs keep their own editing keys. */
 export function handleShortcut(event: KeyboardEvent): void {
   const typing = isTyping(event);
   const mod = event.ctrlKey || event.metaKey;

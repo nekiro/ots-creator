@@ -18,14 +18,10 @@ import (
 )
 
 const (
-	// minMapSide is the smallest width and height of a new map.
-	minMapSide = 32
-	// maxFillTiles is the largest new map that gets its ground filled.
-	maxFillTiles = 4_000_000
-	// maxMinimapPixels is the largest floor ExportMinimap draws.
+	minMapSide       = 32
+	maxFillTiles     = 4_000_000
 	maxMinimapPixels = 64_000_000
-	// minimapGray is the minimap color of tiles whose items have none.
-	minimapGray = 60
+	minimapGray      = 60
 	// progressTotal is the Total of map progress events: Done counts
 	// thousandths of the whole load or save.
 	progressTotal = 1000
@@ -42,20 +38,17 @@ type progressStep struct {
 	start, end int
 }
 
-// loadSteps are the steps of opening a map.
 var loadSteps = map[otmap.Stage]progressStep{
 	otmap.StageRead:  {"Reading the file", 50, 120},
 	otmap.StageTiles: {"Reading tiles", 120, 900},
 	otmap.StageFiles: {"Reading houses and spawns", 900, 960},
 }
 
-// saveSteps are the steps of saving a map.
 var saveSteps = map[otmap.Stage]progressStep{
 	otmap.StageEncode: {"Writing tiles", 0, 800},
 	otmap.StageWrite:  {"Writing the files", 800, progressTotal},
 }
 
-// Progress points of opening a map outside its steps.
 const (
 	progressLoadingItems = 0
 	progressPreparing    = 960
@@ -75,7 +68,6 @@ func (ms *MapService) mapProgress() func(label string, permille int) {
 	}
 }
 
-// stageReporter turns otmap stage progress into report calls along steps.
 func stageReporter(steps map[otmap.Stage]progressStep, report func(label string, permille int)) func(otmap.Stage, int, int) {
 	return func(stage otmap.Stage, done, total int) {
 		step := steps[stage]
@@ -97,7 +89,6 @@ func (ms *MapService) add(gameMap *otmap.Map, path string, data *mapData) *openM
 	return opened
 }
 
-// NewMapOptions configure a new map.
 type NewMapOptions struct {
 	Width       uint16            `json:"width"`
 	Height      uint16            `json:"height"`
@@ -107,7 +98,6 @@ type NewMapOptions struct {
 	Fill string `json:"fill"`
 }
 
-// NewMap creates an empty map.
 func (ms *MapService) NewMap(options NewMapOptions) (MapInfo, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
@@ -132,13 +122,11 @@ func (ms *MapService) NewMap(options NewMapOptions) (MapInfo, error) {
 	return ms.info(opened, true), nil
 }
 
-// OpenResult is an opened map with load warnings.
 type OpenResult struct {
 	Info     MapInfo  `json:"info"`
 	Warnings []string `json:"warnings"`
 }
 
-// OpenMap loads an OTBM map (and its houses, spawns and zones).
 func (ms *MapService) OpenMap(path string) (OpenResult, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
@@ -172,7 +160,6 @@ func (ms *MapService) OpenMap(path string) (OpenResult, error) {
 	return OpenResult{Info: ms.info(opened, true), Warnings: warnings}, nil
 }
 
-// SaveMap writes a map to its file (path "" keeps the current file).
 func (ms *MapService) SaveMap(id int, path string) (MapChange, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
@@ -208,7 +195,6 @@ func (ms *MapService) SaveMap(id int, path string) (MapChange, error) {
 	return change, nil
 }
 
-// CloseMap closes a map without saving.
 func (ms *MapService) CloseMap(id int) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
@@ -216,7 +202,6 @@ func (ms *MapService) CloseMap(id int) {
 	go debug.FreeOSMemory()
 }
 
-// AnyChanged reports whether an open map has unsaved changes.
 func (ms *MapService) AnyChanged() bool {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
@@ -228,10 +213,8 @@ func (ms *MapService) AnyChanged() bool {
 	return false
 }
 
-// RemoveRecent forgets a recent map ("" clears the list).
 func (ms *MapService) RemoveRecent(path string) error { return ms.store.RemoveRecent(path) }
 
-// ImportMap merges another map file into a map.
 func (ms *MapService) ImportMap(id int, path string, options mapedit.ImportOptions) (MapChange, error) {
 	var items *otitems.DB
 	if err := ms.withMap(id, func(_ *openMap, data *mapData) error { items = data.items; return nil }); err != nil {
@@ -248,12 +231,10 @@ func (ms *MapService) ImportMap(id int, path string, options mapedit.ImportOptio
 	return change, err
 }
 
-// SaveImage writes a PNG made by the frontend (screenshots).
 func (ms *MapService) SaveImage(path string, data []byte) error {
 	return os.WriteFile(fsutil.EnsureExt(path, ".png"), data, fsutil.FileMode)
 }
 
-// minimapImage draws tiles of one floor, one pixel per tile.
 func minimapImage(editor *mapedit.Editor, area image.Rectangle, floor int) *image.NRGBA {
 	img := image.NewNRGBA(image.Rect(0, 0, area.Dx(), area.Dy()))
 	editor.Map.EachIn(area.Min.X, area.Min.Y, area.Max.X-1, area.Max.Y-1, floor, floor, func(pos otmap.Position, tile *otmap.Tile) {
@@ -271,8 +252,6 @@ func minimapImage(editor *mapedit.Editor, area image.Rectangle, floor int) *imag
 	return img
 }
 
-// ExportMinimap writes one PNG per floor (1 pixel per tile) of the used
-// area into dir. It returns the written files.
 func (ms *MapService) ExportMinimap(id int, dir string, floors []int) (written []string, err error) {
 	err = ms.withMap(id, func(opened *openMap, _ *mapData) error {
 		minX, minY, maxX, maxY, ok := opened.editor.Map.Bounds()

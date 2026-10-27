@@ -9,7 +9,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-// Properties are the editable map header fields.
 type Properties struct {
 	Description string            `json:"description"`
 	Width       uint16            `json:"width"`
@@ -21,13 +20,11 @@ type Properties struct {
 	SpawnFormat otmap.SpawnFormat `json:"spawnFormat"`
 }
 
-// Properties returns the map header.
 func (e *Editor) Properties() Properties {
 	gameMap := e.Map
 	return Properties{gameMap.Description, gameMap.Width, gameMap.Height, gameMap.HouseFile, gameMap.SpawnFile, gameMap.NpcFile, gameMap.ZoneFile, gameMap.SpawnFormat}
 }
 
-// SetProperties changes the map header.
 func (e *Editor) SetProperties(props Properties) error {
 	if props.SpawnFormat != otmap.SpawnsSingle && props.SpawnFormat != otmap.SpawnsSeparate {
 		props.SpawnFormat = otmap.SpawnsSingle
@@ -41,13 +38,11 @@ func (e *Editor) SetProperties(props Properties) error {
 	return nil
 }
 
-// HouseInfo is a house with its size.
 type HouseInfo struct {
 	otmap.House
 	Size int `json:"size"`
 }
 
-// Houses lists the houses with their tile counts.
 func (e *Editor) Houses() []HouseInfo {
 	sizes := otmap.HouseSizes(e.Map)
 	var out []HouseInfo
@@ -57,7 +52,6 @@ func (e *Editor) Houses() []HouseInfo {
 	return out
 }
 
-// firstFreeHouseID returns the lowest house id not in use.
 func (e *Editor) firstFreeHouseID() uint32 {
 	id := uint32(1)
 	for e.Map.Houses[id] != nil {
@@ -83,7 +77,6 @@ func (e *Editor) SaveHouse(house otmap.House) (uint32, error) {
 	return house.ID, nil
 }
 
-// RemoveHouse deletes a house and clears its tiles.
 func (e *Editor) RemoveHouse(id uint32) {
 	tx := e.Begin("Remove house", 0)
 	tx.Meta()
@@ -98,7 +91,6 @@ func (e *Editor) RemoveHouse(id uint32) {
 	tx.Commit()
 }
 
-// HouseTiles returns the tiles of a house.
 func (e *Editor) HouseTiles(id uint32) []otmap.Position {
 	var out []otmap.Position
 	e.Map.EachStored(func(pos otmap.Position, tile *otmap.Tile) {
@@ -160,7 +152,6 @@ func (e *Editor) SaveWaypoint(oldName string, waypoint otmap.Waypoint) error {
 	return nil
 }
 
-// RemoveWaypoint deletes a waypoint.
 func (e *Editor) RemoveWaypoint(name string) {
 	tx := e.Begin("Remove waypoint", 0)
 	tx.Meta()
@@ -168,7 +159,6 @@ func (e *Editor) RemoveWaypoint(name string) {
 	tx.Commit()
 }
 
-// SaveZone creates or renames a zone (ID 0 creates one).
 func (e *Editor) SaveZone(zone otmap.Zone) (uint16, error) {
 	if strings.TrimSpace(zone.Name) == "" {
 		return 0, errors.New("the zone needs a name")
@@ -197,7 +187,6 @@ func (e *Editor) SaveZone(zone otmap.Zone) (uint16, error) {
 	return zone.ID, nil
 }
 
-// RemoveZone deletes a zone and removes it from tiles.
 func (e *Editor) RemoveZone(id uint16) {
 	tx := e.Begin("Remove zone", 0)
 	tx.Meta()
@@ -212,7 +201,6 @@ func (e *Editor) RemoveZone(id uint16) {
 	tx.Commit()
 }
 
-// ImportOptions control merging another map.
 type ImportOptions struct {
 	DX int `json:"dx"`
 	DY int `json:"dy"`
@@ -226,7 +214,6 @@ type ImportOptions struct {
 	Towns bool `json:"towns"`
 }
 
-// Import merges another map into this one.
 func (e *Editor) Import(source *otmap.Map, options ImportOptions) (int, error) {
 	tx := e.Begin("Import map", 0)
 	tx.Meta()
@@ -275,8 +262,6 @@ func (e *Editor) importHouses(source *otmap.Map, options ImportOptions) map[uint
 	return houseIDs
 }
 
-// importTownsAndWaypoints adds the towns and waypoints of source that are
-// missing.
 func (e *Editor) importTownsAndWaypoints(source *otmap.Map, options ImportOptions) {
 	for _, town := range source.SortedTowns() {
 		if e.Map.Towns[town.ID] == nil {
@@ -298,7 +283,6 @@ func (e *Editor) importTownsAndWaypoints(source *otmap.Map, options ImportOption
 	}
 }
 
-// importTile replaces or merges target with a tile of the imported map.
 func (e *Editor) importTile(target, sourceTile *otmap.Tile, houseIDs map[uint32]uint32, options ImportOptions) {
 	imported := sourceTile.Clone()
 	imported.SetSelected(false)
@@ -350,7 +334,6 @@ func (e *Editor) MinimapColor(tile *otmap.Tile) uint8 {
 	return 0
 }
 
-// MinimapRGB converts a Tibia minimap color index to RGB.
 func MinimapRGB(colorIndex uint8) (red, green, blue uint8) {
 	if colorIndex >= minimapColorCount {
 		return 0, 0, 0

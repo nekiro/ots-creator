@@ -30,9 +30,7 @@ var (
 	MarketAPIURL   = "https://otscreatormarket.nekiro.dev"
 )
 
-// Market timeouts.
 const (
-	// marketIndexTTL is how long a downloaded index is reused.
 	marketIndexTTL = 5 * time.Minute
 	// marketRequestTimeout bounds every market request; callers add their
 	// own deadline.
@@ -43,13 +41,10 @@ const (
 	marketDeleteTimeout  = 30 * time.Second
 )
 
-// shareSpriteSizes are the sprite sizes a shared image may be cut into.
 var shareSpriteSizes = []int{32, 64}
 
 var httpClient = &http.Client{Timeout: marketRequestTimeout}
 
-// MarketService browses the market, imports entries and shares objects
-// and sprites.
 type MarketService struct {
 	session  *Session
 	settings *settings.Store
@@ -61,15 +56,12 @@ type MarketService struct {
 	fetched time.Time
 }
 
-// NewMarketService returns the service for the configured market.
 func NewMarketService(session *Session, store *settings.Store) *MarketService {
 	filesURL := cmp.Or(os.Getenv("OTS_MARKET_URL"), MarketFilesURL)
 	apiURL := cmp.Or(os.Getenv("OTS_MARKET_API"), MarketAPIURL)
 	return newMarketService(session, store, filesURL, apiURL, httpClient)
 }
 
-// newMarketService returns the service for a market at filesURL and apiURL
-// ("" for none).
 func newMarketService(session *Session, store *settings.Store, filesURL, apiURL string, client *http.Client) *MarketService {
 	service := &MarketService{session: session, settings: store}
 	if filesURL != "" {
@@ -85,7 +77,6 @@ func newMarketService(session *Session, store *settings.Store, filesURL, apiURL 
 
 var errNoMarket = errors.New("this build has no market configured")
 
-// MarketConfig tells the UI what the market can do.
 type MarketConfig struct {
 	// Browse and Share are false when the build has no market URLs.
 	Browse bool `json:"browse"`
@@ -94,11 +85,9 @@ type MarketConfig struct {
 	// CaptchaOrigin the origin its messages come from.
 	CaptchaURL    string `json:"captchaUrl"`
 	CaptchaOrigin string `json:"captchaOrigin"`
-	// Author is the nickname last used to share.
-	Author string `json:"author"`
+	Author        string `json:"author"`
 }
 
-// Config returns the market configuration.
 func (m *MarketService) Config() MarketConfig {
 	config := MarketConfig{Browse: m.src != nil, Share: m.api != nil && m.src != nil, Author: m.settings.Get().MarketAuthor}
 	if m.api != nil {
@@ -120,8 +109,6 @@ type MarketIndex struct {
 	Admin   bool           `json:"admin"`
 }
 
-// Index returns the market entries, downloading them again when refresh is
-// set or the cached copy is old.
 func (m *MarketService) Index(refresh bool) (*MarketIndex, error) {
 	if m.src == nil {
 		return nil, errNoMarket
@@ -180,8 +167,6 @@ func (m *MarketService) download(id string) (*market.Entry, []byte, error) {
 	return entry, data, nil
 }
 
-// Read downloads an object entry for previewing. No client needs to be
-// open.
 func (m *MarketService) Read(id string) (*ObjectFile, error) {
 	entry, data, err := m.download(id)
 	if err != nil {
@@ -197,8 +182,6 @@ func (m *MarketService) Read(id string) (*ObjectFile, error) {
 	return newObjectFile(entry.File, object), nil
 }
 
-// MarketImport reports an imported entry: an object (Category and ID) or
-// the new sprite ids of a sprite pack.
 type MarketImport struct {
 	Kind     string         `json:"kind"`
 	Category thing.Category `json:"category"`
@@ -247,7 +230,6 @@ func (m *MarketService) Import(id string) (*MarketImport, error) {
 	return result, nil
 }
 
-// ShareRequest is what the author fills in. Captcha is the captcha token.
 type ShareRequest struct {
 	Name        string   `json:"name"`
 	Author      string   `json:"author"`
@@ -269,7 +251,6 @@ func (req ShareRequest) meta(kind string, spriteSize int) market.Meta {
 	}
 }
 
-// ShareObject publishes one object and returns the new entry id.
 func (m *MarketService) ShareObject(category thing.Category, id uint32, req ShareRequest) (string, error) {
 	proj, err := m.session.Project()
 	if err != nil {
@@ -282,7 +263,6 @@ func (m *MarketService) ShareObject(category thing.Category, id uint32, req Shar
 	return m.shareOBD(object, req)
 }
 
-// shareOBD publishes OBD data as an object entry.
 func (m *MarketService) shareOBD(object *obd.Data, req ShareRequest) (string, error) {
 	object.Thing.Name, object.Thing.Description = "", "" // assets names do not travel
 	object.Version = obd.Version3
@@ -306,8 +286,6 @@ func (m *MarketService) shareOBD(object *obd.Data, req ShareRequest) (string, er
 	return m.submit(market.Submission{Meta: meta, Info: info, File: data, Preview: preview, Captcha: req.Captcha})
 }
 
-// ShareSprites publishes sprites as a pack and returns the new entry id.
-// Empty sprites are left out.
 func (m *MarketService) ShareSprites(ids []uint32, req ShareRequest) (string, error) {
 	proj, err := m.session.Project()
 	if err != nil {
@@ -324,7 +302,6 @@ func (m *MarketService) ShareSprites(ids []uint32, req ShareRequest) (string, er
 	return m.sharePixels(sprites, proj.SpriteSize(), req)
 }
 
-// sharePixels publishes sprites as a pack; empty sprites are left out.
 func (m *MarketService) sharePixels(all [][]byte, spriteSize int, req ShareRequest) (string, error) {
 	var sprites [][]byte
 	for _, pixels := range all {

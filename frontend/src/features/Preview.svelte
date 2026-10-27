@@ -1,9 +1,7 @@
 <script lang="ts" module>
-  // The chosen mount and view survive switching objects.
   let savedMountId = 0;
   let savedSheetView = false;
 
-  /** Something other than the selected object of the client, shown read-only. */
   export interface PreviewSource {
     /** Changes when another object is shown, which resets the view. */
     key: string;
@@ -49,8 +47,6 @@
   let stage = $state<HTMLDivElement>();
   let stageSize = $state<[number, number]>([0, 0]);
   let showGrid = $state(true);
-  // Lines between single pixels; drawn only from PIXEL_GRID_ZOOM up, where
-  // they do not hide the sprite.
   let showPixelGrid = $state(false);
   const PIXEL_GRID_ZOOM = 4;
   let playing = $state(true);
@@ -64,7 +60,7 @@
   let canvasSize = $state<[number, number]>([0, 0]);
   let colors = $state<OutfitColors>({ ...DEFAULT_COLORS });
   let pos = $state<TexturePos>({ layer: 0, x: 0, y: 0, z: 0, frame: 0 });
-  let loaded = $state(0); // bumps when sprites arrive
+  let loaded = $state(0);
   let hoverSlot = $state<number | null>(null);
   let dropSlot = $state<number | null>(null);
 
@@ -77,7 +73,6 @@
   // Fitting a small object to a big window would blow it up past what is
   // useful to look at.
   const MAX_FIT_ZOOM = 4;
-  /** Canvas-wrap margin and borders. */
   const STAGE_MARGIN = 34;
   const fittedZoom = $derived.by(() => {
     if (!frameGroup || !stageSize[0]) return 4;
@@ -209,13 +204,11 @@
     }
   }
 
-  // Reset view state when another thing is selected.
   let lastKey = "";
   $effect(() => {
     const key = source ? source.key : `${app.category}:${thing?.id}`;
     if (key === lastKey) return;
     lastKey = key;
-    // Keep the idle/walking tab when the new thing has that group too.
     if (group >= (thing?.frameGroups.length ?? 1)) group = 0;
     view.reset();
     paintImage = null;
@@ -224,7 +217,6 @@
     hoverSlot = null;
   });
 
-  // Keep the position valid when the layout changes.
   $effect(() => {
     if (!frameGroup) return;
     const clamped = clampPos(frameGroup, pos);
@@ -257,7 +249,6 @@
     if (mountGroup) spriteCache.load(mountGroup.sprites).then(() => loaded++);
   });
 
-  // Load all sprites of the current group.
   $effect(() => {
     if (!frameGroup || source) return;
     const ids = frameGroup.sprites;
@@ -272,7 +263,6 @@
     });
   });
 
-  // Animation.
   let animator: Animator | null = null;
   $effect(() => {
     if (!frameGroup || frameGroup.frames < 2 || !playing || editing) {
@@ -304,14 +294,12 @@
     return () => cancelAnimationFrame(raf);
   });
 
-  // Draw.
   $effect(() => {
     void loaded;
     void paintTick;
     if (!frameGroup || !canvas) return;
     let image: ImageData;
     if (editing) {
-      // The raw texture of the chosen layer, as it is stored.
       image = paintImage ?? compose(frameGroup, frameGroup.sprites, size, { pos }, getSprite);
       riderOffset = [0, 0];
     } else {
@@ -338,7 +326,6 @@
     pos.frame = (pos.frame + delta + frameGroup.frames) % frameGroup.frames;
   }
 
-  /** Puts sprites into slot and the following ones (multi-drag). */
   function assign(slot: number, ids: number[]) {
     if (readonly || !frameGroup || !app.draft) return;
     const draftGroup = frameGroupAt(app.draft, group)!;
@@ -607,14 +594,12 @@
     flex-direction: column;
     gap: 6px;
   }
-  /* Wails marks the drop target under a dragged file. */
   .preview:global(.file-drop-target-active) {
     outline: 1px dashed var(--gold);
     outline-offset: 2px;
   }
   .stage-wrap {
     flex: 1;
-    /* The stage gives up space first; controls keep their size. */
     min-height: 80px;
     position: relative;
     display: flex;
@@ -674,12 +659,10 @@
   .stage.panning {
     cursor: grabbing;
   }
-  /* While panning, slots neither click nor show hover outlines. */
   .stage.pan-ready .slots,
   .stage.panning .slots {
     pointer-events: none;
   }
-  /* One line per pixel edge; grey stays visible on dark and light pixels. */
   .pixel-grid {
     position: absolute;
     inset: 0;
@@ -725,7 +708,6 @@
     flex: 0 1 160px;
     min-width: 96px;
   }
-  /* Playback and zoom stay on one line; the group tabs shrink instead. */
   .controls > .playback {
     flex-wrap: nowrap;
     min-width: 0;
@@ -748,7 +730,6 @@
     font: inherit;
     cursor: pointer;
   }
-  /* Fitting the window: gold, like other automatic values. */
   .zoom.auto {
     color: var(--gold);
     cursor: default;

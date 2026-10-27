@@ -1,4 +1,3 @@
-// Geometry of an OTClient HorizontalScrollBar used as a value slider.
 import { clamp } from "../util/math";
 
 export { clamp };
@@ -11,14 +10,12 @@ export function thumbWidth(track: number, min: number, max: number): number {
   return Math.min(track, Math.max(THUMB_MIN, Math.round(track / steps)));
 }
 
-/** Thumb offset inside the track for a value. */
 export function thumbOffset(value: number, track: number, min: number, max: number): number {
   if (max <= min) return 0;
   const free = track - thumbWidth(track, min, max);
   return Math.round(((clamp(value, min, max) - min) / (max - min)) * free);
 }
 
-/** Value for a pointer at x (track coordinates), centred on the thumb. */
 export function valueAt(x: number, track: number, min: number, max: number): number {
   if (max <= min) return min;
   const thumb = thumbWidth(track, min, max);

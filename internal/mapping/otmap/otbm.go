@@ -6,7 +6,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/core/otitems"
 )
 
-// OTBM node types.
 const (
 	nodeRoot      = 0
 	nodeMapData   = 2
@@ -21,7 +20,6 @@ const (
 	nodeTileZone  = 19
 )
 
-// OTBM attributes.
 const (
 	attrDescription   = 1
 	attrTileFlags     = 3
@@ -49,13 +47,10 @@ const (
 	attrAttributeMap  = 128
 )
 
-// Generator is written into saved maps as the first description.
 var Generator = "OTS Creator"
 
-// ErrNotOTBM is returned for files that are not OTBM maps.
 var ErrNotOTBM = errors.New("not an OTBM map")
 
-// Items is what the codec needs to know about item types.
 type Items interface {
 	Get(id uint16) *otitems.Type
 }
@@ -63,7 +58,6 @@ type Items interface {
 // Format holds OTBM variants of server forks. The zero value is the
 // standard format.
 type Format struct {
-	// CountU16 stores the count attribute as uint16 instead of uint8.
 	CountU16 bool `json:"countU16"`
 }
 

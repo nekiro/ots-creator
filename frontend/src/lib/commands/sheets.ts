@@ -1,4 +1,3 @@
-// Sprite sheets of the focused object: export, import, copy and paste.
 import { CATEGORY_NAMES, DialogService, ThingService, encodeBytes, errorMessage, res } from "../api";
 import { app, applyDraft, run, toast, versions } from "../state/app.svelte";
 import { IMAGE_FILTERS, guard, imageFilters } from "./shared";
@@ -18,14 +17,12 @@ async function importSheetWith(load: (id: number) => Promise<void>): Promise<voi
 }
 
 export const sheetCommands = {
-  /** Opens the sprite sheet export window with a preview. */
   exportSheet(group = 0) {
     if (!guard() || app.focused === null) return;
     app.sheetGroup = group;
     app.dialog = "sheet";
   },
 
-  /** Asks where to save and writes the sheet in the chosen format. */
   async saveSheet(group: number, format: string, transparent: boolean): Promise<boolean> {
     if (!guard() || app.focused === null) return false;
     const name = `${CATEGORY_NAMES[app.category]}_${app.focused}.${format}`;
@@ -53,13 +50,10 @@ export const sheetCommands = {
     await importSheetWith((id) => ThingService.ImportSheet(app.category, id, group, path));
   },
 
-  /** loadSheet for image bytes from the clipboard. */
   async pasteSheet(data: Uint8Array, group = 0) {
     await importSheetWith((id) => ThingService.PasteSheet(app.category, id, group, encodeBytes(data)));
   },
 
-  /** Puts the sprite sheet of the focused object on the clipboard as a
-   * PNG with transparency; Ctrl+V on another object pastes it there. */
   async copySheet(group = 0) {
     if (!guard() || app.focused === null) return;
     const category = app.category;

@@ -1,4 +1,3 @@
-// Menu entries shared by the menu bar and context menus.
 import { toCss } from "./pixelscale";
 
 export interface MenuItem {
@@ -10,7 +9,6 @@ export interface MenuItem {
 }
 export type MenuEntry = MenuItem | "-";
 
-/** The open context menu, rendered once by ContextMenu in App. */
 export const contextMenu = $state<{ items: MenuEntry[] | null; x: number; y: number }>({ items: null, x: 0, y: 0 });
 
 export function openContextMenu(event: MouseEvent, items: MenuEntry[]): void {

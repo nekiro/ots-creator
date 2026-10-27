@@ -12,7 +12,6 @@ type Item struct {
 	Ext      *ItemExt `json:"ext,omitempty"`
 }
 
-// ItemExt holds attributes few items have.
 type ItemExt struct {
 	ActionID    uint16    `json:"actionId,omitempty"`
 	UniqueID    uint16    `json:"uniqueId,omitempty"`
@@ -21,16 +20,13 @@ type ItemExt struct {
 	Dest        *Position `json:"dest,omitempty"`
 	DepotID     uint16    `json:"depotId,omitempty"`
 	DoorID      uint8     `json:"doorId,omitempty"`
-	// Items are the contents of a container.
-	Items []Item `json:"items,omitempty"`
-	// Attrs is the OTBM attribute map (custom attributes).
-	Attrs []Attr `json:"attrs,omitempty"`
+	Items       []Item    `json:"items,omitempty"`
+	Attrs       []Attr    `json:"attrs,omitempty"`
 	// Raw keeps attributes the editor does not edit (written date, duration,
 	// decay state...) to write them back unchanged.
 	Raw []RawAttr `json:"raw,omitempty"`
 }
 
-// Attribute value types of the OTBM attribute map.
 const (
 	AttrString  uint8 = 1
 	AttrInteger uint8 = 2
@@ -39,7 +35,6 @@ const (
 	AttrDouble  uint8 = 5
 )
 
-// Attr is one custom attribute.
 type Attr struct {
 	Key   string  `json:"key"`
 	Type  uint8   `json:"type"`
@@ -49,7 +44,6 @@ type Attr struct {
 	Value bool    `json:"value,omitempty"`
 }
 
-// RawAttr is an OTBM item attribute kept as bytes.
 type RawAttr struct {
 	Code byte   `json:"code"`
 	Data []byte `json:"data"`
@@ -60,7 +54,6 @@ func (e *ItemExt) empty() bool {
 		e.DepotID == 0 && e.DoorID == 0 && len(e.Items) == 0 && len(e.Attrs) == 0 && len(e.Raw) == 0)
 }
 
-// Ensure returns the item's ext, creating it.
 func (it *Item) Ensure() *ItemExt {
 	if it.Ext == nil {
 		it.Ext = &ItemExt{}
@@ -68,14 +61,12 @@ func (it *Item) Ensure() *ItemExt {
 	return it.Ext
 }
 
-// Compact drops an empty ext.
 func (it *Item) Compact() {
 	if it.Ext.empty() {
 		it.Ext = nil
 	}
 }
 
-// ActionID returns the action id.
 func (it *Item) ActionID() uint16 {
 	if it.Ext == nil {
 		return 0
@@ -83,7 +74,6 @@ func (it *Item) ActionID() uint16 {
 	return it.Ext.ActionID
 }
 
-// UniqueID returns the unique id.
 func (it *Item) UniqueID() uint16 {
 	if it.Ext == nil {
 		return 0
@@ -95,7 +85,6 @@ func (it *Item) UniqueID() uint16 {
 // subtype (the eraser can keep those).
 func (it *Item) Complex() bool { return !it.Ext.empty() }
 
-// Clone returns a deep copy.
 func (it Item) Clone() Item {
 	if it.Ext == nil {
 		return it

@@ -16,14 +16,12 @@ import (
 )
 
 const (
-	// maxMinimapSide bounds the area of one minimap request.
 	maxMinimapSide = 2048
 	// markedItemDefaultColor is the minimap color (yellow) of marked items
 	// without one.
 	markedItemDefaultColor = 210
 )
 
-// mapRequest is a request for one open map, made under the read lock.
 type mapRequest struct {
 	opened *openMap
 	data   *mapData
@@ -62,14 +60,12 @@ func (ms *MapService) serveMap(w http.ResponseWriter, r *http.Request, parts []s
 	handler(ms, w, mapRequest{opened: opened, data: data, query: r.URL.Query()})
 }
 
-// mapHandlers serves the requests of serveMap by their last path part.
 var mapHandlers = map[string]func(*MapService, http.ResponseWriter, mapRequest){
 	"chunks":  (*MapService).serveChunks,
 	"geo":     (*MapService).serveGeometry,
 	"minimap": (*MapService).serveMinimap,
 }
 
-// scene is what maprender draws the map from.
 func (ms *MapService) scene(opened *openMap, data *mapData) *maprender.Scene {
 	return &maprender.Scene{
 		Map:          opened.editor.Map,
@@ -86,8 +82,6 @@ func (ms *MapService) scene(opened *openMap, data *mapData) *maprender.Scene {
 	}
 }
 
-// markedItemColors gives each marked item of the settings its minimap
-// color (yellow when it has none).
 func markedItemColors(editor *mapedit.Editor) map[uint16][3]uint8 {
 	ids := editor.Settings.MarkedItems
 	if ids == nil {
@@ -120,7 +114,6 @@ func chunkKeys(query url.Values) (keys []otmap.ChunkKey, ok bool) {
 	return keys, true
 }
 
-// queryInt reads an int parameter, 0 when missing or invalid.
 func queryInt(query url.Values, name string) int {
 	value, _ := strconv.Atoi(query.Get(name))
 	return value

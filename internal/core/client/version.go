@@ -1,4 +1,3 @@
-// Package client describes client versions and their feature switches.
 package client
 
 import (
@@ -13,10 +12,9 @@ import (
 //go:embed versions.xml
 var versionsXML []byte
 
-// Version is one known client release.
 type Version struct {
-	Value        uint16 `json:"value"` // e.g. 1098
-	Name         string `json:"name"`  // e.g. "10.98"
+	Value        uint16 `json:"value"`
+	Name         string `json:"name"`
 	DatSignature uint32 `json:"datSignature"`
 	SprSignature uint32 `json:"sprSignature"`
 }
@@ -32,7 +30,6 @@ type xmlVersions struct {
 	} `xml:"version"`
 }
 
-// ParseVersions parses a versions.xml document in the ObjectBuilder format.
 func ParseVersions(data []byte) ([]Version, error) {
 	var doc xmlVersions
 	if err := xml.Unmarshal(data, &doc); err != nil {
@@ -62,7 +59,6 @@ var (
 	builtin     []Version
 )
 
-// Versions returns the built-in version table.
 func Versions() []Version {
 	builtinOnce.Do(func() {
 		parsed, err := ParseVersions(versionsXML)
@@ -74,7 +70,6 @@ func Versions() []Version {
 	return slices.Clone(builtin)
 }
 
-// FindBySignatures returns the first version that matches both signatures.
 func FindBySignatures(datSignature, sprSignature uint32) (Version, bool) {
 	for _, version := range Versions() {
 		if version.DatSignature == datSignature && version.SprSignature == sprSignature {
@@ -84,7 +79,6 @@ func FindBySignatures(datSignature, sprSignature uint32) (Version, bool) {
 	return Version{}, false
 }
 
-// FindByValue returns every version with the given numeric value.
 func FindByValue(value uint16) []Version {
 	var out []Version
 	for _, version := range Versions() {

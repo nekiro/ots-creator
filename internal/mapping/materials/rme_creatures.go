@@ -6,7 +6,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/xmltree"
 )
 
-// ParseRMECreatures reads an RME creatures.xml.
 func ParseRMECreatures(data []byte) ([]*CreatureType, error) {
 	root, err := xmltree.Parse(data)
 	if err != nil {

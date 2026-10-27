@@ -9,7 +9,6 @@
   interface Tool {
     label: string;
     hint: string;
-    /** Tool names for the selection and the whole map; null when not available. */
     selection: string | null;
     all: string;
     confirm?: string;

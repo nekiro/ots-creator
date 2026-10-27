@@ -1,4 +1,3 @@
-// Files dropped onto the window.
 import { SpriteService, ThingService } from "../api";
 import { app, applyDraft, run, select, toast } from "../state/app.svelte";
 import { classifyDrop } from "./classifyDrop";
@@ -21,7 +20,6 @@ export const dropCommands = {
         await sheetCommands.loadSheet(action.path, group);
         return;
       case "thingSheet":
-        // Keep unapplied edits of the current object, then switch to the target.
         if (app.dirty) {
           await applyDraft();
           if (app.dirty) return;

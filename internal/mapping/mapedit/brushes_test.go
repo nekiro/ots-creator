@@ -19,7 +19,6 @@ func brushesTestEditor(t *testing.T, mutate func(materialsDB *materials.Material
 	return e
 }
 
-// brushesAddBrush is a mutate function for brushesTestEditor that appends brushes.
 func brushesAddBrush(brushes ...*materials.Brush) func(materialsDB *materials.Materials) {
 	return func(materialsDB *materials.Materials) {
 		materialsDB.Brushes = append(materialsDB.Brushes, brushes...)

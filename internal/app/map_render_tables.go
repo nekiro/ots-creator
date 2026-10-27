@@ -5,8 +5,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
-// ItemTable lists every item type in parallel arrays (compact for the
-// palette, search and drawing).
 type ItemTable struct {
 	IDs     []uint16 `json:"ids"`
 	Clients []uint16 `json:"clients"`
@@ -22,7 +20,6 @@ type ItemTable struct {
 	Flagbits map[string]uint32 `json:"flagbits"`
 }
 
-// Items returns the item table.
 func (ms *MapService) Items() (table ItemTable, err error) {
 	err = ms.withData(func(data *mapData) error {
 		table = itemTable(data.items)
@@ -49,7 +46,6 @@ func itemTable(items *otitems.DB) ItemTable {
 	return table
 }
 
-// Appearance flags, the bits of Appearance.Flags.
 const (
 	appearanceAnimateAlways uint32 = 1 << iota
 	appearanceHangable
@@ -65,7 +61,6 @@ const (
 	appearanceFullGround
 )
 
-// Appearance is what the map renderer needs to draw a client thing.
 type Appearance struct {
 	ID        uint32   `json:"id"`
 	Width     uint8    `json:"width"`
@@ -91,8 +86,6 @@ type Appearance struct {
 	Moving *Appearance `json:"moving,omitempty"`
 }
 
-// Appearances returns render data of client things (missing ids are left
-// out).
 func (ms *MapService) Appearances(category thing.Category, ids []uint32) ([]Appearance, error) {
 	proj, err := ms.session.Project()
 	if err != nil {
@@ -109,7 +102,6 @@ func (ms *MapService) Appearances(category thing.Category, ids []uint32) ([]Appe
 	return out, nil
 }
 
-// frameGroupAppearance is the size, patterns, frames and sprites of a frame group.
 func frameGroupAppearance(id uint32, group *thing.FrameGroup) Appearance {
 	appearance := Appearance{
 		ID: id, Width: group.Width, Height: group.Height, Layers: group.Layers,

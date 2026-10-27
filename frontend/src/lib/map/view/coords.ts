@@ -15,19 +15,16 @@ export function floorOffset(z: number): number {
   return floorShift(z, z);
 }
 
-/** Tile under a world position on the floor in view. */
 export function worldToTile(worldX: number, worldY: number, floor: number, tileSize: number): { x: number; y: number } {
   const offset = floorOffset(floor);
   return { x: Math.floor(worldX / tileSize) + offset, y: Math.floor(worldY / tileSize) + offset };
 }
 
-/** The tile under a world position on the floor in view, clamped to the map (never below 0). */
 export function worldToPosition(worldX: number, worldY: number, floor: number, tileSize: number): Position {
   const tile = worldToTile(worldX, worldY, floor, tileSize);
   return { x: Math.max(0, tile.x), y: Math.max(0, tile.y), z: floor };
 }
 
-/** World position of the center of a tile, seen from its own floor. */
 export function tileToWorld(position: Position, tileSize: number): { x: number; y: number } {
   const offset = floorOffset(position.z);
   return { x: (position.x - offset + 0.5) * tileSize, y: (position.y - offset + 0.5) * tileSize };

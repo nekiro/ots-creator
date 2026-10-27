@@ -1,4 +1,3 @@
-// Menus of the map editor.
 import { app, toast } from "../../state/app.svelte";
 import type { MenuEntry } from "../../menu.svelte";
 import { MapService, fmtPos, type Position } from "../data/api";
@@ -20,7 +19,6 @@ function copy(text: string) {
   );
 }
 
-/** View options that are on or off. */
 type ViewToggle = { [Key in keyof ViewOptions]: ViewOptions[Key] extends boolean ? Key : never }[keyof ViewOptions];
 const toggle = (key: ViewToggle, label: string, keys?: string): MenuEntry => ({
   label,
@@ -147,13 +145,11 @@ export function readableIndex(tile: TileData | null | undefined): number {
   return -1;
 }
 
-/** Opens the text of an item like the game shows it. */
 export function openText(pos: Position, index: number): void {
   map.textItem = { pos, index };
   map.dialog = "text";
 }
 
-/** Context menu of a map tile. */
 export function mapContextMenu(position: Position, tileData: TileData | null, actions: { pick: () => void }): MenuEntry[] {
   const items = map.items;
   const top = tileData && tileData.ids.length ? tileData.ids[tileData.ids.length - 1] : 0;

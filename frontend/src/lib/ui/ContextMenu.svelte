@@ -6,7 +6,6 @@
   let menu = $state<HTMLDivElement>();
   let pos = $state({ left: 0, top: 0 });
 
-  // Keep the menu inside the window.
   $effect(() => {
     if (!contextMenu.items || !menu) return;
     const bounds = menu.getBoundingClientRect();

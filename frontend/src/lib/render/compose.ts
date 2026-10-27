@@ -7,15 +7,12 @@ import { colorize, type OutfitColors } from "./outfit";
 
 export interface ComposeOptions {
   pos: TexturePos;
-  /** Extra pattern Y values drawn on top (outfit addons). */
   addons?: number[];
-  /** Colorize with layer 1 as template (outfits with 2+ layers). */
   colors?: OutfitColors | null;
 }
 
 export type PixelSource = (spriteId: number) => Uint8ClampedArray | undefined;
 
-/** Alpha-blends the source pixel over the destination pixel (straight alpha). */
 export function blendOver(dst: Uint8ClampedArray, dstOffset: number, src: Uint8ClampedArray, srcOffset: number): void {
   const srcAlpha8 = src[srcOffset + 3];
   if (srcAlpha8 === 0) return;

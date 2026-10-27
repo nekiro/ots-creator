@@ -9,7 +9,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/binio"
 )
 
-// boolFlags are the flags without payload.
 var boolFlags = []struct {
 	num protowire.Number
 	get func(*thing.Properties) *bool
@@ -57,8 +56,6 @@ var boolFlags = []struct {
 	{57, func(props *thing.Properties) *bool { return &props.WrapKit }},
 }
 
-// valueFlags are the flags whose payload is one number (payloadValue): the
-// property that marks the flag set and the property holding the number.
 var valueFlags = []struct {
 	num    protowire.Number
 	fields func(*thing.Properties) (set *bool, value *uint16)
@@ -78,7 +75,6 @@ var valueFlags = []struct {
 	}},
 }
 
-// boolFlagIndex and valueFlagIndex find the table entry of a flag number.
 var boolFlagIndex, valueFlagIndex = func() (map[protowire.Number]int, map[protowire.Number]int) {
 	bools := map[protowire.Number]int{}
 	for i, flag := range boolFlags {
@@ -104,7 +100,6 @@ func professionMask(values []uint64) uint16 {
 	return mask
 }
 
-// knownFlags lists every flag number written by encodeFlags.
 var knownFlags = func() []protowire.Number {
 	out := []protowire.Number{flagHook, flagLight, flagShift, flagMarket, flagNpcSaleData, flagHookSouth, flagHookEast}
 	for _, flag := range valueFlags {
@@ -116,7 +111,6 @@ var knownFlags = func() []protowire.Number {
 	return out
 }()
 
-// Supported lists the json names of the properties appearances can store.
 func Supported() []string {
 	return []string{
 		"ground", "groundBorder", "onBottom", "onTop", "container", "stackable", "forceUse", "multiUse",
@@ -131,8 +125,6 @@ func Supported() []string {
 	}
 }
 
-// Unsupported lists the json names of properties set in props that
-// appearances cannot store.
 func Unsupported(props *thing.Properties) []string {
 	var out []string
 	if props.HasCharges {
@@ -147,10 +139,8 @@ func Unsupported(props *thing.Properties) []string {
 	return out
 }
 
-// clampUint16 limits a decoded number to the uint16 of the model.
 func clampUint16(value uint64) uint16 { return uint16(min(value, math.MaxUint16)) }
 
-// clampInt16 reads a proto int32 and limits it to the int16 of the model.
 func clampInt16(value uint64) int16 {
 	return int16(max(min(int64(int32(value)), math.MaxInt16), math.MinInt16))
 }
@@ -197,7 +187,6 @@ func decodeFlags(flags message, props *thing.Properties) {
 	}
 }
 
-// decodeNpcSales reads the repeated NPC sale entries of the flags.
 func decodeNpcSales(flags message) []thing.NpcSale {
 	var out []thing.NpcSale
 	for _, sale := range flags.all(flagNpcSaleData) {
@@ -230,7 +219,6 @@ func encodeNpcSale(sale thing.NpcSale) []byte {
 	return out
 }
 
-// flagWriter builds a flags message on top of the original flags.
 type flagWriter struct {
 	out      []byte
 	original message
@@ -242,7 +230,6 @@ func (w *flagWriter) sub(num protowire.Number, known []protowire.Number, fields 
 	w.out = putBytes(w.out, num, w.original.sub(num).appendOthers(fields, known...))
 }
 
-// value writes a flag whose payload is one number.
 func (w *flagWriter) value(num protowire.Number, value uint64) {
 	w.sub(num, []protowire.Number{payloadValue}, putUint(nil, payloadValue, value))
 }

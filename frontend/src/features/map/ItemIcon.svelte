@@ -1,6 +1,4 @@
 <script lang="ts">
-  // Icon of a map item (server id) or a creature outfit, from the client
-  // thumbnails.
   import { Category, res } from "../../lib/api";
   import { map } from "../../lib/map/state.svelte";
   import { versions } from "../../lib/state/app.svelte";

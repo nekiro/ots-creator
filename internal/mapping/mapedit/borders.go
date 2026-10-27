@@ -85,8 +85,6 @@ func findBorderBlock(brush *GroundBrush, outer bool, target int) *borderBlock {
 	return nil
 }
 
-// findZilchBorderBlock returns the first inner or outer border block of
-// the brush toward empty tiles.
 func findZilchBorderBlock(brush *GroundBrush, outer bool) *borderBlock {
 	for _, block := range brush.borders {
 		if block.outer == outer && block.to == toNone {
@@ -129,7 +127,6 @@ type borderCluster struct {
 	border *autoBorder
 }
 
-// borderPlan is the border stack automagic wants on a tile.
 type borderPlan struct {
 	ids []uint16 // bottom to top
 	// managed holds every piece of the border sets the plan used, so a new
@@ -158,8 +155,6 @@ func claimNeighbors(neighbors *[8]borderNeighbor, start int, matches func(*Groun
 	return mask
 }
 
-// mergeBorderCluster adds the neighbor bits to the cluster of the border,
-// or starts a new cluster for it.
 func mergeBorderCluster(clusters []borderCluster, border *autoBorder, mask, z int) []borderCluster {
 	for i := range clusters {
 		if clusters[i].border == border {
@@ -307,8 +302,6 @@ func (plan *borderPlan) stackClusters(clusters []borderCluster) {
 	plan.ids = append(topFirst, plan.ids...)
 }
 
-// applySpecificCases runs the specific cases of the border blocks on the
-// plan and marks their pieces as managed.
 func (e *Editor) applySpecificCases(plan *borderPlan, blocks []*borderBlock) {
 	for _, block := range blocks {
 		for _, specific := range block.specific {
@@ -325,7 +318,6 @@ func (e *Editor) applySpecificCases(plan *borderPlan, blocks []*borderBlock) {
 	}
 }
 
-// applySpecific runs a specific case of a border rule on a border stack.
 func (e *Editor) applySpecific(ids []uint16, specific specificCase) []uint16 {
 	if len(specific.match) == 0 {
 		return ids

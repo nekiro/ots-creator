@@ -1,6 +1,4 @@
 <script lang="ts">
-  // The values of a set flag (light level and color, cloth slot…), shared by
-  // the properties panel and the bulk editor. The owner reads and stores them.
   import type { Field } from "../lib/flags";
   import NumberField from "../lib/ui/NumberField.svelte";
   import Select from "../lib/ui/Select.svelte";
@@ -13,12 +11,9 @@
     showAny = false,
   }: {
     fields: Field[];
-    /** The current value of a field. */
     value: (field: Field) => any;
     onset: (field: Field, value: string | number) => void;
-    /** Choices of a select field. */
     options: (field: Field) => { value: number; label: string }[];
-    /** "(any)" next to a mask with no bit set. */
     showAny?: boolean;
   } = $props();
 </script>

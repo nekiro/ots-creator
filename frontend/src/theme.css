@@ -110,8 +110,6 @@ body {
   border-image-repeat: repeat;
 }
 
-/* ---------- containers ---------- */
-
 /* dialog-frame-borderimage: 2px bevel, 14px title bar, 1px line; 4px sides. */
 .t-window {
   position: relative;
@@ -162,7 +160,6 @@ body {
   line-height: 12px;
   text-shadow: 1px 1px 0 #000;
 }
-/* Header buttons fit the 12px bar. */
 .t-mini-header .t-icon-btn {
   width: 13px;
   height: 12px;
@@ -207,7 +204,6 @@ body {
   border-image: url("./assets/ui/2pixel-up-frame-borderimage.png") 2 fill / 2px repeat;
 }
 
-/* A dark line over a bright one, like the client's separators. */
 .t-sep {
   height: 2px;
   background:
@@ -223,8 +219,6 @@ body {
     url("./assets/ui/vertical-line-dark.png") 0 0 / 1px auto repeat-y,
     url("./assets/ui/vertical-line-bright.png") 1px 0 / 1px auto repeat-y;
 }
-
-/* ---------- controls ---------- */
 
 .t-btn {
   font: inherit;
@@ -264,7 +258,6 @@ body {
 .t-btn.primary {
   color: #fff;
 }
-/* button-green: actions that should stand out (the client's "Buy", "Start"). */
 .t-btn.green {
   color: #fff;
   border-image-source: url("./assets/ui/button-green-up.png");
@@ -280,13 +273,10 @@ body {
 .t-btn.danger:active:not(:disabled) {
   border-image-source: url("./assets/ui/btn-danger-pressed.png");
 }
-/* Small remove buttons (×): red when pointed at. */
 .t-icon-btn.danger:hover:not(:disabled) {
   color: #ff8a8a;
 }
 
-/* Square icon button (20x20 like the client's small buttons):
-   button-textured, a 1px bevel around stone. */
 .t-icon-btn {
   width: 20px;
   height: 20px;
@@ -391,7 +381,6 @@ input[type="number"].t-input::-webkit-outer-spin-button {
   gap: 2px;
   flex: none;
 }
-/* console-tab: 2px bevel, open at the bottom; the active tab is lighter. */
 .t-tab {
   flex: 1;
   font: inherit;
@@ -416,7 +405,6 @@ input[type="number"].t-input::-webkit-outer-spin-button {
   filter: none;
 }
 
-/* Item slot (34x34) */
 .t-slot {
   width: 34px;
   height: 34px;
@@ -457,7 +445,6 @@ input[type="number"].t-input::-webkit-outer-spin-button {
     transform: rotate(360deg);
   }
 }
-/* Small spinning ring next to a "Loading…" text */
 .t-spinner {
   display: inline-block;
   width: 12px;
@@ -480,20 +467,16 @@ input[type="number"].t-input::-webkit-outer-spin-button {
   color: var(--text-bright);
 }
 
-/* ---------- scrollbars (WebView2 / Chromium) ---------- */
-
 ::-webkit-scrollbar {
   width: 12px;
   height: 12px;
 }
-/* scrollbar-texture: 1px bevel at the sides, tiled along. */
 ::-webkit-scrollbar-track:vertical {
   background: url("./assets/ui/scrollbar-texture-vertical.png") repeat-y;
 }
 ::-webkit-scrollbar-track:horizontal {
   background: url("./assets/ui/scrollbar-texture-horizontal.png") repeat-x;
 }
-/* scrollbar-handle: a rounded bar; the 6px ends stay, the middle stretches. */
 ::-webkit-scrollbar-thumb:vertical {
   min-height: 14px;
   border-style: solid;
@@ -557,8 +540,6 @@ html.sb-fake-buttons ::-webkit-scrollbar-track:horizontal {
   background: #2a2a2a;
 }
 
-/* ---------- helpers ---------- */
-
 .row {
   display: flex;
   align-items: center;
@@ -593,8 +574,6 @@ kbd {
   font: var(--fs-small) / 10px var(--font-small);
 }
 
-/* ---------- popup menus (OTClient PopupMenu) ---------- */
-
 /* 3pixel_frame_borderimage, image-border 4 */
 .t-menu {
   padding: 1px;
@@ -616,7 +595,6 @@ kbd {
   border-style: solid;
   border-width: 2px;
   border-image: url("./assets/ui/qcombo-popup.png") 2 / 2px repeat;
-  /* A flat veil softens the stone so only a hint of it shows. */
   background:
     linear-gradient(rgba(76, 76, 76, 0.7), rgba(76, 76, 76, 0.7)),
     #4c4c4c url("./assets/ui/background.png") repeat;
@@ -624,13 +602,11 @@ kbd {
   image-rendering: pixelated;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
 }
-/* PopupMenuSeparator: horizontal_line_bright */
 .t-menu-sep {
   height: 2px;
   margin: 2px 3px;
   background: url("./assets/ui/context-menu-separator.png") 0 0 / auto 2px repeat-x;
 }
-/* PopupMenuButton */
 .t-menu-entry {
   font: inherit;
   color: #ffffff;

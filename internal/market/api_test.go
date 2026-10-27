@@ -48,7 +48,6 @@ func TestSubmitAndDelete(t *testing.T) {
 		t.Fatal("a deleted entry must be gone")
 	}
 
-	// The admin token deletes any entry.
 	again, err := api.Submit(ctx, market.Submission{Meta: meta, File: []byte("png"), Captcha: "solved"})
 	if err != nil {
 		t.Fatal(err)

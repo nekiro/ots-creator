@@ -7,7 +7,6 @@ import (
 	"strings"
 )
 
-// SaveBorder creates (ID 0) or replaces a border and returns its id.
 func (m *Materials) SaveBorder(border Border) uint32 {
 	if border.ID == 0 {
 		border.ID = m.NextBorderID()
@@ -46,8 +45,6 @@ func (m *Materials) SaveBrush(oldName string, brush Brush, tilesets []string) er
 	return nil
 }
 
-// setBrushTilesets makes brush listed in exactly the named tilesets,
-// creating the missing ones.
 func (m *Materials) setBrushTilesets(brush *Brush, tilesets []string) {
 	isBrush := func(name string) bool { return strings.EqualFold(name, brush.Name) }
 	wanted := map[string]bool{}
@@ -73,7 +70,6 @@ func (m *Materials) setBrushTilesets(brush *Brush, tilesets []string) {
 	}
 }
 
-// SaveTileset creates or replaces a tileset (oldName "" creates).
 func (m *Materials) SaveTileset(oldName string, tileset Tileset) error {
 	tileset.Name = strings.TrimSpace(tileset.Name)
 	if tileset.Name == "" {
@@ -95,7 +91,6 @@ func (m *Materials) RemoveTileset(name string) {
 	m.Tilesets = slices.DeleteFunc(m.Tilesets, func(tileset *Tileset) bool { return strings.EqualFold(tileset.Name, name) })
 }
 
-// AddRawItems adds items to the raw palette of a tileset, creating it.
 func (m *Materials) AddRawItems(tilesetName string, items []uint16) {
 	tileset := m.Tileset(tilesetName)
 	if tileset == nil {
@@ -105,7 +100,6 @@ func (m *Materials) AddRawItems(tilesetName string, items []uint16) {
 	tileset.Raw = appendMissingIDs(tileset.Raw, items)
 }
 
-// SaveCreature adds or replaces a creature type.
 func (m *Materials) SaveCreature(creature CreatureType) error {
 	if strings.TrimSpace(creature.Name) == "" {
 		return errors.New("the creature needs a name")

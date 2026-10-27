@@ -9,23 +9,16 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-// Settings change how brushes behave.
 type Settings struct {
-	// Automagic places borders, walls, carpets and tables automatically.
 	Automagic bool `json:"automagic"`
 	// EraserLeaveUnique keeps items with attributes (and borders) when
 	// erasing.
-	EraserLeaveUnique bool `json:"eraserLeaveUnique"`
-	// HouseRemoveItems removes moveable items from tiles painted as house.
-	HouseRemoveItems bool `json:"houseRemoveItems"`
-	// AutoDoorID assigns free door ids to doors of house tiles.
-	AutoDoorID bool `json:"autoDoorId"`
-	// DoodadEraseLike only erases items of the selected doodad brush.
-	DoodadEraseLike bool `json:"doodadEraseLike"`
-	// DefaultSpawnTime is the spawn time of new creatures (seconds).
-	DefaultSpawnTime int32 `json:"defaultSpawnTime"`
-	// AutoCreateSpawn creates a spawn under creatures placed outside one.
-	AutoCreateSpawn bool `json:"autoCreateSpawn"`
+	EraserLeaveUnique bool  `json:"eraserLeaveUnique"`
+	HouseRemoveItems  bool  `json:"houseRemoveItems"`
+	AutoDoorID        bool  `json:"autoDoorId"`
+	DoodadEraseLike   bool  `json:"doodadEraseLike"`
+	DefaultSpawnTime  int32 `json:"defaultSpawnTime"`
+	AutoCreateSpawn   bool  `json:"autoCreateSpawn"`
 	// RawReplaceBottom replaces bottom items (walls) of the same kind when
 	// placing a raw bottom item.
 	RawReplaceBottom bool `json:"rawReplaceBottom"`
@@ -38,12 +31,10 @@ type Settings struct {
 	MarkedItems []uint16 `json:"markedItems"`
 }
 
-// Format is the OTBM format the settings ask for.
 func (s Settings) Format() otmap.Format {
 	return otmap.Format{CountU16: s.CountU16}
 }
 
-// DefaultSettings returns the defaults.
 func DefaultSettings() Settings {
 	return Settings{Automagic: true, EraserLeaveUnique: true, HouseRemoveItems: true, AutoDoorID: true, DefaultSpawnTime: defaultSpawnTimeSeconds, AutoCreateSpawn: true}
 }
@@ -57,14 +48,12 @@ func DefaultMarkedItems(mode otitems.Mode) []uint16 {
 	return []uint16{459, 460}
 }
 
-// change is one tile change of an action.
 type change struct {
 	pos    otmap.Position
 	before *otmap.Tile
 	after  *otmap.Tile
 }
 
-// metaState is the map data outside tiles.
 type metaState struct {
 	header    otmap.Map // only the header fields are used
 	towns     map[uint32]*otmap.Town
@@ -73,7 +62,6 @@ type metaState struct {
 	zones     []otmap.Zone
 }
 
-// snapshotMeta copies the map data outside tiles.
 func snapshotMeta(gameMap *otmap.Map) *metaState {
 	snapshot := &metaState{
 		towns:     make(map[uint32]*otmap.Town, len(gameMap.Towns)),
@@ -100,7 +88,6 @@ func snapshotMeta(gameMap *otmap.Map) *metaState {
 	return snapshot
 }
 
-// restore puts a copy of the saved data back into the map.
 func (s *metaState) restore(gameMap *otmap.Map) {
 	header := s.header
 	gameMap.Width, gameMap.Height, gameMap.ItemsMajor, gameMap.ItemsMinor = header.Width, header.Height, header.ItemsMajor, header.ItemsMinor
@@ -109,7 +96,6 @@ func (s *metaState) restore(gameMap *otmap.Map) {
 	gameMap.Towns, gameMap.Houses, gameMap.Waypoints, gameMap.Zones = restored.towns, restored.houses, restored.waypoints, restored.zones
 }
 
-// Action is one undo step.
 type Action struct {
 	Label   string
 	changes []change
@@ -123,13 +109,11 @@ type Action struct {
 	at         time.Time
 }
 
-// ActionInfo describes an undo step for the history window.
 type ActionInfo struct {
 	Label string `json:"label"`
 	Tiles int    `json:"tiles"`
 }
 
-// Editor edits one map.
 type Editor struct {
 	Map      *otmap.Map
 	Items    *otitems.DB
@@ -139,20 +123,15 @@ type Editor struct {
 	undo []*Action
 	redo []*Action
 	// clean is the undo stack depth of the last save (-1: never matches).
-	clean int
-	rng   *rand.Rand
-	// dirty collects the chunks changed since the last TakeDirty.
-	dirty     map[otmap.ChunkKey]bool
-	metaDirty bool
-	// doodad is the current doodad placement preview.
-	doodad *DoodadBuffer
-	// selectedPositions holds the positions of tiles with something selected.
+	clean             int
+	rng               *rand.Rand
+	dirty             map[otmap.ChunkKey]bool
+	metaDirty         bool
+	doodad            *DoodadBuffer
 	selectedPositions map[otmap.Position]struct{}
-	// replace is the ground an Alt ground stroke replaces.
-	replace strokeReplace
-	// peekScratch and peekItems hold the tile returned by peek.
-	peekScratch otmap.Tile
-	peekItems   [32]otmap.Item
+	replace           strokeReplace
+	peekScratch       otmap.Tile
+	peekItems         [32]otmap.Item
 }
 
 // peek returns the map tile at x, y, z for a read-only look that ends
@@ -162,12 +141,10 @@ func (e *Editor) peek(x, y, z int) *otmap.Tile {
 	return e.Map.PeekAt(x, y, z, &e.peekScratch, e.peekItems[:])
 }
 
-// peekPos is peek for a position.
 func (e *Editor) peekPos(pos otmap.Position) *otmap.Tile {
 	return e.Map.Peek(pos, &e.peekScratch, e.peekItems[:])
 }
 
-// New returns an editor for a map.
 func New(gameMap *otmap.Map, items *otitems.DB, brushes *Brushes) *Editor {
 	return &Editor{
 		Map: gameMap, Items: items, Brushes: brushes, Settings: DefaultSettings(),
@@ -177,31 +154,23 @@ func New(gameMap *otmap.Map, items *otitems.DB, brushes *Brushes) *Editor {
 	}
 }
 
-// SetBrushes replaces the brush index (after materials change).
 func (e *Editor) SetBrushes(brushes *Brushes) {
 	e.Brushes = brushes
 	e.doodad = nil
 }
 
-// Seed makes random choices reproducible (tests).
 func (e *Editor) Seed(seed uint64) { e.rng = rand.New(rand.NewPCG(seed, seed)) }
 
-// Changed reports whether the map has changes since it was saved.
 func (e *Editor) Changed() bool { return len(e.undo) != e.clean }
 
-// MarkSaved marks the current state as saved.
 func (e *Editor) MarkSaved() { e.clean = len(e.undo) }
 
-// MarkUnsaved makes the map count as changed (new or imported maps).
 func (e *Editor) MarkUnsaved() { e.clean = -1 }
 
-// CanUndo reports whether there is something to undo.
 func (e *Editor) CanUndo() bool { return len(e.undo) > 0 }
 
-// CanRedo reports whether there is something to redo.
 func (e *Editor) CanRedo() bool { return len(e.redo) > 0 }
 
-// History returns the undo steps, oldest first, and the redo steps.
 func (e *Editor) History() (undo, redo []ActionInfo) {
 	for _, action := range e.undo {
 		undo = append(undo, ActionInfo{action.Label, len(action.changes)})
@@ -212,8 +181,6 @@ func (e *Editor) History() (undo, redo []ActionInfo) {
 	return undo, redo
 }
 
-// TakeDirty returns the chunks changed since the last call and whether map
-// data outside tiles changed.
 func (e *Editor) TakeDirty() (chunks []otmap.ChunkKey, meta bool) {
 	for chunk := range e.dirty {
 		chunks = append(chunks, chunk)
@@ -225,7 +192,6 @@ func (e *Editor) TakeDirty() (chunks []otmap.ChunkKey, meta bool) {
 
 func (e *Editor) markDirty(pos otmap.Position) { e.dirty[otmap.KeyOf(pos)] = true }
 
-// Undo reverts the last action and returns its label.
 func (e *Editor) Undo() string {
 	if len(e.undo) == 0 {
 		return ""
@@ -250,7 +216,6 @@ func (e *Editor) Undo() string {
 	return action.Label
 }
 
-// Redo applies the last undone action again.
 func (e *Editor) Redo() string {
 	if len(e.redo) == 0 {
 		return ""
@@ -287,7 +252,6 @@ type Tx struct {
 	written map[otmap.Position]bool
 }
 
-// Label returns the action label.
 func (t *Tx) Label() string { return t.label }
 
 // Begin starts an action. Actions with the same non-zero stroke merge into
@@ -304,10 +268,8 @@ func (e *Editor) BeginSelection() *Tx {
 	return tx
 }
 
-// Get returns the current tile (read-only).
 func (t *Tx) Get(pos otmap.Position) *otmap.Tile { return t.editor.Map.Tile(pos) }
 
-// Prior returns the tile at pos as it was before this action (read-only).
 func (t *Tx) Prior(pos otmap.Position) *otmap.Tile {
 	if beforeTile, seen := t.before[pos]; seen {
 		return beforeTile
@@ -339,7 +301,6 @@ func (t *Tx) Edit(pos otmap.Position) *otmap.Tile {
 	return tile
 }
 
-// Meta records the map data outside tiles before it changes.
 func (t *Tx) Meta() {
 	if t.meta == nil {
 		t.meta = snapshotMeta(t.editor.Map)
@@ -347,7 +308,6 @@ func (t *Tx) Meta() {
 	t.editor.metaDirty = true
 }
 
-// Commit finishes the action and returns the number of changed tiles.
 func (t *Tx) Commit() int {
 	editor := t.editor
 	changes := t.collectChanges()

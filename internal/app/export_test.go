@@ -74,7 +74,7 @@ func TestExportAllSheets(t *testing.T) {
 	_, ps, _, ss, _ := newEnv(t)
 	ps.New(v1098(), client.Features{})
 	img := filepath.Join(dir, "tiles.png")
-	writePNG(t, img, 32*5, 32, [4]byte{200, 10, 10, 255}) // 5 sprites
+	writePNG(t, img, 32*5, 32, [4]byte{200, 10, 10, 255})
 	if _, err := ss.ImportImages([]string{img}); err != nil {
 		t.Fatal(err)
 	}

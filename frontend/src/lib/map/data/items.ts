@@ -1,8 +1,5 @@
-// Item table of the map editor: server ids with their client ids, flags,
-// names and minimap colors, in typed arrays for fast lookups while drawing.
 import type { ItemTable } from "./api";
 
-/** Top orders of ItemIndex.top: common items, borders, bottom items (walls) and top items. */
 export const TOP_ORDER = { common: 0, border: 1, bottom: 2, top: 3 } as const;
 
 export class ItemIndex {
@@ -19,7 +16,6 @@ export class ItemIndex {
   readonly ids: number[];
   readonly bits: Record<string, number>;
   readonly mode: string;
-  /** Lowercase names for searching. */
   private lowercaseNames: string[];
 
   constructor(table: ItemTable) {
@@ -66,14 +62,12 @@ export class ItemIndex {
     return name || `item ${id}`;
   }
 
-  /** Items whose name contains the query or whose id it is, ids first. */
   search(query: string, limit = 500): number[] {
     const text = query.trim().toLowerCase();
     if (!text) return [];
     const out: number[] = [];
     const queryId = /^\d+$/.test(text) ? Number(text) : NaN;
     if (this.has(queryId)) out.push(queryId);
-    // "100-200" lists an id range.
     const range = text.match(/^(\d+)\s*-\s*(\d+)$/);
     if (range) {
       for (let id = Number(range[1]); id <= Math.min(Number(range[2]), this.maxId) && out.length < limit; id++) {
@@ -105,14 +99,12 @@ export function clientColorOffset(color: number): number {
   return color > 0 && color < 216 ? color * 3 : 0;
 }
 
-/** Tibia minimap color index to CSS rgb. */
 export function minimapCss(color: number): string {
   if (color >= 216) return "#000";
   const offset = clientColorOffset(color);
   return `rgb(${CLIENT_COLOR_RGB[offset]},${CLIENT_COLOR_RGB[offset + 1]},${CLIENT_COLOR_RGB[offset + 2]})`;
 }
 
-/** Tibia minimap color index to 0xRRGGBB. */
 export function minimapRgb(color: number): [number, number, number] {
   const offset = clientColorOffset(color);
   return [CLIENT_COLOR_RGB[offset], CLIENT_COLOR_RGB[offset + 1], CLIENT_COLOR_RGB[offset + 2]];

@@ -19,13 +19,11 @@ import (
 	"unicode/utf8"
 )
 
-// Entry kinds.
 const (
 	KindObject  = "object"
 	KindSprites = "sprites"
 )
 
-// File names inside an entry folder.
 const (
 	ObjectFile  = "thing.obd"
 	SpritesFile = "sprites.png"
@@ -47,7 +45,6 @@ const (
 	MaxPackSprites  = 1024
 )
 
-// Licenses an author can pick.
 var Licenses = []string{"CC0-1.0", "CC-BY-4.0", "CC-BY-SA-4.0", "OTS-free"}
 
 // Meta is what the author describes. Author is a free nickname.
@@ -59,8 +56,7 @@ type Meta struct {
 	Description string   `json:"description,omitempty"`
 	License     string   `json:"license"`
 	Author      string   `json:"author"`
-	// SpriteSize is the sprite edge of the entry (32 or 64).
-	SpriteSize int `json:"spriteSize"`
+	SpriteSize  int      `json:"spriteSize"`
 }
 
 var (
@@ -69,10 +65,8 @@ var (
 	categories = []string{"item", "outfit", "effect", "missile"}
 )
 
-// ValidID reports whether id can name an entry folder.
 func ValidID(id string) bool { return idPattern.MatchString(id) }
 
-// NormalizeTags lowercases, trims and dedupes tags; spaces become dashes.
 func NormalizeTags(tags []string) []string {
 	out := []string{}
 	for _, tag := range tags {
@@ -88,7 +82,6 @@ func plain(text string, maxRunes int) bool {
 	return text != "" && text == strings.TrimSpace(text) && utf8.RuneCountInString(text) <= maxRunes && !strings.ContainsFunc(text, unicode.IsControl)
 }
 
-// Validate checks the fields an author fills in.
 func (m *Meta) Validate() error {
 	var errs []error
 	if !plain(m.Name, MaxName) {
@@ -132,7 +125,6 @@ func (m *Meta) Validate() error {
 	return errors.Join(errs...)
 }
 
-// Entry is one index row.
 type Entry struct {
 	ID string `json:"id"`
 	Meta
@@ -143,11 +135,9 @@ type Entry struct {
 	Bytes   int    `json:"bytes"`
 }
 
-// Index is index.json.
 type Index struct {
 	Version int     `json:"version"`
 	Entries []Entry `json:"entries"`
 }
 
-// IndexVersion is the newest index format the app reads.
 const IndexVersion = 1

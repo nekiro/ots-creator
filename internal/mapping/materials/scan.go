@@ -15,9 +15,7 @@ import (
 )
 
 const (
-	// maxScanFiles limits how many files a creature scan reads.
-	maxScanFiles = 50000
-	// maxScanFileSize skips bigger files in a creature scan.
+	maxScanFiles    = 50000
 	maxScanFileSize = 2 << 20
 	// xmlSniffBytes is how much of an XML file is checked for a creature
 	// root before parsing it.
@@ -105,14 +103,11 @@ func ScanCreatures(dir string) ([]*CreatureType, error) {
 	return out, err
 }
 
-// isCreatureRegistry reports whether data is a TFS monsters.xml or npcs.xml.
 func isCreatureRegistry(data []byte) bool {
 	head := strings.ToLower(string(data[:min(len(data), xmlSniffBytes)]))
 	return strings.Contains(head, "<monsters") || strings.Contains(head, "<npcs")
 }
 
-// registryCreatures lists the entries of a registry under their registered
-// names, with the outfit of the file each one points to.
 func registryCreatures(path string, xmlFiles map[string]*CreatureType) []*CreatureType {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -211,8 +206,6 @@ func luaCreatures(script string) []*CreatureType {
 	return out
 }
 
-// AutoTilesets groups every item by its flags, so a client without brush
-// definitions still has an organized palette.
 func AutoTilesets(db *otitems.DB) []*Tileset {
 	groups := []struct {
 		name string

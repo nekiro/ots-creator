@@ -1,10 +1,7 @@
-// Where the map is on screen in a frame: tile positions in device pixels,
-// the tiles in view and the floors drawn.
 import { GROUND_FLOOR, LIMITS, MAX_FLOOR } from "../constants";
 import { floorShift } from "./coords";
 import type { Scene } from "../render/scene";
 
-/** A rectangle of tiles (inclusive). */
 export interface TileRange {
   x0: number;
   y0: number;
@@ -13,14 +10,10 @@ export interface TileRange {
 }
 
 export class Camera {
-  /** Device pixels per tile. */
   readonly tilePx: number;
-  /** Tiles of one floor in view, with a margin. */
   readonly visibleTiles: number;
-  /** Half the view size in tiles. */
   readonly halfWidthTiles: number;
   readonly halfHeightTiles: number;
-  /** Half the view size in device pixels. */
   private halfWidthPx: number;
   private halfHeightPx: number;
 
@@ -40,19 +33,16 @@ export class Camera {
     return floorShift(z, this.scene.floor);
   }
 
-  /** Screen x of the left edge of tile x on floor z. */
   tileX(x: number, z: number): number {
     const scene = this.scene;
     return Math.round(((x - this.shift(z)) * scene.spriteSize - scene.camX) * scene.scale + this.halfWidthPx);
   }
 
-  /** Screen y of the top edge of tile y on floor z. */
   tileY(y: number, z: number): number {
     const scene = this.scene;
     return Math.round(((y - this.shift(z)) * scene.spriteSize - scene.camY) * scene.scale + this.halfHeightPx);
   }
 
-  /** Tiles in view on floor z, widened by `before` tiles up and left and `after` tiles down and right. */
   tiles(z: number, before: number, after: number): TileRange {
     const scene = this.scene;
     const shift = this.shift(z);
@@ -64,7 +54,6 @@ export class Camera {
     };
   }
 
-  /** The view center on floor z in tiles (fractional). */
   centerX(z: number): number {
     return this.scene.camX / this.scene.spriteSize + this.shift(z);
   }

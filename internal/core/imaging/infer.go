@@ -70,8 +70,6 @@ func hasSprites(object *thing.Thing) bool {
 	return false
 }
 
-// mergedLayout is the layout of a thing's sheet with every frame group
-// stacked: idle frames then walking frames, when the groups share a layout.
 func mergedLayout(object *thing.Thing) *thing.FrameGroup {
 	group, ok := object.Stacked()
 	if !ok {
@@ -169,10 +167,8 @@ func isMaskColumns(img *image.NRGBA, texture, cols int) bool {
 	return opaque > 0 && template*10 >= opaque*9
 }
 
-// isHigh reports whether a color channel is close to full.
 func isHigh(value uint8) bool { return value >= 0xE0 }
 
-// isLow reports whether a color channel is close to zero.
 func isLow(value uint8) bool { return value <= 0x20 }
 
 // looksLikeAddons reports whether rows come in groups of three where the

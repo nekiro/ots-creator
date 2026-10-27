@@ -10,7 +10,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
 )
 
-// ErrNoMap is returned for an unknown map id.
 var ErrNoMap = errors.New("the map is not open")
 
 var errNoClient = errors.New("open a client first: the map editor draws the map with its sprites")
@@ -48,7 +47,6 @@ type MapService struct {
 	activeID      int
 }
 
-// NewMapService returns the service.
 func NewMapService(session *Session, store *MapStore) *MapService {
 	return &MapService{session: session, store: store, maps: map[int]*openMap{}}
 }
@@ -91,7 +89,6 @@ func (ms *MapService) read(id int) (*openMap, *mapData, func(), error) {
 	}
 }
 
-// withMap runs fn on an open map under the lock.
 func (ms *MapService) withMap(id int, fn func(opened *openMap, data *mapData) error) error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
@@ -102,7 +99,6 @@ func (ms *MapService) withMap(id int, fn func(opened *openMap, data *mapData) er
 	return fn(opened, data)
 }
 
-// withData runs fn on the item data of the open client under the lock.
 func (ms *MapService) withData(fn func(data *mapData) error) error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
@@ -141,7 +137,6 @@ func (ms *MapService) edit(id int, fn func(editor *mapedit.Editor, data *mapData
 	return change, err
 }
 
-// editMap is edit for actions that report no count.
 func (ms *MapService) editMap(id int, fn func(editor *mapedit.Editor) error) (MapChange, error) {
 	return ms.edit(id, func(editor *mapedit.Editor, _ *mapData) (int, error) { return 0, fn(editor) })
 }

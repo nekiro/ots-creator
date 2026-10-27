@@ -1,7 +1,3 @@
-// Choices of the tile inspector: fluid kinds, creature directions and the
-// value types of custom item attributes (OTBM).
-
-/** Fluid subtypes and their names, in menu order. */
 export const FLUIDS = [
   [0, "Empty"],
   [1, "Water"],
@@ -42,7 +38,6 @@ export const ATTR_TYPE_OPTIONS = [
   { value: 5, label: "Double" },
 ];
 
-/** A count or subtype typed by the user: a whole number from 0 to 65535 (0 when invalid). */
 export function parseCount(text: string): number {
   const count = Math.trunc(Number(text));
   return Number.isFinite(count) && count >= 0 ? Math.min(count, 65535) : 0;

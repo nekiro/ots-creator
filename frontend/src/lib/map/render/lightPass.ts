@@ -17,7 +17,6 @@ export class LightPass {
   private pixels = new Uint8Array(0);
   /** The grid of the last light map; null when the last frame was not darkened. */
   private grid: LightGrid | null = null;
-  /** Size of the texture storage, reused while the grid keeps its size. */
   private textureWidth = 0;
   private textureHeight = 0;
 
@@ -77,7 +76,6 @@ export class LightPass {
     gl.activeTexture(gl.TEXTURE0);
   }
 
-  /** Forgets the last light map: the frame is not darkened. */
   clear(): void {
     this.grid = null;
   }

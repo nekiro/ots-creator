@@ -5,14 +5,12 @@ import { ambientIntensity, buildLightMap, lightColor } from "./lightMap";
 
 const SPRITE = 32;
 
-/** Tiles ([x, y]) of a chunk per bit plane of GeoChunk.shades. */
 interface Shades {
   shaded?: number[][];
   translucent?: number[][];
   grounds?: number[][];
 }
 
-/** Every tile of the first row of a chunk. */
 const ROW = Array.from({ length: 32 }, (_, x) => [x, 0]);
 
 /** A chunk of floor z with lights ([x, y, level, color] in world pixels) and shade bits on tiles. */
@@ -34,7 +32,6 @@ function chunk(chunkX: number, chunkY: number, z: number, lights: number[][], { 
   return { key: chunkKey(chunkX, chunkY, z), quads: new Uint8Array(0), quadCount: 0, animated: new Uint32Array(0), composed: new Uint32Array(0), sprites: new Uint32Array(0), lights: view, lightCount: lights.length, shades, signature: "" };
 }
 
-/** The red channel of each tile, row by row. */
 function reds(pixels: Uint8Array, width: number): number[][] {
   const rows: number[][] = [];
   for (let offset = 0; offset < pixels.length; offset += 4) {

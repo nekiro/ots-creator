@@ -1,9 +1,7 @@
-// Names and texts drawn on a 2D canvas over the map.
 import { LABEL_FONT } from "../constants";
 import { nameLeft } from "./creatureInfo";
 import type { Label } from "./scene";
 
-/** Left, top, right, bottom in device pixels. */
 export type Box = [number, number, number, number];
 
 export function boxesOverlap(first: Box, second: Box): boolean {
@@ -20,12 +18,10 @@ const OUTLINE = [
 const NAME_FONT = '"Tibia Verdana", Verdana, sans-serif';
 const SMALL_FONT = '"Tibia Small", Verdana, sans-serif';
 
-/** Loads the label fonts; labels drawn before used the fallback. */
 export function loadLabelFonts(): Promise<unknown> {
   return Promise.all([document.fonts?.load(`bold ${LABEL_FONT.nameSize}px "Tibia Verdana"`), document.fonts?.load(`${LABEL_FONT.smallSize}px "Tibia Small"`)]);
 }
 
-/** Labels under the mouse come last: drawn over the others. */
 const topLast = (first: Label, second: Label) => Number(!!first.top) - Number(!!second.top);
 
 const rounded = (label: Label): Label => ({ ...label, x: Math.round(label.x), y: Math.round(label.y) });
@@ -35,7 +31,6 @@ export function wholePixelRatio(devicePixelRatio: number): number {
   return Math.max(1, Math.round(devicePixelRatio || 1));
 }
 
-/** Clears the canvas and draws the labels of a frame. */
 export function drawLabels(context: CanvasRenderingContext2D, width: number, height: number, labels: Label[], devicePixelRatio: number): void {
   context.clearRect(0, 0, width, height);
   if (!labels.length) return;

@@ -1,7 +1,4 @@
 <script lang="ts">
-  // Modal window shown while a map opens or saves: the file, the current
-  // step and a progress bar over the whole job. It cannot be closed: the job
-  // runs to the end or fails with a message.
   import { map } from "../../lib/map/state.svelte";
   import { backdrop, pop } from "../../lib/ui/motion";
   import ProgressBar from "../../lib/ui/ProgressBar.svelte";

@@ -22,9 +22,9 @@ describe("Animator", () => {
 
   it("stops after loopCount loops", () => {
     const a = new Animator(AnimationMode.Async, 2, 0, [d(10), d(10)], 0);
-    a.update(10); // 1
-    a.update(20); // 0 (second loop)
-    a.update(30); // 1
+    a.update(10);
+    a.update(20);
+    a.update(30);
     expect(a.update(40)).toBe(1);
     expect(a.isComplete).toBe(true);
     expect(a.update(1000)).toBe(1);
@@ -103,7 +103,7 @@ describe("outfit colors", () => {
   it("has 133 colors with white and black ends", () => {
     expect(PALETTE_SIZE).toBe(133);
     expect(hsiToRgb(0)).toBe(0xffffff);
-    expect(hsiToRgb(4 * 19 + 0)).toBe(hsiToRgb(76)); // grey column
+    expect(hsiToRgb(4 * 19 + 0)).toBe(hsiToRgb(76));
     expect(hsiToRgb(999)).toBe(0xffffff); // out of range -> 0
   });
 
@@ -114,11 +114,11 @@ describe("outfit colors", () => {
 
   it("multiplies only template areas", () => {
     const base = new Uint8ClampedArray([200, 200, 200, 255, 200, 200, 200, 255]);
-    const tpl = new Uint8ClampedArray([255, 0, 0, 255, 0, 0, 0, 0]); // body, untouched
-    colorize(base, tpl, { head: 0, body: 0, legs: 0, feet: 0 }); // white multiplier
+    const tpl = new Uint8ClampedArray([255, 0, 0, 255, 0, 0, 0, 0]);
+    colorize(base, tpl, { head: 0, body: 0, legs: 0, feet: 0 });
     expect(Array.from(base)).toEqual([200, 200, 200, 255, 200, 200, 200, 255]);
     const tpl2 = new Uint8ClampedArray([255, 0, 0, 255, 0, 0, 0, 0]);
-    colorize(base, tpl2, { head: 0, body: 132, legs: 0, feet: 0 }); // last color, darkest row
+    colorize(base, tpl2, { head: 0, body: 132, legs: 0, feet: 0 });
     expect(base[0]).toBeLessThan(200);
     expect(base[4]).toBe(200);
   });

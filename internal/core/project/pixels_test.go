@@ -9,7 +9,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
-// dot returns a transparent sprite with one red pixel at (x, y).
 func dot(x, y int) []byte {
 	pixels := make([]byte, 32*32*4)
 	offset := (y*32 + x) * 4
@@ -33,7 +32,6 @@ func TestSetSlotPixelsNeverEditsSharedSprites(t *testing.T) {
 	if pixels, _ := project.SpritePixels(1); pixels[2] != 255 {
 		t.Fatal("shared sprite 1 was changed")
 	}
-	// Clearing a slot and an unchanged edit.
 	if err := project.SetSlotPixels(thing.CategoryItem, 100, 0, []int{0}, [][]byte{make([]byte, 32*32*4)}, "Erase"); err != nil {
 		t.Fatal(err)
 	}

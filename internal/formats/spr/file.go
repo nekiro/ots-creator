@@ -8,7 +8,6 @@ import (
 	"math"
 )
 
-// Options select the encoding of a spr file.
 type Options struct {
 	Extended    bool // u32 sprite count instead of u16
 	Transparent bool // pixels carry alpha
@@ -57,7 +56,6 @@ func Open(data []byte, opts Options) (*File, error) {
 	return file, nil
 }
 
-// Options returns the options used to open the file.
 func (f *File) Options() Options { return f.opts }
 
 // Compressed returns the RLE data of a sprite. Empty sprites return nil.
@@ -86,7 +84,6 @@ func (f *File) Compressed(id uint32) ([]byte, error) {
 	return f.data[start : start+length], nil
 }
 
-// Pixels returns the decoded RGBA pixels of a sprite.
 func (f *File) Pixels(id uint32) ([]byte, error) {
 	compressed, err := f.Compressed(id)
 	if err != nil {
@@ -95,9 +92,7 @@ func (f *File) Pixels(id uint32) ([]byte, error) {
 	return Decompress(compressed, f.opts.size(), f.opts.Transparent)
 }
 
-// Source supplies compressed sprites for Encode.
 type Source interface {
-	// Count returns the number of sprites (highest id).
 	Count() uint32
 	// Compressed returns sprite data already encoded with the target
 	// transparency. Empty sprites return nil.

@@ -1,5 +1,3 @@
-// Package dat reads and writes Tibia.dat metadata files (7.10 - 13.x
-// legacy format).
 package dat
 
 import (
@@ -13,15 +11,12 @@ import (
 // maxSpritesPerGroup guards against corrupted layouts allocating huge slices.
 const maxSpritesPerGroup = 1 << 16
 
-// Options select the encoding of a dat file.
 type Options struct {
 	// Format is the flag table (1..6), see client.MetadataFormat.
 	Format   int
 	Features client.Features
 }
 
-// OptionsFor returns the options mandated by a client version combined with
-// user selected features.
 func OptionsFor(version uint16, features client.Features) Options {
 	features.ApplyVersionDefaults(version)
 	return Options{Format: client.MetadataFormat(version), Features: features}
@@ -29,7 +24,6 @@ func OptionsFor(version uint16, features client.Features) Options {
 
 func (o Options) hasPatternZ() bool { return o.Format >= 3 }
 
-// File is a decoded Tibia.dat.
 type File struct {
 	Signature uint32
 	// Things holds things of each category ordered by id, starting at
@@ -37,13 +31,11 @@ type File struct {
 	Things map[thing.Category][]*thing.Thing
 }
 
-// NewFile returns an empty file.
 func NewFile(signature uint32) *File {
 	file := &File{Signature: signature, Things: map[thing.Category][]*thing.Thing{}}
 	return file
 }
 
-// Get returns a thing by category and id.
 func (f *File) Get(category thing.Category, id uint32) *thing.Thing {
 	list := f.Things[category]
 	i := int(id) - int(category.MinID())
@@ -53,12 +45,10 @@ func (f *File) Get(category thing.Category, id uint32) *thing.Thing {
 	return list[i]
 }
 
-// MaxID returns the highest id of a category, or MinID-1 when it is empty.
 func (f *File) MaxID(category thing.Category) uint32 {
 	return category.MinID() + uint32(len(f.Things[category])) - 1
 }
 
-// Decode parses a Tibia.dat file.
 func Decode(data []byte, opts Options) (*File, error) {
 	r := binio.NewReader(data)
 	file := NewFile(r.U32())
@@ -125,7 +115,6 @@ func readGroups(r *binio.Reader, object *thing.Thing, opts Options) error {
 	return r.Err()
 }
 
-// ReadGroup reads one frame group layout followed by its sprite ids.
 func ReadGroup(r *binio.Reader, group *thing.FrameGroup, patternZ, durations, extended bool, defaultDuration uint32) error {
 	if err := ReadLayout(r, group, patternZ, durations, defaultDuration); err != nil {
 		return err
@@ -185,7 +174,6 @@ func ReadLayout(r *binio.Reader, group *thing.FrameGroup, patternZ, durations bo
 	return r.Err()
 }
 
-// Encode serializes a dat file.
 func Encode(file *File, opts Options) ([]byte, error) {
 	w := binio.NewWriter(1 << 20)
 	w.U32(file.Signature)
@@ -210,7 +198,6 @@ func Encode(file *File, opts Options) ([]byte, error) {
 	return w.Bytes(), nil
 }
 
-// WriteThing encodes one thing (flags + texture patterns).
 func WriteThing(w *binio.Writer, object *thing.Thing, opts Options) error {
 	if err := object.Validate(); err != nil {
 		return err
@@ -244,7 +231,6 @@ func GroupType(index, count int) uint8 {
 	return uint8(index)
 }
 
-// WriteGroup writes one frame group layout followed by its sprite ids.
 func WriteGroup(w *binio.Writer, group *thing.FrameGroup, patternZ, durations, extended bool) error {
 	if err := WriteLayout(w, group, patternZ, durations); err != nil {
 		return err

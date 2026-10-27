@@ -8,7 +8,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-// TileItem is one item of the tile inspector.
 type TileItem struct {
 	ID        uint16         `json:"id"`
 	ClientID  uint16         `json:"clientId"`
@@ -25,14 +24,12 @@ type TileItem struct {
 	Contents  []TileItem     `json:"contents"`
 }
 
-// TileCreature is a creature with its look.
 type TileCreature struct {
 	otmap.Creature
 	Outfit  materials.Outfit `json:"outfit"`
 	Unknown bool             `json:"unknown"`
 }
 
-// TileInfo is everything on a tile, for the inspector.
 type TileInfo struct {
 	Pos       otmap.Position `json:"pos"`
 	Exists    bool           `json:"exists"`
@@ -46,15 +43,11 @@ type TileInfo struct {
 	SpawnNPC  *otmap.Spawn   `json:"spawnNpc"`
 	Zones     []uint16       `json:"zones"`
 	Modified  bool           `json:"modified"`
-	// HouseExit names the house whose exit is here.
-	HouseExit string `json:"houseExit"`
-	// Waypoints lists waypoints on the tile; Temple the town whose temple
-	// is here.
-	Waypoints []string `json:"waypoints"`
-	Temple    string   `json:"temple"`
+	HouseExit string         `json:"houseExit"`
+	Waypoints []string       `json:"waypoints"`
+	Temple    string         `json:"temple"`
 }
 
-// kindInvalid is the TileItem kind of items missing from the item data.
 const kindInvalid = "invalid"
 
 func (data *mapData) tileItem(item otmap.Item) TileItem {
@@ -75,7 +68,6 @@ func (data *mapData) tileItem(item otmap.Item) TileItem {
 	return tileItem
 }
 
-// Tile returns the inspector data of a tile.
 func (ms *MapService) Tile(id int, pos otmap.Position) (info TileInfo, err error) {
 	err = ms.withMap(id, func(opened *openMap, data *mapData) error {
 		info = data.tileInfo(opened.editor.Map, pos)

@@ -15,7 +15,6 @@
   const changes = $derived(Object.values(states).filter((value) => value !== undefined).length);
   const count = $derived(app.selection.length);
 
-  // A new selection or category starts clean.
   $effect(() => {
     void app.category;
     void count;
@@ -31,7 +30,6 @@
     return (field.options ?? []).map(([value, label]) => ({ value, label }));
   }
 
-  // Fields start at 0 (or empty text) until they are set.
   function fieldValue(field: Field) {
     if (field.kind === "text") return values[field.key] ?? "";
     if (field.kind === "select") return values[field.key] ?? 0;

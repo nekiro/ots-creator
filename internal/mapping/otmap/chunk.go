@@ -12,14 +12,11 @@ import "slices"
 // Map.Put (the editor's working copies) always stores a *Tile, which
 // replaces the packed tile. Map.SetTile packs a tile when it can.
 
-// Chunk is a 32x32 block of one floor.
 type Chunk struct {
-	X, Y uint16 // chunk coordinates (tile >> ChunkBits)
-	Z    uint8
-	// Count is the number of tiles.
+	X, Y  uint16 // chunk coordinates (tile >> ChunkBits)
+	Z     uint8
 	Count int
-	// Rev is the map revision of the last change in this chunk.
-	Rev uint64
+	Rev   uint64
 
 	// cells holds per tile: 0 = none, cellPtr|i = ptrs[i], else packed[cell-1].
 	cells  [ChunkSize * ChunkSize]uint16
@@ -36,9 +33,7 @@ const (
 	cellPtr = 0x8000
 	// maxPackedItems keeps the item count of a packed tile, the ground
 	// included, within its uint8.
-	maxPackedItems = 254
-	// minDeadToRepack is the number of dead packed tiles below which a
-	// chunk is never repacked.
+	maxPackedItems  = 254
 	minDeadToRepack = 32
 )
 
@@ -52,7 +47,6 @@ type packedItem struct {
 	id, subtype uint16
 }
 
-// packable reports whether a tile can be stored packed.
 func packable(tile *Tile) bool {
 	if tile.Flags != 0 || tile.HouseID != 0 || tile.State != 0 || tile.Ext != nil || len(tile.Items) > maxPackedItems {
 		return false
@@ -111,7 +105,6 @@ func (c *Chunk) unpack(stored packedTile, tile *Tile, buf []Item) *Tile {
 func (c *Chunk) set(i int, tile *Tile, pack bool) (had bool) {
 	cell := c.cells[i]
 	had = cell != 0
-	// Release what the cell holds.
 	switch {
 	case cell&cellPtr != 0:
 		slot := cell &^ cellPtr
@@ -183,7 +176,6 @@ func (c *Chunk) maybeRepack() {
 	c.packed, c.items, c.dead = packed, slices.Clip(items), 0
 }
 
-// clip trims the slices of a chunk after loading.
 func (c *Chunk) clip() {
 	if cap(c.items) > len(c.items) {
 		c.items = append([]packedItem(nil), c.items...)
@@ -193,7 +185,6 @@ func (c *Chunk) clip() {
 	}
 }
 
-// eachPtr calls fn for every tile stored as *Tile.
 func (c *Chunk) eachPtr(fn func(tile *Tile)) {
 	for _, tile := range c.ptrs {
 		if tile != nil {
@@ -202,7 +193,6 @@ func (c *Chunk) eachPtr(fn func(tile *Tile)) {
 	}
 }
 
-// eachStored calls fn for every tile stored as *Tile, with its position.
 func (c *Chunk) eachStored(fn func(pos Position, tile *Tile)) {
 	for i := range c.cells {
 		if cell := c.cells[i]; cell&cellPtr != 0 {

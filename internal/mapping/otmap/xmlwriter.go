@@ -7,7 +7,6 @@ import (
 	"strings"
 )
 
-// xmlWriter writes simple indented XML.
 type xmlWriter struct {
 	buf   bytes.Buffer
 	depth int
@@ -19,7 +18,6 @@ func newXMLWriter() *xmlWriter {
 	return w
 }
 
-// xmlAttr is one attribute of an element.
 type xmlAttr struct {
 	name  string
 	value string

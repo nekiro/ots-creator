@@ -61,7 +61,6 @@ func addBorderItem(tile *otmap.Tile, id uint16) {
 	tile.Items = slices.Insert(tile.Items, 0, otmap.Item{ID: id})
 }
 
-// cleanBorders removes the border items at the bottom of the stack.
 func (e *Editor) cleanBorders(tile *otmap.Tile) {
 	borderCount := 0
 	for borderCount < len(tile.Items) && e.Brushes.isBorder(tile.Items[borderCount].ID) {
@@ -91,7 +90,6 @@ func (e *Editor) hasOptionalBorder(tile *otmap.Tile) bool {
 	return false
 }
 
-// IsBlocking reports whether a tile blocks walking.
 func (e *Editor) IsBlocking(tile *otmap.Tile) bool { return e.blocking(tile) }
 
 // blocking reports whether a tile blocks walking (no ground counts).
@@ -102,7 +100,6 @@ func (e *Editor) blocking(tile *otmap.Tile) bool {
 	return e.hasFlag(tile, otitems.FlagUnpassable)
 }
 
-// hasFlag reports whether the ground or an item of a tile has flag.
 func (e *Editor) hasFlag(tile *otmap.Tile, flag otitems.Flags) bool {
 	if tile == nil {
 		return false

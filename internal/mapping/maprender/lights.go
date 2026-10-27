@@ -18,7 +18,6 @@ import (
 // have and still count as opaque (client: Image::loadPNG, sprite sheets).
 const maxSeeThroughPixels = 4
 
-// Thing opacity, computed when first needed.
 const (
 	opacityUnknown = iota
 	opacityOpaque
@@ -137,7 +136,6 @@ func (b *geometryBuilder) hasTopGround(tile *otmap.Tile) bool {
 	return false
 }
 
-// itemLook is the look of a map item (nil when it has none).
 func (b *geometryBuilder) itemLook(item otmap.Item) *thingLook {
 	itemType := b.scene.Items.Get(item.ID)
 	if itemType == nil || itemType.Flags.Has(otitems.FlagMeta) {
@@ -210,7 +208,6 @@ const (
 	shadePlanes
 )
 
-// shade sets the bit of the tile being drawn in a plane of the shades.
 func (b *geometryBuilder) shade(plane int) {
 	size := max(b.options.Block, 1) << otmap.ChunkBits
 	bit := plane*size*size + int(b.tileY)*size + int(b.tileX)

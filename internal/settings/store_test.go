@@ -72,7 +72,6 @@ func TestMarketSharedAndAuthor(t *testing.T) {
 	if got.MarketAuthor != "nick" || len(got.MarketShared) != 1 || got.MarketShared["entry-1"] != "token-1" {
 		t.Fatalf("market %q %v", got.MarketAuthor, got.MarketShared)
 	}
-	// Get returns a copy.
 	got.MarketShared["entry-3"] = "token-3"
 	if len(reopened.Get().MarketShared) != 1 {
 		t.Fatal("Get must not share its maps with the store")

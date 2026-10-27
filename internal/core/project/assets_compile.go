@@ -3,8 +3,8 @@ package project
 import (
 	"errors"
 	"fmt"
-	"os"
 	"maps"
+	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -136,8 +136,6 @@ func (w *assetWriter) encodePasses(file *assets.File, base *assets.Catalog) ([]b
 	return appearancesData, kept, groups, nil
 }
 
-// obsoleteFiles returns the sheets of base that are not kept (dropped or
-// repacked) and its appearances file, which is replaced.
 func obsoleteFiles(base *assets.Catalog, kept []assets.Sheet) map[string]bool {
 	obsolete := map[string]bool{base.Appearances: true}
 	for _, sheet := range base.Sheets {
@@ -149,8 +147,6 @@ func obsoleteFiles(base *assets.Catalog, kept []assets.Sheet) map[string]bool {
 	return obsolete
 }
 
-// filesToCopy lists the files of the source folder a compile to another
-// directory copies: every file of base that is not obsolete.
 func (p *Project) filesToCopy(dir string, base *assets.Catalog, obsolete map[string]bool) []string {
 	var names []string
 	if p.assets != nil && !fsutil.SamePath(p.assets.dir, dir) {
@@ -180,8 +176,6 @@ func (p *Project) copySourceFiles(dir string, names []string, done *counter) err
 	})
 }
 
-// writeSheets encodes the new sprite groups as sheets on all cores and
-// writes them to dir. It returns the sheets and the bytes of new files.
 func writeSheets(dir string, groups [][]*newSprite, done *counter) ([]assets.Sheet, int64, error) {
 	sheets := make([]assets.Sheet, len(groups))
 	errs := make([]error, len(groups))
@@ -232,8 +226,6 @@ func writeSheets(dir string, groups [][]*newSprite, done *counter) ([]assets.She
 	return sheets, addedBytes.Load(), nil
 }
 
-// writeCatalog writes the appearances file and a catalog listing it and
-// sheets. It returns the written catalog.
 func writeCatalog(dir string, base *assets.Catalog, appearancesData []byte, sheets []assets.Sheet) (*assets.Catalog, error) {
 	appearances := "appearances-" + hash(appearancesData) + ".dat"
 	if err := fsutil.WriteAtomic(filepath.Join(dir, appearances), appearancesData); err != nil {
@@ -250,8 +242,6 @@ func writeCatalog(dir string, base *assets.Catalog, appearancesData []byte, shee
 	return catalog, nil
 }
 
-// compileStats counts the obsolete sheets of base and the bytes they free,
-// minus the bytes of new sheet files.
 func (p *Project) compileStats(base *assets.Catalog, obsolete map[string]bool, addedBytes int64) CompileStats {
 	stats := CompileStats{Freed: -addedBytes}
 	for _, sheet := range base.Sheets {
@@ -268,8 +258,6 @@ func (p *Project) compileStats(base *assets.Catalog, obsolete map[string]bool, a
 	return stats
 }
 
-// reloadAssets reopens the compiled folder so piece ids match the new
-// sheets.
 func (p *Project) reloadAssets(dir string) error {
 	state, err := loadAssets(dir)
 	if err != nil {
@@ -285,7 +273,6 @@ func (p *Project) reloadAssets(dir string) error {
 	return nil
 }
 
-// assetWarnings lists what cannot be stored in an asset folder.
 func (p *Project) assetWarnings() []string {
 	var out []string
 	for _, category := range thing.Categories {

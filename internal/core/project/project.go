@@ -1,5 +1,3 @@
-// Package project holds an editing session over one client (dat + spr):
-// thing and sprite storage, undo/redo and compilation.
 package project
 
 import (
@@ -24,7 +22,6 @@ import (
 // client and no version was given.
 var ErrUnknownVersion = errors.New("unknown client version")
 
-// Info describes the loaded client.
 type Info struct {
 	Format      Format          `json:"format"`
 	Version     client.Version  `json:"version"`
@@ -36,13 +33,10 @@ type Info struct {
 	CanUndo     bool            `json:"canUndo"`
 	CanRedo     bool            `json:"canRedo"`
 	FormatLabel string          `json:"formatLabel"`
-	// Supported lists property names the current format can store.
-	Supported []string `json:"supported"`
-	// ItemsOTB is the attached items.otb, kept in sync when compiling.
-	ItemsOTB *OTBInfo `json:"itemsOtb"`
+	Supported   []string        `json:"supported"`
+	ItemsOTB    *OTBInfo        `json:"itemsOtb"`
 }
 
-// Counts holds the highest id of each category and the sprite count.
 type Counts struct {
 	Items    uint32 `json:"items"`
 	Outfits  uint32 `json:"outfits"`
@@ -75,7 +69,6 @@ type Project struct {
 	moves map[uint32]uint32
 }
 
-// OpenOptions control how a client is opened.
 type OpenOptions struct {
 	DatPath string
 	SprPath string
@@ -85,7 +78,6 @@ type OpenOptions struct {
 	Features client.Features
 }
 
-// Open loads a dat/spr pair.
 func Open(options OpenOptions) (*Project, error) {
 	datBytes, err := os.ReadFile(options.DatPath)
 	if err != nil {
@@ -151,7 +143,6 @@ func New(version client.Version, features client.Features) *Project {
 	}
 }
 
-// Info returns a snapshot of the project state.
 func (p *Project) Info() Info {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -190,19 +181,16 @@ func (p *Project) infoLocked() Info {
 	}
 }
 
-// SpriteSize returns the sprite edge length in pixels.
 func (p *Project) SpriteSize() int { return p.features.SpriteSize }
 
-// CompileOptions select the output of Compile.
 type CompileOptions struct {
 	// Format is the output format; empty means FormatDat. For FormatAssets
 	// DatPath is the output folder and the other fields are ignored.
-	Format   Format
-	DatPath  string
-	SprPath  string
-	Version  client.Version
-	Features client.Features
-	// WriteOTFI also writes an OTClient feature file next to the dat.
+	Format    Format
+	DatPath   string
+	SprPath   string
+	Version   client.Version
+	Features  client.Features
 	WriteOTFI bool
 	// Progress, when set, is called with the work done so far, possibly
 	// from several goroutines and very often.
@@ -212,15 +200,13 @@ type CompileOptions struct {
 	Stats *CompileStats
 }
 
-// CompileStats reports the sheets of an asset compilation.
 type CompileStats struct {
 	// SheetsRemoved counts sheets of the folder that no longer hold a used
 	// sprite as they were (dropped, or repacked into new sheets).
 	SheetsRemoved int `json:"sheetsRemoved"`
 	// Freed is the size of the removed sheets minus the new ones, in bytes.
-	Freed int64 `json:"freed"`
-	// OTB reports the update of the attached items.otb (nil when none).
-	OTB *OTBReport `json:"otb"`
+	Freed int64      `json:"freed"`
+	OTB   *OTBReport `json:"otb"`
 }
 
 // Compile writes the project to disk. Files are written to temporary files
@@ -292,7 +278,6 @@ func (p *Project) Compile(options CompileOptions) error {
 	return nil
 }
 
-// saved resets change tracking after the files were written.
 func (p *Project) saved() {
 	p.unsaved = false
 	p.history.clear()
@@ -301,8 +286,6 @@ func (p *Project) saved() {
 	p.delta.everything()
 }
 
-// Warnings lists things whose properties would be lost when compiling to
-// the given format and version.
 func (p *Project) Warnings(format Format, version client.Version) []string {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -325,7 +308,6 @@ func (p *Project) Warnings(format Format, version client.Version) []string {
 	return out
 }
 
-// encodedSize returns the size of the spr file Encode writes for src.
 func encodedSize(src spr.Source, extended bool) (int, error) {
 	header := 6
 	if extended {

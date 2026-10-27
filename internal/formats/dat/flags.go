@@ -7,7 +7,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/binio"
 )
 
-// attr is a version-independent flag identifier.
 type attr uint8
 
 const (
@@ -56,10 +55,8 @@ const (
 	attrBones
 )
 
-// LastFlag terminates a flag list.
 const LastFlag = 0xFF
 
-// FlagTable maps flag bytes of one format to attributes.
 type FlagTable struct {
 	name string
 	// offsetHasPayload is false for 7.10-7.50 where the offset flag means (8,8).
@@ -69,10 +66,8 @@ type FlagTable struct {
 	order            []byte // flag bytes in ascending order, used for writing
 }
 
-// Name returns a human readable name of the table.
 func (t *FlagTable) Name() string { return t.name }
 
-// ReadProperties reads flags until LastFlag into props.
 func (t *FlagTable) ReadProperties(r *binio.Reader, props *thing.Properties) error {
 	previous := -1
 	for {
@@ -112,7 +107,6 @@ func (t *FlagTable) WriteProperties(w *binio.Writer, props *thing.Properties) {
 	w.U8(LastFlag)
 }
 
-// Supported lists json names of properties the table can store.
 func (t *FlagTable) Supported() []string {
 	out := make([]string, 0, len(t.byAttr))
 	for attribute := attrGround; attribute <= attrBones; attribute++ {
@@ -136,16 +130,12 @@ func (t *FlagTable) Unsupported(props *thing.Properties) []string {
 	return append(out, props.AssetOnly()...)
 }
 
-// isSet reports whether the attribute is set in props.
 func (a attr) isSet(props *thing.Properties) bool { return *attrSpecs[a].flag(props) }
 
-// name returns the json name of the property behind the attribute.
 func (a attr) name() string { return attrSpecs[a].name }
 
-// attrSpec describes how an attribute maps to thing.Properties.
 type attrSpec struct {
 	name string // json name of the property
-	// flag returns the property that tells whether the attribute is set.
 	flag func(*thing.Properties) *bool
 	// read and write handle the payload after the flag byte; nil when the
 	// attribute has none.
@@ -153,12 +143,10 @@ type attrSpec struct {
 	write func(*FlagTable, *binio.Writer, *thing.Properties)
 }
 
-// boolAttr is an attribute without payload.
 func boolAttr(name string, flag func(*thing.Properties) *bool) attrSpec {
 	return attrSpec{name: name, flag: flag}
 }
 
-// valueAttr is an attribute with one uint16 payload.
 func valueAttr(name string, fields func(*thing.Properties) (set *bool, value *uint16)) attrSpec {
 	return attrSpec{
 		name: name,

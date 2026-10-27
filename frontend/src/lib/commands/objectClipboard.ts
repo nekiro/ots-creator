@@ -1,4 +1,3 @@
-// Copying and pasting objects, and Ctrl+V of images as sprite sheets.
 import { CATEGORY_NAMES, ThingService, errorMessage, type PropsPatch, type Thing } from "../api";
 import { clipboardThing, clipboardThings, copyThings, pasteInto, type PasteMode } from "../clipboard";
 import { app, run, select, toast } from "../state/app.svelte";
@@ -6,7 +5,6 @@ import { sheetCommands } from "./sheets";
 import { OBJECT_CLIP, confirmDiscard, guard, snapshot } from "./shared";
 
 export const clipboardCommands = {
-  /** Copies the selection; the focused object is copied with unapplied edits. */
   async copyObject() {
     const draft = app.draft;
     if (!draft) return;

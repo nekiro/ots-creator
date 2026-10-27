@@ -1,4 +1,3 @@
-// Package workpool runs independent pieces of work on all cores.
 package workpool
 
 import (

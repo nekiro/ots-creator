@@ -10,13 +10,11 @@ import (
 	"github.com/nekiro/ots-creator/internal/core/imaging"
 )
 
-// Kinds of files the viewer lists.
 const (
 	ViewerOBD   = "obd"
 	ViewerImage = "image"
 )
 
-// ViewerEntry is one file the viewer can show.
 type ViewerEntry struct {
 	Path string `json:"path"`
 	Name string `json:"name"`
@@ -24,7 +22,6 @@ type ViewerEntry struct {
 	Size int64  `json:"size"`
 }
 
-// ImageFile is an image decoded for the viewer, re-encoded as PNG.
 type ImageFile struct {
 	Path   string `json:"path"`
 	Format string `json:"format"`
@@ -33,8 +30,6 @@ type ImageFile struct {
 	PNG    []byte `json:"png"`
 }
 
-// ViewerService lists and reads files for the OBD viewer. It works without
-// an open client.
 type ViewerService struct{}
 
 func viewerKind(name string) string {
@@ -47,8 +42,6 @@ func viewerKind(name string) string {
 	return ""
 }
 
-// List returns the OBD files and images in dir, OBD files first, each
-// group sorted by name with numbers in natural order.
 func (*ViewerService) List(dir string) ([]ViewerEntry, error) {
 	files, err := os.ReadDir(dir)
 	if err != nil {
@@ -78,7 +71,6 @@ func (*ViewerService) List(dir string) ([]ViewerEntry, error) {
 	return out, nil
 }
 
-// ReadImage decodes an image file.
 func (*ViewerService) ReadImage(path string) (*ImageFile, error) {
 	if viewerKind(path) != ViewerImage {
 		return nil, fmt.Errorf("%s is not an image", filepath.Base(path))
@@ -120,7 +112,6 @@ func naturalCompare(first, second string) int {
 	return len(first) - len(second)
 }
 
-// leadingDigits counts the digits text starts with.
 func leadingDigits(text string) int {
 	count := 0
 	for count < len(text) && text[count] >= '0' && text[count] <= '9' {

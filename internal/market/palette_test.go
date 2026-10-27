@@ -18,7 +18,6 @@ func TestHSIToRGB(t *testing.T) {
 			t.Errorf("hsiToRGB(%d) = %v, want %v", index, got, want)
 		}
 	}
-	// Every palette entry is valid and colored ones are not gray.
 	for index := 0; index < 19*7; index++ {
 		rgb := hsiToRGB(index)
 		if index%19 != 0 && rgb[0] == rgb[1] && rgb[1] == rgb[2] {

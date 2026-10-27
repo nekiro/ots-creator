@@ -12,20 +12,16 @@ import (
 	"strings"
 )
 
-// Mode tells how map item ids relate to client ids.
 type Mode string
 
 const (
-	// ModeOTB maps server ids to client ids through items.otb.
-	ModeOTB Mode = "otb"
-	// ModeClient uses client ids as server ids (no items.otb).
+	ModeOTB    Mode = "otb"
 	ModeClient Mode = "client"
 )
 
 // DB is the item database. It is read-only after loading.
 type DB struct {
-	Mode Mode `json:"mode"`
-	// OTB versions, written into OTBM headers.
+	Mode         Mode   `json:"mode"`
 	MajorVersion uint32 `json:"majorVersion"`
 	MinorVersion uint32 `json:"minorVersion"`
 	BuildNumber  uint32 `json:"buildNumber"`
@@ -33,7 +29,6 @@ type DB struct {
 	byClient     map[uint16]uint16
 }
 
-// Get returns the type of a server id, or nil.
 func (db *DB) Get(id uint16) *Type {
 	if db == nil || int(id) >= len(db.items) {
 		return nil
@@ -41,7 +36,6 @@ func (db *DB) Get(id uint16) *Type {
 	return db.items[id]
 }
 
-// MaxID returns the highest server id.
 func (db *DB) MaxID() uint16 {
 	if len(db.items) == 0 {
 		return 0
@@ -55,7 +49,6 @@ func (db *DB) FromClient(clientID uint16) (uint16, bool) {
 	return id, ok
 }
 
-// Each calls fn for every item type in id order.
 func (db *DB) Each(fn func(*Type)) {
 	for _, itemType := range db.items {
 		if itemType != nil {
@@ -64,7 +57,6 @@ func (db *DB) Each(fn func(*Type)) {
 	}
 }
 
-// Count returns the number of item types.
 func (db *DB) Count() int {
 	count := 0
 	for _, itemType := range db.items {
@@ -94,8 +86,6 @@ func (db *DB) index() {
 	}
 }
 
-// Search returns server ids whose name contains query (case-insensitive)
-// or whose id equals query, at most limit.
 func (db *DB) Search(query string, limit int) []uint16 {
 	query = strings.ToLower(strings.TrimSpace(query))
 	var out []uint16
@@ -121,7 +111,6 @@ func (db *DB) Search(query string, limit int) []uint16 {
 	return out
 }
 
-// NewDB returns a database with the given types.
 func NewDB(mode Mode, types []*Type) *DB {
 	db := &DB{Mode: mode}
 	for _, itemType := range types {

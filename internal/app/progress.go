@@ -9,10 +9,8 @@ import (
 	"github.com/nekiro/ots-creator/internal/workpool"
 )
 
-// EventProgress carries a Progress while a long operation runs.
 const EventProgress = "app:progress"
 
-// Progress reports how far a long operation is.
 type Progress struct {
 	Label string `json:"label"`
 	Done  int    `json:"done"`
@@ -21,10 +19,8 @@ type Progress struct {
 	Percent bool `json:"percent"`
 }
 
-// ErrCanceled is returned by a long operation stopped with Cancel.
 var ErrCanceled = errors.New("canceled")
 
-// progressEvery is the minimum time between progress events.
 const progressEvery = 150 * time.Millisecond
 
 // reporter returns a progress callback for label that sends at most one

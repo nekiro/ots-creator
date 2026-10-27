@@ -100,7 +100,6 @@ func (p *Project) ImportOBDsTo(category thing.Category, files []*obd.Data, targe
 	return targets, nil
 }
 
-// ExportOBD builds OBD data for a thing.
 func (p *Project) ExportOBD(category thing.Category, id uint32, version int) (*obd.Data, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()

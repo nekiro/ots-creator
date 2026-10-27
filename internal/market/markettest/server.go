@@ -14,7 +14,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/market"
 )
 
-// Server serves the files at URL+"/files/" and the API at URL+"/".
 type Server struct {
 	*httptest.Server
 	Admin string
@@ -26,20 +25,16 @@ type Server struct {
 	seq     int
 }
 
-// New starts a server; close it with Close.
 func New() *Server {
 	server := &Server{Admin: "admin", files: map[string][]byte{}, tokens: map[string]string{}}
 	server.Server = httptest.NewServer(http.HandlerFunc(server.serve))
 	return server
 }
 
-// FilesURL is the files base URL.
 func (s *Server) FilesURL() string { return s.URL + "/files/" }
 
-// APIURL is the API base URL.
 func (s *Server) APIURL() string { return s.URL + "/" }
 
-// Has reports whether the bucket holds a file.
 func (s *Server) Has(key string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -47,7 +42,6 @@ func (s *Server) Has(key string) bool {
 	return ok
 }
 
-// maxFormBytes bounds the memory of a parsed upload.
 const maxFormBytes = 16 << 20
 
 func fail(w http.ResponseWriter, status int, message string) {

@@ -4,7 +4,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/xmltree"
 )
 
-// ReadZones applies a zones.xml.
 func ReadZones(gameMap *Map, data []byte) error {
 	doc, err := xmltree.Parse(data)
 	if err != nil {
@@ -18,7 +17,6 @@ func ReadZones(gameMap *Map, data []byte) error {
 	return nil
 }
 
-// WriteZones returns a zones.xml.
 func WriteZones(gameMap *Map) []byte {
 	w := newXMLWriter()
 	w.elem("zones", nil, false)

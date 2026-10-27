@@ -2,7 +2,6 @@ package otmap
 
 import "cmp"
 
-// Map limits.
 const (
 	MaxFloor    = 15
 	GroundFloor = 7
@@ -10,7 +9,6 @@ const (
 	ChunkSize   = 1 << ChunkBits
 )
 
-// Position is a map position.
 type Position struct {
 	X uint16 `json:"x"`
 	Y uint16 `json:"y"`
@@ -27,25 +25,20 @@ func (p Position) Add(dx, dy, dz int) (Position, bool) {
 	return Position{uint16(x), uint16(y), uint8(z)}, true
 }
 
-// ComparePositions orders positions by floor, then row, then column.
 func ComparePositions(left, right Position) int {
 	return cmp.Or(cmp.Compare(left.Z, right.Z), cmp.Compare(left.Y, right.Y), cmp.Compare(left.X, right.X))
 }
 
-// ChunkKey identifies a chunk.
 type ChunkKey uint32
 
-// KeyOf returns the key of the chunk holding a position.
 func KeyOf(pos Position) ChunkKey {
 	return MakeKey(pos.X>>ChunkBits, pos.Y>>ChunkBits, pos.Z)
 }
 
-// MakeKey builds a key from chunk coordinates.
 func MakeKey(chunkX, chunkY uint16, z uint8) ChunkKey {
 	return ChunkKey(uint32(chunkX)<<15 | uint32(chunkY)<<4 | uint32(z&15))
 }
 
-// Split returns the chunk coordinates of a key.
 func (k ChunkKey) Split() (chunkX, chunkY uint16, z uint8) {
 	return uint16(k >> 15), uint16(k>>4) & 0x7FF, uint8(k & 15)
 }

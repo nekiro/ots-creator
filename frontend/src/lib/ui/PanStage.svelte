@@ -1,9 +1,4 @@
 <script lang="ts">
-  // A canvas-like view for images in dialogs, like the main preview: the
-  // content is centered, there are no scrollbars, and it is moved with
-  // space + drag, the middle button or the wheel (ctrl+wheel zooms).
-  // The content is drawn at 1x and scaled by `zoom`; zoom changes and
-  // centering animate.
   import type { Snippet } from "svelte";
   import { PanView } from "../pan.svelte";
 
@@ -15,13 +10,9 @@
     stageSize = $bindable<[number, number]>([0, 0]),
   }: {
     children: Snippet;
-    /** Scale of the content (pixelated). */
     zoom?: number;
-    /** Ctrl+wheel: +1 or -1. */
     onzoom?: (delta: number) => void;
-    /** A change centers the content again (another file or object). */
     resetKey?: string;
-    /** Out: the size of the stage, for fit-to-window zooms. */
     stageSize?: [number, number];
   } = $props();
 
@@ -34,7 +25,6 @@
     (delta) => onzoom?.(delta),
   );
 
-  // Zoom and centering glide; panning by hand follows the mouse directly.
   let animate = $state(false);
   let glideTimer: ReturnType<typeof setTimeout> | undefined;
   function glide() {
@@ -46,7 +36,6 @@
   $effect(() => {
     stageSize = [stageWidth, stageHeight];
   });
-  // Zooming keeps the centered pixel in place.
   let lastZoom = 0;
   $effect(() => {
     const nextZoom = zoom;

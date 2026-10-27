@@ -1,6 +1,3 @@
-// Package assets reads and writes the asset folder of Tibia 12+ clients:
-// catalog-content.json, the protobuf appearances file and LZMA compressed
-// BMP sprite sheets.
 package assets
 
 import (
@@ -17,11 +14,9 @@ import (
 const (
 	SheetSize   = 384
 	sheetPixels = SheetSize * SheetSize * 4
-	// TileSize is the edge of one map tile in pixels.
-	TileSize = 32
+	TileSize    = 32
 )
 
-// Sprite types of catalog entries (sprite sizes in a sheet).
 const (
 	Sprite32x32 = 0
 	Sprite32x64 = 1
@@ -29,7 +24,6 @@ const (
 	Sprite64x64 = 3
 )
 
-// SpriteDims returns the sprite width and height of a sprite type in pixels.
 func SpriteDims(spriteType int) (width, height int, ok bool) {
 	switch spriteType {
 	case Sprite32x32:
@@ -44,8 +38,6 @@ func SpriteDims(spriteType int) (width, height int, ok bool) {
 	return 0, 0, false
 }
 
-// SpriteTypeFor returns the sprite type of a sprite covering width x height
-// tiles.
 func SpriteTypeFor(width, height int) (int, bool) {
 	switch {
 	case width == 1 && height == 1:
@@ -60,7 +52,6 @@ func SpriteTypeFor(width, height int) (int, bool) {
 	return 0, false
 }
 
-// SheetCapacity returns how many sprites of a type fit in one sheet.
 func SheetCapacity(spriteType int) int {
 	width, height, ok := SpriteDims(spriteType)
 	if !ok {
@@ -69,7 +60,6 @@ func SheetCapacity(spriteType int) int {
 	return (SheetSize / width) * (SheetSize / height)
 }
 
-// SpriteRect returns the position of the i-th sprite of a sheet.
 func SpriteRect(spriteType, i int) (x, y, width, height int) {
 	width, height, _ = SpriteDims(spriteType)
 	columns := SheetSize / width
@@ -85,7 +75,6 @@ const cipHeaderSize = 32
 // size and the size field.
 const lzmaHeaderSize = 13
 
-// bmpHeaderSize is the size of the BMP file header plus BITMAPV4HEADER.
 const bmpHeaderSize = 122
 
 // decodeDictCap replaces the 32 MiB dictionary announced by the files: a

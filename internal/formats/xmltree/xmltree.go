@@ -14,7 +14,6 @@ import (
 	"strings"
 )
 
-// ErrEmpty is returned for a document without elements.
 var ErrEmpty = errors.New("empty document")
 
 // Node is one element. Element and attribute names are lower case.
@@ -24,7 +23,6 @@ type Node struct {
 	Children []*Node
 }
 
-// Parse reads the root element of data.
 func Parse(data []byte) (*Node, error) {
 	// Some data files end with a NUL byte, which RME accepts.
 	data = bytes.ReplaceAll(data, []byte{0}, nil)
@@ -69,10 +67,8 @@ func Parse(data []byte) (*Node, error) {
 	return root, nil
 }
 
-// Str returns an attribute, or "" when it is missing.
 func (n *Node) Str(key string) string { return n.Attrs[key] }
 
-// Has reports whether the attribute is present.
 func (n *Node) Has(key string) bool {
 	_, ok := n.Attrs[key]
 	return ok

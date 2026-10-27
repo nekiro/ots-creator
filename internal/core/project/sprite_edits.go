@@ -7,14 +7,12 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/spr"
 )
 
-// SpritePixels returns RGBA pixels of a sprite.
 func (p *Project) SpritePixels(id uint32) ([]byte, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.sprites.pixels(id)
 }
 
-// IsSpriteEmpty reports whether a sprite has no colored pixels.
 func (p *Project) IsSpriteEmpty(id uint32) (bool, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -30,7 +28,6 @@ func (p *Project) checkPixels(pixels []byte) error {
 	return nil
 }
 
-// AddSprites appends sprites and returns their ids.
 func (p *Project) AddSprites(pixels [][]byte) ([]uint32, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -56,7 +53,6 @@ func (p *Project) addSpritesLocked(edit *recorder, pixels [][]byte) []uint32 {
 	return ids
 }
 
-// ReplaceSprite overwrites one sprite.
 func (p *Project) ReplaceSprite(id uint32, pixels []byte) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()

@@ -13,28 +13,22 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-// toolsPut stores a tile with the given ground (0: none) and items.
 func toolsPut(e *Editor, pos otmap.Position, ground uint16, items ...otmap.Item) {
 	e.Map.SetTile(pos, &otmap.Tile{Ground: otmap.Item{ID: ground}, Items: items})
 }
 
-// toolsBag is a bag holding the given items.
 func toolsBag(contents ...otmap.Item) otmap.Item {
 	return otmap.Item{ID: bagID, Ext: &otmap.ItemExt{Items: contents}}
 }
 
-// toolsWithAction is an item with an action id.
 func toolsWithAction(id, actionID uint16) otmap.Item {
 	return otmap.Item{ID: id, Ext: &otmap.ItemExt{ActionID: actionID}}
 }
 
-// toolsWithUnique is an item with a unique id.
 func toolsWithUnique(id, uniqueID uint16) otmap.Item {
 	return otmap.Item{ID: id, Ext: &otmap.ItemExt{UniqueID: uniqueID}}
 }
 
-// toolsGroundAndItems lists the ground id followed by the item ids of a tile
-// (nil when there is no tile).
 func toolsGroundAndItems(tile *otmap.Tile) []uint16 {
 	if tile == nil {
 		return nil
@@ -42,7 +36,6 @@ func toolsGroundAndItems(tile *otmap.Tile) []uint16 {
 	return append([]uint16{tile.Ground.ID}, itemIDs(tile)...)
 }
 
-// toolsSnapshot lists every tile as "{x y z}: [ground items...]".
 func toolsSnapshot(e *Editor) []string {
 	var lines []string
 	e.Map.Each(func(pos otmap.Position, tile *otmap.Tile) {
@@ -50,8 +43,6 @@ func toolsSnapshot(e *Editor) []string {
 	})
 	return lines
 }
-
-// --- Find ---
 
 func TestFindByIDsListsMatchingItemsInMapOrder(t *testing.T) {
 	e := testEditor(t)
@@ -335,8 +326,6 @@ func TestFindInSelectionSkipsSelectedPositionWithoutTile(t *testing.T) {
 		t.Fatalf("Find(in selection) = %+v, want only the stone of the remaining tile", found)
 	}
 }
-
-// --- Replace and remove tools ---
 
 func TestReplaceItemsReplacesOnTilesAndInContainersKeepingAttributes(t *testing.T) {
 	e := testEditor(t)
@@ -748,8 +737,6 @@ func TestStatsCountsEverything(t *testing.T) {
 	}
 }
 
-// --- Item inspector ---
-
 // inspectorEditor has sand at 5,5 with a bag (index 0) holding a coin.
 func inspectorEditor(t *testing.T) *Editor {
 	t.Helper()
@@ -758,7 +745,6 @@ func inspectorEditor(t *testing.T) *Editor {
 	return e
 }
 
-// inspectorItem resolves a reference on the current map (read only).
 func inspectorItem(t *testing.T, e *Editor, ref ItemRef) otmap.Item {
 	t.Helper()
 	item, _, _, err := itemAt(e.Map.Tile(ref.Pos), ref)
@@ -1272,8 +1258,6 @@ func TestUpdateSpawnNotFound(t *testing.T) {
 		})
 	}
 }
-
-// --- Moving selections next to hand-placed borders ---
 
 // moveNextToBorderEditor has sand around 70,70 with a hand-placed north
 // border at 70,69 and a selected stone at 70,70.

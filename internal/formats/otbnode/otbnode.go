@@ -21,7 +21,6 @@ const (
 	escape    = 0xFD
 )
 
-// ErrFormat is returned for malformed node files.
 var ErrFormat = errors.New("otbnode: malformed node file")
 
 // Node is one parsed node. Props holds the unescaped property bytes
@@ -32,16 +31,12 @@ type Node struct {
 	Children []*Node
 }
 
-// Parse reads a node file. ident receives the 4-byte identifier.
 func Parse(data []byte) (root *Node, ident [4]byte, err error) {
 	return ParseProgress(data, nil)
 }
 
-// progressStep is how many bytes are parsed between progress calls.
 const progressStep = 1 << 20
 
-// ParseProgress is Parse that calls progress (when not nil) with the bytes
-// parsed so far and the total.
 func ParseProgress(data []byte, progress func(done, total int)) (root *Node, ident [4]byte, err error) {
 	return (&parser{buf: make([]byte, 0, len(data)), progress: progress}).parse(data)
 }
@@ -84,7 +79,6 @@ type parser struct {
 	stack []*Node
 }
 
-// node parses a node whose start marker was consumed.
 func (p *parser) node() (*Node, error) {
 	if p.pos >= len(p.data) {
 		return nil, fmt.Errorf("%w: truncated node", ErrFormat)
@@ -165,10 +159,8 @@ type Reader struct {
 	props binio.Reader
 }
 
-// NewReader returns a reader over props.
 func NewReader(props []byte) *Reader { return &Reader{props: *binio.NewReader(props)} }
 
-// Err returns the first read error.
 func (r *Reader) Err() error {
 	err := r.props.Err()
 	if err == nil || errors.Is(err, ErrFormat) {
@@ -177,37 +169,27 @@ func (r *Reader) Err() error {
 	return fmt.Errorf("%w: property: %v", ErrFormat, err)
 }
 
-// Remaining is the number of unread bytes.
 func (r *Reader) Remaining() int { return r.props.Remaining() }
 
-// More reports whether bytes are left and no error happened.
 func (r *Reader) More() bool { return r.props.Err() == nil && r.props.Remaining() > 0 }
 
-// U8 reads a byte.
 func (r *Reader) U8() uint8 { return r.props.U8() }
 
-// U16 reads a little-endian uint16.
 func (r *Reader) U16() uint16 { return r.props.U16() }
 
-// U32 reads a little-endian uint32.
 func (r *Reader) U32() uint32 { return r.props.U32() }
 
-// U64 reads a little-endian uint64.
 func (r *Reader) U64() uint64 { return r.props.U64() }
 
-// Bytes reads count raw bytes.
 func (r *Reader) Bytes(count int) []byte { return r.props.Bytes(count) }
 
-// Skip skips count bytes.
 func (r *Reader) Skip(count int) { r.props.Bytes(count) }
 
-// String reads a string with a uint16 length.
 func (r *Reader) String() string {
 	length := int(r.props.U16())
 	return string(r.props.Bytes(length))
 }
 
-// LongString reads a string with a uint32 length.
 func (r *Reader) LongString() string {
 	length := r.props.U32()
 	if length > math.MaxInt32 {
@@ -217,27 +199,23 @@ func (r *Reader) LongString() string {
 	return string(r.props.Bytes(int(length)))
 }
 
-// Writer writes a node file with escaping.
 type Writer struct {
 	out     *bufio.Writer
 	err     error
 	scratch [8]byte
 }
 
-// NewWriter writes the identifier and returns a writer.
 func NewWriter(dest io.Writer, ident [4]byte) *Writer {
 	out := bufio.NewWriterSize(dest, 1<<20)
 	_, err := out.Write(ident[:])
 	return &Writer{out: out, err: err}
 }
 
-// Start opens a node of the given type.
 func (w *Writer) Start(nodeType byte) {
 	w.raw(nodeStart)
 	w.U8(nodeType)
 }
 
-// End closes the current node.
 func (w *Writer) End() { w.raw(nodeEnd) }
 
 func (w *Writer) raw(value byte) {
@@ -246,7 +224,6 @@ func (w *Writer) raw(value byte) {
 	}
 }
 
-// U8 writes an escaped byte.
 func (w *Writer) U8(value byte) {
 	if value == nodeStart || value == nodeEnd || value == escape {
 		w.raw(escape)
@@ -254,26 +231,22 @@ func (w *Writer) U8(value byte) {
 	w.raw(value)
 }
 
-// Bytes writes escaped bytes.
 func (w *Writer) Bytes(data []byte) {
 	for _, value := range data {
 		w.U8(value)
 	}
 }
 
-// U16 writes a little-endian uint16.
 func (w *Writer) U16(value uint16) {
 	binary.LittleEndian.PutUint16(w.scratch[:], value)
 	w.Bytes(w.scratch[:2])
 }
 
-// U32 writes a little-endian uint32.
 func (w *Writer) U32(value uint32) {
 	binary.LittleEndian.PutUint32(w.scratch[:], value)
 	w.Bytes(w.scratch[:4])
 }
 
-// U64 writes a little-endian uint64.
 func (w *Writer) U64(value uint64) {
 	binary.LittleEndian.PutUint64(w.scratch[:], value)
 	w.Bytes(w.scratch[:8])
@@ -288,13 +261,11 @@ func (w *Writer) String(text string) {
 	w.Bytes([]byte(text))
 }
 
-// LongString writes a string with a uint32 length.
 func (w *Writer) LongString(text string) {
 	w.U32(uint32(len(text)))
 	w.Bytes([]byte(text))
 }
 
-// Flush writes buffered data and returns the first error.
 func (w *Writer) Flush() error {
 	if w.err != nil {
 		return w.err

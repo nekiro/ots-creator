@@ -136,11 +136,11 @@ func TestUndoRedoThings(t *testing.T) {
 	if project.Info().Counts.Items != 102 {
 		t.Fatal("count")
 	}
-	project.Undo() // duplicate
+	project.Undo()
 	if project.Info().Counts.Items != 101 {
 		t.Fatalf("after undo count %d", project.Info().Counts.Items)
 	}
-	project.Undo() // update
+	project.Undo()
 	got, _ := project.Thing(thing.CategoryItem, 101)
 	if got.Props.Stackable {
 		t.Fatal("update not undone")
@@ -154,7 +154,6 @@ func TestUndoRedoThings(t *testing.T) {
 	if project.Info().Counts.Items != 102 || project.Info().CanRedo {
 		t.Fatal("duplicate not redone")
 	}
-	// New edit clears redo.
 	project.Undo()
 	project.AddThing(thing.CategoryEffect)
 	if project.Info().CanRedo {
@@ -165,7 +164,7 @@ func TestUndoRedoThings(t *testing.T) {
 func TestRemoveThings(t *testing.T) {
 	project := New(v1098(), client.Features{})
 	project.AddThing(thing.CategoryItem)
-	project.AddThing(thing.CategoryItem) // 100,101,102
+	project.AddThing(thing.CategoryItem)
 	it, _ := project.Thing(thing.CategoryItem, 101)
 	it.Props.Pickupable = true
 	project.UpdateThing(it)
@@ -528,7 +527,7 @@ func TestImportOBDsTo(t *testing.T) {
 
 func TestPasteThings(t *testing.T) {
 	project := New(v1098(), client.Features{})
-	project.AddThing(thing.CategoryItem) // 101
+	project.AddThing(thing.CategoryItem)
 	item := thing.New(5, thing.CategoryItem)
 	item.Props.Stackable = true
 	ids, err := project.PasteThings(thing.CategoryItem, 100, []*thing.Thing{item, item, item})

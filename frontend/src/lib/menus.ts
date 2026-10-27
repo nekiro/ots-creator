@@ -1,4 +1,3 @@
-// Menu entries shared by the menu bar and the list context menus.
 import { clipboardThing, clipboardThings } from "./clipboard";
 import { commands } from "./commands";
 import type { MenuEntry } from "./menu.svelte";
@@ -11,7 +10,6 @@ const notSingle = () => !app.open || app.selection.length !== 1;
 const noSprite = () => !app.open || app.selectedSprites.length === 0;
 const noClip = () => noThing() || clipboardThings().length === 0;
 const noPropsClip = () => noThing() || !clipboardThing();
-/** The export format of objects, as shown in menus. */
 const fmt = () => (prefs.settings.objectFormat === "obd" ? "OBD" : "OTOBJ");
 
 function copy(text: string) {
@@ -79,7 +77,6 @@ export function objectMenu(context = false): MenuEntry[] {
   ];
 }
 
-/** Context menu of the empty area of the object list. */
 export function objectListMenu(): MenuEntry[] {
   return [
     { label: "New object", action: commands.newThing, disabled: noProject },
@@ -88,7 +85,6 @@ export function objectListMenu(): MenuEntry[] {
   ];
 }
 
-/** Context menu of the empty area of the sprite list. */
 export function spriteListMenu(): MenuEntry[] {
   return [
     { label: "Import images…", action: commands.importSprites, disabled: noProject },
@@ -111,4 +107,4 @@ export function spriteMenu(context = false): MenuEntry[] {
       : []),
   ];
 }
-
+

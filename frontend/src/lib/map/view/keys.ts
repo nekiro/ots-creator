@@ -21,7 +21,6 @@ export interface KeyAction {
   run: () => unknown;
   /** Works without an open map and while typing in a field. */
   always?: boolean;
-  /** Runs again while the key is held down. */
   repeat?: boolean;
 }
 
@@ -66,7 +65,6 @@ export const KEY_ACTIONS: KeyAction[] = [
   { id: "shortcuts", group: "Map", label: "Keyboard shortcuts", keys: ["F1"], run: () => (map.dialog = "shortcuts"), always: true },
 ];
 
-/** Shortcuts that cannot be changed, listed next to the others. */
 export const FIXED_KEYS: { group: KeyGroup; keys: string; label: string }[] = [
   { group: "Drawing", keys: "Click / drag", label: "Draw with the brush" },
   { group: "Drawing", keys: "Ctrl + click", label: "Erase what the brush places" },
@@ -89,18 +87,15 @@ export const FIXED_KEYS: { group: KeyGroup; keys: string; label: string }[] = [
   { group: "View", keys: "Arrows (Shift: faster)", label: "Move the view" },
 ];
 
-/** The keys of an action: the user's choice or the defaults. */
 export function keysOf(action: KeyAction, overrides: Record<string, string[]> = map.keys): string[] {
   return overrides[action.id] ?? action.keys;
 }
 
-/** The first key of an action by id, for menus and tooltips. */
 export function keyLabel(id: string): string | undefined {
   const action = KEY_ACTIONS.find((candidate) => candidate.id === id);
   return action ? keysOf(action)[0] : undefined;
 }
 
-/** Handles a key press in the map editor. Returns true when handled. */
 export function mapShortcut(event: KeyboardEvent): boolean {
   const combo = comboOf(event);
   if (!combo) return false;

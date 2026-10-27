@@ -1,4 +1,3 @@
-// Importing, replacing, exporting and clearing sprites.
 import { DialogService, ProjectService, SpriteService, errorMessage } from "../api";
 import { ask } from "../confirm.svelte";
 import { prefs } from "../state/prefs.svelte";
@@ -60,7 +59,6 @@ export const spriteCommands = {
     }
   },
 
-  /** Stops the running export after asking. */
   async stopTask() {
     if (!app.stoppable || app.stopping) return;
     const ok = await ask({ title: "Export in progress", message: "Sprites are still being exported. Stop the export?", ok: "Stop" });
@@ -70,12 +68,10 @@ export const spriteCommands = {
     await ProjectService.Cancel();
   },
 
-  /** Asks for single files or sprite sheets, then exports every sprite. */
   exportAllSprites() {
     if (guard()) app.dialog = "exportSprites";
   },
 
-  /** Points every use of the selected sprites at another sprite. */
   replaceRefs() {
     if (!guard() || app.selectedSprites.length === 0) return;
     app.dialog = "replaceRefs";

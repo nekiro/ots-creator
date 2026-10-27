@@ -128,7 +128,6 @@ func TestSpriteHashEmpty(t *testing.T) {
 func TestSpriteHashPixels(t *testing.T) {
 	group := thing.NewFrameGroup()
 	group.Sprites = []uint32{7}
-	// One red pixel at (0, 0), the rest transparent.
 	data := []byte{0, 0, 1, 0, 0xFF, 0, 0}
 	got, err := SpriteHash(group, false, func(int) ([]byte, error) { return data, nil })
 	if err != nil {
@@ -182,7 +181,6 @@ func TestNewItemCloneSetClientID(t *testing.T) {
 		t.Fatal("clone shares attribute bytes")
 	}
 
-	// SetClientID adds the attribute when it is missing.
 	deprecated := &Item{Group: GroupDeprecated}
 	deprecated.SetClientID(5)
 	if deprecated.ClientID() != 5 || len(deprecated.Attrs) != 1 {

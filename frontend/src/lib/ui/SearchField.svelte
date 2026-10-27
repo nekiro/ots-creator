@@ -1,6 +1,4 @@
 <script lang="ts">
-  // Tibia client search field: a text edit with the 20x20 clear button
-  // inside at its right end. Esc clears too.
   let { value = $bindable(""), placeholder = "Search by name" }: { value?: string; placeholder?: string } = $props();
   let input: HTMLInputElement;
 </script>
@@ -31,7 +29,6 @@
 </div>
 
 <style>
-  /* The clear button sits inside the edit at its right end; text stops before it. */
   .sf {
     position: relative;
     display: flex;

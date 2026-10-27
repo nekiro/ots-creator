@@ -10,7 +10,6 @@ export interface SpriteEntry {
 const BATCH = 512;
 
 export class SpriteCache {
-  /** url builds the batch request: res.sprites for the open client. */
   constructor(private url: (ids: number[], rev: number) => string = res.sprites) {}
   size = 32;
   // Bumped on every invalidation; batches fetched under an older generation
@@ -20,7 +19,6 @@ export class SpriteCache {
   private inflight = new Map<number, Promise<void>>();
   private listeners = new Set<(ids: number[] | null) => void>();
 
-  /** Drops the given sprites, or everything when ids is null. */
   invalidate(ids: number[] | null): void {
     this.gen++;
     this.inflight.clear();
@@ -29,7 +27,6 @@ export class SpriteCache {
     for (const listener of this.listeners) listener(ids);
   }
 
-  /** Calls listener with the dropped sprites (null: all) on every invalidation. */
   onInvalidate(listener: (ids: number[] | null) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -76,5 +73,4 @@ export class SpriteCache {
 }
 
 export const spriteCache = new SpriteCache();
-/** Sprites of the second client of the compare window. */
 export const otherSpriteCache = new SpriteCache(res.otherSprites);

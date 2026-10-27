@@ -1,4 +1,3 @@
-// WebGL programs and vertex layouts of the map renderer.
 import { GPU } from "../constants";
 import { QUAD_BYTES } from "./geo";
 

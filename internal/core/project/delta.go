@@ -6,7 +6,6 @@ import "github.com/nekiro/ots-creator/internal/core/thing"
 // reports "everything changed": cheaper than listing them.
 const deltaLimit = 4096
 
-// ThingRef names one thing.
 type ThingRef struct {
 	Category thing.Category `json:"category"`
 	ID       uint32         `json:"id"`
@@ -66,7 +65,6 @@ func (d *deltaSet) everything() {
 	*d = deltaSet{all: true}
 }
 
-// TakeDelta returns the changes since the last call and resets them.
 func (p *Project) TakeDelta() Delta {
 	p.mu.Lock()
 	defer p.mu.Unlock()

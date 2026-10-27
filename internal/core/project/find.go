@@ -7,23 +7,18 @@ import (
 	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
-// Content filters for FindThings.
 const (
 	ContentAll   = ""
 	ContentUsed  = "used"  // at least one sprite with pixels
 	ContentEmpty = "empty" // no sprite with pixels
 )
 
-// Filter selects things in a category.
 type Filter struct {
 	Content string `json:"content"`
 	Flag    string `json:"flag"` // JSON name of a boolean property that must be set
-	// Name matches things whose name contains it, ignoring case.
-	Name string `json:"name"`
+	Name    string `json:"name"`
 }
 
-// FindThings returns the ids of things in category that match filter, in
-// order.
 func (p *Project) FindThings(category thing.Category, filter Filter) ([]uint32, error) {
 	switch filter.Content {
 	case ContentAll, ContentUsed, ContentEmpty:
@@ -85,7 +80,6 @@ func (p *Project) hasPixels(object *thing.Thing) bool {
 	return false
 }
 
-// Names returns the names of the named things in category, by id.
 func (p *Project) Names(category thing.Category) map[uint32]string {
 	p.mu.RLock()
 	defer p.mu.RUnlock()

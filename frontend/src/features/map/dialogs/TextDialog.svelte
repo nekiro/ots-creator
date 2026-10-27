@@ -7,8 +7,6 @@
   import Dialog from "../../../lib/ui/Dialog.svelte";
   import ItemIcon from "../ItemIcon.svelte";
 
-  // The text window of the game: the item, a line about it and the text,
-  // always editable.
   const target = map.textItem!;
   let item = $state<TileItem | null>(null);
   let text = $state("");

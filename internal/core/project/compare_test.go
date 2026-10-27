@@ -19,8 +19,6 @@ func version(t *testing.T, value uint16) client.Version {
 	return client.Version{}
 }
 
-// setItem gives item id the sprites and pickupable flag, adding the item
-// (and empty ones before it) when needed.
 func setItem(t *testing.T, project *Project, id uint32, pickup bool, sprites ...uint32) {
 	t.Helper()
 	for project.Info().Counts.Items < id {
@@ -42,7 +40,6 @@ func TestDiff(t *testing.T) {
 	clientA := New(v1098(), client.Features{})
 	clientB := New(v1098(), client.Features{})
 	clientA.AddSprites([][]byte{solid(255, 0, 0), solid(0, 255, 0)})
-	// Same pixels under other ids in b.
 	clientB.AddSprites([][]byte{solid(0, 255, 0), solid(255, 0, 0), solid(0, 0, 255)})
 	setItem(t, clientA, 100, false, 1)
 	setItem(t, clientB, 100, false, 2) // same red sprite: equal
@@ -129,7 +126,6 @@ func TestRestoreThings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Revert one copy only, then the copy past the end.
 	if err := clientA.RestoreThings(thing.CategoryItem, map[uint32]*thing.Thing{100: res.Before[100]}); err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +222,6 @@ func TestDiffIgnoresFormatDifferences(t *testing.T) {
 		t.Fatalf("diff %+v %v", d, err)
 	}
 
-	// Both clients store durations: they count.
 	other := New(v1098(), client.Features{})
 	other.AddSprites([][]byte{solid(255, 0, 0), solid(0, 255, 0), solid(0, 0, 255)})
 	duplicate.FrameGroups[1].Durations[0].Max = 90

@@ -48,7 +48,6 @@
     }
   });
 
-  // Widths of the side panels; the splitters trade them with the map.
   const SIDES_KEY = "map:sides";
   // The panels' forms are laid out for these widths and break when narrower,
   // so they are also the minimum: the splitters only widen the panels.
@@ -73,7 +72,6 @@
     saveJson(SIDES_KEY, sides);
   }
 
-  // Painting houses, zones or areas belongs to the world; show it there.
   $effect(() => {
     const k = map.brush?.kind;
     if (map.tool === "brush" && (k === "house" || k === "houseExit" || k === "zone" || k === "flag" || k === "waypoint")) map.side = "world";
@@ -107,7 +105,6 @@
     </div>
     <Splitter vertical ondrag={(dx) => resizeSide("left", dx)} onend={saveSides} />
     <div class="center">
-      <!-- With maps open the canvas goes edge to edge: the tabs name the map, no window frame. -->
       <section class="mapwin" class:t-window={!map.maps.length} class:open={map.maps.length > 0}>
         {#if !map.maps.length}<div class="t-window-title">Map</div>{/if}
         {#if map.maps.length}
@@ -188,7 +185,6 @@
     flex: 1;
     min-height: 0;
     display: grid;
-    /* The splitter columns are the 6px gaps between the panels. */
     grid-template-columns: var(--left-w) auto minmax(400px, 1fr) auto var(--right-w);
     padding: 4px;
   }
@@ -239,7 +235,6 @@
     align-items: flex-end;
     overflow: hidden;
   }
-  /* A .t-tab holding the name and its close button; sized by its name. */
   .tab {
     flex: 0 1 auto;
     display: flex;

@@ -16,7 +16,6 @@ export const updates = $state<{
   progress: { written: number; total: number } | null;
 }>({ version: "", info: null, checking: false, stage: "idle", progress: null });
 
-/** Loads the running version and, when autoCheck is on, checks for updates in the background. */
 export async function initUpdates(autoCheck: boolean): Promise<void> {
   try {
     updates.version = await UpdateService.Version();
@@ -32,7 +31,6 @@ export async function initUpdates(autoCheck: boolean): Promise<void> {
   setTimeout(() => void checkForUpdates(false), 3000);
 }
 
-/** Checks GitHub. A manual check also reports "up to date" and errors. */
 export async function checkForUpdates(manual: boolean): Promise<void> {
   if (updates.checking) return;
   updates.checking = true;
@@ -51,7 +49,6 @@ export async function checkForUpdates(manual: boolean): Promise<void> {
   }
 }
 
-/** Downloads, verifies and swaps in the new version, then restarts. */
 export async function installUpdate(): Promise<void> {
   updates.stage = "downloading";
   updates.progress = null;

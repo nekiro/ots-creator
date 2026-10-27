@@ -1,4 +1,3 @@
-// Sprite id to atlas cell lookup the chunk shader reads.
 import { GPU } from "../constants";
 
 /** Atlas cells of ids in a R32UI texture the chunk shader reads (GPU.missingCell: not in the atlas). */
@@ -6,10 +5,8 @@ export class CellIndex {
   private cells: Uint32Array;
   private texture: WebGLTexture;
   private rows: number;
-  /** Rows changed since the last upload. */
   private dirtyFrom = Infinity;
   private dirtyTo = -1;
-  /** The texture must be allocated again (new size or cleared). */
   private grown = true;
   /** Nothing else binds its texture unit: once bound it stays. */
   private bound = false;
@@ -51,7 +48,6 @@ export class CellIndex {
     this.grown = true;
   }
 
-  /** Uploads changes and binds the texture to its unit (leaves unit 0 active). */
   bind(): void {
     if (this.bound && !this.grown && this.dirtyTo < 0) return;
     this.bound = true;

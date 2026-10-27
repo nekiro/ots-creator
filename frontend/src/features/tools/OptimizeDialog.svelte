@@ -8,7 +8,6 @@
   let duplicates = $state(true);
   let empty = $state(true);
   let unused = $state(true);
-  // The dialog shows the options, then a loader while the backend works, then the result.
   let stage = $state<"options" | "running" | "done">("options");
   let result = $state<OptimizeResult | null>(null);
 

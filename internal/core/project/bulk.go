@@ -12,8 +12,6 @@ import (
 // values. Nested objects such as "market" are merged key by key.
 type PropsPatch map[string]any
 
-// PatchThings applies the same property changes to many things in one undo
-// step and returns how many things changed.
 func (p *Project) PatchThings(category thing.Category, ids []uint32, patch PropsPatch) (int, error) {
 	if len(patch) == 0 {
 		return 0, nil
@@ -93,7 +91,6 @@ func applyPatch(props *thing.Properties, patch PropsPatch) error {
 	return nil
 }
 
-// UpdateThings replaces several things in one undo step.
 func (p *Project) UpdateThings(objects []*thing.Thing) error {
 	for _, object := range objects {
 		if err := object.Validate(); err != nil {
@@ -118,8 +115,6 @@ func (p *Project) UpdateThings(objects []*thing.Thing) error {
 	return nil
 }
 
-// SetDurations gives every frame of every animated thing in the given
-// categories the same duration range. It returns how many things changed.
 func (p *Project) SetDurations(categories []thing.Category, minMs, maxMs uint32) (int, error) {
 	if maxMs < minMs {
 		return 0, fmt.Errorf("maximum duration %d is below minimum %d", maxMs, minMs)
@@ -159,7 +154,6 @@ func needsDurations(object *thing.Thing, want thing.FrameDuration) bool {
 	return false
 }
 
-// ConvertResult reports a frame group conversion.
 type ConvertResult struct {
 	Converted int `json:"converted"`
 	// Skipped counts outfits whose idle and walking layouts differ, so they
@@ -201,7 +195,6 @@ func (p *Project) ConvertFrameGroups(toGroups bool) ConvertResult {
 	return result
 }
 
-// frameBlock returns the sprites of frames [from, to) of group.
 func frameBlock(group *thing.FrameGroup, from, to int) []uint32 {
 	spritesPerFrame := group.TotalSprites() / max(int(group.Frames), 1)
 	return append([]uint32(nil), group.Sprites[from*spritesPerFrame:to*spritesPerFrame]...)

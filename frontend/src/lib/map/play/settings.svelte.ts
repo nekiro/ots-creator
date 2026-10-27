@@ -13,14 +13,11 @@ export interface PlayerSettings {
   feet: number;
   /** Addon bits: 1 first, 2 second. */
   addons: number;
-  /** Mount looktype, ridden while mounted is set. */
   mount: number;
   mounted: boolean;
   /** Sets the speed (TFS: 220 + 2 per level above 1). */
   level: number;
-  /** World light the server sends (PLAY.dayLight by day, PLAY.nightLight by night). */
   worldLight: number;
-  /** Client options: names, health bars and the player's mana bar over creatures. */
   showNames: boolean;
   showHealth: boolean;
   showMana: boolean;

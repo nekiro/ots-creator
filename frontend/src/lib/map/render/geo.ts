@@ -32,7 +32,6 @@ export const GEO_COMPOSED = 0x80000000;
 export const GEO_RECT = 0x40000000;
 /** Added to the key of a block's top-left chunk: the key of the block (blocks and chunks share a store). */
 export const GEO_BLOCK = 1 << 28;
-/** Bytes per light source (see GeoChunk.lights). */
 export const LIGHT_BYTES = 8;
 /** Bytes per quad: int16 x, y, uint32 sprite, rgba8 color, uint16 x, y of its tile (from the chunk's corner). */
 export const QUAD_BYTES = 16;
@@ -67,7 +66,6 @@ export function geoBits(view: GeoView): number {
   );
 }
 
-/** What chunk geometry is built for: the view option bits, the highlighted house and the block size. */
 export interface GeoSignature {
   bits: number;
   house: number;
@@ -75,7 +73,6 @@ export interface GeoSignature {
   blockSize: number;
 }
 
-/** The signature as a string ("bits|house|blockSize"), the key geometry is stored under. */
 export function encodeGeoSignature({ bits, house, blockSize }: GeoSignature): string {
   return `${bits}|${house}|${blockSize}`;
 }
@@ -94,19 +91,15 @@ export interface GeoChunk {
   animated: Uint32Array;
   /** Colored outfit pieces, four values each: quad, sprite, template sprite, colors (head, body, legs, feet bytes). */
   composed: Uint32Array;
-  /** Every plain sprite the quads use. */
   sprites: Uint32Array;
   /** Light sources, LIGHT_BYTES each: int16 x, y (world pixels from the chunk's corner), uint8 level, uint8 color (8-bit client color). */
   lights: DataView;
-  /** Light sources in lights. */
   lightCount: number;
   /** Three bit planes of the same size, one bit per tile row by row (null: no bit set): the tiles that hide the light of the floors under them, those of them that only dim it (a translucent thing) and the tiles with a ground. */
   shades: Uint8Array | null;
-  /** What it was built for. */
   signature: string;
 }
 
-/** Decodes a geometry response. */
 export function decodeGeo(buffer: ArrayBuffer, signature: string): GeoChunk[] {
   const view = new DataView(buffer);
   const out: GeoChunk[] = [];
@@ -139,13 +132,11 @@ export function decodeGeo(buffer: ArrayBuffer, signature: string): GeoChunk[] {
   return out;
 }
 
-/** Chunks per request. */
 const BATCH = 64;
 
 interface Entry {
   chunk: GeoChunk | null;
   signature: string;
-  /** Changed on the map since it was fetched. */
   stale: boolean;
 }
 
@@ -155,16 +146,13 @@ interface Entry {
  */
 export class GeoStore {
   private chunks = new Map<number, Entry>();
-  /** Signature of the newest request of each chunk in flight. */
   private inflight = new Map<number, string>();
   private queued = new Map<string, Set<number>>();
   /** Request number of the newest request of each chunk: older answers are dropped. */
   private latest = new Map<number, number>();
   private requestNumber = 0;
   private timer = 0;
-  /** Recent requests: when each ended, its whole time and the backend's build time (ms). */
   private times: { at: number; total: number; build: number }[] = [];
-  /** The loading burst under way (from the first request until nothing loads), logged when it ends. */
   private burst: { start: number; requests: number; chunks: number; bytes: number; packed: number; total: number; max: number; build: number; wait: number } | null = null;
 
   constructor(
@@ -246,7 +234,6 @@ export class GeoStore {
     }
   }
 
-  /** Logs the burst once nothing loads any more. */
   private logBurst(): void {
     const burst = this.burst;
     if (!burst || !this.idle()) return;
@@ -275,7 +262,6 @@ export class GeoStore {
     const all = new Set<number>();
     for (const key of keys) {
       all.add(key);
-      // The block holding the chunk, of the block size the renderer uses.
       const [chunkX, chunkY, z] = splitKey(key);
       all.add(GEO_BLOCK + chunkKey(chunkX - (chunkX % BLOCK_CHUNKS), chunkY - (chunkY % BLOCK_CHUNKS), z));
     }
@@ -287,7 +273,6 @@ export class GeoStore {
     }
   }
 
-  /** Requests that ended in the last second: count and average times (ms). */
   stats(): { count: number; total: number; build: number } {
     const now = performance.now();
     this.times = this.times.filter((time) => now - time.at < 1000);
@@ -297,22 +282,18 @@ export class GeoStore {
     return { count, total: average((time) => time.total), build: average((time) => time.build) };
   }
 
-  /** Nothing is requested or loading. */
   idle(): boolean {
     return this.inflight.size === 0 && this.queued.size === 0;
   }
 
-  /** The geometry of a chunk without requesting it. */
   peek(key: number): GeoChunk | null | undefined {
     return this.chunks.get(key)?.chunk;
   }
 
-  /** Forgets a chunk: the next get() fetches it again. */
   drop(key: number): void {
     this.chunks.delete(key);
   }
 
-  /** Forgets chunks far from a view to bound memory. */
   trim(keep: (key: number) => boolean, max = 12000): void {
     trimStore(this.chunks, keep, max);
   }

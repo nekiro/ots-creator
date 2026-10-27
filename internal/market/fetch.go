@@ -17,12 +17,10 @@ type Source struct {
 	HTTP  *http.Client
 }
 
-// NewSource returns a source reading one base URL.
 func NewSource(base string) *Source {
 	return &Source{Bases: []string{strings.TrimSuffix(base, "/") + "/"}}
 }
 
-// PreviewBase is the base URL the UI loads preview images from.
 func (s *Source) PreviewBase() string { return s.Bases[0] }
 
 func (s *Source) get(ctx context.Context, bases []string, name string, limit int64) ([]byte, error) {
@@ -70,10 +68,8 @@ func (s *Source) get(ctx context.Context, bases []string, name string, limit int
 
 var errNotFound = errors.New("not found")
 
-// maxIndexBytes bounds index.json (about 50k entries).
 const maxIndexBytes = 32 << 20
 
-// Index downloads index.json.
 func (s *Source) Index(ctx context.Context) (*Index, error) {
 	data, err := s.get(ctx, s.Bases, IndexFile, maxIndexBytes)
 	if errors.Is(err, errNotFound) {
@@ -95,7 +91,6 @@ func (s *Source) Index(ctx context.Context) (*Index, error) {
 	return &index, nil
 }
 
-// File downloads the file of an entry (thing.obd or sprites.png).
 func (s *Source) File(ctx context.Context, entry *Entry) ([]byte, error) {
 	if !ValidID(entry.ID) || !strings.HasPrefix(entry.File, EntriesDir+"/"+entry.ID+"/") {
 		return nil, fmt.Errorf("bad entry %q", entry.ID)

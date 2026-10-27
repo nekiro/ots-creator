@@ -14,7 +14,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/fsutil"
 )
 
-// ClientFiles describes a dat/spr pair found on disk before opening it.
 type ClientFiles struct {
 	// Format is FormatAssets for a Tibia 12+ asset folder; DatPath is then
 	// the folder and Detected its version.
@@ -30,8 +29,6 @@ type ClientFiles struct {
 	OTBPath string `json:"otbPath"`
 }
 
-// inspectClient finds the client files of a client directory or of any of
-// its dat, spr or otfi files: their signatures, version and OTFI features.
 func inspectClient(path string) (ClientFiles, error) {
 	// A dat or otfi in the chosen folder wins over an assets subfolder
 	// (some clients ship both).
@@ -75,8 +72,6 @@ func inspectClient(path string) (ClientFiles, error) {
 	return files, nil
 }
 
-// applyOTFI reads the features and file names of an OTFI file, when there
-// is one.
 func (files *ClientFiles) applyOTFI(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -125,7 +120,6 @@ func findClientFile(dir string) (string, error) {
 	return "", fmt.Errorf("no .dat or .otfi file in %s", dir)
 }
 
-// readSignature reads the uint32 signature a dat or spr file starts with.
 func readSignature(path string) (uint32, error) {
 	file, err := os.Open(path)
 	if err != nil {

@@ -110,7 +110,6 @@ func TestReadObjectAndPreview(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Walking frames at the preview speed.
 	if len(anim.Image) != 2 || anim.Delay[0] != 10 {
 		t.Fatalf("preview: %d frames, delay %v", len(anim.Image), anim.Delay)
 	}

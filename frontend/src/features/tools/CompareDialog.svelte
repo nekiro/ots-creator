@@ -1,8 +1,4 @@
 <script lang="ts">
-  // Compares the open client (A) with a second client (B) and copies objects
-  // in both directions. Copies keep their ids (replacing, or extending the
-  // target) or are appended as new objects. Objects of B can also be queued
-  // and dropped into chosen slots of A (DropPanel, queue.svelte.ts).
   import { hasImprovedAnimations } from "../../lib/thing";
   import { CATEGORIES, CATEGORY_LABELS, CATEGORY_NAMES, CompareService, Format, normalizeThing, res, ThingService, type Category, type DiffEntry, type DiffResult } from "../../lib/api";
   import { mergeIds, mergeSummary, type MergeStep } from "../../lib/compare";
@@ -54,7 +50,6 @@
   const improvedA = $derived(hasImprovedAnimations(infoA));
   const improvedB = $derived(hasImprovedAnimations(infoB));
 
-  // Hovering a row animates both of its thumbnails, like the object list.
   const hoverAnim = (get: typeof ThingService.Get) => async (id: number) => {
     const requested = category;
     const raw = await get(requested, id);
@@ -92,7 +87,6 @@
   const fromB = $derived(picked.filter((entry) => entry.status !== "onlyA" && entry.status !== "copied"));
   const pickedCopies = $derived(picked.filter((entry) => copied[entry.id]).map((entry) => entry.id));
 
-  // Compare again after every change of either client.
   let seq = 0;
   $effect(() => {
     const compared = category;
@@ -112,7 +106,6 @@
       .finally(() => request === seq && (loading = false));
   });
 
-  // The last clicked object is previewed, from A or B.
   const focused = $derived(entries.find((entry) => entry.id === anchor && selectedSet.has(entry.id)) ?? null);
   let side = $state<"A" | "B">("B");
   const hasA = $derived(!!focused && focused.status !== "onlyB");
@@ -170,8 +163,6 @@
     anchor = next.anchor;
   }
 
-  // Right click selects the row (unless it is selected) and offers the
-  // actions for the selection.
   function oncontextmenu(event: MouseEvent, id: number) {
     if (!selectedSet.has(id)) {
       selected = [id];
@@ -196,7 +187,6 @@
     openContextMenu(event, items);
   }
 
-  // Selects an id in the list and scrolls to it (from the queue and slots).
   let scrollTo = $state<number | null>(null);
   function show(id: number) {
     const position = entries.findIndex((entry) => entry.id === id);
@@ -221,7 +211,6 @@
     selected = entries.filter((entry) => entry.status === status).map((entry) => entry.id);
   }
 
-  /** Copies the picked objects; toOther copies A into B. */
   async function transfer(toOther: boolean, appendNew: boolean, list: DiffEntry[]) {
     if (!list.length) return;
     const ids = list.map((entry) => entry.id);
@@ -235,14 +224,12 @@
 
   const queuedIds = $derived(new Set(compareQueue.queued(category)));
 
-  // Double click queues the object of B (or takes it out of the queue).
   function dblclick(entry: DiffEntry) {
     if (entry.status === "onlyA" || entry.status === "copied") return;
     if (queuedIds.has(entry.id)) compareQueue.dequeue(category, [entry.id]);
     else compareQueue.enqueue(category, [entry.id]);
   }
 
-  /** Puts copied objects back as they were before they were copied. */
   async function revert(ids: number[]) {
     for (const to of ["A", "B"] as const) {
       const list = ids.filter((id) => copied[id] === to);
@@ -257,7 +244,6 @@
     }
   }
 
-  /** Copies everything B has and A lacks or has differently, in every category. */
   async function mergeAll() {
     const plan: MergeStep[] = [];
     for (const mergedCategory of CATEGORIES) {

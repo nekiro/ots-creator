@@ -1,5 +1,3 @@
-// Quads built on the CPU every frame (brush previews, overlays, dragged
-// selections) and drawn in screen pixels with the sprite program.
 import type { Atlas } from "./atlas";
 import { GPU } from "../constants";
 import { compileProgram, createQuadVao } from "./gpu";
@@ -16,7 +14,6 @@ export class QuadBatch {
   private quads = new Float32Array(GPU.floatsPerQuad * 4096);
   private quadCount = 0;
   private uniforms: Record<string, WebGLUniformLocation | null> = {};
-  /** The atlas the cells of pushed quads are in. */
   atlas: Atlas | null = null;
 
   constructor(
@@ -29,7 +26,6 @@ export class QuadBatch {
     this.vao = createQuadVao(gl, corners, this.instances);
   }
 
-  /** Drops the quads pushed so far without drawing them. */
   clear(): void {
     this.quadCount = 0;
   }
@@ -62,12 +58,10 @@ export class QuadBatch {
     this.quadCount++;
   }
 
-  /** A colored rectangle in screen pixels. */
   rect(x: number, y: number, width: number, height: number, color: Color): void {
     this.push(x, y, width, height, 0, color[0], color[1], color[2], color[3]);
   }
 
-  /** The outline of a rectangle, lineWidth pixels wide inside it. */
   stroke(x: number, y: number, width: number, height: number, color: Color, lineWidth: number): void {
     this.rect(x, y, width, lineWidth, color);
     this.rect(x, y + height - lineWidth, width, lineWidth, color);

@@ -37,8 +37,6 @@ func (ts *ThingService) ExportSheet(category thing.Category, id uint32, group in
 	return os.WriteFile(path, data, fsutil.FileMode)
 }
 
-// renderSheet draws the sprite sheet of one frame group (or AllGroups) on
-// magenta (like ObjectBuilder) or a transparent background.
 func renderSheet(proj *project.Project, category thing.Category, id uint32, group int, transparent bool) (*image.NRGBA, error) {
 	found, err := proj.Thing(category, id)
 	if err != nil {
@@ -86,8 +84,6 @@ func (ts *ThingService) ImportSheet(category thing.Category, id uint32, group in
 	return ts.importSheet(category, id, group, img)
 }
 
-// PasteSheet is ImportSheet for an image from the clipboard (PNG, BMP,
-// GIF or JPEG bytes).
 func (ts *ThingService) PasteSheet(category thing.Category, id uint32, group int, data []byte) error {
 	img, err := imaging.Decode(bytes.NewReader(data))
 	if err != nil {
@@ -118,16 +114,12 @@ func (ts *ThingService) importSheet(category thing.Category, id uint32, group in
 	})
 }
 
-// SetPixels replaces the pixels of sprite slots of one frame group after
-// painting (see project.SetSlotPixels).
 func (ts *ThingService) SetPixels(category thing.Category, id uint32, group int, slots []int, pixels [][]byte) error {
 	return ts.editAll(func(proj *project.Project) error {
 		return proj.SetSlotPixels(category, id, group, slots, pixels, "Paint")
 	})
 }
 
-// ShiftPixels moves the pixels of every texture of a frame group, or with
-// singleTexture set only the texture at frame and pattern x, y, z (all its layers).
 func (ts *ThingService) ShiftPixels(category thing.Category, id uint32, group, dx, dy int, singleTexture bool, frame, x, y, z int) error {
 	return ts.editAll(func(proj *project.Project) error {
 		texture := project.TexturePos{Frame: frame, PatternX: x, PatternY: y, PatternZ: z}

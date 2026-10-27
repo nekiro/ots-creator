@@ -10,21 +10,18 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/assets"
 )
 
-// newSprite is a sprite created by an edit, waiting for a sheet.
 type newSprite struct {
 	spriteType int
 	pixels     []byte
 	id         uint32
 }
 
-// assetWriter turns piece ids back into official sprites while compiling.
 type assetWriter struct {
 	project *Project
 	pieces  *assets.PieceMap // nil when converting from dat/spr
 	known   map[string]*newSprite
 	order   []*newSprite
-	// byHash lists base pieces by content hash (see sameContent).
-	byHash map[spriteHash][]uint32
+	byHash  map[spriteHash][]uint32
 	// used marks the existing sprites the things still reference;
 	// repacked maps the ones moved out of a partly used sheet.
 	used     map[uint32]bool
@@ -62,7 +59,6 @@ func (w *assetWriter) resolve(pieces []uint32, tilesWide, tilesHigh int) (uint32
 	return w.add(spriteType, pixels).id, nil
 }
 
-// add queues a new sprite; identical ones share one.
 func (w *assetWriter) add(spriteType int, pixels []byte) *newSprite {
 	key := strconv.Itoa(spriteType) + string(pixels)
 	sprite, ok := w.known[key]
@@ -74,7 +70,6 @@ func (w *assetWriter) add(spriteType int, pixels []byte) *newSprite {
 	return sprite
 }
 
-// existing returns the id an existing sprite gets in the output.
 func (w *assetWriter) existing(id uint32) uint32 {
 	if sprite, ok := w.repacked[id]; ok {
 		return sprite.id
@@ -183,7 +178,6 @@ func (w *assetWriter) sameContent(pieces []uint32, tilesWide, tilesHigh int) (ui
 	return 0, false, nil
 }
 
-// indexBase lists the base pieces by content hash.
 func (w *assetWriter) indexBase() error {
 	store := w.project.sprites
 	count := store.baseCount()

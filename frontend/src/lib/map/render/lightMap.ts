@@ -17,11 +17,9 @@ export const DAYLIGHT_INTENSITY = 250;
 export const WHITE_LIGHT_COLOR = 215;
 /** Light falls off over this many tiles at its edge (client: intensity * 0.2 per tile). */
 const FALLOFF_PER_TILE = 0.2;
-/** Lights weaker than this at a tile leave it as it is. */
 const MIN_LIGHT = 0.01;
 /** What a dimmed light keeps (client: LightView::updatePixels, 0.8). */
 const DIMMED = 0.8;
-/** The bit planes of GeoChunk.shades. */
 const SHADE_PLANE = 0;
 const TRANSLUCENT_PLANE = 1;
 const GROUND_PLANE = 2;
@@ -51,7 +49,6 @@ export interface LightFloor {
   z: number;
   chunks: GeoChunk[];
   shift: number;
-  /** Lights added after the chunks' lights. */
   extra?: ExtraLight[];
 }
 

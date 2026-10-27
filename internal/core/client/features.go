@@ -1,9 +1,7 @@
 package client
 
-// DefaultSpriteSize is the edge length of a classic sprite in pixels.
 const DefaultSpriteSize = 32
 
-// Features are the format switches that change how dat/spr files are encoded.
 type Features struct {
 	// Extended stores sprite ids and the sprite count as u32 instead of u16.
 	Extended bool `json:"extended"`
@@ -13,11 +11,9 @@ type Features struct {
 	ImprovedAnimations bool `json:"improvedAnimations"`
 	// FrameGroups stores several frame groups (idle, walking) for outfits.
 	FrameGroups bool `json:"frameGroups"`
-	// SpriteSize is the sprite edge length in pixels (32 for official clients).
-	SpriteSize int `json:"spriteSize"`
+	SpriteSize  int  `json:"spriteSize"`
 }
 
-// DefaultFeatures returns the features forced by a client version.
 func DefaultFeatures(version uint16) Features {
 	features := Features{SpriteSize: DefaultSpriteSize}
 	features.ApplyVersionDefaults(version)

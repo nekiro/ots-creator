@@ -1,5 +1,4 @@
 <script lang="ts">
-  // Entries of an OTClient PopupMenu (menu bar drop-downs and context menus).
   import type { MenuEntry, MenuItem } from "../menu.svelte";
 
   let { items, onpick }: { items: MenuEntry[]; onpick: (item: MenuItem) => void } = $props();

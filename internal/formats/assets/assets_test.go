@@ -213,7 +213,6 @@ func TestOfficialAssets(t *testing.T) {
 	if !bytes.Equal(out, data) {
 		t.Fatalf("round trip differs: %d vs %d bytes", len(out), len(data))
 	}
-	// Regenerating every thing must keep the same model.
 	for _, c := range thing.Categories {
 		for i, th := range f.Things[c] {
 			f.Things[c][i] = th.Clone()
@@ -244,7 +243,6 @@ func TestOfficialAssets(t *testing.T) {
 			}
 		}
 	}
-	// One sheet decodes.
 	raw, err := os.ReadFile(filepath.Join(dir, c.Sheets[0].File))
 	if err != nil {
 		t.Fatal(err)
@@ -260,10 +258,10 @@ func TestNewerFlagsRoundTrip(t *testing.T) {
 	flags := putBytes(nil, flagNpcSaleData, npc)
 	flags = putBytes(flags, flagNpcSaleData, putBytes(putUint(nil, npcSalePrice, 20), npcQuestFlag, []byte("gold token")))
 	flags = putBytes(flags, flagChangedToExpire, putUint(nil, 1, 3051))
-	flags = putBool(flags, 42, true) // corpse
+	flags = putBool(flags, 42, true)
 	flags = putBytes(flags, flagCyclopedia, putUint(nil, 1, 3))
 	flags = putBytes(flags, flagUpgradeClassification, putUint(nil, 1, 4))
-	flags = putBool(flags, 57, true)                                                                  // wrapkit
+	flags = putBool(flags, 57, true)
 	flags = putBytes(flags, flagMarket, putUint(putUint(nil, marketVocation, 10), marketVocation, 1)) // promoted + knight
 	app := putBytes(putUint(nil, 1, 100), 3, flags)
 

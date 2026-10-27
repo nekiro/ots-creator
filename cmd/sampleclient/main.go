@@ -19,19 +19,15 @@ import (
 
 const size = 32
 
-// Signatures of the 10.98 client files.
 const (
 	datSignature1098 = 0x42A3
 	sprSignature1098 = 0x57BBD603
 )
 
 const (
-	// generatedItems is the number of plain items (grounds and gems).
 	generatedItems = 160
-	// groundSpeckles is the number of light pixels on a ground sprite.
 	groundSpeckles = 40
-	// firstItemID is the first item id of a client.
-	firstItemID = 100
+	firstItemID    = 100
 )
 
 type canvas []byte
@@ -87,7 +83,6 @@ func main() {
 	writeOutput(proj, version, *out)
 }
 
-// makeItems adds grounds and gems.
 func makeItems(proj *project.Project) {
 	for i := 0; i < generatedItems; i++ {
 		sprite := newCanvas()
@@ -124,7 +119,6 @@ func makeItems(proj *project.Project) {
 	}
 }
 
-// makeAnimatedItem adds a torch-like item: 2x2 tiles, 4 frames.
 func makeAnimatedItem(proj *project.Project) {
 	id, _ := proj.AddThing(thing.CategoryItem)
 	item, _ := proj.Thing(thing.CategoryItem, id)
@@ -160,8 +154,6 @@ func makeAnimatedItem(proj *project.Project) {
 	}
 }
 
-// makeOutfit fills outfit 1: 4 directions, template layer, 1 addon, idle
-// and walking.
 func makeOutfit(proj *project.Project) {
 	outfit, _ := proj.Thing(thing.CategoryOutfit, 1)
 	idle := outfitGroup(proj, 1)
@@ -186,21 +178,20 @@ func outfitGroup(proj *project.Project, frames uint8) *thing.FrameGroup {
 				}
 				if addon == 0 {
 					skin := color.NRGBA{230, 190, 150, 255}
-					base.disc(16, 9+float64(bob), 5, color.NRGBA{200, 200, 200, 255}) // head (template)
+					base.disc(16, 9+float64(bob), 5, color.NRGBA{200, 200, 200, 255})
 					template.disc(16, 9+float64(bob), 5, color.NRGBA{255, 255, 0, 255})
 					base.disc(16, 11+float64(bob), 3, skin)
-					base.rect(10, 15+bob, 22, 24+bob, color.NRGBA{210, 210, 210, 255}) // body
+					base.rect(10, 15+bob, 22, 24+bob, color.NRGBA{210, 210, 210, 255})
 					template.rect(10, 15+bob, 22, 24+bob, color.NRGBA{255, 0, 0, 255})
-					base.rect(11, 24, 21, 29, color.NRGBA{190, 190, 190, 255}) // legs
+					base.rect(11, 24, 21, 29, color.NRGBA{190, 190, 190, 255})
 					template.rect(11, 24, 21, 29, color.NRGBA{0, 255, 0, 255})
-					base.rect(11, 29, 21, 31, color.NRGBA{170, 170, 170, 255}) // feet
+					base.rect(11, 29, 21, 31, color.NRGBA{170, 170, 170, 255})
 					template.rect(11, 29, 21, 31, color.NRGBA{0, 0, 255, 255})
-					// direction marker
 					dx := []int{0, 5, 0, -5}[direction]
 					dy := []int{-5, 0, 3, 0}[direction]
 					base.disc(16+float64(dx), 18+float64(dy+bob), 1.5, color.NRGBA{40, 40, 40, 255})
 				} else {
-					base.rect(8, 4+bob, 24, 6+bob, color.NRGBA{200, 160, 40, 255}) // hat addon
+					base.rect(8, 4+bob, 24, 6+bob, color.NRGBA{200, 160, 40, 255})
 				}
 				ids, _ := proj.AddSprites([][]byte{base, template})
 				group.Sprites[group.SpriteIndex(0, 0, 0, direction, addon, 0, frame)] = ids[0]
@@ -211,7 +202,6 @@ func outfitGroup(proj *project.Project, frames uint8) *thing.FrameGroup {
 	return group
 }
 
-// makeEffect fills effect 1: an expanding ring, 6 frames.
 func makeEffect(proj *project.Project) {
 	effect, _ := proj.Thing(thing.CategoryEffect, 1)
 	group := effect.FrameGroups[0]
@@ -235,7 +225,6 @@ func makeEffect(proj *project.Project) {
 	}
 }
 
-// makeMissile fills missile 1: an arrow in 9 directions (3x3 patterns).
 func makeMissile(proj *project.Project) {
 	missile, _ := proj.Thing(thing.CategoryMissile, 1)
 	group := missile.FrameGroups[0]
@@ -257,7 +246,6 @@ func makeMissile(proj *project.Project) {
 	}
 }
 
-// writeOutput compiles the client into dir.
 func writeOutput(proj *project.Project, version client.Version, dir string) {
 	datPath := filepath.Join(dir, "Tibia.dat")
 	sprPath := filepath.Join(dir, "Tibia.spr")

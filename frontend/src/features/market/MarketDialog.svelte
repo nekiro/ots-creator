@@ -1,9 +1,4 @@
 <script lang="ts">
-  // Browses the shared market (see internal/market): sections, tags,
-  // search and sort run on the downloaded index; objects are previewed live
-  // and imported into the open client. Own entries (and, with the admin
-  // token, every entry) can be deleted. Share opens the share window with a
-  // picker for an object or sprites.
   import { onMount } from "svelte";
   import { MarketService, errorMessage, type MarketIndex } from "../../lib/api";
   import { commands } from "../../lib/commands";
@@ -51,7 +46,6 @@
   const entries = $derived((index?.entries ?? []) as MarketEntry[]);
   const filtered = $derived(filterEntries(entries, { section, tags, query, sort, spriteSize: sameSize ? size : 0 }));
   const counts = $derived(sectionCounts(entries));
-  // Every tag used in the section, most used first, for the tag filter.
   const tagOptions = $derived(topTags(section === "all" ? entries : entries.filter((entry) => sectionOf(entry) === section), 1000));
   const selected = $derived(entries.find((entry) => entry.id === selectedId) ?? null);
   const url = (path: string) => (index ? index.base + path : "");
@@ -80,7 +74,6 @@
     tags = tags.includes(tag) ? tags.filter((other) => other !== tag) : [...tags, tag];
   }
 
-  // Live preview of the selected object (downloaded once per entry).
   const cache = new Map<string, Promise<DecodedObject>>();
   let loaded = $state<DecodedObject | null>(null);
   let previewError = $state("");
@@ -445,7 +438,6 @@
     min-height: 0;
     overflow: hidden;
   }
-  /* The preview takes what the text leaves, so the panel never scrolls. */
   .stage {
     position: relative;
     flex: 1 1 150px;

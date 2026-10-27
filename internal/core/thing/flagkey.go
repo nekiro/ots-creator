@@ -11,8 +11,6 @@ var (
 	flagFields     map[string]int
 )
 
-// FlagByKey reports a boolean property by its JSON name. ok is false when no
-// boolean property has that name.
 func (p *Properties) FlagByKey(key string) (value, ok bool) {
 	flagFieldsOnce.Do(func() {
 		flagFields = map[string]int{}

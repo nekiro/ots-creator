@@ -1,7 +1,5 @@
-// Client versions offered by the version pickers.
 import { ProjectService, type Version } from "./api";
 
-/** The known client versions, newest first. */
 export async function loadVersions(): Promise<Version[]> {
   return ((await ProjectService.Versions()) ?? []).slice().reverse();
 }

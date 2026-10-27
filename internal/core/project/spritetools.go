@@ -7,14 +7,12 @@ import (
 	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
-// Sprite filters for FindSprites.
 const (
 	SpritesUnused    = "unused"    // no thing references the sprite
 	SpritesEmpty     = "empty"     // no visible pixels
 	SpritesDuplicate = "duplicate" // same pixels as a sprite with a lower id
 )
 
-// FindSprites returns the ids of the sprites that match filter, in order.
 func (p *Project) FindSprites(filter string) ([]uint32, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -55,7 +53,6 @@ func (p *Project) FindSprites(filter string) ([]uint32, error) {
 	return out, nil
 }
 
-// usedSpritesLocked marks every sprite id some thing references.
 func (p *Project) usedSpritesLocked() []bool {
 	used := make([]bool, p.sprites.count()+1)
 	for _, category := range thing.Categories {
@@ -75,7 +72,6 @@ func (p *Project) usedSpritesLocked() []bool {
 	return used
 }
 
-// SpriteUsers lists the things that reference sprite id.
 func (p *Project) SpriteUsers(id uint32) []ThingRef {
 	p.mu.RLock()
 	defer p.mu.RUnlock()

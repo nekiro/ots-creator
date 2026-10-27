@@ -31,7 +31,6 @@ func TestSaveBrush(t *testing.T) {
 	if err := m.SaveBrush("", Brush{Name: "GRASS"}, nil); err == nil {
 		t.Fatal("duplicate name saved")
 	}
-	// Rename and move to another tileset.
 	if err := m.SaveBrush("grass", Brush{Name: "lawn", Type: TypeDoodad}, []string{"Garden"}); err != nil {
 		t.Fatal(err)
 	}

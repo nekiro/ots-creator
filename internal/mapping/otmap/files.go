@@ -10,7 +10,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/fsutil"
 )
 
-// Stage is a step of loading a map.
 type Stage int
 
 const (
@@ -21,15 +20,12 @@ const (
 	StageWrite               // saving: writing the files (done/total in files)
 )
 
-// Progress is called while a map loads.
 type Progress func(stage Stage, done, total int)
 
-// Load reads a map and its auxiliary files from disk.
 func Load(path string, items Items, format Format) (*Map, []string, error) {
 	return LoadProgress(path, items, format, nil)
 }
 
-// LoadProgress is Load that reports its progress (progress may be nil).
 func LoadProgress(path string, items Items, format Format, progress Progress) (*Map, []string, error) {
 	if progress == nil {
 		progress = func(Stage, int, int) {}
@@ -82,7 +78,6 @@ func LoadProgress(path string, items Items, format Format, progress Progress) (*
 	return gameMap, warnings, nil
 }
 
-// ClearModified clears the modified state of every tile.
 func (m *Map) ClearModified() {
 	for _, chunk := range m.chunks {
 		// Packed tiles have no state.
@@ -96,7 +91,6 @@ func Save(path string, gameMap *Map, items Items, format Format) ([]string, erro
 	return SaveProgress(path, gameMap, items, format, nil)
 }
 
-// SaveProgress is Save that reports its progress (progress may be nil).
 func SaveProgress(path string, gameMap *Map, items Items, format Format, progress Progress) ([]string, error) {
 	if progress == nil {
 		progress = func(Stage, int, int) {}

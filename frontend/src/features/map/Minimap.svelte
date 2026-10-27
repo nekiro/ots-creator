@@ -11,16 +11,13 @@
   import Icon from "../../lib/ui/Icon.svelte";
   import Splitter from "../../lib/ui/Splitter.svelte";
 
-  /** Tiles shown across the minimap. */
   const SPANS = [64, 128, 256, 512];
   let span = $state(256);
   let rev = $state(0);
   let box = $state<HTMLDivElement>();
   let layer = $state<HTMLDivElement>();
   let size = $state(200);
-  // Inside of the box (no border): the image fills its width.
   let innerWidth = $state(0);
-  // Shown height inside the box: below the chosen one when the column has no room for it.
   let shown = $state(0);
 
   // Height chosen with the splitter below the image; square (null) until dragged.
@@ -29,7 +26,6 @@
   let chosen = $state<number | null>(loadHeight());
   const height = $derived(chosen ?? size);
   const maxHeight = () => Math.max(HEIGHT_MIN, window.innerHeight - 320);
-  /** Tiles down a box this tall: the image keeps square tiles. */
   const tilesDown = (pixels: number) => Math.max(8, Math.round((span * pixels) / Math.max(1, innerWidth || size)));
   // While the splitter is dragged, one image as tall as the box can get is fetched,
   // its top kept where it was: the box shows more of it with every pixel of the drag.
@@ -89,7 +85,6 @@
     };
   });
 
-  // The view rectangle of the map canvas.
   const view = $derived.by(() => {
     if (!image) return null;
     if (player) return { x: center.x - PLAY.tilesWide / 2 - image.x, y: center.y - PLAY.tilesHigh / 2 - image.y, w: PLAY.tilesWide, h: PLAY.tilesHigh };
@@ -121,7 +116,6 @@
     const rect = layer.getBoundingClientRect();
     let x = image.x + Math.floor(((event.clientX - rect.left) / rect.width) * image.span);
     let y = image.y + Math.floor(((event.clientY - rect.top) / rect.height) * image.spanY);
-    // Stay where the map has tiles; outside it there is only black.
     const info = map.active;
     if (info?.hasBounds) {
       const [x0, y0, x1, y1] = info.bounds;
@@ -168,7 +162,6 @@
 </MiniWindow>
 
 <style>
-  /* Both shrink so the image stays inside the window when the column is short. */
   .wrap {
     flex: 0 1 auto;
     min-height: 0;

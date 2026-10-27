@@ -1,4 +1,3 @@
-// State of the map editor (Svelte 5 runes).
 import { errorMessage } from "../api";
 import { loadJson, saveJson } from "../state/storage";
 import { toast } from "../state/app.svelte";
@@ -10,7 +9,6 @@ import { GROUND_FLOOR } from "./constants";
 export type EditorMode = "objects" | "map";
 export type Tool = "select" | "brush";
 
-/** The brush in use. Kind matches mapedit draw kinds. */
 export interface BrushSel {
   kind: string;
   name?: string;
@@ -22,14 +20,12 @@ export interface BrushSel {
   flag?: number;
   zone?: number;
   doorType?: string;
-  /** Item shown for the brush (server id). */
   look?: number;
   label: string;
 }
 
 export type MapDialog = "data" | "import" | "minimap" | "brush" | "settings" | "tools" | "shortcuts" | "warnings" | "text" | null;
 
-/** What the inspector shows: a tile, a part of the world, or the map itself. */
 export type Focus =
   | { kind: "tile" }
   | { kind: "map" }
@@ -38,7 +34,6 @@ export type Focus =
   | { kind: "waypoint"; name: string }
   | { kind: "zone"; id: number };
 
-/** Left panel: what to draw with, or what the map contains. */
 export type SidePanel = "library" | "world";
 
 export interface FindResultRow {
@@ -95,13 +90,10 @@ class MapState {
   settings = $state<EditorSettings | null>(null);
   /** Keyboard shortcuts changed by the user: action id -> key combinations. */
   keys = $state.raw<Record<string, string[]>>({});
-  /** Warnings from loading each open map, by map id. */
   loadWarnings = $state.raw<Record<number, string[]>>({});
-  /** Tab the settings window opens on. */
   settingsTab = $state<"general" | "keys">("general");
   items = $state.raw<ItemIndex | null>(null);
   palette = $state.raw<Palette | null>(null);
-  /** Bumped when the item table or palette is reloaded. */
   dataRev = $state(0);
 
   /** Selection until a brush is picked: a click must not draw by surprise. */
@@ -115,7 +107,6 @@ class MapState {
   spawnTime = $state(0);
   direction = $state(2);
   fill = $state(false);
-  /** Bumped to generate a new doodad placement. */
   reroll = $state(0);
   recentBrushes = $state<BrushSel[]>([]);
   /** Item the library should show and scroll to (set by picking a brush from the map). */
@@ -124,13 +115,11 @@ class MapState {
   view = $state<ViewOptions>(loadJson(VIEW_KEY, DEFAULT_VIEW));
   cams = $state<Record<number, Camera>>({});
   hover = $state.raw<Position | null>(null);
-  /** Tile shown in the inspector. */
   inspect = $state.raw<Position | null>(null);
   tile = $state.raw<TileInfo | null>(null);
   /** Inspector content; null shows the map. */
   focus = $state<Focus | null>(null);
   side = $state<SidePanel>("library");
-  /** Find panel: open, the values it opens with, and its results. */
   findOpen = $state(false);
   findPreset = $state<{ ids?: number[]; inSelection?: boolean; replace?: boolean } | null>(null);
   results = $state.raw<{ title: string; items: FindResultRow[]; more: boolean } | null>(null);
@@ -139,9 +128,7 @@ class MapState {
   dialog = $state<MapDialog>(null);
   /** Item shown in the text dialog (index among the tile items, ground excluded). */
   textItem = $state<{ pos: Position; index: number } | null>(null);
-  /** Brush edited in the brush editor ("" for a new brush). */
   editBrush = $state<{ name: string; type: string } | null>(null);
-  /** The clipboard follows the mouse until a click pastes it. */
   pasting = $state(false);
   /** The play view shows the map in place of the editor, the player starting here (null: editing). */
   play = $state<Position | null>(null);
@@ -150,7 +137,6 @@ class MapState {
   /** A click on the map picks a position for this callback (teleport destinations). */
   pick = $state<{ label: string; done: (position: Position) => void } | null>(null);
   busy = $state<string | null>(null);
-  /** A map being opened or saved: its file name, the current step and how far the whole job is (0-100). */
   loading = $state<{ name: string; step: string; percent: number; title?: string } | null>(null);
 
   readonly active = $derived<MapInfo | null>(this.maps.find((open) => open.id === this.activeId) ?? null);
@@ -179,7 +165,6 @@ $effect.root(() => {
   map.shape = brush.shape;
 }
 
-/** Listeners of map changes (the canvas redraws touched chunks). */
 type ChangeListener = (id: number, change: MapChange) => void;
 const listeners = new Set<ChangeListener>();
 
@@ -188,7 +173,6 @@ export function onMapChange(listener: ChangeListener): () => void {
   return () => listeners.delete(listener);
 }
 
-/** Applies a change from the backend: map info and redraw. */
 export function applyChange(id: number, change: MapChange | null | undefined): void {
   if (!change) return;
   const info = change.info;
@@ -205,7 +189,6 @@ export function applyChange(id: number, change: MapChange | null | undefined): v
   if (map.inspect && id === map.activeId) void refreshTile();
 }
 
-/** Runs a backend call that returns a change of the active map. */
 export async function edit(call: (id: number) => Promise<MapChange>): Promise<MapChange | null> {
   const id = map.activeId;
   if (id === null) return null;
@@ -236,7 +219,6 @@ export async function refreshTile(): Promise<void> {
 
 let dataRequest = 0;
 
-/** Loads the selected tab's item interpretation and palette. */
 export async function loadMapData(force = false, activate = true): Promise<void> {
   const request = ++dataRequest;
   try {
@@ -275,7 +257,6 @@ export async function loadMapData(force = false, activate = true): Promise<void>
   }
 }
 
-/** Reloads the palette (after brush changes). */
 export async function reloadPalette(): Promise<void> {
   try {
     map.palette = await MapService.Palette();
@@ -306,7 +287,6 @@ export function selectBrush(brush: BrushSel): void {
   }
 }
 
-/** Selects a creature brush (from a creature on the map or the palette). */
 export function useCreature(creature: { name: string; npc?: boolean }): void {
   selectBrush({ kind: "creature", creature: creature.name, npc: !!creature.npc, label: creature.name });
 }
@@ -315,12 +295,10 @@ function brushKey(brush: BrushSel): string {
   return `${brush.kind}:${brush.name ?? ""}:${brush.item ?? ""}:${brush.house ?? ""}:${brush.creature ?? ""}:${brush.flag ?? ""}:${brush.zone ?? ""}:${brush.waypoint ?? ""}:${brush.doorType ?? ""}`;
 }
 
-/** True when the brush is the one in use. */
 export function isBrushActive(brush: BrushSel): boolean {
   return !!map.brush && map.tool === "brush" && brushKey(map.brush) === brushKey(brush);
 }
 
-/** Outfit look type of a creature brush (0 when unknown). */
 export function creatureOutfit(name: string | undefined): number {
   if (!name) return 0;
   return map.palette?.creatures?.find((creature) => creature?.name === name)?.outfit.lookType ?? 0;

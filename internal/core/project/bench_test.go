@@ -18,7 +18,7 @@ func bigClient(b *testing.B) (string, string) {
 	for i := range px {
 		s := solid(byte(i), byte(i>>8), 7)
 		for pieceIndex := 0; pieceIndex < len(s); pieceIndex += 12 {
-			s[pieceIndex+3] = 0 // some transparency, like real sprites
+			s[pieceIndex+3] = 0
 		}
 		px[i] = s
 	}

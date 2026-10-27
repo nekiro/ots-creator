@@ -1,9 +1,4 @@
 <script lang="ts">
-  // Browses OBD files and images of a folder. OBD objects are rendered and
-  // can be imported; images are shown as plain pictures, clearly marked as
-  // not being objects, and can be imported as sprites. Objects can also be
-  // queued and dropped into chosen slots of the client (DropPanel,
-  // queue.svelte.ts).
   import { frameGroupAt } from "../../lib/thing";
   import { onMount, tick } from "svelte";
   import { SvelteMap } from "svelte/reactivity";
@@ -82,10 +77,8 @@
     if (paths?.length) await open(paths[0]);
   }
 
-  // Windows paths compare without case and separator differences.
   const samePath = (first: string, second: string) => first.replace(/\//g, "\\").toLowerCase() === second.replace(/\//g, "\\").toLowerCase();
 
-  /** Shows a file and lists the other files of its folder. */
   async function open(path: string) {
     const folder = dirname(path);
     if (!samePath(folder, dir)) {
@@ -225,12 +218,10 @@
     void show(entries[next].path);
   }
 
-  // Queue of object files to drop into chosen ids of the client.
   let dropCategory = $state<Category>(app.category);
   const queueCounts = $derived(fileQueue.counts());
   const queuedPaths = $derived(new Set(app.fileQueue.map((item) => item.key)));
 
-  /** First frame of a thing, cropped to its visible pixels, as a PNG data URL. */
   function thumbnail(object: Thing, spritePixels: Uint8ClampedArray[], size: number): string {
     const frameGroup = object.frameGroups[0];
     const outfit = object.category === Category.CategoryOutfit;
@@ -247,7 +238,6 @@
     return cropped.toDataURL();
   }
 
-  /** Queues an object file, or takes it out of the queue. */
   async function toggleQueue(path: string) {
     const queued = app.fileQueue.find((item) => item.key === path);
     if (queued) {
@@ -507,7 +497,6 @@ Click to open another file` : "Open a file"} onclick={browse}>{dir || "No folder
   .folder:hover {
     color: var(--text-bright);
   }
-  /* The empty list is one big open button. */
   .none.open {
     margin: 0;
     flex: 1;
@@ -537,7 +526,6 @@ Click to open another file` : "Open a file"} onclick={browse}>{dir || "No folder
     overflow: hidden;
     border: 1px solid #1a1a1a;
   }
-  /* Previous content stays visible but faded while the next file loads. */
   .view.dim > :global(:not(.loader)) {
     opacity: 0.35;
   }

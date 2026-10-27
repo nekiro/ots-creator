@@ -1,4 +1,3 @@
-// Waypoints, house entrances and temples marked on the map.
 import type { MapInfo } from "../data/api";
 import { LABEL_FONT, MARKER_COLORS } from "../constants";
 import type { Marker } from "./scene";
@@ -8,13 +7,11 @@ export function houseLabel(name: string): string {
   return name.slice(name.lastIndexOf(",") + 1).trim() || name;
 }
 
-/** Cuts a long name with an ellipsis. */
 export function shortLabel(name: string): string {
   const max = LABEL_FONT.maxMarkerChars;
   return name.length > max ? name.slice(0, max - 1).trimEnd() + "…" : name;
 }
 
-/** Markers of a map. The color tells the kind, so labels carry only a short name. */
 export function markersOf(info: Pick<MapInfo, "waypoints" | "houses" | "towns"> | null): Marker[] {
   const markers: Marker[] = [];
   if (!info) return markers;

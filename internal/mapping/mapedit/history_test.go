@@ -11,7 +11,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-// historyPutStone records one action that puts a stone at pos.
 func historyPutStone(e *Editor, label string, pos otmap.Position, stroke int64) int {
 	tx := e.Begin(label, stroke)
 	tile := tx.Edit(pos)
@@ -19,7 +18,6 @@ func historyPutStone(e *Editor, label string, pos otmap.Position, stroke int64) 
 	return tx.Commit()
 }
 
-// historyLabels returns the labels of history entries.
 func historyLabels(entries []ActionInfo) []string {
 	var labels []string
 	for _, entry := range entries {
@@ -28,8 +26,6 @@ func historyLabels(entries []ActionInfo) []string {
 	return labels
 }
 
-// historyDrawStroke draws a stone on three tiles in three requests of one
-// stroke.
 func historyDrawStroke(e *Editor, stroke int64) {
 	for i := range 3 {
 		e.Draw(DrawRequest{Kind: KindRaw, Item: stoneID, Points: points(at(10+i, 10)), Stroke: stroke})
@@ -378,8 +374,6 @@ func TestUndoRedoTileChangesInPlace(t *testing.T) {
 	}
 }
 
-// historyChangeDescription records an action that only changes the map
-// description.
 func historyChangeDescription(e *Editor, description string, stroke int64) {
 	tx := e.Begin("Map properties", stroke)
 	tx.Meta()

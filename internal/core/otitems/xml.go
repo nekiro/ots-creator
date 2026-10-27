@@ -10,7 +10,6 @@ import (
 	"strings"
 )
 
-// ErrNoItems is returned when items.xml has no items element.
 var ErrNoItems = errors.New("items.xml: no <items> element")
 
 // ApplyXML reads names and types from an items.xml. Ids are server ids

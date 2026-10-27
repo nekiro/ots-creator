@@ -52,7 +52,6 @@
     picked = new Set();
   }
 
-  // Draw the image, the grid and the picked cells.
   $effect(() => {
     if (!canvas || !img || !bitmap) return;
     const canvasWidth = img.width * zoom;

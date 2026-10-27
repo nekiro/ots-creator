@@ -11,7 +11,6 @@
   let to = $state(0);
   let users = $state<string[] | null>(null);
 
-  // Objects that use the sprites (looked up for a reasonable selection only).
   $effect(() => {
     if (from.length > 200) return;
     Promise.all(from.map((id) => SpriteService.Users(id))).then((lists) => {

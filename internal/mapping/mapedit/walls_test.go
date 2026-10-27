@@ -10,7 +10,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-// Item ids of the extra materials built by wallsEditor.
 const (
 	fullWallBase    = 1000 // "full wall": a piece for every alignment, id = base + alignment
 	fullDoorH       = 1100 // normal door, closed, horizontal
@@ -117,7 +116,6 @@ func wallsEditor(t *testing.T) *Editor {
 	return editor
 }
 
-// wallsDraw applies a draw request and fails the test on an error.
 func wallsDraw(t *testing.T, editor *Editor, req DrawRequest) int {
 	t.Helper()
 	changed, err := editor.Draw(req)
@@ -127,8 +125,6 @@ func wallsDraw(t *testing.T, editor *Editor, req DrawRequest) int {
 	return changed
 }
 
-// wallsPut places a tile with the given items, without any automatic
-// reshaping.
 func wallsPut(editor *Editor, pos otmap.Position, ids ...uint16) *otmap.Tile {
 	tile := &otmap.Tile{}
 	for _, id := range ids {
@@ -138,7 +134,6 @@ func wallsPut(editor *Editor, pos otmap.Position, ids ...uint16) *otmap.Tile {
 	return tile
 }
 
-// wallsExpect checks the item ids on the tile at x, y.
 func wallsExpect(t *testing.T, editor *Editor, x, y int, want []uint16, why string) {
 	t.Helper()
 	if got := itemIDs(editor.Map.Tile(at(x, y))); !slices.Equal(got, want) {
@@ -146,8 +141,6 @@ func wallsExpect(t *testing.T, editor *Editor, x, y int, want []uint16, why stri
 	}
 }
 
-// wallsNeighbors returns the center and the positions of its wall
-// neighbors in mask.
 func wallsNeighbors(centerX, centerY, mask int) []otmap.Position {
 	positions := []otmap.Position{at(centerX, centerY)}
 	for _, neighbor := range wallNeighborOffsets {
@@ -824,8 +817,6 @@ func TestWallCarpetTableUnknownBrushFails(t *testing.T) {
 	}
 }
 
-// Carpets.
-
 func TestCarpetPieceForNeighborMask(t *testing.T) {
 	allSides := bitN | bitE | bitS | bitW
 	allCorners := bitNW | bitNE | bitSW | bitSE
@@ -976,8 +967,6 @@ func TestEraseCarpetOnTileWithoutCarpetChangesNothing(t *testing.T) {
 	}
 	wallsExpect(t, editor, 10, 10, []uint16{stoneID}, "no carpet to erase")
 }
-
-// Tables.
 
 func TestTablePieceForNeighborMask(t *testing.T) {
 	cases := []struct {

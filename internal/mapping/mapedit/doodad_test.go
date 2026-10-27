@@ -10,13 +10,11 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-// doodadEditor is testEditor with extra doodad brushes.
 func doodadEditor(t *testing.T, brushes ...*materials.Brush) *Editor {
 	t.Helper()
 	return brushesTestEditor(t, brushesAddBrush(brushes...))
 }
 
-// doodadSingles is an alternative of single items, each with its chance.
 func doodadSingles(singles ...materials.Single) materials.Alternative {
 	return materials.Alternative{Singles: singles}
 }
@@ -25,7 +23,6 @@ func doodadSingleOf(id uint16, chance int) materials.Single {
 	return materials.Single{Chance: chance, Item: materials.ItemSpec{ID: id}}
 }
 
-// doodadPutTile puts a tile on the map, outside the undo history.
 func doodadPutTile(e *Editor, pos otmap.Position, ground uint16, items ...uint16) {
 	e.Map.SetTile(pos, &otmap.Tile{Ground: otmap.Item{ID: ground}, Items: tileopsItems(items...)})
 }
@@ -560,13 +557,11 @@ func TestDoodadStampSkipsTileThatAlreadyHasItsItem(t *testing.T) {
 	}
 }
 
-// doodadGroundPatch is a doodad brush that places grass ground.
 func doodadGroundPatch(redoBorders bool) *materials.Brush {
 	return &materials.Brush{Name: "patch", Type: materials.TypeDoodad, Doodad: &materials.DoodadOptions{RedoBorders: redoBorders},
 		Alternatives: []materials.Alternative{doodadSingles(doodadSingleOf(grassA, 1))}}
 }
 
-// doodadNeighborItems lists the items of the 8 neighbors of a position.
 func doodadNeighborItems(e *Editor, center otmap.Position) [][]uint16 {
 	var neighbors [][]uint16
 	for _, offset := range neighbors8 {

@@ -1,4 +1,3 @@
-// Colored outfit pieces in the atlas: keys and pixels.
 import { colorize } from "../../render/outfit";
 import type { SpriteCache } from "../../render/sprites";
 import type { CreatureData } from "../data/chunks";
@@ -10,7 +9,6 @@ export function composedKey(spriteId: number, templateId: number, colors: number
   return `o:${spriteId}:${templateId}:${colors & 255}.${(colors >> 8) & 255}.${(colors >> 16) & 255}.${colors >>> 24}`;
 }
 
-/** Head, body, legs and feet colors packed in one number (a byte each). */
 export function packColors(colors: OutfitColors): number {
   return colors.head | (colors.body << 8) | (colors.legs << 16) | (colors.feet << 24);
 }

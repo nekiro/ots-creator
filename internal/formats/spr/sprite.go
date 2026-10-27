@@ -1,5 +1,3 @@
-// Package spr reads and writes Tibia.spr sprite files and the RLE pixel
-// compression they use.
 package spr
 
 import (
@@ -46,7 +44,6 @@ func Compress(rgba []byte, size int, transparent bool) []byte {
 	return out
 }
 
-// Decompress decodes RLE data into RGBA pixels of a size x size sprite.
 func Decompress(data []byte, size int, transparent bool) ([]byte, error) {
 	out := make([]byte, size*size*4)
 	return out, DecompressInto(out, data, size, transparent)

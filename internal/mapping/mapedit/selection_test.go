@@ -7,8 +7,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-// selectionSandWithStone paints a 3x3 sand square around (70, 70) with a
-// stone on the center, without automagic borders.
 func selectionSandWithStone(t *testing.T) *Editor {
 	t.Helper()
 	e := testEditor(t)
@@ -18,8 +16,6 @@ func selectionSandWithStone(t *testing.T) *Editor {
 	return e
 }
 
-// selectionSquare lists the positions of a square on floor 7, sorted like
-// Editor.Selected.
 func selectionSquare(x0, y0, x1, y1 int) []otmap.Position {
 	var positions []otmap.Position
 	for y := y0; y <= y1; y++ {
@@ -30,14 +26,12 @@ func selectionSquare(x0, y0, x1, y1 int) []otmap.Position {
 	return positions
 }
 
-// selectionDesks draws a row of desks on y=30 from x0 to x1.
 func selectionDesks(e *Editor, x0, x1 int) {
 	for x := x0; x <= x1; x++ {
 		e.Draw(DrawRequest{Kind: KindTable, Name: "desk", Points: points(at(x, 30))})
 	}
 }
 
-// selectionDeskRow returns the items of the tiles on y=30 from x0 to x1.
 func selectionDeskRow(e *Editor, x0, x1 int) [][]uint16 {
 	var row [][]uint16
 	for x := x0; x <= x1; x++ {
@@ -46,8 +40,6 @@ func selectionDeskRow(e *Editor, x0, x1 int) [][]uint16 {
 	return row
 }
 
-// selectionGrassBorders are the borders grass at (60, 60) puts on the sand
-// around it.
 var selectionGrassBorders = map[[2]int]uint16{
 	{60, 59}: borderS, {60, 61}: borderN, {59, 60}: borderE, {61, 60}: borderW,
 	{59, 59}: borderCSE, {61, 59}: borderCSW, {59, 61}: borderCNE, {61, 61}: borderCNW,

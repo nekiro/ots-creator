@@ -1,7 +1,4 @@
 <script lang="ts">
-  // Queue panel of the compare window and the object viewer: the queued
-  // objects and the slots of A. A click on a slot drops the next queued
-  // object there.
   import { CATEGORY_NAMES, errorMessage, minId, res, ThingService, type Category } from "../../lib/api";
   import { openContextMenu, type MenuEntry } from "../../lib/menu.svelte";
   import type { DropQueue, QueueItem } from "../../lib/state/queue.svelte";
@@ -19,9 +16,7 @@
   }: {
     queue: DropQueue<any>;
     category: Category;
-    /** Shows a queued object in the window's list. */
     onshow: (key: any) => void;
-    /** Shows an object of A in the window's list. */
     onshowSlot?: (id: number) => void;
   } = $props();
 
@@ -60,7 +55,6 @@
     scrollTo = index < 0 ? count - 1 : index;
   }
 
-  // Ids that just got objects light up for a moment.
   let recent = $state<Set<number>>(new Set());
   let timer: ReturnType<typeof setTimeout> | undefined;
   async function dropAt(at: number, amount = 1, free = false) {

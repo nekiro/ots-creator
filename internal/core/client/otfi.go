@@ -24,7 +24,6 @@ type OTFI struct {
 	SpritesFile  string   `json:"spritesFile"`
 }
 
-// ParseOTFI parses the DatSpr node of an OTML document.
 func ParseOTFI(data []byte) (OTFI, error) {
 	var result OTFI
 	scanner := bufio.NewScanner(bytes.NewReader(data))
@@ -91,7 +90,6 @@ func parseBool(text string) bool {
 	return value
 }
 
-// Marshal writes the OTFI document.
 func (o OTFI) Marshal() []byte {
 	var builder strings.Builder
 	builder.WriteString("DatSpr\n")

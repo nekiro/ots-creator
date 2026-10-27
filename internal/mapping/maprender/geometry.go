@@ -45,7 +45,6 @@ const (
 )
 
 const (
-	// MaxBlock is the largest GeometryOptions.Block.
 	MaxBlock = 8
 	// maxElevation is the most items on a tile raise the items above them.
 	maxElevation = 24
@@ -54,7 +53,6 @@ const (
 	outfitCacheKey = 1 << 20
 )
 
-// Top orders of item types (see otitems.Type.TopOrder).
 const (
 	topCommon = 0
 	topBorder = 1
@@ -70,17 +68,14 @@ const (
 	hookEast  = 2
 )
 
-// GeometryOptions is what chunk geometry is built for besides the chunk.
 type GeometryOptions struct {
 	ViewFlags uint32
-	// House is the house highlighted by ViewHouses.
-	House uint32
+	House     uint32
 	// Block makes every key stand for Block x Block chunks from it, built
 	// into one geometry (fewer draws far out). 0 or 1: single chunks.
 	Block int
 }
 
-// tint is the color a quad's sprite is multiplied by.
 type tint struct{ red, green, blue, alpha float64 }
 
 var white = tint{1, 1, 1, 1}
@@ -94,7 +89,6 @@ func (color tint) withAlpha(alpha float64) tint {
 	return color
 }
 
-// Colors of markers drawn without sprites.
 var (
 	unknownItemColor     = tint{0.8, 0, 0, 0.6}
 	missingSpriteColor   = tint{0.8, 0, 0, 0.5}
@@ -138,7 +132,6 @@ const (
 // stackCountThresholds start the pattern columns of the second stack row.
 var stackCountThresholds = [...]int{5, 10, 25, 50}
 
-// thingLook is the drawing data of one client thing.
 type thingLook struct {
 	frameGroup       *thing.FrameGroup
 	offsetX, offsetY int
@@ -146,8 +139,7 @@ type thingLook struct {
 	hangable         bool
 	// lightLevel and lightColor: the light the thing gives (level 0: none).
 	lightLevel, lightColor uint8
-	// lightOrigins caches lightOrigin by pattern.
-	lightOrigins map[int]lightOrigin
+	lightOrigins           map[int]lightOrigin
 	// ground, groundBorder, fullGround and translucent are client flags
 	// (see canShade).
 	ground, groundBorder, fullGround, translucent bool
@@ -185,7 +177,6 @@ type geometryBuilder struct {
 	chunks       []*otmap.Chunk
 	scratch      otmap.Tile
 	scratchItems [16]otmap.Item
-	// tileX, tileY: the tile being drawn, from the chunk's corner.
 	tileX, tileY uint16
 	// onTop is set while the tile's top items are drawn: their quads are
 	// tagged (tileTop) so creatures drawn later can go under them.
@@ -221,7 +212,6 @@ func (b *geometryBuilder) quad(x, y int, sprite uint32, color tint) {
 	b.quadCount++
 }
 
-// unitByte maps 0..1 to 0..255.
 func unitByte(value float64) uint8 {
 	return uint8(math.Round(min(max(value, 0), 1) * 255))
 }
@@ -259,7 +249,6 @@ func (b *geometryBuilder) lookOf(category thing.Category, id uint32) *thingLook 
 	return look
 }
 
-// pattern selects the pattern of a thing to draw.
 type pattern struct{ x, y, z int }
 
 // drawLook emits the pieces of one texture with its bottom-right tile at
@@ -321,7 +310,6 @@ func (b *geometryBuilder) composedPiece(group *thing.FrameGroup, index int, spri
 	b.composedCount++
 }
 
-// item emits one item of the tile at position and returns its elevation.
 func (b *geometryBuilder) item(item otmap.Item, position tilePosition, anchorX, anchorY int, color tint, hook int) int {
 	spriteSize := b.scene.SpriteSize
 	itemType := b.scene.Items.Get(item.ID)
@@ -397,7 +385,6 @@ func (b *geometryBuilder) creature(creature otmap.Creature, position tilePositio
 		return
 	}
 	if outfit.LookType == 0 {
-		// Unknown creature: a marker so it is not invisible.
 		marker := unknownCreatureColor
 		if creature.NPC {
 			marker = unknownNPCColor
@@ -413,7 +400,6 @@ func (b *geometryBuilder) creature(creature otmap.Creature, position tilePositio
 	b.outfit(look, outfit, int(creature.Direction&3), anchorX, anchorY, color)
 }
 
-// outfit emits an outfit with its mount and addons facing direction.
 func (b *geometryBuilder) outfit(look *thingLook, outfit materials.Outfit, direction, anchorX, anchorY int, color tint) {
 	group := look.frameGroup
 	direction = min(direction, int(group.PatternX)-1)
@@ -438,7 +424,6 @@ func (b *geometryBuilder) outfit(look *thingLook, outfit materials.Outfit, direc
 	}
 }
 
-// tilePosition is a map position as ints, for pattern math.
 type tilePosition struct{ x, y, z int }
 
 // tileTint is the color a tile's ground and borders are drawn with: the
@@ -585,7 +570,6 @@ func (b *geometryBuilder) tile(tile *otmap.Tile, position tilePosition, anchorX,
 	}
 }
 
-// skip reports whether an item (not a ground) is left out of far geometry.
 func (b *geometryBuilder) skip(itemType *otitems.Type) bool {
 	return b.view(ViewFar) && itemType != nil && itemType.Flags&(otitems.FlagMoveable|otitems.FlagPickupable) != 0
 }

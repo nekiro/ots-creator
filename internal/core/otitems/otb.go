@@ -6,7 +6,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/itemsotb"
 )
 
-// ParseOTB reads an items.otb.
 func ParseOTB(data []byte) (*DB, error) {
 	file, err := itemsotb.Parse(data)
 	if err != nil {

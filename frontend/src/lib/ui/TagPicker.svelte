@@ -1,9 +1,4 @@
 <script lang="ts">
-  // Multi select with search: picked tags are small removable chips in the
-  // field, typing filters a popup list (grouped, like the Select popup).
-  // Enter or a click adds the highlighted tag (the best match first); with
-  // allowCustom, a typed tag that is not in the list is offered last. Backspace on an empty
-  // field removes the last tag.
   import { tick } from "svelte";
   import { matchTags, parseTags, type TagOption } from "../market";
   import { toCss } from "../pixelscale";
@@ -20,12 +15,10 @@
     placeholder = "Search tags…",
     plain = false,
   }: {
-    /** Names as typed (spaces and case kept) instead of market tags. */
     plain?: boolean;
     value: string[];
     options: TagOption[];
     onchange: (tags: string[]) => void;
-    /** Maximum number of tags (0 = no limit). */
     max?: number;
     allowCustom?: boolean;
     placeholder?: string;
@@ -49,7 +42,6 @@
     const free = options.filter((option) => !value.includes(option.tag));
     return search ? free.filter((option) => option.tag.toLowerCase().includes(search)) : free;
   });
-  // A typed tag that is not offered can be added as is.
   const custom = $derived.by(() => {
     if (!allowCustom) return "";
     const typed = plain ? query.trim() : (parseTags(query)[0] ?? "");
@@ -64,7 +56,6 @@
       out.push({ tag: match.tag, count: match.count, header: match.group && match.group !== group ? match.group : undefined });
       group = match.group;
     }
-    // Last, so Enter takes the best match; alone when nothing matches.
     if (custom) out.push({ tag: custom, custom: true, header: matches.length ? (plain ? "New" : "Your tag") : undefined });
     return out;
   });

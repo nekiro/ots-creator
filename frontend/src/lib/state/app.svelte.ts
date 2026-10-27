@@ -1,6 +1,3 @@
-// Global UI state (Svelte 5 runes). Components read fields directly; only
-// the fields they touch re-render.
-
 import { Events } from "@wailsio/runtime";
 import { Category, CompareService, ProjectService, ThingService, errorMessage, normalizeThing, type State, type Thing } from "../api";
 import { otherSpriteCache, spriteCache, type SpriteCache } from "../render/sprites";
@@ -13,7 +10,6 @@ export interface Toast {
   text: string;
   /** Toasts with the same key replace each other instead of stacking. */
   key?: string;
-  /** A button on the toast, e.g. to show details. */
   action?: { label: string; run: () => void };
 }
 
@@ -38,20 +34,16 @@ export type DialogName =
   | "itemsOtb"
   | null;
 
-/** What the share window publishes. */
 export type ShareTarget = (
   | { kind: "object"; category: Category; id: number }
   | { kind: "sprites"; ids: number[] }
-  /** An OBD file or an image from disk; works without an open client. */
   | { kind: "file"; path: string }
 ) & {
-  /** The share window lets the user pick another object or other sprites. */
   pick?: boolean;
 };
 
 class AppState {
   project = $state.raw<State | null>(null);
-  /** Second client of the compare window (B). */
   other = $state.raw<State | null>(null);
   category = $state<Category>(Category.CategoryItem);
   /** Selected thing ids in the current category (first = focused). */
@@ -65,26 +57,17 @@ class AppState {
   toasts = $state<Toast[]>([]);
   dialog = $state<DialogName>(null);
   busy = $state<string | null>(null);
-  /** Progress of the running long operation, while it reports one. */
   progress = $state<{ done: number; total: number } | null>(null);
   /** Label of the running operation that blocks the window with a loader (see run). */
   modal = $state<string | null>(null);
-  /** The running operation can be stopped (commands.stopTask). */
   stoppable = $state(false);
   stopping = $state(false);
-  /** Path for the open dialog (dropped file); "" asks for a folder. */
   openPath = $state("");
-  /** The open dialog loads the second client of the compare window. */
   openOther = $state(false);
-  /** Frame group shown by the sprite sheet export window. */
   sheetGroup = $state(0);
-  /** File for the OBD viewer; "" asks for one. */
   obdPath = $state("");
-  /** What the share window publishes. */
   shareTarget = $state<ShareTarget | null>(null);
-  /** Objects of B queued in the compare window to be dropped into A. */
   queue = $state<QueueItem<number>[]>([]);
-  /** Object files queued in the object viewer to be dropped into A. */
   fileQueue = $state<QueueItem<string>[]>([]);
 
   get open(): boolean {
@@ -112,7 +95,6 @@ export const app = new AppState();
  * of what it touched, so other images stay cached and do not flicker.
  */
 class ResourceVersions {
-  /** cache: the sprite cache that shows this client. */
   constructor(private cache: SpriteCache) {}
   private tick = $state(0);
   private epoch = 0;
@@ -145,12 +127,10 @@ class ResourceVersions {
 }
 
 export const versions = new ResourceVersions(spriteCache);
-/** Cache keys of the second client of the compare window. */
 export const otherVersions = new ResourceVersions(otherSpriteCache);
 
 let toastSeq = 0;
 const toastTimers = new Map<number, ReturnType<typeof setTimeout>>();
-/** Toasts shown at once; older ones make room for new ones. */
 const MAX_TOASTS = 4;
 /** Shows a toast. One with the key of a shown toast replaces it and keeps it up longer. */
 export function toast(text: string, kind: ToastKind = "info", duration = 3500, key?: string, action?: Toast["action"]): void {
@@ -176,7 +156,6 @@ export function toast(text: string, kind: ToastKind = "info", duration = 3500, k
   );
 }
 
-/** Whether a toast with the key is shown. */
 export function hasToast(key: string): boolean {
   return app.toasts.some((shown) => shown.key === key);
 }
@@ -231,7 +210,6 @@ function applyOther(state: State): void {
 export async function initState(): Promise<void> {
   Events.On("project:changed", (event) => applyState(event.data));
   Events.On("compare:changed", (event) => applyOther(event.data));
-  // Long operations report progress in the busy label.
   Events.On("app:progress", (event) => {
     const progress = event.data;
     if ((app.busy || app.stoppable) && progress.done < progress.total) {
@@ -260,7 +238,6 @@ function setDraft(thing: Parameters<typeof normalizeThing>[0]): void {
   app.original = JSON.stringify(plain);
 }
 
-/** Focuses a thing. Unsaved draft changes are discarded. */
 export async function select(id: number, additive = false): Promise<void> {
   if (!app.open) return;
   if (additive) {

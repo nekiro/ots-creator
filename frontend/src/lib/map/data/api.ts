@@ -1,4 +1,3 @@
-// Typed access to the map editor service and its resources.
 export * as MapService from "../../../../bindings/github.com/nekiro/ots-creator/internal/app/mapservice";
 export type {
   Appearance,
@@ -64,7 +63,6 @@ export type {
 import type { Position } from "../../../../bindings/github.com/nekiro/ots-creator/internal/mapping/otmap/models";
 import { MAX_FLOOR } from "../constants";
 
-/** Tile map flags (OTBM). */
 export const TILE_FLAGS = { pz: 1, noPvp: 4, noLogout: 8, pvpZone: 16, refresh: 32 } as const;
 
 export const res = {
@@ -85,7 +83,6 @@ export function fmtPos(position: Position | null | undefined): string {
   return position ? `${position.x}, ${position.y}, ${position.z}` : "–";
 }
 
-/** Parses "x, y, z" (any separators); null when it is not a position. */
 export function parsePos(text: string): Position | null {
   const match = text.match(/(\d+)\D+(\d+)\D+(\d+)/);
   if (!match) return null;

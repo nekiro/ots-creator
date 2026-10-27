@@ -74,8 +74,6 @@ func TestInferOutfit(t *testing.T) {
 }
 
 func TestInferKeepsCurrentLayout(t *testing.T) {
-	// A 1x1 outfit with idle (2 frames) and walking (4 frames) groups: its
-	// own exported sheet keeps that layout.
 	cur := thing.New(1, thing.CategoryOutfit)
 	idle := cur.FrameGroups[0]
 	idle.Resize(1, 1, 1, 4, 1, 1, 2, 300)

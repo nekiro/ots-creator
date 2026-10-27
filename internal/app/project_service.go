@@ -7,30 +7,22 @@ import (
 	"github.com/nekiro/ots-creator/internal/core/project"
 )
 
-// ProjectService opens, creates and compiles clients.
 type ProjectService struct {
 	session *Session
 }
 
-// NewProjectService returns the service.
 func NewProjectService(session *Session) *ProjectService { return &ProjectService{session: session} }
 
-// Cancel stops the running export; it then returns ErrCanceled.
 func (ps *ProjectService) Cancel() { ps.session.Cancel() }
 
-// Versions returns all known client versions.
 func (ps *ProjectService) Versions() []client.Version { return client.Versions() }
 
-// DefaultFeatures returns the features forced by a version.
 func (ps *ProjectService) DefaultFeatures(version uint16) client.Features {
 	return client.DefaultFeatures(version)
 }
 
-// State returns the current project state.
 func (ps *ProjectService) State() State { return ps.session.State() }
 
-// Inspect looks at a client directory or any of its dat, spr or otfi files
-// and finds the matching files, signatures, version and OTFI features.
 func (ps *ProjectService) Inspect(path string) (ClientFiles, error) {
 	files, err := inspectClient(path)
 	if err == nil {
@@ -39,9 +31,7 @@ func (ps *ProjectService) Inspect(path string) (ClientFiles, error) {
 	return files, err
 }
 
-// OpenRequest selects the client to open.
 type OpenRequest struct {
-	// Format FormatAssets opens the asset folder in DatPath.
 	Format   project.Format  `json:"format"`
 	DatPath  string          `json:"datPath"`
 	SprPath  string          `json:"sprPath"`
@@ -52,7 +42,6 @@ type OpenRequest struct {
 	OTBPath *string `json:"otbPath"`
 }
 
-// openProject loads the client a request selects.
 func openProject(req OpenRequest) (*project.Project, error) {
 	if req.Format == project.FormatAssets {
 		return project.OpenAssets(req.DatPath)
@@ -60,7 +49,6 @@ func openProject(req OpenRequest) (*project.Project, error) {
 	return project.Open(project.OpenOptions{DatPath: req.DatPath, SprPath: req.SprPath, Version: req.Version, Features: req.Features})
 }
 
-// Open loads a client and makes it the current project.
 func (ps *ProjectService) Open(req OpenRequest) (State, error) {
 	proj, err := openProject(req)
 	if err != nil {
@@ -116,7 +104,6 @@ func (ps *ProjectService) AttachItemsOTB(path string) (State, error) {
 	return ps.session.State(), ps.rememberOTB(proj.Info().DatPath, path)
 }
 
-// DetachItemsOTB stops keeping the items.otb in sync and forgets it.
 func (ps *ProjectService) DetachItemsOTB() (State, error) {
 	proj, err := ps.session.Project()
 	if err != nil {
@@ -127,8 +114,6 @@ func (ps *ProjectService) DetachItemsOTB() (State, error) {
 	return ps.session.State(), ps.rememberOTB(proj.Info().DatPath, "")
 }
 
-// ItemsOTBPreview reports what compiling would change in the attached
-// items.otb.
 func (ps *ProjectService) ItemsOTBPreview() (project.OTBReport, error) {
 	proj, err := ps.session.Project()
 	if err != nil {
@@ -137,20 +122,16 @@ func (ps *ProjectService) ItemsOTBPreview() (project.OTBReport, error) {
 	return proj.OTBPreview()
 }
 
-// New creates an empty client.
 func (ps *ProjectService) New(version client.Version, features client.Features) State {
 	ps.session.Set(project.New(version, features))
 	return ps.session.State()
 }
 
-// Close closes the current client.
 func (ps *ProjectService) Close() {
 	ps.session.Set(nil)
 }
 
-// CompileRequest selects the output of a compilation.
 type CompileRequest struct {
-	// Format FormatAssets writes an asset folder to DatPath.
 	Format    project.Format  `json:"format"`
 	DatPath   string          `json:"datPath"`
 	SprPath   string          `json:"sprPath"`
@@ -159,7 +140,6 @@ type CompileRequest struct {
 	WriteOTFI bool            `json:"writeOtfi"`
 }
 
-// Compile saves to the current files with the current settings.
 func (ps *ProjectService) Compile() (project.CompileStats, error) {
 	proj, err := ps.session.Project()
 	if err != nil {
@@ -172,13 +152,10 @@ func (ps *ProjectService) Compile() (project.CompileStats, error) {
 	return ps.CompileAs(currentFilesRequest(info))
 }
 
-// currentFilesRequest compiles a client to its current files with its
-// current settings.
 func currentFilesRequest(info project.Info) CompileRequest {
 	return CompileRequest{Format: info.Format, DatPath: info.DatPath, SprPath: info.SprPath, Version: info.Version, Features: info.Features}
 }
 
-// options returns the compile options of the request.
 func (req CompileRequest) options(progress func(done, total int)) project.CompileOptions {
 	return project.CompileOptions{Format: req.Format, DatPath: req.DatPath, SprPath: req.SprPath, Version: req.Version, Features: req.Features, WriteOTFI: req.WriteOTFI, Progress: progress}
 }
@@ -215,18 +192,14 @@ func (ps *ProjectService) Warnings(format project.Format, version client.Version
 	return proj.Warnings(format, version), nil
 }
 
-// Undo reverts the last edit and returns its label.
 func (ps *ProjectService) Undo() (string, error) {
 	return ps.history((*project.Project).Undo)
 }
 
-// Redo re-applies the last undone edit and returns its label.
 func (ps *ProjectService) Redo() (string, error) {
 	return ps.history((*project.Project).Redo)
 }
 
-// history runs Undo or Redo and returns the label of the step ("" when
-// there was none).
 func (ps *ProjectService) history(step func(*project.Project) string) (string, error) {
 	proj, err := ps.session.Project()
 	if err != nil {

@@ -66,7 +66,6 @@ func (b *sheetBase) sheet(i int) ([]byte, error) {
 	return entry.pixels, entry.err
 }
 
-// piecePixels returns the RGBA pixels of one piece.
 func (b *sheetBase) piecePixels(id uint32) ([]byte, error) {
 	piece, ok := b.pieces.Locate(id)
 	if !ok {

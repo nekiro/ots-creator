@@ -19,8 +19,6 @@
 </script>
 
 <footer class="status">
-  <!-- The client info gives way first on a narrow window: the busy text and
-       the stop button always stay visible. -->
   <div class="info">
     {#if map.mode === "map" && activeMap}
       <span class="v">{activeMap.name}</span>
@@ -47,7 +45,6 @@
       <span class="t-label">No client loaded</span>
     {/if}
   </div>
-  <!-- A running operation takes the place of the client path. -->
   {#if app.busy || app.stoppable}
     <span class="busy" class:fixed={app.stoppable}>{app.busy ?? "Exporting"}…</span>
     {#if app.stoppable}<button class="t-btn danger stop" title="Stop the export" disabled={app.stopping} onclick={commands.stopTask}>{app.stopping ? "Stopping" : "Stop"}</button>{/if}

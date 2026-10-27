@@ -14,10 +14,8 @@
   import { mapCommands } from "../lib/map/view/commands";
 
   const noProject = () => !app.open;
-  // Compiling only makes sense with changes, or for a client never saved.
   const nothingToCompile = () => !app.open || !(app.project?.info.changed || app.dirty || !app.project?.info.datPath);
 
-  // The maximize button turns into "restore" while the window is maximized.
   let maximised = $state(false);
   async function syncMaximised() {
     try {
@@ -90,7 +88,6 @@
     },
   ]);
 
-  // Help and the scale modes stay; the rest depends on the editor.
   const viewScale = $derived(objectMenus.find((menu) => menu.label === "View")!);
   const help = $derived(objectMenus.find((menu) => menu.label === "Help")!);
   const menus = $derived(
@@ -192,7 +189,6 @@
     box-shadow: 0 1px 0 #444 inset;
     position: relative;
     z-index: 20;
-    /* Drag the frameless window by the bar; controls opt out below. */
     --wails-draggable: drag;
     user-select: none;
   }

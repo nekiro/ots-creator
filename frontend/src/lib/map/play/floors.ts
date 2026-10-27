@@ -9,7 +9,6 @@ const UNDERGROUND_FLOOR = 8;
 /** Floors seen above and below the player under ground (aware-underground-floor-range). */
 const UNDERGROUND_RANGE = 2;
 
-/** Client flags of a map item the floor rules read. */
 export interface FloorItemFlags {
   ground: boolean;
   /** Ground border, on bottom and on top items come before the common ones in the client's stack. */

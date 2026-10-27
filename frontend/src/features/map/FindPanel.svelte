@@ -1,6 +1,4 @@
 <script lang="ts">
-  // Find items on the map, walk through the results, and replace or remove
-  // what was found. Stays open while you work on the map.
   import { errorMessage } from "../../lib/api";
   import { toast } from "../../lib/state/app.svelte";
   import { plural } from "../../lib/util/format";
@@ -37,7 +35,6 @@
   let busy = $state(false);
   let current = $state(-1);
 
-  // Applies what the panel was opened with (Ctrl+F, "Find on the map"…).
   $effect(() => {
     const preset = map.findPreset;
     if (!preset) return;

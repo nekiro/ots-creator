@@ -148,7 +148,6 @@ func main() {
 	}
 }
 
-// openClient opens the client of a dat, spr, otfi or folder path.
 func openClient(projects *app.ProjectService, path string) {
 	files, err := projects.Inspect(path)
 	if err == nil {

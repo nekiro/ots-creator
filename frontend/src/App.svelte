@@ -56,7 +56,6 @@
     handleShortcut(event);
   }
 
-  // Height of the sprite list; the splitter trades it with the preview.
   const SPRITES_KEY = "layout:sprites-height";
   const SPRITES_MIN = 120;
   const EDITOR_MIN = 266; // preview window minimum (stage + outfit controls) plus the splitter
@@ -102,7 +101,6 @@
 
   const recent = $derived((prefs.settings.recent ?? []).slice(0, 6));
 
-  // The object list panel is as wide as its chosen number of columns.
   const listWidth = $derived(listPanelWidth(prefs.settings.listColumns || 7));
   $effect(() => setMinLayoutWidth(listWidth + 740));
 </script>
@@ -203,7 +201,6 @@
     /* The object list keeps its width; the editor keeps at least 460px and
        the properties panel gives up width first. The sum (with gaps) is
        MIN_LAYOUT.width in pixelscale.ts. */
-    /* --list-w fits the chosen objects per row (Settings). */
     grid-template-columns: var(--list-w, 300px) minmax(460px, 1fr) minmax(250px, 280px);
     min-width: calc(var(--list-w, 300px) + 734px); /* 460 + 250 + gaps */
     gap: 6px;

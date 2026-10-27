@@ -8,7 +8,6 @@
   const otb = $derived(app.project?.info.itemsOtb ?? null);
   let pending = $state<OTBReport | null>(null);
 
-  // What the next compile changes; refreshed with every edit.
   $effect(() => {
     void app.project?.rev;
     if (!otb) {

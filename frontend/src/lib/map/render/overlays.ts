@@ -1,6 +1,3 @@
-// Overlays drawn over the map every frame in screen pixels: grid, spawn
-// radiuses, selection and area rectangles, markers, the client view box,
-// and labels (creature names, item texts, positions, item tooltips).
 import { ItemFlags, TileFlags } from "../data/chunks";
 import { ALPHA, COLORS, LABEL_COLORS, LIMITS, ZOOM } from "../constants";
 import { labelText, wrapText } from "../editor/itemText";
@@ -9,16 +6,13 @@ import type { QuadBatch } from "./quadBatch";
 import type { FrameResult, Scene } from "./scene";
 import { type Camera } from "../view/view";
 
-/** What every overlay draws with in a frame. */
 interface Overlay {
   scene: Scene;
   result: FrameResult;
   camera: Camera;
   batch: QuadBatch;
-  /** The floor in view. */
   z: number;
   tilePx: number;
-  /** Outline width in device pixels. */
   lineWidth: number;
 }
 
@@ -61,7 +55,6 @@ function drawGrid({ scene, camera, batch, z }: Overlay): void {
   for (let y = range.y0; y <= range.y1; y++) batch.rect(0, camera.tileY(y, z), scene.width, 1, COLORS.grid);
 }
 
-/** Spawn radius outlines of the current floor. */
 function drawSpawns(overlay: Overlay): void {
   const { scene, camera, batch, z, tilePx, lineWidth } = overlay;
   forEachTile(overlay, LIMITS.spawnSearch, LIMITS.spawnSearch, (x, y) => {
@@ -78,7 +71,6 @@ function drawSpawns(overlay: Overlay): void {
   });
 }
 
-/** Selection and area rectangles. */
 function drawRects({ scene, camera, batch, z, tilePx, lineWidth }: Overlay): void {
   for (const mark of scene.rects) {
     if (mark.z !== z) continue;
@@ -91,7 +83,6 @@ function drawRects({ scene, camera, batch, z, tilePx, lineWidth }: Overlay): voi
   }
 }
 
-/** Marked positions: an outline on the tile and its name above it. */
 function drawMarkers({ scene, result, camera, batch, z, tilePx, lineWidth }: Overlay): void {
   for (const marker of scene.markers) {
     if (marker.z !== z) continue;
@@ -100,7 +91,6 @@ function drawMarkers({ scene, result, camera, batch, z, tilePx, lineWidth }: Ove
     const [red, green, blue] = marker.color;
     batch.stroke(x + lineWidth, y + lineWidth, tilePx - 2 * lineWidth, tilePx - 2 * lineWidth, [red, green, blue, ALPHA.marker], Math.max(2, lineWidth * 2));
     if (tilePx >= ZOOM.markerNames && scene.opts.labels) {
-      // The whole name under the mouse, the short one elsewhere.
       const hovered = isHovered(scene, marker.x, marker.y, z);
       result.labels.push({
         x: x + tilePx / 2,
@@ -144,7 +134,6 @@ function labelItemTexts(overlay: Overlay): void {
     const centerX = camera.tileX(x, z) + tilePx / 2;
     const centerY = camera.tileY(y, z) + tilePx / 2;
     if (isHovered(scene, x, y, z)) {
-      // Line by line, over the other labels.
       const lines = wrapText(text);
       const lineHeight = 11 * wholePixelRatio(globalThis.devicePixelRatio);
       lines.forEach((line, i) => result.labels.push({ x: centerX, y: centerY + (i - (lines.length - 1) / 2) * lineHeight, text: line, color: LABEL_COLORS.itemText, small: true, top: true }));
@@ -155,7 +144,6 @@ function labelItemTexts(overlay: Overlay): void {
   });
 }
 
-/** The position of the tile under the mouse, in a dark tag above it (below it at the top edge). */
 function labelHoverPosition({ scene, result, camera, batch, z, tilePx }: Overlay): void {
   const hover = scene.hover!;
   const ratio = wholePixelRatio(globalThis.devicePixelRatio);

@@ -119,7 +119,6 @@
       action();
       return;
     }
-    // Type to jump: first option starting with the typed character.
     if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
       const typed = event.key.toLowerCase();
       const start = (open ? active : selected) + 1;
@@ -195,7 +194,6 @@
 {/if}
 
 <style>
-  /* QtComboBox: image-border 2, image-border-right 22, text centered (offset -11) */
   .combo {
     font: var(--fs) var(--font);
     color: #c0c0c0;
@@ -251,7 +249,6 @@
     overflow-y: auto;
     padding: 1px 0;
   }
-  /* QtComboBoxPopupMenuButton: height 20, text-offset 5 0 */
   .item {
     height: 20px;
     padding: 0 8px 0 5px;

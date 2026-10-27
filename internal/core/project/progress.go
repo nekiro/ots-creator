@@ -6,7 +6,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/spr"
 )
 
-// counter reports work done to a CompileOptions.Progress.
 type counter struct {
 	done   atomic.Int64
 	total  int
@@ -22,7 +21,6 @@ func newCounter(total int, report func(done, total int)) *counter {
 
 func (c *counter) tick() { c.report(int(c.done.Add(1)), c.total) }
 
-// countingSource ticks a counter for every sprite read.
 type countingSource struct {
 	spr.Source
 	counter *counter

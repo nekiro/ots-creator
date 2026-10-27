@@ -11,23 +11,19 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-// ThingSource gives the client things sprites are drawn from.
 type ThingSource interface {
 	Thing(category thing.Category, id uint32) (*thing.Thing, error)
 }
 
-// Scene is everything a map is drawn from.
 type Scene struct {
-	Map    *otmap.Map
-	Items  *otitems.DB
-	Things ThingSource
-	// SpriteSize is the size in pixels of one sprite (one tile).
+	Map        *otmap.Map
+	Items      *otitems.DB
+	Things     ThingSource
 	SpriteSize int
 	// SpritePixels returns the RGBA pixels of a sprite. Optional: without
 	// it lights come from the middle of things and no thing is opaque.
 	SpritePixels func(id uint32) ([]byte, error)
-	// IsBlocking reports whether a tile blocks walking.
-	IsBlocking func(tile *otmap.Tile) bool
+	IsBlocking   func(tile *otmap.Tile) bool
 	// Outfit returns the look of a creature by name (zero when unknown).
 	Outfit func(creature string) materials.Outfit
 	// MarkedItems are items covered with a colored square (RGB) when
@@ -35,5 +31,4 @@ type Scene struct {
 	MarkedItems map[uint16][3]uint8
 }
 
-// MaxChunksPerRequest limits the chunks of one request.
 const MaxChunksPerRequest = 512

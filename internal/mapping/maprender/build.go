@@ -49,7 +49,6 @@ func BuildGeometryParts(scene *Scene, keys []otmap.ChunkKey, options GeometryOpt
 		firstErr error
 		workers  sync.WaitGroup
 	)
-	// take hands out the next key; done records a built part.
 	take := func() (int, bool) {
 		lock.Lock()
 		defer lock.Unlock()

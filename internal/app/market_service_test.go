@@ -163,9 +163,6 @@ func TestSettingsKeepMarketShared(t *testing.T) {
 	}
 }
 
-// TestMarketShareFile shares an object file (OTOBJ, stored as OBD by the
-// market) and an image from disk without an
-// open client.
 func TestMarketShareFile(t *testing.T) {
 	srv := markettest.New()
 	defer srv.Close()
@@ -180,7 +177,6 @@ func TestMarketShareFile(t *testing.T) {
 	bad := filepath.Join(dir, "bad.png")
 	writePNG(t, bad, 40, 32, [4]byte{10, 200, 10, 255})
 
-	// A new session: nothing is open.
 	s, _, _, _, _ := newEnv(t)
 	m.session = s
 	req := ShareRequest{Name: "Outfit", Author: "nekiro", License: "CC0-1.0", Captcha: "ok"}

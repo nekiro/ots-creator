@@ -1,4 +1,3 @@
-// Thin, typed access to the Go services and the /res resource endpoints.
 export * as ProjectService from "../../bindings/github.com/nekiro/ots-creator/internal/app/projectservice";
 export * as ThingService from "../../bindings/github.com/nekiro/ots-creator/internal/app/thingservice";
 export * as SpriteService from "../../bindings/github.com/nekiro/ots-creator/internal/app/spriteservice";
@@ -41,13 +40,10 @@ import {
   type NpcSale,
 } from "../../bindings/github.com/nekiro/ots-creator/internal/core/thing/models";
 
-/** Object files: the native .otobj and ObjectBuilder .obd. */
 export const OBJECT_EXT = /\.(otobj|obd)$/i;
 
-/** Payload of the "app:files-dropped" event (app.FilesDropped). */
 export interface FilesDropped {
   paths: string[] | null;
-  /** Id of the drop target element. */
   target: string;
 }
 
@@ -86,7 +82,6 @@ export function minId(category: Category): number {
 
 export const res = {
   thumb: (category: Category, id: number, version: string | number) => `/res/thumb/${CATEGORY_NAMES[category]}/${id}?v=${version}`,
-  /** Thumbnail of the second client of a comparison. */
   otherThumb: (category: Category, id: number, version: string | number) => `/res/b/thumb/${CATEGORY_NAMES[category]}/${id}?v=${version}`,
   /** Full (uncropped) texture of a thing as the client draws it at map position x, y, z. */
   textureAt: (category: Category, id: number, x: number, y: number, z: number, version: string | number) => `/res/texture/${CATEGORY_NAMES[category]}/${id}?x=${x}&y=${y}&z=${z}&wrap=1&v=${version}`,
@@ -94,7 +89,6 @@ export const res = {
   sheet: (category: Category, id: number, group: number, transparent: boolean, version: string | number) =>
     `/res/sheet/${CATEGORY_NAMES[category]}/${id}?g=${group}&bg=${transparent ? "transparent" : "magenta"}&v=${version}`,
   sprites: (ids: number[], revision: number) => `/res/sprites?ids=${ids.join(",")}&r=${revision}`,
-  /** Raw sprites of the second client of a comparison. */
   otherSprites: (ids: number[], revision: number) => `/res/b/sprites?ids=${ids.join(",")}&r=${revision}`,
 };
 
@@ -106,14 +100,12 @@ export function decodeBytes(base64: string | null | undefined): Uint8ClampedArra
   return out;
 }
 
-/** Encodes bytes as base64 for a Go []byte parameter. */
 export function encodeBytes(bytes: Uint8Array | Uint8ClampedArray): string {
   let binary = "";
   for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(binary);
 }
 
-/** Normalizes Go errors (strings or Error objects) into a message. */
 export function errorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   if (typeof err === "string") return err;

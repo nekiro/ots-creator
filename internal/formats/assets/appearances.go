@@ -15,9 +15,7 @@ import (
 // height 2; piece k of a sprite is the tile (k%w, k/w) counted from the
 // bottom-right corner, the order thing.FrameGroup uses for its tiles.
 
-// SpriteMap maps official sprite ids to piece ids.
 type SpriteMap interface {
-	// Pieces returns the first piece id of a sprite and its size in tiles.
 	Pieces(id uint32) (first uint32, width, height int, ok bool)
 }
 
@@ -29,8 +27,7 @@ type Resolver func(pieces []uint32, width, height int) (uint32, error)
 // editor did not touch are written back byte for byte, and the fields the
 // model does not know (names, NPC sale data, newer flags) survive edits.
 type Original struct {
-	raw []byte
-	// thing is the decoded thing; edits replace the thing pointer.
+	raw     []byte
 	thing   *thing.Thing
 	sprites [][]uint32 // official sprite ids per frame group
 }
@@ -50,7 +47,6 @@ var listFields = map[thing.Category]protowire.Number{
 	thing.CategoryMissile: appearancesMissile,
 }
 
-// Decode parses an appearances file.
 func Decode(data []byte, spriteMap SpriteMap) (*File, error) {
 	root, err := parse(data)
 	if err != nil {
@@ -212,7 +208,6 @@ func decodeGroup(groupMsg message, category thing.Category, spriteMap SpriteMap)
 	return group, spriteIDs, nil
 }
 
-// decodeAnimation reads the animation of a group with several frames.
 func decodeAnimation(group *thing.FrameGroup, animation message, phases []message) {
 	if animation.bool(animationSynchronized) {
 		group.Mode = thing.AnimationSync
@@ -252,7 +247,6 @@ func Blank(appearance *thing.Thing) bool {
 	return true
 }
 
-// Encode writes an appearances file. Blank things are left out.
 func Encode(file *File, resolve Resolver) ([]byte, error) {
 	var out []byte
 	for _, category := range thing.Categories {
@@ -270,7 +264,6 @@ func Encode(file *File, resolve Resolver) ([]byte, error) {
 	return append(out, file.rest...), nil
 }
 
-// textureIDs resolves the official sprite ids of every texture of a group.
 func textureIDs(appearance *thing.Thing, group *thing.FrameGroup, resolve Resolver) ([]uint32, error) {
 	width, height := int(group.Width), int(group.Height)
 	if _, ok := SpriteTypeFor(width, height); !ok {

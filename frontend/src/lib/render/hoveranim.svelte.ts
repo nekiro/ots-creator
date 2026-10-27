@@ -6,14 +6,11 @@ import { Category, type Thing } from "../api";
 import type { SpriteCache } from "./sprites";
 
 export class HoverAnim {
-  /** Hovered object, once it and its sprites are loaded. */
   current = $state<{ id: number; thing: Thing } | null>(null);
-  /** Bumped when the sprites are ready; pass to ThingCanvas `ready`. */
   ready = $state(0);
   private id: number | null = null;
   private timer: ReturnType<typeof setTimeout> | undefined;
 
-  /** load returns the object, or null when it is gone or stale. */
   constructor(
     readonly cache: SpriteCache,
     private load: (id: number) => Promise<Thing | null>,

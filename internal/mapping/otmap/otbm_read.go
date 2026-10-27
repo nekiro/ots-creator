@@ -11,7 +11,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/otbnode"
 )
 
-// otbmIdentifiers are the identifiers an OTBM file may start with.
 var otbmIdentifiers = []string{"OTBM", "\x00\x00\x00\x00"}
 
 // streamDepth is the depth of the nodes readOTBM streams: the children of
@@ -24,11 +23,9 @@ type reader struct {
 	format   Format
 	version  uint32
 	warnings []string
-	// warned counts warnings past maxWarnings by problem.
-	warned map[string]int
+	warned   map[string]int
 }
 
-// warn records a warning, "where: problem".
 func (r *reader) warn(format string, args ...any) {
 	message := fmt.Sprintf(format, args...)
 	if len(r.warnings) < maxWarnings {
@@ -42,8 +39,6 @@ func (r *reader) warn(format string, args ...any) {
 	r.warned[problem]++
 }
 
-// ReadOTBM parses OTBM data. Unknown or broken parts are skipped and
-// reported as warnings.
 func ReadOTBM(data []byte, items Items, format Format) (*Map, []string, error) {
 	return readOTBM(data, items, format, nil)
 }
@@ -89,7 +84,6 @@ func readOTBM(data []byte, items Items, format Format, progress Progress) (*Map,
 		return nil, nil, fmt.Errorf("%w: %v", ErrNotOTBM, err)
 	}
 	if r == nil {
-		// A map without tile areas: nothing was streamed.
 		var mapData *otbnode.Node
 		if len(root.Children) > 0 {
 			mapData = root.Children[0]
@@ -107,8 +101,6 @@ func readOTBM(data []byte, items Items, format Format, progress Progress) (*Map,
 	return r.gameMap, r.warnings, nil
 }
 
-// newReader reads the header (root node) and map data properties into a
-// new map.
 func newReader(root, mapData *otbnode.Node, items Items, format Format) (*reader, error) {
 	header := otbnode.NewReader(root.Props)
 	version := header.U32()
@@ -201,7 +193,6 @@ func (r *reader) area(node *otbnode.Node) {
 	}
 }
 
-// tile reads the attributes and child nodes of a tile.
 func (r *reader) tile(tile *Tile, node *otbnode.Node, props *otbnode.Reader, pos Position) {
 	// Sized up front: grown by append, item slices keep up to twice the room.
 	if children := len(node.Children); children > 0 {
@@ -335,7 +326,6 @@ func readItemAttrs(props *otbnode.Reader, item *Item, format Format) error {
 	return props.Err()
 }
 
-// readAttributeMap reads the custom attributes of newer servers.
 func readAttributeMap(props *otbnode.Reader, item *Item) error {
 	count := int(props.U16())
 	for i := 0; i < count && props.Err() == nil; i++ {

@@ -116,7 +116,6 @@ func manifestOf(t *testing.T, file []byte) manifest {
 	return m
 }
 
-// rewrite returns file with the manifest changed by edit and extra entries.
 func rewrite(t *testing.T, file []byte, edit func(m map[string]any), extra map[string]string) []byte {
 	t.Helper()
 	archive, _ := zip.NewReader(bytes.NewReader(file), int64(len(file)))

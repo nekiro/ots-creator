@@ -59,7 +59,6 @@ func TestMoveThingsSwap(t *testing.T) {
 	if o := order(t, project, 100, 105); !slices.Equal(o, []uint32{1, 2, 3, 4, 5, 6}) {
 		t.Fatalf("after undo %v", o)
 	}
-	// Overlapping block, and past the end.
 	if _, err := project.MoveThings(thing.CategoryItem, []uint32{104, 105}, 105, MoveOptions{}); err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +79,6 @@ func TestMoveThingsInsert(t *testing.T) {
 	if o := order(t, project, 100, 105); !slices.Equal(o, []uint32{1, 5, 2, 3, 4, 6}) {
 		t.Fatalf("order %v", o)
 	}
-	// 100 and 101 go to the end.
 	got, err := project.MoveThings(thing.CategoryItem, []uint32{100, 101}, 999, MoveOptions{Insert: true})
 	if err != nil {
 		t.Fatal(err)

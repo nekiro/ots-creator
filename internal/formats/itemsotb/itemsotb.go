@@ -21,7 +21,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/otbnode"
 )
 
-// Group is the item group (node type).
 type Group uint8
 
 const (
@@ -33,7 +32,6 @@ const (
 	GroupDeprecated Group = 14
 )
 
-// Item flags (ItemEditor ServerItemFlag).
 const (
 	FlagUnpassable        = 1 << 0
 	FlagBlockMissiles     = 1 << 1
@@ -62,7 +60,6 @@ const (
 	FlagForceUse          = 1 << 26
 )
 
-// FlagFloorChange is any of the floor change flags.
 const FlagFloorChange = FlagFloorChangeDown | FlagFloorChangeNorth | FlagFloorChangeEast |
 	FlagFloorChangeSouth | FlagFloorChangeWest
 
@@ -73,7 +70,6 @@ const clientFlags = FlagUnpassable | FlagBlockMissiles | FlagBlockPathfinder | F
 	FlagRotatable | FlagHangable | FlagHookSouth | FlagHookEast | FlagClientCharges | FlagIgnoreLook |
 	FlagIsAnimation | FlagFullGround | FlagForceUse
 
-// Item attributes.
 const (
 	AttrServerID          = 0x10
 	AttrClientID          = 0x11
@@ -102,13 +98,11 @@ const versionDescriptionSize = 128
 // readableLensHelp is the lens help value of readable items (books, signs).
 const readableLensHelp = 1112
 
-// Attr is one item attribute.
 type Attr struct {
 	Type byte
 	Data []byte
 }
 
-// Item is one server item.
 type Item struct {
 	Group Group
 	Flags uint32
@@ -117,19 +111,15 @@ type Item struct {
 	tail []byte
 }
 
-// File is a parsed items.otb.
 type File struct {
 	ident     [4]byte
 	rootType  byte
 	rootFlags uint32
-	// rootAttrs are the root attributes, the version among them.
 	rootAttrs []Attr
 	rootTail  []byte
 	Items     []*Item
 }
 
-// New returns an empty items.otb with the given version, written like
-// ItemEditor writes it.
 func New(major, minor, build uint32) *File {
 	version := binary.LittleEndian.AppendUint32(nil, major)
 	version = binary.LittleEndian.AppendUint32(version, minor)
@@ -139,7 +129,6 @@ func New(major, minor, build uint32) *File {
 	return &File{rootAttrs: []Attr{{rootAttrVersion, append(version, description...)}}}
 }
 
-// Parse reads an items.otb.
 func Parse(data []byte) (*File, error) {
 	root, ident, err := otbnode.Parse(data)
 	if err != nil {
@@ -182,7 +171,6 @@ func readAttrs(props []byte) ([]Attr, []byte) {
 	return out, nil
 }
 
-// Encode writes the file.
 func (f *File) Encode() ([]byte, error) {
 	var buf bytes.Buffer
 	writer := otbnode.NewWriter(&buf, f.ident)
@@ -222,7 +210,6 @@ func (f *File) Version() (major, minor, build uint32) {
 	return 0, 0, 0
 }
 
-// Attr returns the data of an attribute, or nil.
 func (it *Item) Attr(attrType byte) []byte {
 	for _, attr := range it.Attrs {
 		if attr.Type == attrType {
@@ -239,7 +226,6 @@ func (it *Item) u16(attrType byte) uint16 {
 	return 0
 }
 
-// ServerID returns the server id (0 when missing).
 func (it *Item) ServerID() uint16 { return it.u16(AttrServerID) }
 
 // ClientID returns the client id (0 when missing, as for deprecated items).
@@ -249,7 +235,6 @@ func (it *Item) ClientID() uint16 { return it.u16(AttrClientID) }
 // has no client id.
 func (it *Item) Deprecated() bool { return it.Group == GroupDeprecated }
 
-// SetClientID changes the client id.
 func (it *Item) SetClientID(id uint16) { it.set(AttrClientID, u16(id)) }
 
 func (it *Item) set(attrType byte, data []byte) {
@@ -264,12 +249,10 @@ func (it *Item) set(attrType byte, data []byte) {
 
 func u16(value uint16) []byte { return binary.LittleEndian.AppendUint16(nil, value) }
 
-// NewItem returns an item for a new client item; Reload fills it.
 func NewItem(serverID, clientID uint16) *Item {
 	return &Item{Flags: FlagMovable, Attrs: []Attr{{AttrServerID, u16(serverID)}, {AttrClientID, u16(clientID)}}}
 }
 
-// Clone returns a deep copy.
 func (it *Item) Clone() *Item {
 	clone := *it
 	clone.Attrs = make([]Attr, len(it.Attrs))
@@ -280,7 +263,6 @@ func (it *Item) Clone() *Item {
 	return &clone
 }
 
-// Equal reports whether two items encode the same.
 func (it *Item) Equal(other *Item) bool {
 	return it.Group == other.Group && it.Flags == other.Flags && bytes.Equal(it.tail, other.tail) &&
 		slices.EqualFunc(it.Attrs, other.Attrs, func(left, right Attr) bool {
@@ -335,7 +317,6 @@ func stackOrder(props *thing.Properties) byte {
 	return 0
 }
 
-// flagsOf returns the client flags of an item with the given stack order.
 func flagsOf(client *thing.Thing, order byte) uint32 {
 	props := &client.Props
 	var flags uint32

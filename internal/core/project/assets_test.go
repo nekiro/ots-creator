@@ -11,8 +11,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/assets"
 )
 
-// buildAssets converts a small dat project into an asset folder: one 1x1
-// item and one 2x2 animated item.
 func buildAssets(t *testing.T) string {
 	t.Helper()
 	project := New(v1098(), client.Features{Transparency: true})
@@ -157,7 +155,6 @@ func TestAssetsRoundTrip(t *testing.T) {
 		t.Fatal("edited sprite lost")
 	}
 
-	// Back to dat/spr.
 	out := t.TempDir()
 	options := CompileOptions{DatPath: filepath.Join(out, "Tibia.dat"), SprPath: filepath.Join(out, "Tibia.spr"), Version: v1098(), Features: client.Features{Transparency: true}}
 	if err := q.Compile(options); err != nil {
@@ -218,7 +215,6 @@ func TestAssetsSplitLegacyOutfits(t *testing.T) {
 	if !bytes.Equal(piece(t, reopened, idle.Sprites[0]), solid(9, 0, 0)) || !bytes.Equal(piece(t, reopened, walking.Sprites[1]), solid(0, 0, 9)) {
 		t.Fatal("frames moved to the wrong group")
 	}
-	// Compiling the asset folder again keeps the groups.
 	if err := reopened.Compile(CompileOptions{Format: FormatAssets, DatPath: dir}); err != nil {
 		t.Fatal(err)
 	}
@@ -227,8 +223,6 @@ func TestAssetsSplitLegacyOutfits(t *testing.T) {
 	}
 }
 
-// TestOfficialAssetsEdit opens the asset folder in OTS_ASSETS, edits one
-// item and compiles to a copy.
 func TestOfficialAssetsEdit(t *testing.T) {
 	src := os.Getenv("OTS_ASSETS")
 	if src == "" {

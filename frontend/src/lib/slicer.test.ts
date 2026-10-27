@@ -14,13 +14,11 @@ describe("slicer", () => {
   });
 
   it("cuts cells with offsets and clears magenta", () => {
-    // 4x4 image, 2px cells: left half red, right half magenta.
     const img = image(4, 4, (x) => (x < 2 ? [255, 0, 0, 255] : [255, 0, 255, 255]));
     const grid = fitGrid(4, 4, 2);
     expect(Array.from(cutCell(img, grid, 0, 1, 2, true).slice(0, 4))).toEqual([255, 0, 0, 255]);
     expect(isEmpty(cutCell(img, grid, 1, 0, 2, true))).toBe(true);
     expect(isEmpty(cutCell(img, grid, 1, 0, 2, false))).toBe(false);
-    // Offset by one pixel: the cell straddles red and magenta, the last column is outside.
     const shifted = cutCell(img, { offsetX: 1, offsetY: 0, columns: 2, rows: 2 }, 1, 0, 2, true);
     expect(Array.from(shifted.slice(0, 8))).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
   });

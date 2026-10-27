@@ -10,7 +10,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/materials"
 )
 
-// saveMaterials writes the brush file and reindexes brushes.
 func (ms *MapService) saveMaterials(data *mapData) error {
 	data.index()
 	for _, opened := range ms.maps {
@@ -27,7 +26,6 @@ func (ms *MapService) saveMaterials(data *mapData) error {
 	return data.materials.Save(data.materialsPath)
 }
 
-// editMaterials runs fn on the materials and saves them when it succeeds.
 func (ms *MapService) editMaterials(fn func(materialSet *materials.Materials) error) error {
 	return ms.withData(func(data *mapData) error {
 		if err := fn(data.materials); err != nil {
@@ -37,13 +35,11 @@ func (ms *MapService) editMaterials(fn func(materialSet *materials.Materials) er
 	})
 }
 
-// MaterialsResult reports a materials change.
 type MaterialsResult struct {
 	Data     DataInfo `json:"data"`
 	Warnings []string `json:"warnings"`
 }
 
-// ImportRME merges brushes from a Remere's Map Editor data folder.
 func (ms *MapService) ImportRME(dir string) (result MaterialsResult, err error) {
 	err = ms.withData(func(data *mapData) error {
 		found, err := materials.FindRMEData(dir, int(data.project.Info().Version.Value))
@@ -64,7 +60,6 @@ func (ms *MapService) ImportRME(dir string) (result MaterialsResult, err error) 
 	return result, err
 }
 
-// ImportMaterials merges a materials JSON file.
 func (ms *MapService) ImportMaterials(path string) (result MaterialsResult, err error) {
 	err = ms.withData(func(data *mapData) error {
 		imported, err := materials.Load(path)
@@ -81,12 +76,10 @@ func (ms *MapService) ImportMaterials(path string) (result MaterialsResult, err 
 	return result, err
 }
 
-// ExportMaterials writes the materials to a JSON file.
 func (ms *MapService) ExportMaterials(path string) error {
 	return ms.withData(func(data *mapData) error { return data.materials.Save(path) })
 }
 
-// Brush returns a brush definition for the brush editor.
 func (ms *MapService) Brush(name string) (brush *materials.Brush, err error) {
 	err = ms.withData(func(data *mapData) error {
 		if brush = data.materials.Brush(name); brush == nil {
@@ -97,7 +90,6 @@ func (ms *MapService) Brush(name string) (brush *materials.Brush, err error) {
 	return brush, err
 }
 
-// Borders returns the border definitions.
 func (ms *MapService) Borders() (borders []*materials.Border, err error) {
 	err = ms.withData(func(data *mapData) error {
 		borders = data.materials.Borders
@@ -106,7 +98,6 @@ func (ms *MapService) Borders() (borders []*materials.Border, err error) {
 	return borders, err
 }
 
-// SaveBorder creates (ID 0) or replaces a border and returns its id.
 func (ms *MapService) SaveBorder(border materials.Border) (id uint32, err error) {
 	err = ms.editMaterials(func(materialSet *materials.Materials) error {
 		id = materialSet.SaveBorder(border)
@@ -122,12 +113,10 @@ func (ms *MapService) SaveBrush(oldName string, brush materials.Brush, tilesets 
 	return ms.editMaterials(func(materialSet *materials.Materials) error { return materialSet.SaveBrush(oldName, brush, tilesets) })
 }
 
-// RemoveBrush deletes a brush.
 func (ms *MapService) RemoveBrush(name string) error {
 	return ms.editMaterials(func(materialSet *materials.Materials) error { materialSet.RemoveBrush(name); return nil })
 }
 
-// SaveTileset creates or replaces a tileset (oldName "" creates).
 func (ms *MapService) SaveTileset(oldName string, tileset materials.Tileset) error {
 	return ms.editMaterials(func(materialSet *materials.Materials) error { return materialSet.SaveTileset(oldName, tileset) })
 }
@@ -137,12 +126,10 @@ func (ms *MapService) RemoveTileset(name string) error {
 	return ms.editMaterials(func(materialSet *materials.Materials) error { materialSet.RemoveTileset(name); return nil })
 }
 
-// AddToTileset adds items (raw palette) to a tileset, creating it.
 func (ms *MapService) AddToTileset(name string, items []uint16) error {
 	return ms.editMaterials(func(materialSet *materials.Materials) error { materialSet.AddRawItems(name, items); return nil })
 }
 
-// SaveCreature adds or replaces a creature type.
 func (ms *MapService) SaveCreature(creature materials.CreatureType) error {
 	return ms.editMaterials(func(materialSet *materials.Materials) error { return materialSet.SaveCreature(creature) })
 }

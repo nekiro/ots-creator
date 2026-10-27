@@ -31,7 +31,6 @@ class Writer {
   }
 }
 
-/** A chunk with one tile holding one item and nothing else. */
 function simpleChunk(writer: Writer, key: number, index: number, itemId: number): Writer {
   return writer.u32(key).u16(1).u16(index).u16(0).u8(1).u16(itemId).u16(0).u8(0);
 }
@@ -130,7 +129,6 @@ describe("ChunkStore", () => {
   async function runFrames() {
     const pending = frames.splice(0);
     for (const frame of pending) frame();
-    // Let the fetches and decoding settle.
     for (let i = 0; i < 5; i++) await Promise.resolve();
     await new Promise((resolve) => setTimeout(resolve, 0));
   }

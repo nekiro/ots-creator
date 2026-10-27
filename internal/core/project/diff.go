@@ -9,14 +9,12 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/spr"
 )
 
-// Diff statuses of one id in two clients.
 const (
 	DiffChanged = "changed"
 	DiffOnlyA   = "onlyA" // the id does not exist in B, or is empty there
 	DiffOnlyB   = "onlyB" // the id does not exist in A, or is empty there
 )
 
-// Parts of a thing that can differ (DiffEntry.Changes).
 const (
 	ChangeName      = "name"
 	ChangeProps     = "props"
@@ -29,7 +27,6 @@ const (
 	ChangeSprites   = "sprites"
 )
 
-// DiffEntry is one id that differs between two clients.
 type DiffEntry struct {
 	ID      uint32   `json:"id"`
 	Status  string   `json:"status"`
@@ -213,7 +210,6 @@ func appendOnce(list []string, value string) []string {
 	return append(list, value)
 }
 
-// spriteComparer compares sprites of two stores by content.
 type spriteComparer struct {
 	storeA, storeB *spriteStore
 	cache          map[[2]uint32]bool

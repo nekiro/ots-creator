@@ -9,8 +9,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
-// SetGroupPixels replaces every sprite of one frame group with new pixels
-// (indexed by sprite slot), for example from an imported sprite sheet.
 func (p *Project) SetGroupPixels(category thing.Category, id uint32, groupIndex int, pixels [][]byte) error {
 	for _, spritePixels := range pixels {
 		if err := p.checkPixels(spritePixels); err != nil {

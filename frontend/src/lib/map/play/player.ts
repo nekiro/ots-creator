@@ -7,7 +7,6 @@ import { combineDirections, Direction, directionOffset, footPhaseDelay, isDiagon
 export interface WalkWorld {
   /** The tile can be walked onto; false also while it is not loaded (client: Tile::isWalkable). */
   isWalkable(x: number, y: number, z: number): boolean;
-  /** Ground speed of a tile (null: no ground). */
   groundSpeed(x: number, y: number, z: number): number | null;
 }
 
@@ -30,7 +29,6 @@ const TURN_RELEASE_LOCK = 200;
 const TURN_DELAY_REPEATED = 150;
 const TURN_DELAY_FIRST = 50;
 
-/** A step being walked. */
 interface Step {
   direction: Direction;
   start: number;
@@ -38,7 +36,6 @@ interface Step {
   animationEnd: number;
   /** Diagonal steps take longer: the next step waits until then. */
   stepEnd: number;
-  /** Straight step duration (foot animation pace). */
   straight: number;
 }
 
@@ -68,15 +65,12 @@ export class Player {
   constructor(
     start: Position,
     private world: WalkWorld,
-    /** Step speed (see playerSpeed). */
     public speed: number,
-    /** Walk phases of the outfit's feet (0: no walk animation). */
     public footPhases = 0,
   ) {
     this.position = { ...start };
   }
 
-  /** Puts the player on another tile at once (no step), facing as it did. */
   teleport(position: Position): void {
     this.position = { ...position };
     this.step = null;
@@ -87,7 +81,6 @@ export class Player {
     this.nextWalkAt = Infinity;
   }
 
-  /** The step is being drawn (the walk animation runs). */
   get walking(): boolean {
     return this.step !== null;
   }
@@ -100,7 +93,6 @@ export class Player {
     return walkOffset(step.direction, progress * spriteSize, spriteSize);
   }
 
-  /** A walk key went down; it walks on the next update (none with a modifier held). */
   pressWalk(direction: Direction, now: number, modifiers: boolean): void {
     if (!this.pressedAt.has(direction)) {
       this.pressedAt.set(direction, now);
@@ -114,13 +106,11 @@ export class Player {
     this.heldDirections = this.heldDirections.filter((held) => held !== direction);
   }
 
-  /** Every walk key let go (the view lost focus). */
   releaseAll(): void {
     this.pressedAt.clear();
     this.heldDirections = [];
   }
 
-  /** A turn key (Ctrl+arrow) went down; repeated while held. */
   turn(direction: Direction, now: number, repeated: boolean): void {
     if (this.step && this.direction === direction) return;
     this.nextWalkDirection = null;
@@ -150,7 +140,6 @@ export class Player {
       this.walkQueued = false;
       if (smart !== undefined) this.walk(smart, now);
     } else if (smart !== undefined && now - (this.pressedAt.get(this.heldDirections[0]) ?? now) >= AUTO_REPEAT_DELAY) {
-      // Held keys repeat after the auto repeat delay.
       this.walk(smart, now);
     }
     if (now >= this.nextWalkAt) {

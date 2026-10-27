@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { blendOver, compose, stackBottomRight } from "./compose";
 import type { Layout } from "./layout";
 
-// jsdom-free ImageData stand-in for node.
 class FakeImageData {
   data: Uint8ClampedArray;
   constructor(public width: number, public height: number) {
@@ -11,7 +10,7 @@ class FakeImageData {
 }
 (globalThis as any).ImageData ??= FakeImageData;
 
-const SPRITE = 2; // tiny sprites keep the test readable
+const SPRITE = 2;
 const solid = (r: number, g: number, b: number, a = 255) => new Uint8ClampedArray(Array.from({ length: SPRITE * SPRITE }, () => [r, g, b, a]).flat());
 
 describe("blendOver", () => {
@@ -42,8 +41,8 @@ describe("compose", () => {
   it("places tile 0 on the right", () => {
     const img = compose(g, sprites, SPRITE, { pos: { layer: 0, x: 0, y: 0, z: 0, frame: 0 } }, get);
     expect(img.width).toBe(4);
-    expect(img.data[0]).toBe(50); // left pixel from sprite 2
-    expect(img.data[2 * 4]).toBe(100); // right half from sprite 1
+    expect(img.data[0]).toBe(50);
+    expect(img.data[2 * 4]).toBe(100);
   });
 
   it("draws addons on top", () => {
@@ -53,8 +52,8 @@ describe("compose", () => {
 
   it("colorizes only template areas", () => {
     const img = compose(g, sprites, SPRITE, { pos: { layer: 0, x: 0, y: 0, z: 0, frame: 0 }, colors: { head: 0, body: 132, legs: 0, feet: 0 } }, get);
-    expect(img.data[8]).toBeLessThan(100); // right tile tinted
-    expect(img.data[0]).toBe(50); // left tile untouched
+    expect(img.data[8]).toBeLessThan(100);
+    expect(img.data[0]).toBe(50);
   });
 });
 
@@ -69,7 +68,7 @@ describe("stackBottomRight", () => {
     const { image, offsets } = stackBottomRight([img(4, 4, 10), img(2, 2, 200)]);
     expect([image.width, image.height]).toEqual([4, 4]);
     expect(offsets).toEqual([[0, 0], [2, 2]]);
-    expect(image.data[0]).toBe(10); // top-left: mount only
-    expect(image.data[(3 * 4 + 3) * 4]).toBe(200); // bottom-right: rider
+    expect(image.data[0]).toBe(10);
+    expect(image.data[(3 * 4 + 3) * 4]).toBe(200);
   });
 });

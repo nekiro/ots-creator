@@ -49,7 +49,6 @@ func (l *chanceList) pick(rng *rand.Rand) uint16 {
 
 func (l *chanceList) has(id uint16) bool { return slices.Contains(l.ids, id) }
 
-// autoBorder is a runtime border: items by edge.
 type autoBorder struct {
 	id               uint32
 	tiles            [edgeCount]uint16
@@ -74,7 +73,6 @@ type borderBlock struct {
 	specific []specificCase
 }
 
-// GroundBrush paints ground with automatic borders.
 type GroundBrush struct {
 	id            int
 	Name          string
@@ -121,7 +119,6 @@ type wallDoor struct {
 	hate     bool
 }
 
-// WallBrush paints walls that connect to their neighbors.
 type WallBrush struct {
 	id          int
 	Name        string
@@ -159,7 +156,6 @@ func (w *WallBrush) hasWall(id uint16, align int) bool {
 	return false
 }
 
-// CarpetBrush paints carpets that join with their neighbors.
 type CarpetBrush struct {
 	id    int
 	Name  string
@@ -167,7 +163,6 @@ type CarpetBrush struct {
 	parts [edgeCount]chanceList
 }
 
-// TableBrush paints tables that join with their neighbors.
 type TableBrush struct {
 	id    int
 	Name  string
@@ -197,7 +192,6 @@ type doodadAlt struct {
 	hasSingleObject bool
 }
 
-// DoodadBrush places random decoration.
 type DoodadBrush struct {
 	id      int
 	Name    string
@@ -219,7 +213,6 @@ func (d *DoodadBrush) alt(variation int) *doodadAlt {
 
 func (d *DoodadBrush) owns(id uint16) bool { return d.owned[id] }
 
-// itemInfo is what the brushes know about one item id.
 type itemInfo struct {
 	ground           *GroundBrush
 	border           bool
@@ -240,7 +233,6 @@ type itemInfo struct {
 	doodad           *DoodadBrush
 }
 
-// Brushes indexes materials for drawing.
 type Brushes struct {
 	items     *otitems.DB
 	Materials *materials.Materials
@@ -251,8 +243,7 @@ type Brushes struct {
 	doodads   map[string]*DoodadBrush
 	info      map[uint16]*itemInfo
 	nextID    int
-	// Warnings collected while indexing.
-	Warnings []string
+	Warnings  []string
 }
 
 func lower(text string) string { return strings.ToLower(strings.TrimSpace(text)) }
@@ -276,7 +267,6 @@ func NewBrushes(items *otitems.DB, materialsDB *materials.Materials) *Brushes {
 	return brushes
 }
 
-// indexBorders creates and registers the shared borders, keyed by border id.
 func (b *Brushes) indexBorders(materialBorders []*materials.Border) map[uint32]*autoBorder {
 	borders := map[uint32]*autoBorder{}
 	for _, materialBorder := range materialBorders {
@@ -287,8 +277,6 @@ func (b *Brushes) indexBorders(materialBorders []*materials.Border) map[uint32]*
 	return borders
 }
 
-// createBrushes creates an empty brush of the right kind for every material
-// brush and gives each one an id.
 func (b *Brushes) createBrushes(materialBrushes []*materials.Brush) {
 	for _, material := range materialBrushes {
 		key := lower(material.Name)
@@ -331,7 +319,6 @@ func (b *Brushes) resolveBrushID(name string) int {
 	return toUnknown
 }
 
-// buildBrushes fills the brushes made by createBrushes from their materials.
 func (b *Brushes) buildBrushes(materialBrushes []*materials.Brush, borders map[uint32]*autoBorder) {
 	for _, material := range materialBrushes {
 		key := lower(material.Name)
@@ -353,7 +340,6 @@ func (b *Brushes) buildBrushes(materialBrushes []*materials.Brush, borders map[u
 	}
 }
 
-// resolveWallRedirects links every wall to the wall it redirects to.
 func (b *Brushes) resolveWallRedirects() {
 	for _, wall := range b.walls {
 		if wall.redirectsTo != "" {
@@ -557,7 +543,6 @@ func (b *Brushes) buildWall(wall *WallBrush, material *materials.Brush, idOf fun
 	}
 }
 
-// buildCarpet fills the carpet pieces and registers their items.
 func (b *Brushes) buildCarpet(carpet *CarpetBrush, material *materials.Brush) {
 	for alignName, chances := range material.Parts {
 		if edge, ok := edgeIndex[alignName]; ok {
@@ -573,7 +558,6 @@ func (b *Brushes) buildCarpet(carpet *CarpetBrush, material *materials.Brush) {
 	}
 }
 
-// buildTable fills the table pieces and registers their items.
 func (b *Brushes) buildTable(table *TableBrush, material *materials.Brush) {
 	for alignName, chances := range material.Parts {
 		align := slices.Index(materials.TableAlignments, alignName)
@@ -626,22 +610,16 @@ func (b *Brushes) buildDoodad(doodad *DoodadBrush, material *materials.Brush) {
 	}
 }
 
-// Ground returns a ground brush by name.
 func (b *Brushes) Ground(name string) *GroundBrush { return b.grounds[lower(name)] }
 
-// Wall returns a wall brush by name.
 func (b *Brushes) Wall(name string) *WallBrush { return b.walls[lower(name)] }
 
-// Carpet returns a carpet brush by name.
 func (b *Brushes) Carpet(name string) *CarpetBrush { return b.carpets[lower(name)] }
 
-// Table returns a table brush by name.
 func (b *Brushes) Table(name string) *TableBrush { return b.tables[lower(name)] }
 
-// Doodad returns a doodad brush by name.
 func (b *Brushes) Doodad(name string) *DoodadBrush { return b.doodads[lower(name)] }
 
-// GroundOf returns the ground brush of an item id.
 func (b *Brushes) GroundOf(id uint16) *GroundBrush {
 	if info := b.info[id]; info != nil {
 		return info.ground
@@ -675,7 +653,6 @@ func (b *Brushes) BrushOf(id uint16) (name, kind string) {
 	return "", ""
 }
 
-// Look returns the palette item of a brush.
 func (b *Brushes) Look(name string) uint16 {
 	key := lower(name)
 	switch {

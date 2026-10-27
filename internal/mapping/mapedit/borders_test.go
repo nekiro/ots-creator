@@ -9,7 +9,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-// Ground items of the custom border materials (bordersEditor).
 const (
 	bordersGrassItem    = 100
 	bordersSandItem     = 110
@@ -37,10 +36,8 @@ const (
 	bordersAltPiece = 251
 )
 
-// bordersPiece is the item of an edge in a border set starting at first.
 func bordersPiece(first uint16, edge int) uint16 { return first + uint16(edge-edgeN) }
 
-// bordersFullSet is a material border with all 12 pieces.
 func bordersFullSet(id uint32, first uint16) *materials.Border {
 	edges := map[string]uint16{}
 	for name, edge := range edgeIndex {
@@ -51,8 +48,6 @@ func bordersFullSet(id uint32, first uint16) *materials.Border {
 	return &materials.Border{ID: id, Edges: edges}
 }
 
-// bordersMaterialBorders are the border sets shared by the custom
-// materials.
 func bordersMaterialBorders() []*materials.Border {
 	optional := bordersFullSet(4, bordersSet4)
 	optional.Optional = true
@@ -68,7 +63,6 @@ func bordersMaterialBorders() []*materials.Border {
 	}
 }
 
-// bordersGround is a ground brush of one item.
 func bordersGround(name string, item uint16, zOrder int, rules ...materials.BorderRule) *materials.Brush {
 	return &materials.Brush{Name: name, Type: materials.TypeGround, ZOrder: zOrder,
 		Items: []materials.Chance{{ID: item, Chance: 1}}, Borders: rules}
@@ -88,7 +82,6 @@ func bordersItemDB() *otitems.DB {
 	return otitems.NewDB(otitems.ModeOTB, types)
 }
 
-// bordersBrushes indexes custom ground brushes over the shared border sets.
 func bordersBrushes(t *testing.T, grounds ...*materials.Brush) *Brushes {
 	t.Helper()
 	materialsDB := materials.New()
@@ -101,7 +94,6 @@ func bordersBrushes(t *testing.T, grounds ...*materials.Brush) *Brushes {
 	return brushes
 }
 
-// bordersEditor is an editor on an empty map with custom ground brushes.
 func bordersEditor(t *testing.T, grounds ...*materials.Brush) *Editor {
 	t.Helper()
 	brushes := bordersBrushes(t, grounds...)
@@ -117,13 +109,11 @@ func bordersDraw(t *testing.T, e *Editor, req DrawRequest) {
 	}
 }
 
-// bordersPaint paints one tile with a ground brush.
 func bordersPaint(t *testing.T, e *Editor, name string, x, y int) {
 	t.Helper()
 	bordersDraw(t, e, DrawRequest{Kind: KindGround, Name: name, Points: points(at(x, y))})
 }
 
-// bordersField paints a ground rectangle.
 func bordersField(t *testing.T, e *Editor, name string, x0, y0, x1, y1 int) {
 	t.Helper()
 	bordersDraw(t, e, DrawRequest{Kind: KindGround, Name: name, Rect: rect(x0, y0, x1, y1)})
@@ -134,7 +124,6 @@ func bordersErase(t *testing.T, e *Editor, name string, x, y int) {
 	bordersDraw(t, e, DrawRequest{Kind: KindGround, Name: name, Points: points(at(x, y)), Erase: true})
 }
 
-// bordersExpect checks the items (above the ground) of a tile.
 func bordersExpect(t *testing.T, e *Editor, x, y int, want []uint16, why string) {
 	t.Helper()
 	if got := itemIDs(e.Map.Tile(at(x, y))); !slices.Equal(got, want) {

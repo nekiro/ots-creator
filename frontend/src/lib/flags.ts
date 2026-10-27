@@ -1,4 +1,3 @@
-// Property editor metadata: groups, labels and payload fields.
 import type { Properties } from "./api";
 import { clamp } from "./util/math";
 
@@ -162,9 +161,6 @@ const CATEGORY_FLAGS: Record<number, ReadonlySet<string>> = {
   4: new Set(["hasLight", "hasOffset"]),
 };
 
-/** Whether the editor shows a flag for a category. A flag that is already set
- * always shows, so stray flags can still be cleared. */
-/** Whether a flag matches the filter text by its label or key. */
 export function flagMatches(filter: string, label: string, key: string): boolean {
   const query = filter.trim().toLowerCase();
   return !query || label.toLowerCase().includes(query) || key.toLowerCase().includes(query);
@@ -194,7 +190,6 @@ export function clampField(kind: FieldKind, value: number): number {
   return clamp(value, 0, 65535);
 }
 
-/** Field metadata by key, e.g. "lightLevel" or "market.name". */
 export function flagFields(key: string): Field[] {
   for (const group of FLAG_GROUPS) for (const flag of group.flags) if (flag.key === key) return flag.fields ?? [];
   return [];

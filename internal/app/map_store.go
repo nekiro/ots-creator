@@ -14,8 +14,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/settings"
 )
 
-// MapDataConfig tells the map editor where the server data of a client
-// lives.
 type MapDataConfig struct {
 	// ItemsMode is "auto" (items.otb when found), "otb" or "client".
 	ItemsMode string `json:"itemsMode"`
@@ -24,14 +22,11 @@ type MapDataConfig struct {
 	// MaterialsPath is the brush file (JSON). Empty uses the default file
 	// of the client version in the settings folder.
 	MaterialsPath string `json:"materialsPath"`
-	// ServerDir is the server data folder scanned for monsters and NPCs.
-	ServerDir string `json:"serverDir"`
+	ServerDir     string `json:"serverDir"`
 }
 
-// RecentMap is a recently opened map.
 type RecentMap struct {
-	Path string `json:"path"`
-	// Client is the client the map was edited with.
+	Path   string `json:"path"`
 	Client string `json:"client"`
 }
 
@@ -44,18 +39,14 @@ type mapStoreData struct {
 	Keys map[string][]string `json:"keys,omitempty"`
 }
 
-// MapStore persists map editor settings next to the app settings.
 type MapStore struct {
 	mu   sync.Mutex
 	path string
 	data mapStoreData
 }
 
-// maxRecentMaps limits the recent map list.
 const maxRecentMaps = 10
 
-// OpenMapStore loads the map editor settings from the settings folder
-// (defaults on errors).
 func OpenMapStore() *MapStore {
 	settingsPath, err := settings.DefaultPath()
 	if err != nil {
@@ -81,7 +72,6 @@ func NewMapStore(path string) *MapStore {
 	return store
 }
 
-// Dir returns the folder of the settings ("" when unknown).
 func (st *MapStore) Dir() string {
 	if st.path == "" {
 		return ""
@@ -97,7 +87,6 @@ func recentMapPath(recent RecentMap) string { return recent.Path }
 
 func profileKey(client string) string { return strings.ToLower(filepath.Clean(client)) }
 
-// Profile returns the data config of a client.
 func (st *MapStore) Profile(client string) (MapDataConfig, bool) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
@@ -105,7 +94,6 @@ func (st *MapStore) Profile(client string) (MapDataConfig, bool) {
 	return config, ok
 }
 
-// SetProfile stores the data config of a client.
 func (st *MapStore) SetProfile(client string, config MapDataConfig) error {
 	st.mu.Lock()
 	defer st.mu.Unlock()
@@ -113,14 +101,12 @@ func (st *MapStore) SetProfile(client string, config MapDataConfig) error {
 	return st.saveLocked()
 }
 
-// Recent returns the recent maps.
 func (st *MapStore) Recent() []RecentMap {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	return append([]RecentMap(nil), st.data.Recent...)
 }
 
-// AddRecent puts a map first in the recent list.
 func (st *MapStore) AddRecent(recent RecentMap) error {
 	st.mu.Lock()
 	defer st.mu.Unlock()
@@ -129,7 +115,6 @@ func (st *MapStore) AddRecent(recent RecentMap) error {
 	return st.saveLocked()
 }
 
-// RemoveRecent forgets a recent map ("" clears the list).
 func (st *MapStore) RemoveRecent(path string) error {
 	st.mu.Lock()
 	defer st.mu.Unlock()
@@ -141,7 +126,6 @@ func (st *MapStore) RemoveRecent(path string) error {
 	return st.saveLocked()
 }
 
-// EditorSettings returns the brush behavior settings.
 func (st *MapStore) EditorSettings() mapedit.Settings {
 	st.mu.Lock()
 	defer st.mu.Unlock()
@@ -151,7 +135,6 @@ func (st *MapStore) EditorSettings() mapedit.Settings {
 	return *st.data.Editor
 }
 
-// SetEditorSettings stores the brush behavior settings.
 func (st *MapStore) SetEditorSettings(settings mapedit.Settings) error {
 	st.mu.Lock()
 	defer st.mu.Unlock()
@@ -159,7 +142,6 @@ func (st *MapStore) SetEditorSettings(settings mapedit.Settings) error {
 	return st.saveLocked()
 }
 
-// Keys returns the changed keyboard shortcuts.
 func (st *MapStore) Keys() map[string][]string {
 	st.mu.Lock()
 	defer st.mu.Unlock()

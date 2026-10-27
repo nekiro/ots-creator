@@ -1,7 +1,5 @@
-// Small questions asked about objects and the clients they come from.
 import { Category, Format, type Features, type FrameGroup, type Thing } from "./api";
 
-/** The frame group shown for a chosen group index: the last one when the object has fewer. */
 export function frameGroupAt(thing: Pick<Thing, "frameGroups"> | null | undefined, index: number): FrameGroup | null {
   if (!thing) return null;
   return thing.frameGroups[Math.min(index, thing.frameGroups.length - 1)] ?? null;
@@ -12,7 +10,6 @@ export function hasImprovedAnimations(info: { format: Format; features?: Pick<Fe
   return !!info && (info.format === Format.FormatAssets || !!info.features?.improvedAnimations);
 }
 
-/** Direction an object is first shown facing: outfits face south when they have four directions. */
 export function defaultDirection(thing: Pick<Thing, "category" | "frameGroups"> | null | undefined): number {
   return thing?.category === Category.CategoryOutfit && (thing.frameGroups[0]?.patternX ?? 1) > 2 ? 2 : 0;
 }

@@ -12,13 +12,10 @@ import (
 	"slices"
 )
 
-// SpawnFormat tells how spawns are stored.
 type SpawnFormat string
 
 const (
-	// SpawnsSingle is one spawn file with monsters and NPCs.
-	SpawnsSingle SpawnFormat = "single"
-	// SpawnsSeparate are separate monster and NPC spawn files.
+	SpawnsSingle   SpawnFormat = "single"
 	SpawnsSeparate SpawnFormat = "separate"
 )
 
@@ -28,10 +25,8 @@ const (
 // in any version.
 const OTBMVersion uint32 = 2
 
-// otbmNewest is the newest OTBM version the reader knows.
 const otbmNewest uint32 = 4
 
-// Map is an OTBM map. It is not safe for concurrent use.
 type Map struct {
 	Width       uint16      `json:"width"`
 	Height      uint16      `json:"height"`
@@ -52,17 +47,13 @@ type Map struct {
 	chunks map[ChunkKey]*Chunk
 	tiles  int
 	floors [MaxFloor + 1]int
-	// Rev increases on every tile change (see Touch).
-	Rev uint64 `json:"-"`
+	Rev    uint64 `json:"-"`
 }
 
-// ForgetAuxFileNames clears the names of the house, spawn, npc and zone
-// files, so that saving under a new name names them after the new map.
 func (m *Map) ForgetAuxFileNames() {
 	m.HouseFile, m.SpawnFile, m.NpcFile, m.ZoneFile = "", "", "", ""
 }
 
-// New returns an empty map.
 func New(width, height uint16) *Map {
 	return &Map{
 		Width: width, Height: height, SpawnFormat: SpawnsSingle,
@@ -71,10 +62,8 @@ func New(width, height uint16) *Map {
 	}
 }
 
-// TileCount returns the number of tiles.
 func (m *Map) TileCount() int { return m.tiles }
 
-// FloorTiles returns the number of tiles on each floor.
 func (m *Map) FloorTiles() [MaxFloor + 1]int { return m.floors }
 
 // Tile returns the tile at pos or nil. Treat it as read-only: a packed tile
@@ -99,7 +88,6 @@ func (m *Map) Peek(pos Position, scratch *Tile, buf []Item) *Tile {
 	return chunk.Peek(index&(ChunkSize-1), index>>ChunkBits, scratch, buf)
 }
 
-// PeekAt is Peek for x, y, z; out of range coordinates are nil.
 func (m *Map) PeekAt(x, y, z int, scratch *Tile, buf []Item) *Tile {
 	if x < 0 || y < 0 || z < 0 || x > 0xFFFF || y > 0xFFFF || z > MaxFloor {
 		return nil
@@ -120,13 +108,11 @@ func (m *Map) stored(pos Position) *Tile {
 	return nil
 }
 
-// Has reports whether there is a tile at pos.
 func (m *Map) Has(pos Position) bool {
 	chunk := m.chunks[KeyOf(pos)]
 	return chunk != nil && chunk.cells[localIndex(pos)] != 0
 }
 
-// At returns the tile at x, y, z or nil; out of range coordinates are nil.
 func (m *Map) At(x, y, z int) *Tile {
 	if x < 0 || y < 0 || z < 0 || x > 0xFFFF || y > 0xFFFF || z > MaxFloor {
 		return nil
@@ -177,14 +163,12 @@ func (m *Map) put(pos Position, tile *Tile, pack bool) {
 	}
 }
 
-// Prune removes the tile at pos when it is empty.
 func (m *Map) Prune(pos Position) {
 	if tile := m.Tile(pos); tile != nil && tile.Empty() {
 		m.Put(pos, nil)
 	}
 }
 
-// Touch marks the chunk of pos changed (after editing a tile in place).
 func (m *Map) Touch(pos Position) {
 	if chunk := m.chunks[KeyOf(pos)]; chunk != nil {
 		m.Rev++
@@ -192,10 +176,8 @@ func (m *Map) Touch(pos Position) {
 	}
 }
 
-// Chunk returns a chunk or nil.
 func (m *Map) Chunk(key ChunkKey) *Chunk { return m.chunks[key] }
 
-// ChunkRev returns the revision of a chunk (0 when it does not exist).
 func (m *Map) ChunkRev(key ChunkKey) uint64 {
 	if chunk := m.chunks[key]; chunk != nil {
 		return chunk.Rev
@@ -240,8 +222,6 @@ func (m *Map) EachStored(fn func(pos Position, tile *Tile)) {
 	}
 }
 
-// EachIn calls fn for every tile inside the rectangle on floors
-// minZ..maxZ.
 func (m *Map) EachIn(minX, minY, maxX, maxY int, minZ, maxZ int, fn func(pos Position, tile *Tile)) {
 	minX, minY = max(minX, 0), max(minY, 0)
 	maxX, maxY = min(maxX, 0xFFFF), min(maxY, 0xFFFF)
@@ -262,7 +242,6 @@ func (m *Map) EachIn(minX, minY, maxX, maxY int, minZ, maxZ int, fn func(pos Pos
 	}
 }
 
-// Bounds returns the area that holds tiles (ok is false for an empty map).
 func (m *Map) Bounds() (minX, minY, maxX, maxY int, ok bool) {
 	first := true
 	for _, chunk := range m.chunks {
@@ -279,7 +258,6 @@ func (m *Map) Bounds() (minX, minY, maxX, maxY int, ok bool) {
 	return minX, minY, maxX, maxY, !first
 }
 
-// SortedTowns returns the towns by id.
 func (m *Map) SortedTowns() []*Town {
 	out := make([]*Town, 0, len(m.Towns))
 	for _, town := range m.Towns {
@@ -289,7 +267,6 @@ func (m *Map) SortedTowns() []*Town {
 	return out
 }
 
-// SortedHouses returns the houses by id.
 func (m *Map) SortedHouses() []*House {
 	out := make([]*House, 0, len(m.Houses))
 	for _, house := range m.Houses {
@@ -299,7 +276,6 @@ func (m *Map) SortedHouses() []*House {
 	return out
 }
 
-// Waypoint returns the waypoint with a name or nil.
 func (m *Map) Waypoint(name string) *Waypoint {
 	for _, waypoint := range m.Waypoints {
 		if waypoint.Name == name {

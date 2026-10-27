@@ -9,12 +9,9 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/spr"
 )
 
-// TransferResult reports a Transfer.
 type TransferResult struct {
-	// IDs are the ids of the copied things in the target, in request order.
-	IDs []uint32 `json:"ids"`
-	// Sprites counts the sprites added to the target.
-	Sprites int `json:"sprites"`
+	IDs     []uint32 `json:"ids"`
+	Sprites int      `json:"sprites"`
 	// Before holds the things the copies replaced (nil: the id did not
 	// exist), for copies that kept their ids. See RestoreThings.
 	Before map[uint32]*thing.Thing `json:"-"`
@@ -132,7 +129,6 @@ func transfer(dst, src *Project, category thing.Category, ids []uint32, appendNe
 	return result, nil
 }
 
-// name is a short name of the client for labels.
 func (p *Project) name() string {
 	if p.datPath == "" {
 		return ""

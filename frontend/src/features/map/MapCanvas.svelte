@@ -57,8 +57,6 @@
     return geoStore;
   }
 
-  // ----- drawing -----
-
   let raf = 0;
   let animTimer = 0;
   function requestDraw() {
@@ -72,7 +70,6 @@
   // Frames drawn in the last second. The map draws on demand, so it reads 0 when nothing changes.
   let frameTimes: number[] = [];
   let fps = $state(0);
-  /** Chunk geometry loading in the last second (shown next to the FPS). */
   let loadInfo = $state("");
   $effect(() => {
     const timer = setInterval(() => {
@@ -151,15 +148,11 @@
     else if (result.pending) animTimer = window.setTimeout(requestDraw, REDRAW_DELAY.pending);
     else if (result.animated) animTimer = window.setTimeout(requestDraw, REDRAW_DELAY.animated);
     if (!result.more && !result.pending) rendered(id);
-    // Keep memory bounded on long sessions.
     store(id).trim((key) => (key & 15) === cam.floor);
     geoOf(id).trim((key) => Math.abs((key & 15) - cam.floor) < 4);
   }
 
   void loadLabelFonts().then(() => requestDraw());
-
-
-  // ----- coordinates -----
 
   function devicePoint(event: MouseEvent): { x: number; y: number } {
     const bounds = canvas!.getBoundingClientRect();
@@ -172,8 +165,6 @@
     const dpr = window.devicePixelRatio || 1;
     return screenToTile(x, y, { width, height, camX: cam.x, camY: cam.y, scale: cam.zoom * dpr, floor: cam.floor, tileSize: spriteSize() });
   }
-
-  // ----- brush preview -----
 
   async function refreshDoodad() {
     const brush = map.brush;
@@ -203,8 +194,6 @@
       });
     } else clip = null;
   });
-
-  // ----- input -----
 
   const modifiers = { ctrl: false, shift: false, alt: false };
   let spaceHeld = $state(false);
@@ -444,8 +433,6 @@
     toast(`Brush: ${items.name(top)}`);
   }
 
-  /** Double click: an item with text opens it, a creature becomes the
-   * brush, anything else is inspected. */
   function ondblclick(event: MouseEvent) {
     const id = map.activeId;
     if (map.tool !== "select" || id === null) return;
@@ -467,8 +454,6 @@
     const entries: MenuEntry[] = mapContextMenu(tile, tileData ?? null, { pick: () => pickBrush(tile) });
     openContextMenu(event, entries);
   }
-
-  // ----- lifecycle -----
 
   onMount(() => {
     try {
@@ -515,7 +500,6 @@
     };
   });
 
-  // Redraw on any state the frame depends on.
   $effect(() => {
     void [map.activeId, map.cam.x, map.cam.y, map.cam.zoom, map.cam.floor, map.dataRev, map.tool, map.brush, map.size, map.shape, map.fill, map.pasting, map.active?.houses, map.active?.waypoints, map.active?.towns];
     void viewOptions;
@@ -533,7 +517,6 @@
     requestDraw();
   });
 
-  // Maps that were closed free their caches.
   $effect(() => {
     const ids = new Set(map.maps.map((open) => open.id));
     for (const id of [...stores.keys()]) {

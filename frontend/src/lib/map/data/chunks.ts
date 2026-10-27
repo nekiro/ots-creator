@@ -26,7 +26,6 @@ export const TileFlags = {
   opaque: 0x8000,
 } as const;
 
-/** Item flags of the chunk format. */
 export const ItemFlags = { selected: 1, ids: 2, text: 4, teleport: 8, contents: 16, doorId: 32 } as const;
 
 export interface CreatureData {
@@ -69,7 +68,6 @@ export function chunkKey(chunkX: number, chunkY: number, z: number): number {
   return chunkX * 32768 + chunkY * 16 + z;
 }
 
-/** The chunk a tile is in (one coordinate). */
 export function chunkOfTile(tile: number): number {
   return tile >> 5;
 }
@@ -82,7 +80,6 @@ export function splitKey(key: number): [number, number, number] {
   return [Math.floor(key / 32768), Math.floor(key / 16) & 0x7ff, key & 15];
 }
 
-/** Index of tile (x, y) in its chunk's tiles. */
 export function tileIndex(x: number, y: number): number {
   return ((y & 31) << 5) | (x & 31);
 }
@@ -92,7 +89,6 @@ const decoder = new TextDecoder();
 const NO_IDS = new Uint16Array(0);
 const NO_FLAGS = new Uint8Array(0);
 
-/** Decodes a chunk response into chunks. */
 export function decodeChunks(buffer: ArrayBuffer): ChunkData[] {
   const view = new DataView(buffer);
   const bytes = new Uint8Array(buffer);
@@ -191,7 +187,6 @@ export function decodeChunks(buffer: ArrayBuffer): ChunkData[] {
   return out;
 }
 
-/** Chunks per request. */
 const BATCH = 96;
 
 /** Forgets entries of a chunk store far from a view to bound memory: once above max, down to three quarters of it. */
@@ -203,7 +198,6 @@ export function trimStore(store: Map<number, unknown>, keep: (key: number) => bo
   }
 }
 
-/** Calls request with the keys split into batches of at most size keys. */
 export function inBatches(keys: number[], size: number, request: (batch: number[]) => void): void {
   for (let i = 0; i < keys.length; i += size) request(keys.slice(i, i + size));
 }
@@ -236,22 +230,18 @@ export class ChunkStore {
     return chunk;
   }
 
-  /** The loaded chunk without requesting it. */
   peek(key: number): ChunkData | null | undefined {
     return this.chunks.get(key);
   }
 
-  /** The tile, its chunk requested when not loaded. */
   tile(x: number, y: number, z: number): TileData | undefined {
     return this.tileIn(x, y, z, true);
   }
 
-  /** The tile when its chunk is loaded (no request). */
   peekTile(x: number, y: number, z: number): TileData | undefined {
     return this.tileIn(x, y, z, false);
   }
 
-  /** request: fetch the chunk when not loaded. */
   private tileIn(x: number, y: number, z: number, request: boolean): TileData | undefined {
     if (x < 0 || y < 0 || z < 0 || z > MAX_FLOOR) return undefined;
     const key = keyOf(x, y, z);
@@ -271,7 +261,6 @@ export class ChunkStore {
     this.request(keys);
   }
 
-  /** Fetches chunks in batches, marking them in flight. */
   private request(keys: number[]): void {
     inBatches(keys, BATCH, (batch) => {
       for (const key of batch) this.inflight.add(key);
@@ -305,7 +294,6 @@ export class ChunkStore {
     }
   }
 
-  /** Drops chunks (all when keys is null) so they load again. */
   invalidate(keys: number[] | null, rev: number): void {
     this.rev = rev;
     if (keys === null) {
@@ -321,7 +309,6 @@ export class ChunkStore {
     this.request(fresh);
   }
 
-  /** Forgets chunks far from a view to bound memory. */
   trim(keep: (key: number) => boolean, max = 3000): void {
     trimStore(this.chunks, keep, max);
   }

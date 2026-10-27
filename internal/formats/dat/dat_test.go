@@ -11,7 +11,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/binio"
 )
 
-// fullProps sets every property with distinct payload values.
 func fullProps() thing.Properties {
 	return thing.Properties{
 		Ground: true, GroundSpeed: 150, GroundBorder: true, OnBottom: true, OnTop: true,
@@ -164,7 +163,6 @@ func sampleFile(withGroups bool) *File {
 	effect.Props.TopEffect = true
 	effect.FrameGroups[0] = animatedGroup(0, 2, 70000)
 	f.Things[thing.CategoryEffect] = []*thing.Thing{effect}
-	// No missiles: header must contain 0.
 	return f
 }
 
@@ -288,7 +286,6 @@ func TestDecodeErrors(t *testing.T) {
 			t.Fatalf("truncated at %d must fail", cut)
 		}
 	}
-	// zero width layout
 	bad := []byte{0, 0, 0, 0, 100, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0, 1, 1, 1, 1, 1, 1}
 	if _, err := Decode(bad, opts); err == nil {
 		t.Fatal("zero layout must fail")

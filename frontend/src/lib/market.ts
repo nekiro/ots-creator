@@ -1,4 +1,3 @@
-// Filtering and sorting of market entries (index.json rows).
 import type { Entry } from "../../bindings/github.com/nekiro/ots-creator/internal/market/models";
 
 export type MarketEntry = Entry;
@@ -24,12 +23,10 @@ export const LICENSES = [
   { value: "OTS-free", label: "Free for OT servers" },
 ];
 
-/** The readable name of a license id (the id itself when unknown). */
 export function licenseLabel(value: string): string {
   return LICENSES.find((license) => license.value === value)?.label ?? value;
 }
 
-/** What a tag group applies to: an object category or "sprites". */
 export type TagKind = "item" | "outfit" | "effect" | "missile" | "sprites";
 
 export interface TagGroup {
@@ -178,8 +175,6 @@ const STYLE = [
   "demonic",
   "holy-place",
 ];
-// Effects and missiles named like the client's magic effects and
-// shoot types.
 const EFFECT = [
   "hit",
   "block",
@@ -283,12 +278,10 @@ const GROUPS: Record<TagKind, TagGroup[]> = {
   ],
 };
 
-/** Tag groups offered when sharing an entry of a kind. */
 export function tagGroups(kind: TagKind): TagGroup[] {
   return GROUPS[kind];
 }
 
-/** Maximum number of tags of an entry. */
 export const MAX_TAGS = 8;
 
 /** The section of an entry: "sprites" for packs, else its category. */
@@ -303,7 +296,6 @@ function matches(entry: MarketEntry, words: string[]): boolean {
   return words.every((word) => text.includes(word));
 }
 
-/** Entries matching the filter, sorted. */
 export function filterEntries(
   entries: MarketEntry[],
   filter: MarketFilter,
@@ -335,14 +327,12 @@ export function filterEntries(
   }
 }
 
-/** Entry counts per section ("all" included). */
 export function sectionCounts(entries: MarketEntry[]): Record<string, number> {
   const out: Record<string, number> = { all: entries.length };
   for (const entry of entries) out[sectionOf(entry)] = (out[sectionOf(entry)] ?? 0) + 1;
   return out;
 }
 
-/** The most used tags of the entries, most used first. */
 export function topTags(
   entries: MarketEntry[],
   limit = 24,
@@ -387,7 +377,6 @@ export function parseIds(text: string, max: number, limit = 1024): number[] {
   return [...out].sort((first, second) => first - second);
 }
 
-/** Formats ids as ranges ("100-120, 130"), the inverse of parseIds. */
 export function formatIds(ids: number[]): string {
   const parts: string[] = [];
   for (let i = 0; i < ids.length;) {
@@ -399,7 +388,6 @@ export function formatIds(ids: number[]): string {
   return parts.join(", ");
 }
 
-/** Problems with a typed tag list, or "" when it is fine. */
 export function tagProblem(tags: string[]): string {
   if (tags.length > 8) return "At most 8 tags.";
   const bad = tags.find(
@@ -410,14 +398,12 @@ export function tagProblem(tags: string[]): string {
     : "";
 }
 
-/** A tag the picker offers: its group (for headers) and an optional count. */
 export interface TagOption {
   tag: string;
   group?: string;
   count?: number;
 }
 
-/** Flattens tag groups into picker options. */
 export const groupOptions = (groups: TagGroup[]): TagOption[] => groups.flatMap((group) => group.tags.map((tag) => ({ tag, group: group.label })));
 
 /**

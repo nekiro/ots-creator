@@ -14,12 +14,10 @@ type DialogService struct {
 	settings *settings.Store
 }
 
-// NewDialogService returns the service; store remembers the dialog folders.
 func NewDialogService(store *settings.Store) *DialogService {
 	return &DialogService{settings: store}
 }
 
-// FileFilter is one entry of a dialog filter list, e.g. {"Client files", "*.dat;*.spr;*.otfi"}.
 type FileFilter struct {
 	Name    string `json:"name"`
 	Pattern string `json:"pattern"`
@@ -44,7 +42,6 @@ func (ds *DialogService) remember(key, dir string) {
 	}
 }
 
-// OpenFiles shows an open dialog. It returns no paths when cancelled.
 func (ds *DialogService) OpenFiles(key, title string, filters []FileFilter, multiple bool) ([]string, error) {
 	dialog := application.Get().Dialog.OpenFile().SetTitle(title).CanChooseFiles(true).SetDirectory(ds.lastDir(key))
 	for _, filter := range filters {
@@ -70,7 +67,6 @@ func (ds *DialogService) OpenFiles(key, title string, filters []FileFilter, mult
 	return paths, nil
 }
 
-// PickDirectory shows a directory chooser. It returns "" when cancelled.
 func (ds *DialogService) PickDirectory(key, title string) (string, error) {
 	dir, err := application.Get().Dialog.OpenFile().SetTitle(title).CanChooseFiles(false).CanChooseDirectories(true).CanCreateDirectories(true).SetDirectory(ds.lastDir(key)).PromptForSingleSelection()
 	if err == nil {
@@ -79,7 +75,6 @@ func (ds *DialogService) PickDirectory(key, title string) (string, error) {
 	return dir, err
 }
 
-// SaveFile shows a save dialog. It returns "" when cancelled.
 func (ds *DialogService) SaveFile(key, title, filename string, filters []FileFilter) (string, error) {
 	dialog := application.Get().Dialog.SaveFile().SetMessage(title).SetFilename(filename).CanCreateDirectories(true).SetDirectory(ds.lastDir(key))
 	for _, filter := range filters {

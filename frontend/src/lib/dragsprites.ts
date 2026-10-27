@@ -1,5 +1,3 @@
-// Dragging sprites from the sprite list onto texture slots.
-
 const ONE = "application/x-sprite-id";
 const MANY = "application/x-sprite-ids";
 
@@ -14,7 +12,6 @@ export function startSpriteDrag(event: DragEvent, id: number, selection: number[
   if (event.dataTransfer) event.dataTransfer.effectAllowed = "copy";
 }
 
-/** Sprite ids carried by first drop, in order; empty when it is not first sprite drag. */
 export function droppedSprites(event: DragEvent): number[] {
   const raw = event.dataTransfer?.getData(MANY) || event.dataTransfer?.getData(ONE) || "";
   return raw

@@ -16,7 +16,6 @@ export type DrawItem = (itemId: number, subtype: number, x: number, y: number, z
 /** footPhase: null draws the first frame (the editor); a number animates as the client does, 0 standing, from 1 walking. */
 export type DrawCreature = (creature: CreatureData, screenX: number, screenY: number, x: number, y: number, z: number, alpha: number, footPhase?: number | null) => void;
 
-/** What drawing found missing in a frame. */
 interface DrawStatus {
   pending: boolean;
   animated: boolean;
@@ -36,7 +35,6 @@ function stackPattern(count: number): [number, number] {
 }
 
 export class ThingDrawer {
-  /** missing: where sprites not loaded yet are added. */
   constructor(
     private batch: QuadBatch,
     private missing: Set<number>,
@@ -117,7 +115,6 @@ export class ThingDrawer {
         return;
       }
       if (!creature.lookType) {
-        // Unknown creature: a marker so it is not invisible.
         const color = creature.npc ? COLORS.unknownNpc : COLORS.unknownMonster;
         this.batch.rect(screenX + tilePx * 0.25, screenY + tilePx * 0.25, tilePx * 0.5, tilePx * 0.5, [color[0], color[1], color[2], color[3] * alpha]);
         return;
@@ -160,7 +157,6 @@ export class ThingDrawer {
     return { drawItem, drawCreature };
   }
 
-  /** Draws the selected things of the current floor at the drag offset. */
   drawMoved(scene: Scene, z: number, range: TileRange, camera: Camera, drawItem: DrawItem, drawCreature: DrawCreature): void {
     const tilePx = camera.tilePx;
     const offset = scene.moveOffset!;
@@ -183,9 +179,7 @@ export class ThingDrawer {
     }
   }
 
-  /** Brush previews and pasted things not placed yet, on the floor in view. */
   drawGhosts(scene: Scene, camera: Camera, drawItem: DrawItem, drawCreature: DrawCreature): void {
-    // Client stacking: ground, borders, bottom, common, top items.
     const stackRank = (itemId: number) => (scene.items.is(itemId, "ground") ? 0 : (STACK_RANK_BY_TOP_ORDER[scene.items.top[itemId]] ?? 3));
     for (const ghost of scene.ghosts) {
       if (ghost.z !== scene.floor) continue;
@@ -200,7 +194,6 @@ export class ThingDrawer {
     }
   }
 
-  /** Every sprite of a frame of a look in a direction (all pattern rows: addons) is loaded. */
   private frameLoaded(scene: Scene, look: Look, patternX: number, patternZ: number, frame: number): boolean {
     const animationFrame = frame % Math.max(look.frames, 1);
     for (let patternY = 0; patternY < look.patternY; patternY++) {

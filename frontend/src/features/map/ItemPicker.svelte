@@ -1,5 +1,4 @@
 <script lang="ts">
-  // Picks an item by name or id with a searchable dropdown of icons.
   import { toCss } from "../../lib/pixelscale";
   import { map } from "../../lib/map/state.svelte";
   import { portal } from "../../lib/ui/portal";

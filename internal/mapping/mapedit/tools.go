@@ -11,26 +11,21 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-// FindQuery searches items on the map.
 type FindQuery struct {
 	// IDs are server ids to find (empty: use Name or Kind).
-	IDs []uint16 `json:"ids"`
-	// Name matches item names (case-insensitive substring).
-	Name string `json:"name"`
+	IDs  []uint16 `json:"ids"`
+	Name string   `json:"name"`
 	// Kind is "unique", "action", "container", "writeable", "teleport",
 	// "door", "duplicate" (same item twice on a tile) or "".
 	Kind string `json:"kind"`
 	// ActionID / UniqueID match exact ids (0 = any).
-	ActionID uint16 `json:"actionId"`
-	UniqueID uint16 `json:"uniqueId"`
-	// InSelection limits the search to the selection.
-	InSelection bool `json:"inSelection"`
-	// Containers also searches container contents.
-	Containers bool `json:"containers"`
-	Limit      int  `json:"limit"`
+	ActionID    uint16 `json:"actionId"`
+	UniqueID    uint16 `json:"uniqueId"`
+	InSelection bool   `json:"inSelection"`
+	Containers  bool   `json:"containers"`
+	Limit       int    `json:"limit"`
 }
 
-// FindResult is one found item.
 type FindResult struct {
 	Pos  otmap.Position `json:"pos"`
 	ID   uint16         `json:"id"`
@@ -39,7 +34,6 @@ type FindResult struct {
 	Detail string `json:"detail"`
 }
 
-// Find searches the map.
 func (e *Editor) Find(query FindQuery) ([]FindResult, bool) {
 	limit := query.Limit
 	if limit <= 0 {
@@ -87,8 +81,6 @@ func (e *Editor) Find(query FindQuery) ([]FindResult, bool) {
 	return results, more
 }
 
-// firstDuplicate returns the first item whose id already appeared
-// earlier in the list.
 func firstDuplicate(items []otmap.Item) (otmap.Item, bool) {
 	seen := map[uint16]bool{}
 	for _, item := range items {
@@ -130,8 +122,6 @@ func (e *Editor) matchFindItem(query FindQuery, lowerName string, item *otmap.It
 	return true, detail
 }
 
-// findKindDetail checks an item against a FindQuery kind and returns the
-// detail text for that kind (empty when there is nothing to show).
 func findKindDetail(kind string, itemType *otitems.Type, item *otmap.Item) (bool, string) {
 	switch kind {
 	case "unique":
@@ -191,7 +181,6 @@ func (e *Editor) name(id uint16) string {
 	return "unknown item " + strconv.Itoa(int(id))
 }
 
-// eachTile visits the selection or the whole map.
 func (e *Editor) eachTile(inSelection bool, fn func(pos otmap.Position, tile *otmap.Tile)) {
 	if inSelection {
 		for _, pos := range e.Selected() {
@@ -300,7 +289,6 @@ func (e *Editor) removeItemsWhere(label string, inSelection bool, shouldRemove f
 	return removed
 }
 
-// RemoveCorpses removes corpse items.
 func (e *Editor) RemoveCorpses(inSelection bool) int {
 	return e.removeItemsWhere("Remove corpses", inSelection, func(item otmap.Item) bool {
 		itemType := e.itemType(item.ID)
@@ -308,7 +296,6 @@ func (e *Editor) RemoveCorpses(inSelection bool) int {
 	})
 }
 
-// RemoveInvalid removes items the item database does not know.
 func (e *Editor) RemoveInvalid(inSelection bool) int {
 	return e.removeItemsWhere("Remove invalid items", inSelection, func(item otmap.Item) bool {
 		return item.ID != 0 && e.itemType(item.ID) == nil
@@ -347,7 +334,6 @@ func (e *Editor) RemoveUnreachable() int {
 	return tx.Commit()
 }
 
-// RemoveEmptySpawns removes spawns without creatures in their area.
 func (e *Editor) RemoveEmptySpawns() int {
 	type spawnRef struct {
 		pos otmap.Position
@@ -392,7 +378,6 @@ func (e *Editor) RemoveEmptySpawns() int {
 	return len(empty)
 }
 
-// ClearInvalidHouses clears house ids of tiles whose house does not exist.
 func (e *Editor) ClearInvalidHouses() int {
 	tx := e.Begin("Clear invalid houses", 0)
 	cleared := 0
@@ -415,25 +400,20 @@ func (e *Editor) ClearModified() {
 	}
 }
 
-// allTilePositions lists the positions of all tiles of the map.
 func (e *Editor) allTilePositions() []otmap.Position {
 	var positions []otmap.Position
 	e.Map.Each(func(pos otmap.Position, _ *otmap.Tile) { positions = append(positions, pos) })
 	return positions
 }
 
-// BorderizeMap redoes all borders and walls.
 func (e *Editor) BorderizeMap() int {
 	return e.borderizePositions("Borderize map", e.allTilePositions())
 }
 
-// RandomizeMap rerolls all grounds.
 func (e *Editor) RandomizeMap() int {
 	return e.randomizePositions("Randomize map", e.allTilePositions())
 }
 
-// borderizePositions redoes borders and walls of the tiles at positions as
-// one undo step.
 func (e *Editor) borderizePositions(label string, positions []otmap.Position) int {
 	tx := e.Begin(label, 0)
 	for _, pos := range positions {
@@ -443,8 +423,6 @@ func (e *Editor) borderizePositions(label string, positions []otmap.Position) in
 	return tx.Commit()
 }
 
-// randomizePositions rerolls the grounds of the tiles at positions as one
-// undo step.
 func (e *Editor) randomizePositions(label string, positions []otmap.Position) int {
 	tx := e.Begin(label, 0)
 	for _, pos := range positions {
@@ -453,7 +431,6 @@ func (e *Editor) randomizePositions(label string, positions []otmap.Position) in
 	return tx.Commit()
 }
 
-// Statistics summarizes the map.
 type Statistics struct {
 	Tiles          int   `json:"tiles"`
 	Items          int   `json:"items"`
@@ -479,7 +456,6 @@ type Statistics struct {
 	MaxY           int   `json:"maxY"`
 }
 
-// Stats computes map statistics.
 func (e *Editor) Stats() Statistics {
 	stats := Statistics{Houses: len(e.Map.Houses), Towns: len(e.Map.Towns), Waypoints: len(e.Map.Waypoints), Floors: make([]int, otmap.MaxFloor+1)}
 	stats.MinX, stats.MinY, stats.MaxX, stats.MaxY, _ = e.Map.Bounds()
@@ -489,7 +465,6 @@ func (e *Editor) Stats() Statistics {
 	return stats
 }
 
-// countTileStats adds one tile and everything on it to stats.
 func (e *Editor) countTileStats(stats *Statistics, pos otmap.Position, tile *otmap.Tile) {
 	stats.Tiles++
 	stats.Floors[pos.Z]++
@@ -573,7 +548,6 @@ type ItemRef struct {
 	Path  []int          `json:"path"`
 }
 
-// itemAt resolves a reference on a writable tile.
 func itemAt(tile *otmap.Tile, ref ItemRef) (*otmap.Item, []otmap.Item, int, error) {
 	var list []otmap.Item
 	var item *otmap.Item
@@ -601,7 +575,6 @@ func itemAt(tile *otmap.Tile, ref ItemRef) (*otmap.Item, []otmap.Item, int, erro
 	return item, list, index, nil
 }
 
-// UpdateItem applies a patch to an item.
 func (e *Editor) UpdateItem(ref ItemRef, patch ItemPatch) error {
 	if e.Map.Tile(ref.Pos) == nil {
 		return ErrNoItem
@@ -655,7 +628,6 @@ func (e *Editor) UpdateItem(ref ItemRef, patch ItemPatch) error {
 	return nil
 }
 
-// RemoveItem deletes an item (or container content).
 func (e *Editor) RemoveItem(ref ItemRef) error {
 	if e.Map.Tile(ref.Pos) == nil {
 		return ErrNoItem
@@ -688,7 +660,6 @@ func (e *Editor) RemoveItem(ref ItemRef) error {
 	return nil
 }
 
-// AddToContainer puts a new item into a container.
 func (e *Editor) AddToContainer(ref ItemRef, id uint16) error {
 	if e.itemType(id) == nil {
 		return fmt.Errorf("unknown item %d", id)
@@ -711,7 +682,6 @@ func (e *Editor) AddToContainer(ref ItemRef, id uint16) error {
 	return nil
 }
 
-// MoveItem changes the stack position of an item on a tile.
 func (e *Editor) MoveItem(pos otmap.Position, from, to int) error {
 	current := e.Map.Tile(pos)
 	if current == nil || from < 0 || from >= len(current.Items) || to < 0 || to >= len(current.Items) || from == to {
@@ -726,7 +696,6 @@ func (e *Editor) MoveItem(pos otmap.Position, from, to int) error {
 	return nil
 }
 
-// AddItem puts a new item on a tile like a raw brush.
 func (e *Editor) AddItem(pos otmap.Position, id uint16) error {
 	if e.itemType(id) == nil {
 		return fmt.Errorf("unknown item %d", id)
@@ -757,7 +726,6 @@ func (e *Editor) RotateItem(ref ItemRef) error {
 	return nil
 }
 
-// SwitchDoor opens or closes a door.
 func (e *Editor) SwitchDoor(pos otmap.Position, index int) error {
 	current := e.Map.Tile(pos)
 	if current == nil || index < 0 || index >= len(current.Items) {
@@ -771,14 +739,12 @@ func (e *Editor) SwitchDoor(pos otmap.Position, index int) error {
 	return nil
 }
 
-// TilePatch changes tile properties.
 type TilePatch struct {
 	Flags   *uint32   `json:"flags,omitempty"`
 	HouseID *uint32   `json:"houseId,omitempty"`
 	Zones   *[]uint16 `json:"zones,omitempty"`
 }
 
-// UpdateTile applies a tile patch.
 func (e *Editor) UpdateTile(pos otmap.Position, patch TilePatch) {
 	tx := e.Begin("Edit tile", 0)
 	tile := tx.Edit(pos)
@@ -804,7 +770,6 @@ type CreaturePatch struct {
 	Remove    bool    `json:"remove,omitempty"`
 }
 
-// UpdateCreature edits a creature of a tile.
 func (e *Editor) UpdateCreature(pos otmap.Position, index int, patch CreaturePatch) error {
 	current := e.Map.Tile(pos)
 	if current == nil || index < 0 || index >= len(current.Creatures()) {

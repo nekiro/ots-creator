@@ -76,7 +76,6 @@ export class Animator {
     }
   }
 
-  /** Jump to a frame (used when stepping manually). */
   setFrame(frame: number, now: number): void {
     this.current = ((frame % this.frames) + this.frames) % this.frames;
     this.remaining = this.durations[this.current];
@@ -107,7 +106,6 @@ export class Animator {
     }
     let elapsed = now - this.lastTime;
     this.lastTime = now;
-    // Advance as many frames as fit in the elapsed time.
     let guard = 0;
     while (elapsed >= this.remaining && !this.complete && guard++ < 10000) {
       elapsed -= this.remaining;
@@ -161,12 +159,9 @@ export function footDelay(walkFrames: number, step = WALK_STEP_MS): number {
   return Math.max(Math.floor(cycle / walkFrames) + 10, 20);
 }
 
-/** What previewDurations needs to know about the thing and its client. */
 export interface PreviewContext {
   outfit: boolean;
-  /** Number of frame groups of the thing. */
   groups: number;
-  /** The animate always flag of the thing. */
   animateAlways: boolean;
   /**
    * The client stores frame durations (improved animations); without them

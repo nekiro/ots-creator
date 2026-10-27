@@ -1,6 +1,4 @@
 <script lang="ts">
-  // Loader over the whole window while a modal run (see run in state) works,
-  // so a long operation never looks like a frozen editor.
   import { app } from "../state/app.svelte";
   import { backdrop, pop } from "./motion";
   import ProgressBar from "./ProgressBar.svelte";

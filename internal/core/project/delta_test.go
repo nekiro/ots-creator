@@ -27,7 +27,6 @@ func TestDeltaTracksEdits(t *testing.T) {
 		t.Fatalf("delta must reset, got %+v", d)
 	}
 
-	// Undo of adding a thing touches the removed slot.
 	project.AddThing(thing.CategoryEffect)
 	project.TakeDelta()
 	project.Undo()

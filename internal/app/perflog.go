@@ -13,11 +13,9 @@ import (
 )
 
 const (
-	// maxPerfLogLine bounds one posted line of timings.
 	maxPerfLogLine = 4096
-	// perfLogFolder is the folder in the user's config directory.
-	perfLogFolder = "OTS Creator"
-	perfLogFile   = "map-perf.log"
+	perfLogFolder  = "OTS Creator"
+	perfLogFile    = "map-perf.log"
 )
 
 // appendPerfLog appends the request body (one line of timings from the map

@@ -5,10 +5,6 @@
 </script>
 
 <script lang="ts">
-  // The client's outfit window (Set Outfit), simpler: the outfit and the
-  // mount are picked from a list of every looktype, searched by id or by the
-  // creatures that wear it, with the addons and the four colors on the
-  // client's palette, and a preview turned to every side.
   import { untrack } from "svelte";
   import { Category, normalizeThing, ThingService, type Thing } from "../../lib/api";
   import { frameGroupAt } from "../../lib/thing";
@@ -27,7 +23,6 @@
   let { outfit, onapply, onclose }: { outfit: Outfit; onapply: (outfit: Outfit) => void; onclose: () => void } = $props();
 
   const draft = $state<Outfit>(untrack(() => ({ ...outfit })));
-  /** The list picks the outfit or the mount. */
   let tab = $state<"outfit" | "mount">("outfit");
   let search = $state("");
   /** Direction the preview faces (pattern X): north, east, south, west. */
@@ -44,7 +39,6 @@
   const hex = (color: number) => "#" + hsiToRgb(color).toString(16).padStart(6, "0");
   const palette = Array.from({ length: PALETTE_SIZE }, (_, color) => color);
 
-  /** Creatures of the palette by the looktype they wear: names for the search and the tooltips. */
   const wornBy = $derived.by(() => {
     const names = new Map<number, string[]>();
     for (const creature of map.palette?.creatures ?? []) {
@@ -58,7 +52,6 @@
     return names;
   });
 
-  /** Looktypes with sprites (empty ones are not shown) and the names asset clients give them. */
   let usedLookTypes = $state.raw<number[]>([]);
   let thingNames = $state.raw<Record<number, string>>({});
   $effect(() => {
@@ -93,7 +86,6 @@
     }
   }
 
-  /** The arrows of the client's window: the previous or next looktype of the list. */
   function cycle(step: number): void {
     if (!lookTypes.length) return;
     const index = chosenIndex < 0 ? 0 : (chosenIndex + step + lookTypes.length) % lookTypes.length;
@@ -109,7 +101,6 @@
     return names.length ? `${lookType} · ${names.slice(0, 6).join(", ")}${names.length > 6 ? "…" : ""}` : String(lookType);
   }
 
-  // The preview: the outfit with its colors and addons, on its mount.
   let outfitThing = $state.raw<Thing | null>(null);
   let mountThing = $state.raw<Thing | null>(null);
   let loaded = $state(0);
@@ -159,7 +150,6 @@
     previewSize = { width: image.width, height: image.height };
   });
 
-  /** The preview as large as fits its box, in whole steps. */
   const PREVIEW_BOX = 144;
   const previewZoom = $derived(Math.max(1, Math.floor(PREVIEW_BOX / Math.max(previewSize.width, previewSize.height, 1))));
 
@@ -315,7 +305,6 @@
     height: 10px;
     border: 1px solid #000;
   }
-  /* The client's palette: 7 rows of 19 colors. */
   .palette {
     display: grid;
     grid-template-columns: repeat(19, 14px);

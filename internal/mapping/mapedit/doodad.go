@@ -10,7 +10,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-// DoodadTile is one tile of a doodad placement, relative to the cursor.
 type DoodadTile struct {
 	X     int          `json:"x"`
 	Y     int          `json:"y"`
@@ -72,7 +71,6 @@ func (a *doodadAlt) pickComposite(rng *rand.Rand) []materials.CompositeTile {
 	return a.composites[0].tiles
 }
 
-// useComposite decides between a composite and a single object.
 func (a *doodadAlt) useComposite(rng *rand.Rand) bool {
 	if !a.hasComposite {
 		return false
@@ -87,15 +85,12 @@ func (a *doodadAlt) useComposite(rng *rand.Rand) bool {
 	return rng.IntN(total) < a.compositeTotal
 }
 
-// doodadPlacement collects the tiles of a placement being generated, keyed
-// by their offset from the cursor.
 type doodadPlacement struct {
 	editor *Editor
 	alt    *doodadAlt
 	tiles  map[[3]int]*DoodadTile
 }
 
-// put adds an item to the tile at an offset, creating the tile.
 func (p *doodadPlacement) put(x, y, z int, item otmap.Item) {
 	key := [3]int{x, y, z}
 	tile := p.tiles[key]
@@ -137,7 +132,6 @@ func (p *doodadPlacement) placeAt(x, y int) bool {
 	return ok
 }
 
-// scatter places count objects at random spots of the brush area.
 func (p *doodadPlacement) scatter(size int, shape string, count int) {
 	rng := p.editor.rng
 	for object := 0; object < count; object++ {
@@ -154,7 +148,6 @@ func (p *doodadPlacement) scatter(size int, shape string, count int) {
 	}
 }
 
-// sortedTiles returns the tiles ordered by floor, row and column.
 func (p *doodadPlacement) sortedTiles() []DoodadTile {
 	var tiles []DoodadTile
 	for _, tile := range p.tiles {
@@ -168,7 +161,6 @@ func (p *doodadPlacement) sortedTiles() []DoodadTile {
 	return tiles
 }
 
-// doodadArea is the number of tiles a brush of this size and shape covers.
 func doodadArea(size int, shape string) int {
 	if shape != shapeCircle {
 		return (2*size+1)*(2*size+1) + 1
@@ -192,8 +184,6 @@ func (e *Editor) doodadScatterCount(brush *DoodadBrush, size int, shape string, 
 	return max(1, objects+e.rng.IntN(max(objects, 0)+1))
 }
 
-// GenerateDoodad builds a new placement for a doodad brush. Thickness sets
-// how many objects a bigger brush scatters.
 func (e *Editor) GenerateDoodad(name string, variation, size int, shape string, thickness float64) *DoodadBuffer {
 	brush := e.Brushes.Doodad(name)
 	buffer := &DoodadBuffer{Brush: name, Variation: variation, Size: size, Shape: shape}
@@ -246,8 +236,6 @@ func (e *Editor) copyStampTile(tile *otmap.Tile, items []otmap.Item) {
 	}
 }
 
-// reborderAround updates borders and walls of the positions and their
-// neighbors, each tile once.
 func (e *Editor) reborderAround(tx *Tx, positions []otmap.Position) {
 	centers := newPosSet()
 	for _, pos := range positions {
@@ -329,5 +317,4 @@ func (e *Editor) eraseDoodad(tile *otmap.Tile, brush *DoodadBrush) {
 	}
 }
 
-// Doodad returns the current doodad preview.
 func (e *Editor) Doodad() *DoodadBuffer { return e.doodad }

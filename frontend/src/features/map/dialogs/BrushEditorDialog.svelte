@@ -15,8 +15,6 @@
   import { frameOf, previewOf, type Frame } from "../../../lib/map/editor/brushpreview";
   import { MAIN_WALLS, MORE_WALLS, chances, collectionsContaining, ensureBrushShape, missingForSave, normalizeBrushForSave, stampOf } from "../../../lib/map/editor/brushEdit";
 
-  // A new brush starts by choosing what it paints; the form then shows only
-  // what that kind needs, in order, with the rarely changed parts folded.
   const TYPES = [
     { value: "ground", label: "Ground", desc: "Grass, sand, floors. Borders join it to the grounds around it." },
     { value: "wall", label: "Wall", desc: "Walls that connect by themselves, with doors and windows." },
@@ -25,7 +23,6 @@
     { value: "table", label: "Table", desc: "Pieces that join into long tables." },
     { value: "decoration", label: "Wall decoration", desc: "Things hung on walls, following the wall shape." },
   ];
-  // Visual layout of border and carpet edges: [edge, column, row].
   const EDGE_GRID: [string, number, number][] = [
     ["cnw", 0, 0], ["n", 1, 0], ["cne", 2, 0],
     ["w", 0, 1], ["e", 2, 1],
@@ -47,12 +44,10 @@
   let step = $state<"type" | "edit">(isNew && !fromSelection ? "type" : "edit");
   let brush = $state<Brush>({ name: "", type: target.type === "fromSelection" ? "doodad" : target.type } as Brush);
   let borders = $state<Border[]>([]);
-  /** Collections the brush is in; edited brushes start with their current ones. */
   let collections = $state<string[]>(isNew ? [] : collectionsContaining(map.palette?.tilesets, target.name));
   let loading = $state(!isNew);
   let saving = $state(false);
   let moreWalls = $state(false);
-  /** Border being edited and its selected edge. */
   let editBorder = $state<Border | null>(null);
   let edge = $state("n");
 
@@ -87,7 +82,6 @@
   }
 
   const typeLabel = $derived(TYPES.find((type) => type.value === brush.type)?.label ?? brush.type);
-  /** A brush made from a selection: one group of tiles and nothing else. */
   const stamp = $derived(stampOf(brush));
 
   // Editing a stamp: chosen tiles in preview coordinates. The frame is taken
@@ -109,7 +103,6 @@
     tile.items = (tile.items ?? []).filter((_, i) => i !== itemIndex);
     if (!tile.items.length && stamp) stamp.tiles = (stamp.tiles ?? []).filter((other) => other !== tile);
   }
-  /** Clears the chosen tiles: the map keeps what is there. */
   function clearPicked() {
     if (!stamp || !picked.length) return;
     const gone = new Set(picked.map(tileAt).filter((tile) => !!tile));
@@ -128,7 +121,6 @@
     step = "edit";
   }
 
-  /** What still stops saving, told in the footer. */
   const missing = $derived(missingForSave(brush, fromSelection));
 
   function save() {
@@ -174,7 +166,6 @@
     }
   }
 
-  // ----- ground -----
   function addRule() {
     brush.borders = [...(brush.borders ?? []), { align: "outer", to: "all", border: 0 } as BorderRule];
   }
@@ -204,7 +195,6 @@
     ensureBrushShape(brush);
   });
 
-  // ----- carpet and table -----
   function part(align: string): Chance[] {
     return chances(brush.parts?.[align]);
   }
@@ -432,7 +422,6 @@
           </div>
         {/if}
 
-        <!-- Rarely changed: folded so the steps above stay the focus. -->
         <details class="adv">
           <summary>More options</summary>
           <div class="col advbody">
@@ -503,7 +492,6 @@
     overflow-y: auto;
     padding-right: 4px;
   }
-  /* Step heading: gold like other section titles, hint on the same line. */
   .sh {
     display: flex;
     align-items: center;

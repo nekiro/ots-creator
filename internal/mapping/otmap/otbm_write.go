@@ -13,8 +13,7 @@ import (
 const (
 	// areaMask keeps the base of the 256 x 256 tile area of a coordinate;
 	// tiles store their offset in it as a byte.
-	areaMask = 0xFF00
-	// progressEveryChunks is how often writeOTBM reports progress.
+	areaMask            = 0xFF00
 	progressEveryChunks = 64
 )
 
@@ -23,8 +22,6 @@ func WriteOTBM(out io.Writer, gameMap *Map, items Items, format Format) error {
 	return writeOTBM(out, gameMap, items, format, nil)
 }
 
-// writeOTBM is WriteOTBM that reports the chunks written (progress may be
-// nil).
 func writeOTBM(out io.Writer, gameMap *Map, items Items, format Format, progress func(done, total int)) error {
 	nodes := otbnode.NewWriter(out, [4]byte{'O', 'T', 'B', 'M'})
 	nodes.Start(nodeRoot)
@@ -59,7 +56,6 @@ func writeOTBM(out io.Writer, gameMap *Map, items Items, format Format, progress
 	return nodes.Flush()
 }
 
-// writeMapHeader writes the attributes of the map data node.
 func writeMapHeader(nodes *otbnode.Writer, gameMap *Map) {
 	nodes.U8(attrDescription)
 	nodes.String("Saved with " + Generator)
@@ -100,7 +96,6 @@ func (w *writer) position(position Position) {
 	w.nodes.U8(position.Z)
 }
 
-// tiles writes the tiles in tile area nodes.
 func (w *writer) tiles(gameMap *Map, progress func(done, total int)) {
 	area := struct {
 		base Position
@@ -193,7 +188,6 @@ func (w *writer) item(item *Item) {
 	w.nodes.End()
 }
 
-// subtype writes the count, or the charges of items with charges.
 func (w *writer) subtype(item *Item) {
 	itemType := w.items.Get(item.ID)
 	if itemType != nil && itemType.Flags.Has(otitems.FlagCharges) && !itemType.Flags.Has(otitems.FlagStackable) {
@@ -247,7 +241,6 @@ func (w *writer) itemExt(ext *ItemExt) {
 	}
 }
 
-// attributeMap writes the custom attributes of newer servers.
 func (w *writer) attributeMap(attrs []Attr) {
 	w.nodes.U8(attrAttributeMap)
 	w.nodes.U16(uint16(min(len(attrs), math.MaxUint16)))
@@ -273,7 +266,6 @@ func (w *writer) attributeMap(attrs []Attr) {
 	}
 }
 
-// EncodeOTBM returns the map as OTBM bytes.
 func EncodeOTBM(gameMap *Map, items Items, format Format) ([]byte, error) {
 	var buf bytes.Buffer
 	err := WriteOTBM(&buf, gameMap, items, format)

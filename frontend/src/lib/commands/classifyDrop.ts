@@ -1,8 +1,5 @@
-// What a drop of files onto the window means, from the paths and the
-// element they were dropped on.
 import { OBJECT_EXT } from "../api";
 
-/** Id of the preview's file drop target: images dropped there are sheets. */
 export const PREVIEW_DROP = "preview-drop";
 /** Ids of object list cells as file drop targets: an image dropped on an
  * object is a sheet for that object. */
@@ -13,22 +10,16 @@ const CLIENT_EXT = /(\.(dat|spr|otfi)|catalog-content\.json)$/i;
 const HAS_EXT = /\.[^\\/]+$/;
 
 export type DropAction =
-  /** One image on the preview: a sheet of the focused object. */
   | { kind: "previewSheet"; path: string }
-  /** One image on an object of the list: a sheet of that object. */
   | { kind: "thingSheet"; path: string; id: number }
-  /** Objects or images without an open client: shown in the viewer. */
   | { kind: "view"; path: string }
   | { kind: "importObjects"; paths: string[] }
   | { kind: "importImages"; paths: string[] }
-  /** A client file or folder. */
   | { kind: "openClient"; path: string }
   | { kind: "unknown" };
 
 export interface DropContext {
-  /** A client is open. */
   open: boolean;
-  /** An object is focused. */
   focused: boolean;
 }
 

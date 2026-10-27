@@ -24,23 +24,17 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/obd"
 )
 
-// Version is the format version this package writes and the highest it
-// reads.
 const Version = 1
 
-// Ext is the file extension, with the dot.
 const Ext = ".otobj"
 
 const (
 	formatName   = "otobj"
 	manifestName = "manifest.json"
-	// maxEntry limits one decompressed entry (64 MiB).
-	maxEntry = 64 << 20
-	// maxSprites limits the sprites of one frame group.
-	maxSprites = 4096
+	maxEntry     = 64 << 20
+	maxSprites   = 4096
 )
 
-// ErrNotOTOBJ is returned for files that are not OTOBJ archives.
 var ErrNotOTOBJ = errors.New("not an otobj file")
 
 type manifest struct {
@@ -83,9 +77,7 @@ type animation struct {
 	Durations  []thing.FrameDuration `json:"durations"`
 }
 
-// Options control Encode.
 type Options struct {
-	// Generator names the writing tool, e.g. "OTS Creator 1.4.0".
 	Generator string
 }
 
@@ -175,7 +167,6 @@ func encodeGroup(object *thing.Thing, groupIndex int, sheet string) group {
 	return out
 }
 
-// encodeFlags writes the properties that differ from their defaults.
 func encodeFlags(props *thing.Properties) (json.RawMessage, error) {
 	raw, err := json.Marshal(props)
 	if err != nil {
@@ -229,7 +220,6 @@ func isZero(value any) bool {
 	return false
 }
 
-// writePNG writes a sheet, with a palette when it has at most 256 colors.
 func writePNG(dest io.Writer, img *image.NRGBA) error {
 	var out image.Image = img
 	if palettedImg := paletted(img); palettedImg != nil {

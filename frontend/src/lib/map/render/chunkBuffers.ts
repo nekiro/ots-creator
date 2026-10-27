@@ -14,19 +14,15 @@ import type { FrameResult, Scene } from "./scene";
 import CHUNK_VERT from "./shaders/chunk.vert?raw";
 import SPRITE_FRAG from "./shaders/sprite.frag?raw";
 
-/** The quads of one chunk on the GPU. */
 interface ChunkBuffer {
   vao: WebGLVertexArrayObject;
   buffer: WebGLBuffer;
-  /** The geometry uploaded; a new one from the store uploads again. */
   source: GeoChunk;
-  /** Atlas cells the quads use, kept alive in the atlas while drawn. */
   cells: Int32Array;
   /** The cells are valid for this atlas and epoch, and every sprite was in it. */
   atlas: Atlas | null;
   epoch: number;
   ready: boolean;
-  /** Frame number it was last drawn in. */
   lastDrawn: number;
   /** The quads, kept on the CPU to patch animated pieces. */
   quads: Uint8Array | null;
@@ -39,9 +35,7 @@ export class ChunkBuffers {
   private uniforms: Record<string, WebGLUniformLocation | null> = {};
   private atlas: Atlas | null = null;
   private buffers = new Map<number, ChunkBuffer>();
-  /** Atlas cells of sprite ids. */
   private spriteCells: CellIndex;
-  /** Atlas cells of composed outfit pieces, by their index in composedIds. */
   private composedCells: CellIndex;
   private composedIds = new Map<string, number>();
   private composedKeys: string[] = [];
@@ -52,7 +46,6 @@ export class ChunkBuffers {
   private uploadedBytes = 0;
   private uploadDeadline = 0;
 
-  /** missing: where sprites not loaded yet are added. */
   constructor(
     private gl: WebGL2RenderingContext,
     private corners: WebGLBuffer,
@@ -64,7 +57,6 @@ export class ChunkBuffers {
     this.composedCells = new CellIndex(gl, 3, 1024, 4);
   }
 
-  /** A new atlas: nothing in the cell indexes is in it. */
   useAtlas(atlas: Atlas): void {
     this.atlas = atlas;
     this.spriteCells.clear();
@@ -78,7 +70,6 @@ export class ChunkBuffers {
     };
   }
 
-  /** Starts a frame: a new upload budget, the chunk program to bind again. */
   beginFrame(): void {
     this.frameNumber++;
     this.boundAlpha = -1;
@@ -86,13 +77,11 @@ export class ChunkBuffers {
     this.uploadDeadline = performance.now() + LIMITS.uploadMs;
   }
 
-  /** Another program was bound: the next chunk drawn binds the chunk program again. */
   unbind(): void {
     this.boundAlpha = -1;
     this.boundTexture = this.atlas!.texture;
   }
 
-  /** Uploads a chunk next to the view in spare upload time, kept as if drawn. */
   prefetch(chunk: GeoChunk): void {
     const buffer = this.upload(chunk, true);
     if (buffer) buffer.lastDrawn = this.frameNumber;
@@ -151,7 +140,6 @@ export class ChunkBuffers {
     return buffer;
   }
 
-  /** Puts every sprite of a chunk in the atlas and the cell index. */
   private ensureSprites(scene: Scene, buffer: ChunkBuffer, result: FrameResult): void {
     const atlas = this.atlas!;
     if (buffer.atlas === atlas && buffer.epoch === atlas.epoch && buffer.ready) {
@@ -193,7 +181,6 @@ export class ChunkBuffers {
     if (!ready) result.pending = true;
   }
 
-  /** The atlas cell of a sprite, uploading it when needed (-1: not loaded yet). */
   private cellOfSprite(scene: Scene, spriteId: number): number {
     const indexed = this.spriteCells.get(spriteId);
     if (indexed !== GPU.missingCell) return indexed;
@@ -231,7 +218,6 @@ export class ChunkBuffers {
     gl.bindVertexArray(null);
   }
 
-  /** Points animated pieces of a chunk at the sprites of their current frame. */
   private animate(scene: Scene, buffer: ChunkBuffer, result: FrameResult): void {
     const quads = buffer.quads!;
     const view = new DataView(quads.buffer, quads.byteOffset, quads.byteLength);
@@ -283,7 +269,6 @@ export class ChunkBuffers {
     }
   }
 
-  /** Binds the chunk program, unless it still is. */
   private bindProgram(scene: Scene, alpha: number): void {
     const gl = this.gl;
     // Uploads to the atlas or the cell index may have happened since.

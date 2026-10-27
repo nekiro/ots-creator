@@ -1,5 +1,3 @@
-// Object clipboard: copy whole objects or only properties onto other
-// objects. The copy is a plain snapshot, independent of later edits.
 import type { Properties, Thing } from "./api";
 
 export type PasteMode = "object" | "properties";
@@ -10,12 +8,10 @@ export function copyThings(things: Thing[]): void {
   copied = JSON.parse(JSON.stringify(things));
 }
 
-/** The copied objects; empty when nothing was copied. */
 export function clipboardThings(): Thing[] {
   return copied;
 }
 
-/** The copied object when exactly one was copied. */
 export function clipboardThing(): Thing | null {
   return copied.length === 1 ? copied[0] : null;
 }

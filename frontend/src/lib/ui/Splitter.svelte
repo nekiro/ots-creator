@@ -50,7 +50,6 @@
     padding: 0 1px;
     cursor: col-resize;
   }
-  /* Grip: two short separator_horizontal ridges, always visible. */
   .grip {
     flex: none;
     width: 32px; /* one separator_horizontal tile, no seam */

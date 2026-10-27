@@ -13,7 +13,6 @@ import { MapRenderer } from "./renderer";
 import { fakeGl } from "./testing/fakeGl";
 import type { PlayScene, Scene, ViewOptions } from "./scene";
 
-/** A small deterministic hash. */
 function mix(...values: number[]): number {
   let hash = 2166136261;
   for (const value of values) {
@@ -26,7 +25,6 @@ function mix(...values: number[]): number {
 
 const SPRITE = 32;
 
-/** complete: every sprite is loaded. */
 function fakeSprites(complete = false): SpriteCache {
   const cache = new Map<number, { pixels: Uint8ClampedArray }>();
   return {
@@ -75,7 +73,6 @@ function look(id: number, outfit: boolean): Look {
   } as unknown as Look;
 }
 
-/** complete: every appearance is loaded. */
 function fakeLooks(complete = false): Appearances {
   const cache = (outfit: boolean) => ({
     get(id: number) {
@@ -127,7 +124,6 @@ function geoChunk(key: number, signature: string): GeoChunk {
   return { key, quads, quadCount, animated, composed, sprites: Uint32Array.from(sprites), lights: new DataView(new ArrayBuffer(0)), lightCount: 0, shades: null, signature };
 }
 
-/** complete: every chunk is built (none still loading). */
 function fakeGeo(log: string[], complete = false): GeoStore {
   const chunks = new Map<string, GeoChunk | null | undefined>();
   const get = (key: number, signature: string) => {
@@ -203,7 +199,6 @@ function fakeChunks(log: string[]): ChunkStore {
       }
       return tiles.get(tileKey);
     },
-    /** Every tile is loaded: requesting one is peeking at it. */
     tile(x: number, y: number, z: number) {
       return store.peekTile(x, y, z);
     },
@@ -237,7 +232,6 @@ const ALL: ViewOptions = {
   ambientLight: 50,
 };
 
-/** What the play view draws with: no editor overlays. */
 const PLAYING: ViewOptions = { ...ALL, grid: false, ghostHigher: false, labels: false, spawns: false, houses: false, special: false, zones: false, pathing: false, highlightItems: false, wallHooks: false, markers: false, tooltips: false, coords: false, ghostItems: false, clientBox: false, lights: true };
 
 function playScene(change: Partial<PlayScene>): PlayScene {
@@ -299,7 +293,6 @@ describe("MapRenderer", () => {
       moveOffset: null,
       hover: { x: 1000, y: 999, z: 7 },
     };
-    // A tile with a text in view, for the hover over a sign.
     let sign = { x: 0, y: 0, z: 7 };
     for (let i = 0; i < 400 && !sign.x; i++) {
       const x = 995 + (i % 20);

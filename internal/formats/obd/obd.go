@@ -17,7 +17,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/dat"
 )
 
-// Format versions as stored in the file.
 const (
 	Version1 = 100
 	Version2 = 200
@@ -27,13 +26,11 @@ const (
 // maxDecompressed guards against decompression bombs (256 MiB).
 const maxDecompressed = 256 << 20
 
-// Sprite is one sprite embedded in an OBD file.
 type Sprite struct {
 	ID     uint32 // id in the source client, informative only
 	Pixels []byte // RGBA, non-premultiplied, size*size*4 bytes
 }
 
-// Data is a decoded OBD file.
 type Data struct {
 	Version       int
 	ClientVersion uint16
@@ -44,7 +41,6 @@ type Data struct {
 	Sprites [][]Sprite
 }
 
-// Decode decompresses and parses an OBD file.
 func Decode(file []byte) (*Data, error) {
 	raw, err := decompress(file)
 	if err != nil {
@@ -53,7 +49,6 @@ func Decode(file []byte) (*Data, error) {
 	return DecodeRaw(raw)
 }
 
-// DecodeRaw parses decompressed OBD data.
 func DecodeRaw(raw []byte) (*Data, error) {
 	reader := binio.NewReader(raw)
 	version := reader.U16()
@@ -187,7 +182,6 @@ func readARGB(reader *binio.Reader, length int, data *Data) ([]byte, error) {
 	return out, nil
 }
 
-// Encode serializes and compresses data with data.Version.
 func Encode(data *Data) ([]byte, error) {
 	raw, err := EncodeRaw(data)
 	if err != nil {
@@ -196,7 +190,6 @@ func Encode(data *Data) ([]byte, error) {
 	return compress(raw)
 }
 
-// EncodeRaw serializes data without compression.
 func EncodeRaw(data *Data) ([]byte, error) {
 	object := data.Thing
 	if err := object.Validate(); err != nil {

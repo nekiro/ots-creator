@@ -7,7 +7,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-// Tile flags of the chunk format.
 const (
 	tileSelected = 1 << iota
 	tileModified
@@ -23,14 +22,12 @@ const (
 	tileOptionalBorder
 	tileBlocking
 	tileText
-	// tileGround marks a tile whose first item is its ground.
 	tileGround
 	// tileOpaque marks a tile with a full ground or an opaque thing: it
 	// covers creatures on the floors under it (client: Tile::isFullyOpaque).
 	tileOpaque
 )
 
-// Item flags of the chunk format.
 const (
 	itemSelected = 1 << iota
 	itemIDs      // action or unique id
@@ -54,15 +51,12 @@ const (
 	// maxTileItems leaves room for the ground in the u8 item count.
 	maxTileItems = math.MaxUint8 - 1
 	// maxListLength bounds the u8 counted lists (creatures, zones, names).
-	maxListLength = math.MaxUint8
-	// chunkBufferSize is the initial buffer of a chunk response.
+	maxListLength   = math.MaxUint8
 	chunkBufferSize = 64 << 10
 )
 
-// chunkWriter appends little endian values to a buffer.
 type chunkWriter struct {
-	buf []byte
-	// looks tells the opacity of things (tileOpaque).
+	buf   []byte
 	looks *geometryBuilder
 }
 
@@ -78,7 +72,6 @@ func (w *chunkWriter) bool(value bool) {
 	}
 }
 
-// shortString writes a string of at most 255 bytes with its u8 length.
 func (w *chunkWriter) shortString(text string) {
 	text = text[:min(len(text), maxListLength)]
 	w.u8(uint8(len(text)))
@@ -255,7 +248,6 @@ func (w *chunkWriter) creatures(scene *Scene, creatures []otmap.Creature) {
 	}
 }
 
-// topText is the text of the topmost item of the tile that has one.
 func topText(tile *otmap.Tile) string {
 	for i := len(tile.Items) - 1; i >= 0; i-- {
 		if ext := tile.Items[i].Ext; ext != nil && ext.Text != "" {

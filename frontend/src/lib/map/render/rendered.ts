@@ -4,7 +4,6 @@
 
 const waiters = new Map<number, Set<() => void>>();
 
-/** Resolves once the map has been drawn completely, or after timeout ms. */
 export function whenRendered(id: number, timeout = 20000): Promise<void> {
   return new Promise((resolve) => {
     let set = waiters.get(id);
@@ -19,7 +18,6 @@ export function whenRendered(id: number, timeout = 20000): Promise<void> {
   });
 }
 
-/** Called by the map canvas after a frame with nothing left to load. */
 export function rendered(id: number): void {
   const set = waiters.get(id);
   if (!set?.size) return;

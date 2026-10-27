@@ -11,7 +11,6 @@
   import type { OutfitColors } from "../lib/render/outfit";
   import { PanView } from "../lib/pan.svelte";
 
-  /** The pixel grid shows from this zoom up (same as the single view). */
   const PIXEL_GRID_ZOOM = 4;
 
   let {
@@ -35,31 +34,23 @@
   }: {
     frameGroup: FrameGroup;
     size: number;
-    /** Bumps when sprites arrive. */
     loaded: number;
     selected: number[];
     showGrid: boolean;
-    /** Lines between single pixels (from PIXEL_GRID_ZOOM up). */
     pixelGrid?: boolean;
-    /** Outfit colors painted on layer 0 textures; mask layers stay as they are. */
     colors?: OutfitColors | null;
     /** A change centers the sheet again (another object or frame group). */
     resetKey?: string;
-    /** Texture shown in the single view, highlighted here. */
     current: TexturePos;
     onassign: (slot: number, ids: number[]) => void;
     onpick: (slot: number, pos: TexturePos) => void;
-    /** Double click: show this texture in the single view. */
     onopen: (pos: TexturePos) => void;
     /** Zoom chosen by hand; null fits the window. */
     manualZoom?: number | null;
     /** Out: the zoom that fits the window. */
     fitZoom?: number;
-    /** Ctrl+wheel: +1 or -1. */
     onwheelzoom?: (delta: number) => void;
-    /** Pixels of the sprites; the open client's by default. */
     get?: PixelSource;
-    /** No sprites can be dropped. */
     readonly?: boolean;
   } = $props();
 
@@ -69,14 +60,13 @@
   let dropSlot = $state<number | null>(null);
   let dropCount = $state(1);
 
-  const GAP = 4; // pixels between textures (unscaled)
+  const GAP = 4;
   const grid = $derived(sheetGrid(frameGroup));
   const textureWidth = $derived(frameGroup.width * size);
   const textureHeight = $derived(frameGroup.height * size);
   const sheetWidth = $derived(grid.columns * (textureWidth + GAP) - GAP);
   const sheetHeight = $derived(grid.rows * (textureHeight + GAP) - GAP);
   const STAGE_MARGIN = 24;
-  // Like the preview: no huge zoom on big screens.
   const MAX_FIT_ZOOM = 4;
   const fit = $derived(stageSize[0] ? zoomToFit(sheetWidth, sheetHeight, stageSize[0], stageSize[1], MAX_FIT_ZOOM, STAGE_MARGIN, 1) : 1);
   $effect(() => {
@@ -84,8 +74,6 @@
   });
   const zoom = $derived(manualZoom ?? fit);
 
-  // A canvas, not a scrolled box: the sheet is centered and panned
-  // (space + drag, middle button drag, wheel; ctrl+wheel zooms).
   const view = new PanView(
     () => ({ width: sheetWidth * zoom, height: sheetHeight * zoom, stageWidth: stageSize[0], stageHeight: stageSize[1] }),
     (delta) => onwheelzoom?.(delta),
@@ -106,7 +94,6 @@
     lastKey = resetKey;
   });
 
-  // Every slot with its position on the (unscaled) sheet.
   const tiles = $derived.by(() => {
     const out: { slot: number; x: number; y: number; pos: TexturePos }[] = [];
     for (let row = 0; row < grid.rows; row++)
@@ -120,7 +107,6 @@
       }
     return out;
   });
-  // Slots a drop of dropCount sprites at dropSlot would fill.
   const filling = $derived(dropSlot === null ? null : new Set(Array.from({ length: dropCount }, (_, i) => dropSlot! + i)));
   const selectedSet = $derived(new Set(selected));
   const isCurrent = (pos: TexturePos) =>

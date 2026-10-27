@@ -14,7 +14,6 @@ import (
 // ClientToServer converts a client id (RME "lookid") to a server id.
 type ClientToServer func(clientID uint16) (uint16, bool)
 
-// maxImportWarnings caps the warnings of one import.
 const maxImportWarnings = 200
 
 // maxVersionFolder is the highest folder name on the scale of client
@@ -85,8 +84,6 @@ func FindRMEData(dir string, clientVersion int) (string, error) {
 	return filepath.Join(dir, best), nil
 }
 
-// ImportRME reads a Remere's Map Editor data folder (materials.xml with its
-// includes and creatures.xml).
 func ImportRME(dir string, toServer ClientToServer) (*Materials, []string, error) {
 	im := &importer{materials: New(), visited: map[string]bool{}, toServer: toServer}
 	if err := im.file(filepath.Join(dir, "materials.xml")); err != nil {

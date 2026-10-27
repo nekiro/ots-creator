@@ -1,11 +1,7 @@
-// Pixel painting on one texture: strokes on an ImageData and splitting the
-// result back into sprite slots.
-
 import { textureSlots, type Layout, type TexturePos } from "./layout";
 
 export type RGBA = [number, number, number, number];
 
-/** Sets one pixel; outside the image does nothing. */
 export function setPixel(img: ImageData, x: number, y: number, color: RGBA): void {
   if (x < 0 || y < 0 || x >= img.width || y >= img.height) return;
   img.data.set(color, (y * img.width + x) * 4);
@@ -16,7 +12,6 @@ export function getPixel(img: ImageData, x: number, y: number): RGBA {
   return [img.data[offset], img.data[offset + 1], img.data[offset + 2], img.data[offset + 3]];
 }
 
-/** Paints every pixel on the line from (x0, y0) to (x1, y1) (Bresenham). */
 export function drawLine(img: ImageData, x0: number, y0: number, x1: number, y1: number, color: RGBA): void {
   const dx = Math.abs(x1 - x0);
   const dy = -Math.abs(y1 - y0);
@@ -38,7 +33,6 @@ export function drawLine(img: ImageData, x0: number, y0: number, x1: number, y1:
   }
 }
 
-/** Copies the size x size tile at (x, y) out of an image. */
 function tile(img: ImageData, x: number, y: number, size: number): Uint8ClampedArray {
   const out = new Uint8ClampedArray(size * size * 4);
   for (let row = 0; row < size; row++) {

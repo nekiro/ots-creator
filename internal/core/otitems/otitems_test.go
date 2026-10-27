@@ -10,7 +10,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/otbnode"
 )
 
-// writeOTB builds a minimal items.otb with the given items.
 func writeOTB(t *testing.T, items []struct {
 	group          Group
 	flags          uint32

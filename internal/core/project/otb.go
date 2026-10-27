@@ -17,7 +17,6 @@ import (
 // moved client items, items whose client data changed get it reloaded, and
 // client items past the last mapped one get new server ids.
 
-// itemsOTB is the attached items.otb.
 type itemsOTB struct {
 	path string
 	file *itemsotb.File
@@ -38,7 +37,6 @@ func newItemsOTB(path string, file *itemsotb.File, data []byte) *itemsOTB {
 	return otb
 }
 
-// OTBInfo describes the attached items.otb.
 type OTBInfo struct {
 	Path string `json:"path"`
 	// Version is "major.minor.build"; minor is the client version id.
@@ -50,7 +48,6 @@ type OTBInfo struct {
 	MaxClientID uint16 `json:"maxClientId"`
 }
 
-// OTBReport tells what syncing the items.otb changes (or changed).
 type OTBReport struct {
 	// Remapped counts server items whose client item was moved to another id.
 	Remapped int `json:"remapped"`
@@ -59,15 +56,13 @@ type OTBReport struct {
 	// Added counts new server items for client items past the last mapped one.
 	Added int `json:"added"`
 	// Missing counts server items whose client item no longer exists.
-	Missing int `json:"missing"`
-	// Written is set when the file was rewritten.
+	Missing int  `json:"missing"`
 	Written bool `json:"written"`
 	// Error is set when the file could not be updated (the client files
 	// were still written).
 	Error string `json:"error,omitempty"`
 }
 
-// Changed reports whether the sync changes the file.
 func (r OTBReport) Changed() bool { return r.Remapped+r.Updated+r.Added > 0 }
 
 // AttachOTB reads an items.otb and keeps it in sync with the client from
@@ -87,14 +82,12 @@ func (p *Project) AttachOTB(path string) (OTBInfo, error) {
 	return p.otb.info, nil
 }
 
-// DetachOTB stops syncing the items.otb.
 func (p *Project) DetachOTB() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.otb = nil
 }
 
-// OTB returns the attached items.otb, or nil.
 func (p *Project) OTB() *OTBInfo {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -105,7 +98,6 @@ func (p *Project) OTB() *OTBInfo {
 	return &info
 }
 
-// OTBPreview reports what compiling would change in the items.otb.
 func (p *Project) OTBPreview() (OTBReport, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -169,7 +161,6 @@ func (p *Project) otbSpriteHash() bool {
 // are 16 bit there too.
 const maxServerID = 0xFFFF
 
-// otbSync brings a copy of the attached items.otb in line with the client.
 type otbSync struct {
 	project *Project
 	report  OTBReport
@@ -308,7 +299,6 @@ func (s *otbSync) spriteHash(object *thing.Thing) (*[16]byte, error) {
 	return &digest, nil
 }
 
-// reload refreshes the client data of a server item from object.
 func (s *otbSync) reload(item *itemsotb.Item, object *thing.Thing) error {
 	digest, err := s.spriteHash(object)
 	if err != nil {

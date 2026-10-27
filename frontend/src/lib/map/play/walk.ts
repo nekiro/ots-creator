@@ -7,7 +7,6 @@
 export const Direction = { north: 0, east: 1, south: 2, west: 3, northEast: 4, southEast: 5, southWest: 6, northWest: 7 } as const;
 export type Direction = (typeof Direction)[keyof typeof Direction];
 
-/** Tile steps of each direction. */
 const OFFSETS: Record<Direction, [number, number]> = {
   0: [0, -1],
   1: [1, 0],
@@ -56,7 +55,6 @@ const MIN_SPEED = 80;
 const MAX_SPEED = 6000;
 /** Step durations are rounded up to whole server beats (ms). */
 const SERVER_BEAT = 50;
-/** Ground speed of a tile without a ground speed. */
 const DEFAULT_GROUND_SPEED = 150;
 /** Ground speed of a tile without a ground (client Tile::getGroundSpeed). */
 const NO_GROUND_SPEED = 100;

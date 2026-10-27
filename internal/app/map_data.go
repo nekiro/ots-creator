@@ -17,14 +17,12 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/materials"
 )
 
-// Item data sources of MapDataConfig.ItemsMode.
 const (
 	itemsAuto   = "auto"
 	itemsOTB    = "otb"
 	itemsClient = "client"
 )
 
-// mapData is the item database and brushes of the open client.
 type mapData struct {
 	project       *project.Project
 	client        string
@@ -41,7 +39,6 @@ type mapData struct {
 	clientData *mapData
 }
 
-// projectSource reads client items for the item database.
 type projectSource struct{ things map[uint32]*thing.Thing }
 
 func (source projectSource) Thing(_ thing.Category, id uint32) (*thing.Thing, error) {
@@ -83,7 +80,6 @@ func (ms *MapService) dataConfig(config *MapDataConfig, client, hint string) Map
 	return resolved
 }
 
-// loadData builds the item database and brushes for the open client.
 func (ms *MapService) loadData(config *MapDataConfig, hint string) (*mapData, error) {
 	proj, err := ms.session.Project()
 	if err != nil {
@@ -155,7 +151,6 @@ func (data *mapData) loadMaterials(storeDir string) {
 	}
 }
 
-// index rebuilds what derives from the items and materials.
 func (data *mapData) index() {
 	data.brushes = mapedit.NewBrushes(data.items, data.materials)
 	data.creatures = map[string]*materials.CreatureType{}
@@ -164,8 +159,6 @@ func (data *mapData) index() {
 	}
 }
 
-// allCreatures lists the creatures of the materials file and the scanned
-// ones it does not override, sorted by name.
 func (data *mapData) allCreatures() []*materials.CreatureType {
 	var all []*materials.CreatureType
 	defined := map[string]bool{}
@@ -191,8 +184,6 @@ func (data *mapData) outfit(creature string) (materials.Outfit, bool) {
 	return materials.Outfit{}, false
 }
 
-// ensure returns the data of the open client, building it when the client
-// changed.
 func (ms *MapService) ensure(hint string) (*mapData, error) {
 	proj, err := ms.session.Project()
 	if err != nil {
@@ -253,7 +244,6 @@ func (data *mapData) asClientIDs(storeDir string) *mapData {
 	return converted
 }
 
-// DataInfo describes the item and brush data of the map editor.
 type DataInfo struct {
 	Ready      bool          `json:"ready"`
 	Client     string        `json:"client"`
@@ -280,17 +270,14 @@ func (data *mapData) info() DataInfo {
 	return info
 }
 
-// MapStatus is the state of the map editor.
 type MapStatus struct {
-	Data     DataInfo         `json:"data"`
-	Maps     []MapInfo        `json:"maps"`
-	Recent   []RecentMap      `json:"recent"`
-	Settings mapedit.Settings `json:"settings"`
-	// Keys are the keyboard shortcuts changed by the user.
-	Keys map[string][]string `json:"keys"`
+	Data     DataInfo            `json:"data"`
+	Maps     []MapInfo           `json:"maps"`
+	Recent   []RecentMap         `json:"recent"`
+	Settings mapedit.Settings    `json:"settings"`
+	Keys     map[string][]string `json:"keys"`
 }
 
-// Status returns the data info, the open maps and the recent maps.
 func (ms *MapService) Status() MapStatus {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
@@ -309,11 +296,8 @@ func (ms *MapService) Status() MapStatus {
 	return status
 }
 
-// DetectData looks for items.otb and items.xml from a folder or map path.
 func (ms *MapService) DetectData(path string) MapDataConfig { return detectServerData(path) }
 
-// SetData changes where the item data and brushes come from and reloads
-// them.
 func (ms *MapService) SetData(config MapDataConfig) (DataInfo, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
@@ -328,7 +312,6 @@ func (ms *MapService) SetData(config MapDataConfig) (DataInfo, error) {
 	return data.info(), nil
 }
 
-// Reload rebuilds the item data from the client (after object edits).
 func (ms *MapService) Reload() (DataInfo, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
@@ -344,7 +327,6 @@ func (ms *MapService) Reload() (DataInfo, error) {
 	return data.info(), nil
 }
 
-// SetEditorSettings changes brush behavior settings.
 func (ms *MapService) SetEditorSettings(settings mapedit.Settings) error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()

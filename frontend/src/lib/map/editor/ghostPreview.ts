@@ -1,5 +1,3 @@
-// What the map shows of an action before it happens: ghost tiles of the
-// brush, paste or doodad and rectangles of selections and erasing.
 import type { Clip, CreatureType, DoodadBuffer, Position } from "../data/api";
 import type { CreatureData } from "../data/chunks";
 import { AREA_BRUSH_KINDS, MAX_RECT_PREVIEW_TILES, PREVIEW_COLORS } from "../constants";
@@ -7,7 +5,6 @@ import type { GhostTile, RectMark } from "../render/scene";
 import type { BrushSel, Tool } from "../state.svelte";
 import { brushArea, squareOutline } from "./tileGeometry";
 
-/** A mouse drag on the map canvas. */
 export type MapDrag =
   | { kind: "pan"; x: number; y: number; camX: number; camY: number; button: number; moved: boolean }
   | { kind: "paint"; last: Position; stroke: number; pending: Position[]; erase: boolean; alt: boolean; inflight: boolean }
@@ -22,7 +19,6 @@ export interface PreviewInput {
   floor: number;
   tool: Tool;
   brush: BrushSel | null;
-  /** Ctrl is held: the brush erases. */
   erase: boolean;
   pasting: boolean;
   clip: Clip | null;
@@ -39,12 +35,10 @@ export interface Preview {
   rects: RectMark[];
 }
 
-/** Item shown for a brush (server id, 0 for none). */
 export function lookOf(brush: BrushSel): number {
   return brush.look ?? brush.item ?? 0;
 }
 
-/** The creature of a creature brush, as drawn on a tile. */
 export function creatureGhost(brush: BrushSel, creatures: PreviewInput["creatures"], direction: number): CreatureData[] {
   const creature = creatures?.find((candidate) => candidate?.name === brush.creature);
   if (!creature) return [];

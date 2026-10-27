@@ -10,7 +10,6 @@ type PieceMap struct {
 	count  uint32
 }
 
-// NewPieceMap builds the piece numbering of a catalog.
 func NewPieceMap(catalog *Catalog) *PieceMap {
 	pieceMap := &PieceMap{sheets: catalog.Sheets, first: make([]uint32, len(catalog.Sheets))}
 	next := uint32(1)
@@ -27,10 +26,8 @@ func tiles(spriteType int) int {
 	return (width / TileSize) * (height / TileSize)
 }
 
-// Count returns the number of pieces.
 func (m *PieceMap) Count() uint32 { return m.count }
 
-// Pieces implements SpriteMap.
 func (m *PieceMap) Pieces(id uint32) (first uint32, width, height int, ok bool) {
 	i, ok := findSheet(m.sheets, id)
 	if !ok {
@@ -46,11 +43,10 @@ func (m *PieceMap) Pieces(id uint32) (first uint32, width, height int, ok bool) 
 // pixel position of the piece inside the sheet.
 type Piece struct {
 	Sheet  int
-	Sprite uint32 // official sprite id
+	Sprite uint32
 	X, Y   int
 }
 
-// Locate finds a piece by id.
 func (m *PieceMap) Locate(piece uint32) (Piece, bool) {
 	if piece == 0 || piece > m.count {
 		return Piece{}, false

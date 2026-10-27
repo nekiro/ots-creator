@@ -13,11 +13,8 @@ export interface GlCall {
 export interface FakeGl {
   gl: WebGL2RenderingContext;
   calls: GlCall[];
-  /** The test name of a created object or uniform location. */
   nameOf(object: unknown): string | undefined;
-  /** A call as one line: name(args) -> result. Typed arrays show their size and a hash. */
   format(call: GlCall): string;
-  /** The calls of one method. */
   callsOf(name: string): GlCall[];
 }
 
@@ -27,7 +24,6 @@ function hashBytes(bytes: Uint8Array): string {
   return (hash >>> 0).toString(16);
 }
 
-/** onCall sees each call as it happens. */
 export function fakeGl(onCall?: (call: GlCall) => void): FakeGl {
   const counts = new Map<string, number>();
   const names = new WeakMap<object, string>();

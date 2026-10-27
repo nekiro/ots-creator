@@ -91,8 +91,6 @@ var OBDTable = newTable("obd", true, map[byte]attr{
 	0x26: attrTopEffect, 0xFC: attrHasCharges, 0xFD: attrFloorChange, 0xFE: attrUsable,
 })
 
-// Table returns the flag table for a metadata format (1..6, see
-// client.MetadataFormat).
 func Table(format int) *FlagTable {
 	switch format {
 	case 1:

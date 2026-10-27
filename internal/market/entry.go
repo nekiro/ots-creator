@@ -27,7 +27,6 @@ type Info struct {
 	Sprites int `json:"sprites"`
 }
 
-// ReadObject decodes an object entry file and checks it against meta.
 func ReadObject(meta *Meta, data []byte) (*obd.Data, Info, error) {
 	if len(data) > MaxObjectBytes {
 		return nil, Info{}, fmt.Errorf("%s is larger than %d bytes", ObjectFile, MaxObjectBytes)
@@ -97,10 +96,8 @@ func alphas(pixels []byte) []byte {
 	return out
 }
 
-// packColumns is the widest grid PackImage lays sprites out in.
 const packColumns = 8
 
-// PackImage lays sprites out in a grid of up to packColumns columns.
 func PackImage(sprites [][]byte, size int) (*image.NRGBA, error) {
 	if len(sprites) == 0 {
 		return nil, errors.New("no sprites")
@@ -121,7 +118,6 @@ func PackImage(sprites [][]byte, size int) (*image.NRGBA, error) {
 // them with the creature speed; stored durations are placeholders).
 const walkFrameMs = 100
 
-// maxPreviewFrames bounds the frames of a preview GIF.
 const maxPreviewFrames = 64
 
 // Preview renders an animated GIF of an object: outfits walk south, other
@@ -160,7 +156,6 @@ func Preview(object *obd.Data) ([]byte, error) {
 		}
 		frames = append(frames, img)
 	}
-	// Crop every frame to the union of visible pixels.
 	var box image.Rectangle
 	for _, frame := range frames {
 		box = box.Union(imaging.ContentBounds(frame))

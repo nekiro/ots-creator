@@ -21,7 +21,6 @@ export const SCALE_MODES: { value: ScaleMode; label: string }[] = [
 
 const KEY = "ui-scale";
 
-/** Webview zoom that turns the system scale into the requested integer scale. */
 export function zoomFor(systemScale: number, mode: ScaleMode): number {
   if (!(systemScale > 0) || mode === "system") return 1;
   const target = mode === "auto" ? Math.max(1, Math.round(systemScale)) : mode;
@@ -44,17 +43,14 @@ let systemScale = 0;
 let current: ScaleMode = "auto";
 let rootZoom = 1;
 
-/** CSS zoom of the page (1 unless the UI is scaled below the system scale). */
 export function cssZoom(): number {
   return rootZoom;
 }
 
-/** Converts a distance in viewport pixels (mouse events, getBoundingClientRect) to CSS pixels. */
 export function toCss(distance: number): number {
   return distance / rootZoom;
 }
 
-/** Splits a zoom into the webview part (>= 1) and the CSS part (<= 1). */
 export function splitZoom(zoom: number): { webview: number; css: number } {
   return zoom >= 1 ? { webview: zoom, css: 1 } : { webview: 1, css: zoom };
 }
@@ -107,8 +103,6 @@ export function getMode(): ScaleMode {
   return current;
 }
 
-/** Detects the system scale and applies the saved mode; re-applies when the
- * window moves to a monitor with another scale. */
 export async function initPixelScale(): Promise<void> {
   current = loadMode();
   let zoom = 1;

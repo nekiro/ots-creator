@@ -9,7 +9,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-// MapInfo describes an open map.
 type MapInfo struct {
 	ItemMode  otitems.Mode `json:"itemMode"`
 	ID        int          `json:"id"`
@@ -73,11 +72,10 @@ func (ms *MapService) info(opened *openMap, meta bool) MapInfo {
 // state. Meta is set when towns, houses, waypoints or zones changed (Info
 // then lists them).
 type MapChange struct {
-	Chunks []uint32 `json:"chunks"`
-	All    bool     `json:"all"`
-	Meta   bool     `json:"meta"`
-	Info   MapInfo  `json:"info"`
-	// Count is the number of affected tiles or items (tools).
+	Chunks   []uint32 `json:"chunks"`
+	All      bool     `json:"all"`
+	Meta     bool     `json:"meta"`
+	Info     MapInfo  `json:"info"`
 	Count    int      `json:"count"`
 	Warnings []string `json:"warnings"`
 }
@@ -86,7 +84,6 @@ type MapChange struct {
 // that show a map without editing it (the play window).
 const EventMapChanged = "map:changed"
 
-// MapChanged lists the chunks an edit changed on a map.
 type MapChanged struct {
 	All    bool     `json:"all"`
 	ID     int      `json:"id"`
@@ -102,7 +99,6 @@ func (ms *MapService) change(opened *openMap) MapChange {
 	return MapChange{Chunks: keys, Meta: meta, Info: ms.info(opened, meta)}
 }
 
-// Info returns the state of a map (with towns, houses and waypoints).
 func (ms *MapService) Info(id int) (info MapInfo, err error) {
 	err = ms.withMap(id, func(opened *openMap, _ *mapData) error {
 		info = ms.info(opened, true)

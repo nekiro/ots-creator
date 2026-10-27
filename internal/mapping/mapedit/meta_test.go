@@ -8,7 +8,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-// metaLastLabel is the label of the newest undo step ("" when none).
 func metaLastLabel(e *Editor) string {
 	undo, _ := e.History()
 	if len(undo) == 0 {
@@ -17,7 +16,6 @@ func metaLastLabel(e *Editor) string {
 	return undo[len(undo)-1].Label
 }
 
-// metaWaypointNames lists the waypoint names in map order.
 func metaWaypointNames(e *Editor) []string {
 	var names []string
 	for _, waypoint := range e.Map.Waypoints {
@@ -25,8 +23,6 @@ func metaWaypointNames(e *Editor) []string {
 	}
 	return names
 }
-
-// --- Properties ---
 
 func TestPropertiesReturnsMapHeader(t *testing.T) {
 	e := testEditor(t)
@@ -74,8 +70,6 @@ func TestSetPropertiesIsUndoable(t *testing.T) {
 		t.Fatalf("after undo Properties() = %+v, want %+v", got, before)
 	}
 }
-
-// --- Houses ---
 
 func TestSaveHouseNewGetsFirstFreeID(t *testing.T) {
 	e := testEditor(t)
@@ -196,8 +190,6 @@ func TestHousesListsHousesByIDWithSizes(t *testing.T) {
 	}
 }
 
-// --- Towns ---
-
 func TestSaveTownNewGetsFirstFreeID(t *testing.T) {
 	e := testEditor(t)
 	e.Map.Towns[1] = &otmap.Town{ID: 1, Name: "One"}
@@ -275,8 +267,6 @@ func TestRemoveTownKeepsHouseTownIDs(t *testing.T) {
 		t.Fatal("undo did not bring the town back")
 	}
 }
-
-// --- Waypoints ---
 
 func TestSaveWaypointAddsTrimmedWaypoint(t *testing.T) {
 	e := testEditor(t)
@@ -369,8 +359,6 @@ func TestRemoveWaypointDeletesByName(t *testing.T) {
 	}
 }
 
-// --- Zones ---
-
 func TestSaveZoneNewGetsFirstFreeID(t *testing.T) {
 	e := testEditor(t)
 	e.Map.Zones = []otmap.Zone{{ID: 1, Name: "one"}, {ID: 3, Name: "three"}}
@@ -433,9 +421,6 @@ func TestRemoveZoneDeletesItAndClearsTiles(t *testing.T) {
 	}
 }
 
-// --- Import ---
-
-// metaSource is a 100x100 map with grass and a stone at 10,10.
 func metaSource() *otmap.Map {
 	source := otmap.New(100, 100)
 	source.SetTile(at(10, 10), &otmap.Tile{Ground: otmap.Item{ID: grassA}, Items: []otmap.Item{{ID: stoneID}}})
@@ -537,8 +522,6 @@ func TestImportedTilesAreModifiedAndNotSelected(t *testing.T) {
 	}
 }
 
-// metaHouseSource has houses 1 and 2 with one tile each; house 1 has an
-// exit, house 2 none.
 func metaHouseSource() *otmap.Map {
 	source := otmap.New(100, 100)
 	source.Houses[1] = &otmap.House{ID: 1, Name: "Theirs", Exit: at(10, 11)}
@@ -618,8 +601,6 @@ func TestImportHouseIDOverridesTargetTileOnMerge(t *testing.T) {
 	}
 }
 
-// metaTownSource has town 5 and waypoint "far", plus town 1 and waypoint
-// "start" that collide with the target's.
 func metaTownSource() *otmap.Map {
 	source := metaSource()
 	source.Towns[1] = &otmap.Town{ID: 1, Name: "Theirs", Temple: at(1, 1)}
@@ -665,8 +646,6 @@ func TestImportIsOneUndoStep(t *testing.T) {
 		t.Fatalf("after undo: %d houses, %d tiles, want the map empty again", len(e.Map.Houses), e.Map.TileCount())
 	}
 }
-
-// --- Minimap ---
 
 func TestMinimapColor(t *testing.T) {
 	cases := []struct {

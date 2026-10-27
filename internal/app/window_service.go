@@ -11,7 +11,6 @@ import (
 // and calls WindowService.Quit to close anyway.
 const EventCloseRequested = "app:close-requested"
 
-// EventFilesDropped carries a FilesDropped for files dropped onto the window.
 const EventFilesDropped = "app:files-dropped"
 
 // FilesDropped lists dropped files and the id of the drop target element
@@ -21,23 +20,19 @@ type FilesDropped struct {
 	Target string   `json:"target"`
 }
 
-// WindowService guards the main window against closing with unsaved work.
 type WindowService struct {
 	session *Session
-	// Maps reports unsaved maps.
-	Maps  *MapService
-	close func()
+	Maps    *MapService
+	close   func()
 	// OpenWindow opens another window of the app at a frontend URL (set by
 	// main). closed is called when it closes; it returns what focuses it.
 	OpenWindow func(url, title string, width, height int, closed func()) (focus func())
-	// playMu guards focusPlay, set while the play window is open.
-	playMu    sync.Mutex
-	focusPlay func()
-	unapplied atomic.Bool
-	force     atomic.Bool
+	playMu     sync.Mutex
+	focusPlay  func()
+	unapplied  atomic.Bool
+	force      atomic.Bool
 }
 
-// NewWindowService returns the guard. closeWindow closes the main window.
 func NewWindowService(session *Session, closeWindow func()) *WindowService {
 	return &WindowService{session: session, close: closeWindow}
 }
@@ -46,11 +41,8 @@ func NewWindowService(session *Session, closeWindow func()) *WindowService {
 // not applied to the client yet.
 func (ws *WindowService) SetUnapplied(unapplied bool) { ws.unapplied.Store(unapplied) }
 
-// EventPlayMove carries a PlayMove to the open play window: the player
-// starts again there.
 const EventPlayMove = "play:move"
 
-// PlayMove is where the play window's player starts again.
 type PlayMove struct {
 	Map int `json:"map"`
 	X   int `json:"x"`
@@ -79,14 +71,12 @@ func (ws *WindowService) OpenPlayWindow(mapID, x, y, z int) {
 	}
 }
 
-// PlayWindowOpen reports whether the play window is open.
 func (ws *WindowService) PlayWindowOpen() bool {
 	ws.playMu.Lock()
 	defer ws.playMu.Unlock()
 	return ws.focusPlay != nil
 }
 
-// Quit closes the window without asking.
 func (ws *WindowService) Quit() {
 	ws.force.Store(true)
 	ws.close()

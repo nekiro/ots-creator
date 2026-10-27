@@ -8,7 +8,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/formats/xmltree"
 )
 
-// ReadHouses applies a houses.xml to the map.
 func ReadHouses(gameMap *Map, data []byte) ([]string, error) {
 	doc, err := xmltree.Parse(data)
 	if err != nil {
@@ -43,7 +42,6 @@ func ReadHouses(gameMap *Map, data []byte) ([]string, error) {
 	return warnings, nil
 }
 
-// HouseSizes counts the tiles of every house.
 func HouseSizes(gameMap *Map) map[uint32]int {
 	sizes := map[uint32]int{}
 	for _, chunk := range gameMap.chunks {
@@ -57,7 +55,6 @@ func HouseSizes(gameMap *Map) map[uint32]int {
 	return sizes
 }
 
-// WriteHouses returns a houses.xml.
 func WriteHouses(gameMap *Map) []byte {
 	w := newXMLWriter()
 	w.elem("houses", nil, false)

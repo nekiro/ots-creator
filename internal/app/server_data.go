@@ -6,10 +6,8 @@ import (
 	"github.com/nekiro/ots-creator/internal/fsutil"
 )
 
-// serverDataSearchDepth is how many folders up detectServerData looks.
 const serverDataSearchDepth = 5
 
-// serverDataFolders are where item files are looked for in each folder.
 var serverDataFolders = []string{"items", filepath.Join("data", "items"), ""}
 
 // detectServerData looks for items.otb and items.xml in a server data

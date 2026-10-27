@@ -7,7 +7,6 @@ import (
 	"github.com/nekiro/ots-creator/internal/core/thing"
 )
 
-// Thing returns a copy of a thing.
 func (p *Project) Thing(category thing.Category, id uint32) (*thing.Thing, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -18,7 +17,6 @@ func (p *Project) Thing(category thing.Category, id uint32) (*thing.Thing, error
 	return object.Clone(), nil
 }
 
-// ThingRange returns copies of things with ids in [from, to].
 func (p *Project) ThingRange(category thing.Category, from, to uint32) []*thing.Thing {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -33,8 +31,6 @@ func (p *Project) ThingRange(category thing.Category, from, to uint32) []*thing.
 	return out
 }
 
-// UpdateThing replaces an existing thing with object (matched by category
-// and id).
 func (p *Project) UpdateThing(object *thing.Thing) error {
 	if err := object.Validate(); err != nil {
 		return err
@@ -73,7 +69,6 @@ func (p *Project) checkSpriteIDs(object *thing.Thing) error {
 	return nil
 }
 
-// AddThing appends a new empty thing and returns its id.
 func (p *Project) AddThing(category thing.Category) (uint32, error) {
 	if !category.Valid() {
 		return 0, fmt.Errorf("invalid category %d", category)
@@ -87,7 +82,6 @@ func (p *Project) AddThing(category thing.Category) (uint32, error) {
 	return id, nil
 }
 
-// DuplicateThings appends copies of the given things and returns new ids.
 func (p *Project) DuplicateThings(category thing.Category, ids []uint32) ([]uint32, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()

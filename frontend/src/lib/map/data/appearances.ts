@@ -1,9 +1,6 @@
-// Render data of client items and outfits, loaded in batches from
-// MapService.Appearances.
 import { Category } from "../../api";
 import { MapService, type Appearance } from "./api";
 
-/** Appearance flags (see app.Appearance). */
 export const AF = {
   animateAlways: 1,
   hangable: 2,
@@ -21,7 +18,6 @@ export const AF = {
 
 export interface Look extends Omit<Appearance, "sprites" | "offsetX" | "offsetY" | "elevation" | "moving"> {
   sprites: number[];
-  /** The walking frame group of an outfit that has one. */
   moving: Look | null;
   offsetX: number;
   offsetY: number;
@@ -108,7 +104,6 @@ class Cache {
   }
 }
 
-/** Item and outfit appearances. */
 export class Appearances {
   readonly items: Cache;
   readonly outfits: Cache;

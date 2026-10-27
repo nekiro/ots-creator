@@ -1,6 +1,4 @@
 <script lang="ts">
-  // A map position: typed or pasted, picked with a click on the map, or
-  // visited.
   import { fmtPos, parsePos, type Position } from "../../../lib/map/data/api";
   import { goTo } from "../../../lib/map/view/commands";
   import { pickPosition } from "../../../lib/map/editor/world";

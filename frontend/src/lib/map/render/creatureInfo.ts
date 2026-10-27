@@ -39,13 +39,10 @@ export interface Rect {
 export interface InfoLayout {
   /** The bar's black background; the health bar is inside it, 1 pixel in. */
   bar: Rect;
-  /** Top of the name. */
   nameTop: number;
-  /** Where the name is centered before the view's edge moves it (see nameLeft). */
   nameCenter: number;
 }
 
-/** What of a creature's information is drawn (client: Otc::DrawNames, DrawBars, DrawManaBar). */
 export interface InfoParts {
   names: boolean;
   bars: boolean;
@@ -70,7 +67,6 @@ export function infoLayout(x: number, y: number, px: number, viewWidth: number, 
   return { bar, nameTop: bar.y - NAME_OVER_BAR * px, nameCenter: bar.x + BAR_CENTER * px };
 }
 
-/** The left of a name of nameWidth device pixels centered at center, a screen pixel inside the view. */
 export function nameLeft(center: number, nameWidth: number, px: number, viewWidth: number): number {
   return clamp(center - Math.trunc(nameWidth / 2), px, Math.max(px, viewWidth - nameWidth - px));
 }
@@ -89,7 +85,6 @@ export function litInfoColor(rgb: readonly [number, number, number], brightness:
   return [Math.trunc((level * rgb[0]) / 51), Math.trunc((level * rgb[1]) / 51), Math.trunc((level * rgb[2]) / 51)];
 }
 
-/** The health bar inside the background: 1 pixel in, its width by health. */
 export function healthRect(bar: Rect, px: number, healthPercent: number): Rect {
   return { x: bar.x + px, y: bar.y + px, width: Math.round((healthPercent / 100) * (BAR_WIDTH - 2) * px), height: bar.height - 2 * px };
 }

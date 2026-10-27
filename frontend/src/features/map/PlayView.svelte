@@ -38,9 +38,7 @@
     start: Position;
     items: ItemIndex;
     spriteSize: number;
-    /** Leaves the play view where the player stands. */
     onexit: (position: Position) => void;
-    /** Moves the play view to its own window (null: it is in one). */
     onpopout?: ((position: Position) => void) | null;
     /** Calls back with the chunks edits change (the play window hears of them from the backend); returns the unsubscribe. */
     changes?: ((changed: (keys: number[]) => void) => () => void) | null;
@@ -48,7 +46,6 @@
 
   let host = $state<HTMLDivElement>();
   let canvas = $state<HTMLCanvasElement>();
-  /** Names over creatures, drawn as text over the map. */
   let overlay = $state<HTMLCanvasElement>();
   let glError = $state("");
   let canvasCss = $state({ width: 0, height: 0 });
@@ -56,7 +53,6 @@
   let width = 0;
   let height = 0;
 
-  // The view is made for one map and start (the parent keys it on the map).
   const initial = untrack(() => ({ mapId, start: { ...start }, items }));
   const chunks = new ChunkStore(initial.mapId, () => requestDraw());
   const geo = new GeoStore(initial.mapId, () => requestDraw());
@@ -66,7 +62,6 @@
   let shown = $state<Position>({ ...initial.start });
   let outfitOpen = $state(false);
 
-  // Only what the client shows: no editor overlays.
   const playView = $derived<ViewOptions>({
     grid: false,
     lowerFloors: true,
@@ -110,16 +105,13 @@
     return () => window.clearInterval(fade);
   });
 
-
   let raf = 0;
   let timer = 0;
-  /** The first floor drawn last frame and the player's floor then. */
   let shownFloors = { z: -1, firstFloor: 0 };
   function requestDraw() {
     if (!raf) raf = requestAnimationFrame(draw);
   }
 
-  /** The mount ridden (0: none). */
   function mountLook(): number {
     return playerSettings.mounted ? playerSettings.mount : 0;
   }
@@ -146,8 +138,6 @@
     }
   }
 
-
-  /** Outfits and mounts whose sprites were asked for, every frame and direction at once. */
   const prefetched = new Set<number>();
   function prefetch(lookType: number): void {
     if (!lookType || prefetched.has(lookType)) return;
@@ -178,7 +168,6 @@
     const position = player.position;
     if (position.x !== shown.x || position.y !== shown.y || position.z !== shown.z) {
       shown = { ...position };
-      // The editor's toolbar stops the play view where the player stands.
       if (onpopout) map.player = { ...position };
     }
     const [offsetX, offsetY] = player.offset(now, spriteSize);
@@ -288,7 +277,6 @@
       onexit({ ...player.position });
       return;
     }
-    // Ctrl+R mounts and dismounts, as in the client (the mount is picked in the outfit window).
     if (event.ctrlKey && event.code === "KeyR") {
       event.preventDefault();
       if (!event.repeat && playerSettings.mount) playerSettings.mounted = !playerSettings.mounted;
@@ -329,7 +317,6 @@
     } catch (err) {
       glError = errorMessage(err);
     }
-    // The view keeps the client's aspect, as large as the window allows.
     const resizeObserver = new ResizeObserver(() => {
       const box = host!.getBoundingClientRect();
       const tile = Math.max(1, Math.min(box.width / PLAY.tilesWide, box.height / PLAY.tilesHigh));
@@ -451,7 +438,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  /* The bar's buttons keep their whole text; the key help gives way. */
   .bar :global(.m-seg) {
     flex: none;
   }

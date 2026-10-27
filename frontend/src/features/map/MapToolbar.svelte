@@ -10,13 +10,10 @@
   const isDoodad = $derived(brush?.kind === "doodad");
   const isCreature = $derived(brush?.kind === "creature");
   const sized = $derived(!!brush && !["door", "houseExit", "waypoint", "creature"].includes(brush.kind));
-  /** Brushes without an item show a color. */
   const SWATCHES: Record<string, string> = { house: "#5a6fd8", houseExit: "#5a6fd8", flag: "#4c4", zone: "#50c8ff", spawn: "#f66", spawnNpc: "#6af", waypoint: "#7c7", optionalBorder: "#a87", eraser: "#ddd" };
   const FLAG_COLORS: Record<number, string> = { 1: "#4c4", 4: "#cc4", 8: "#c44", 16: "#c4c" };
   const swatch = $derived(brush && !brush.look && !brush.item ? (brush.kind === "flag" ? FLAG_COLORS[brush.flag ?? 0] : SWATCHES[brush.kind]) || "#888" : "");
 
-  // Walls switch between the wall itself and the doors and windows that go
-  // into it.
   const DOORS: [string, string, string][] = [
     ["normal", "Door", "A door; Alt places it open"],
     ["locked", "Locked", "A locked door (needs a key)"],
@@ -38,8 +35,6 @@
 
   type ViewToggle = { [Key in keyof typeof map.view]: (typeof map.view)[Key] extends boolean ? Key : never }[keyof typeof map.view];
   type ViewButton = { key: ViewToggle; icon: string; title: string };
-  // What is drawn over the map, shown or hidden with one click, in groups:
-  // creatures, areas, marked places, texts.
   const LAYERS: ViewButton[][] = [
     [
       { key: "creatures", icon: "person", title: "Creatures" },
@@ -59,7 +54,6 @@
       { key: "coords", icon: "hash", title: "Position of the tile under the mouse" },
     ],
   ];
-  // How floors are shown.
   const QUICK: ViewButton[] = [
     { key: "grid", icon: "grid", title: "Grid (G)" },
     { key: "lowerFloors", icon: "sheet", title: "Show lower floors (L)" },
@@ -183,7 +177,6 @@
     gap: 3px;
     flex: none;
   }
-  /* Groups of layer buttons stand apart without separators. */
   .layers {
     gap: 9px;
   }

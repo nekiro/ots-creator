@@ -19,7 +19,7 @@ func TestSheetRoundTrip(t *testing.T) {
 	src := make([][]byte, group.TotalSprites())
 	for i := range src {
 		if i%5 == 0 {
-			continue // empty slot
+			continue
 		}
 		src[i] = solid(byte(i+1), 32)
 	}
@@ -74,7 +74,6 @@ func TestSliceTilesPadsEdges(t *testing.T) {
 	if len(tiles) != 2 {
 		t.Fatalf("tiles %d", len(tiles))
 	}
-	// Second tile: first 8 columns filled, rest transparent.
 	second := tiles[1]
 	if second[0] != 200 || second[8*4+3] != 0 {
 		t.Fatal("padding wrong")
@@ -139,7 +138,6 @@ func TestEncodeFormats(t *testing.T) {
 			}
 			continue
 		}
-		// The transparent pixel is flattened onto magenta.
 		if r, g, b := back.Pix[last], back.Pix[last+1], back.Pix[last+2]; r < 240 || g > 15 || b < 240 {
 			t.Fatalf("%s background %v", f, back.Pix[last:last+4])
 		}

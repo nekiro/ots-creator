@@ -1,5 +1,4 @@
 <script lang="ts" module>
-  // 16x16 pixel-style icons drawn with simple paths.
   const PATHS: Record<string, string> = {
     open: "M2 4h4l1 1h7v8H2z M2 6h12",
     save: "M3 2h8l2 2v10H3z M5 2v4h6V2 M5 9h6v5H5z",

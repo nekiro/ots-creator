@@ -15,13 +15,10 @@ import (
 	"github.com/nekiro/ots-creator/internal/fsutil"
 )
 
-// maxSheetSprites is the most sprites ExportAllSheets puts in one sheet.
 const maxSheetSprites = 64 * 64
 
-// ExportSummary reports an export of a whole client.
 type ExportSummary struct {
-	Files int `json:"files"`
-	// Skipped counts empty objects or sprites that were left out.
+	Files   int `json:"files"`
 	Skipped int `json:"skipped"`
 }
 
@@ -71,8 +68,6 @@ func (ts *ThingService) ExportAll(dir string, skipEmpty bool, format string) (Ex
 
 func categoryFolder(category thing.Category) string { return category.String() + "s" }
 
-// ExportAll writes every sprite as {id}.{format} into dir (see Export).
-// With skipEmpty fully transparent sprites are left out.
 func (ss *SpriteService) ExportAll(dir, format string, skipEmpty bool) (ExportSummary, error) {
 	format = imaging.FormatOf("x." + format)
 	proj, err := ss.session.Project()

@@ -1,5 +1,3 @@
-// Package settings stores user preferences and the recently opened clients
-// in a JSON file in the user's config directory.
 package settings
 
 import (
@@ -17,16 +15,13 @@ import (
 	"github.com/nekiro/ots-creator/internal/core/client"
 )
 
-// MaxRecent is the number of remembered clients.
 const MaxRecent = 10
 
-// Sheet backgrounds.
 const (
 	BackgroundMagenta     = "magenta"
 	BackgroundTransparent = "transparent"
 )
 
-// Recent is a client that was opened or compiled.
 type Recent struct {
 	// Format is "assets" for a Tibia 12+ asset folder (DatPath is the
 	// folder); empty for dat/spr.
@@ -38,28 +33,20 @@ type Recent struct {
 	OpenedAt time.Time       `json:"openedAt"`
 }
 
-// Settings are the user preferences.
 type Settings struct {
-	// CheckUpdates checks GitHub for a new release on startup.
 	CheckUpdates bool `json:"checkUpdates"`
-	// ReopenLast opens the most recent client on startup.
-	ReopenLast bool `json:"reopenLast"`
+	ReopenLast   bool `json:"reopenLast"`
 	// SheetBackground fills empty pixels of exported sprite sheets
 	// (BackgroundMagenta like ObjectBuilder, or BackgroundTransparent).
 	SheetBackground string `json:"sheetBackground"`
-	// ExportFormat is the default image format: png, bmp or jpg.
-	ExportFormat string `json:"exportFormat"`
+	ExportFormat    string `json:"exportFormat"`
 	// ObjectFormat is the file format of exported objects: "otobj" (the
 	// native format) or "obd" (ObjectBuilder).
-	ObjectFormat string `json:"objectFormat"`
-	// ListColumns is the number of objects per row in the object list; the
-	// list panel is sized to fit them.
-	ListColumns int      `json:"listColumns"`
-	Recent      []Recent `json:"recent"`
-	// MarketAuthor is the nickname last used to share to the market.
-	MarketAuthor string `json:"marketAuthor"`
-	// MarketAdminToken deletes any market entry (the API's admin token).
-	MarketAdminToken string `json:"marketAdminToken"`
+	ObjectFormat     string   `json:"objectFormat"`
+	ListColumns      int      `json:"listColumns"`
+	Recent           []Recent `json:"recent"`
+	MarketAuthor     string   `json:"marketAuthor"`
+	MarketAdminToken string   `json:"marketAdminToken"`
 	// MarketShared maps market entries shared from this computer to their
 	// delete tokens. Like Recent, Update keeps it as stored.
 	MarketShared map[string]string `json:"marketShared"`
@@ -71,14 +58,12 @@ type Settings struct {
 	ItemsOTB map[string]string `json:"itemsOtb"`
 }
 
-// Object list columns range.
 const (
 	MinListColumns     = 6
 	MaxListColumns     = 12
 	DefaultListColumns = 7
 )
 
-// Defaults returns the settings of a fresh install.
 func Defaults() Settings {
 	return Settings{CheckUpdates: true, SheetBackground: BackgroundMagenta, ExportFormat: "png", ObjectFormat: "otobj", ListColumns: DefaultListColumns, Recent: []Recent{}, MarketShared: map[string]string{}, LastDirs: map[string]string{}, ItemsOTB: map[string]string{}}
 }
@@ -116,14 +101,12 @@ func (s *Settings) normalize() {
 	}
 }
 
-// Store loads and saves settings. It is safe for concurrent use.
 type Store struct {
 	mu       sync.Mutex
 	path     string
 	settings Settings
 }
 
-// DefaultPath returns the settings file in the user's config directory.
 func DefaultPath() (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
@@ -152,7 +135,6 @@ func Open(path string) (*Store, error) {
 	return store, nil
 }
 
-// Get returns a copy of the settings.
 func (st *Store) Get() Settings {
 	st.mu.Lock()
 	defer st.mu.Unlock()
@@ -178,7 +160,6 @@ func (st *Store) Update(updated Settings) error {
 	return st.saveLocked()
 }
 
-// AddRecent moves a client to the top of the recent list.
 func (st *Store) AddRecent(recent Recent) error {
 	if recent.DatPath == "" {
 		return nil
@@ -206,7 +187,6 @@ func (st *Store) SetMarketShared(id, token string) error {
 	return st.saveLocked()
 }
 
-// SetMarketAuthor remembers the nickname used to share.
 func (st *Store) SetMarketAuthor(name string) error {
 	st.mu.Lock()
 	defer st.mu.Unlock()
@@ -217,14 +197,12 @@ func (st *Store) SetMarketAuthor(name string) error {
 	return st.saveLocked()
 }
 
-// LastDir returns the folder the dialog key last confirmed, or "".
 func (st *Store) LastDir(key string) string {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	return st.settings.LastDirs[key]
 }
 
-// SetLastDir remembers the folder confirmed in the dialog key.
 func (st *Store) SetLastDir(key, dir string) error {
 	if key == "" || dir == "" {
 		return nil
@@ -238,7 +216,6 @@ func (st *Store) SetLastDir(key, dir string) error {
 	return st.saveLocked()
 }
 
-// RemoveRecent drops a client from the recent list; "" clears it.
 func (st *Store) RemoveRecent(datPath string) error {
 	st.mu.Lock()
 	defer st.mu.Unlock()
@@ -252,14 +229,12 @@ func (st *Store) RemoveRecent(datPath string) error {
 
 func recentDatPath(recent Recent) string { return recent.DatPath }
 
-// ItemsOTB returns the items.otb kept in sync with a client, or "".
 func (st *Store) ItemsOTB(clientPath string) string {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	return st.settings.ItemsOTB[fsutil.PathKey(clientPath)]
 }
 
-// SetItemsOTB remembers the items.otb of a client; "" forgets it.
 func (st *Store) SetItemsOTB(clientPath, otbPath string) error {
 	if clientPath == "" {
 		return nil

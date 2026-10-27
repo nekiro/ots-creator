@@ -47,7 +47,6 @@ type baseInfo struct {
 // spriteHash identifies sprite content; the zero value is an empty sprite.
 type spriteHash [2]uint64
 
-// Kinds of spriteSlot.
 const (
 	slotBase  = iota // reads the base sprite of the same id
 	slotData         // reads data
@@ -79,7 +78,6 @@ func sprFile(file *spr.File) spriteBase {
 	return sprFileBase{file}
 }
 
-// baseCount is the number of sprites of the base.
 func (s *spriteStore) baseCount() uint32 {
 	if s.base == nil {
 		return 0
@@ -87,7 +85,6 @@ func (s *spriteStore) baseCount() uint32 {
 	return s.base.Count()
 }
 
-// edited reports whether a sprite differs from the base.
 func (s *spriteStore) edited(id uint32) bool {
 	_, ok := s.overlay[id]
 	_, moved := s.alias[id]
@@ -96,7 +93,6 @@ func (s *spriteStore) edited(id uint32) bool {
 
 func (s *spriteStore) count() uint32 { return s.spriteCount }
 
-// compressed returns sprite data; empty sprites return nil.
 func (s *spriteStore) compressed(id uint32) ([]byte, error) {
 	if id == 0 || id > s.spriteCount {
 		return nil, fmt.Errorf("sprite id %d out of range [1,%d]", id, s.spriteCount)
@@ -113,7 +109,6 @@ func (s *spriteStore) compressed(id uint32) ([]byte, error) {
 	return nil, nil
 }
 
-// baseID returns the base sprite that id reads, if it reads one.
 func (s *spriteStore) baseID(id uint32) (uint32, bool) {
 	if id == 0 || id > s.spriteCount {
 		return 0, false
@@ -142,8 +137,6 @@ func (s *spriteStore) hash(id uint32) (spriteHash, error) {
 	return spriteHash{}, nil
 }
 
-// baseHash returns the content hash of a base sprite, reading it only the
-// first time.
 func (s *spriteStore) baseHash(baseSprite uint32) (spriteHash, error) {
 	if baseSprite == 0 || baseSprite > s.baseCount() {
 		return spriteHash{}, fmt.Errorf("base sprite id %d out of range [1,%d]", baseSprite, s.baseCount())
@@ -171,7 +164,6 @@ func (s *spriteStore) baseHash(baseSprite uint32) (spriteHash, error) {
 	return contentHash, nil
 }
 
-// dataSize returns the compressed size of a sprite in bytes.
 func (s *spriteStore) dataSize(id uint32) (int, error) {
 	if data, ok := s.overlay[id]; ok {
 		return len(data), nil
@@ -209,13 +201,11 @@ func (s *spriteStore) set(id uint32, data []byte) {
 	s.overlay[id] = data
 }
 
-// unset drops an edit: the sprite reads from the base again.
 func (s *spriteStore) unset(id uint32) {
 	delete(s.overlay, id)
 	delete(s.alias, id)
 }
 
-// slot returns how a sprite resolves now.
 func (s *spriteStore) slot(id uint32) spriteSlot {
 	if data, ok := s.overlay[id]; ok {
 		return spriteSlot{kind: slotData, data: data}
@@ -226,7 +216,6 @@ func (s *spriteStore) slot(id uint32) spriteSlot {
 	return spriteSlot{kind: slotBase}
 }
 
-// setSlot makes id resolve as slot.
 func (s *spriteStore) setSlot(id uint32, slot spriteSlot) {
 	switch {
 	case slot.kind == slotData:
@@ -239,8 +228,6 @@ func (s *spriteStore) setSlot(id uint32, slot spriteSlot) {
 	}
 }
 
-// slotOf returns a slot that reads what sprite sourceID reads now, for use at
-// another id.
 func (s *spriteStore) slotOf(sourceID uint32) spriteSlot {
 	slot := s.slot(sourceID)
 	if slot.kind == slotBase {
@@ -302,7 +289,6 @@ func (s *spriteStore) eachHash(fn func(id uint32, contentHash spriteHash)) error
 	})
 }
 
-// source returns an spr.Source that encodes with the given transparency.
 func (s *spriteStore) source(transparent bool) spr.Source {
 	if transparent == s.transparent {
 		return storeSource{s}
@@ -317,7 +303,6 @@ func (source storeSource) Compressed(id uint32) ([]byte, error) {
 	return source.store.compressed(id)
 }
 
-// transcodeSource reads the store re-encoded with another transparency.
 type transcodeSource struct {
 	store       *spriteStore
 	transparent bool

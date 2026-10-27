@@ -12,8 +12,8 @@ import (
 type field struct {
 	num     protowire.Number
 	typ     protowire.Type
-	value   uint64 // varint and fixed values
-	payload []byte // length-delimited payload
+	value   uint64
+	payload []byte
 	raw     []byte
 }
 
@@ -120,7 +120,6 @@ func (m message) all(num protowire.Number) []message {
 	return out
 }
 
-// appendOthers appends the raw fields whose number is not in known.
 func (m message) appendOthers(out []byte, known ...protowire.Number) []byte {
 	for _, entry := range m {
 		if !slices.Contains(known, entry.num) {

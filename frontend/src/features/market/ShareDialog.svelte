@@ -32,9 +32,6 @@
   import TagPicker from "../../lib/ui/TagPicker.svelte";
   import ThingCanvas from "../../lib/ui/ThingCanvas.svelte";
 
-  // Opened from the market, the window picks what to share; from a menu it
-  // shares the selection.
-
   const initial = app.shareTarget!;
   const pick = !!initial.pick;
   let target = $state<ShareTarget>(initial);
@@ -53,7 +50,6 @@
     if (!nameTouched) name = "";
   }
 
-  // A file from disk: an OBD object or an image cut into sprites.
   const FILE_FILTERS = [
     { name: "Objects and images (*.otobj, *.obd, *.png, *.bmp, *.gif)", pattern: "*.otobj;*.obd;*.png;*.bmp;*.gif" },
     OBJECT_FILTERS[0],
@@ -109,7 +105,6 @@
 
   let name = $state(defaultName());
   let author = $state("");
-  // Tags from the curated groups or typed by the author.
   let tags = $state<string[]>([]);
   let description = $state("");
   let license = $state(readLicense());
@@ -167,8 +162,6 @@
     window.addEventListener("message", onmessage);
     return () => window.removeEventListener("message", onmessage);
   });
-
-
 
   async function share() {
     if (target.kind === "object" && app.dirty) await applyDraft();
