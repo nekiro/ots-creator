@@ -109,10 +109,12 @@
 
 <nav class="menubar" ondblclick={(event) => event.target === event.currentTarget || (event.target as HTMLElement).matches(".spacer, .logo") ? Window.ToggleMaximise() : null}>
   <img class="logo" src="/icon.png" alt="" width="16" height="16" draggable="false" />
+  {#if app.open}
   <div class="modes" role="tablist">
     <button class="mode" class:on={map.mode === "objects"} role="tab" aria-selected={map.mode === "objects"} title="Object editor" onclick={() => mapCommands.setMode("objects")}>Objects</button>
     <button class="mode" class:on={map.mode === "map"} role="tab" aria-selected={map.mode === "map"} title="Map editor" onclick={() => mapCommands.setMode("map")}>Map</button>
   </div>
+  {/if}
   {#each menus as menu, i}
     <div class="menu">
       <button

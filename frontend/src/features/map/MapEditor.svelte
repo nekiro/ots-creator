@@ -2,7 +2,6 @@
   import { onMount } from "svelte";
   import { app } from "../../lib/state/app.svelte";
   import { readJson, saveJson } from "../../lib/state/storage";
-  import { commands } from "../../lib/commands";
   import { MapService } from "../../lib/map/data/api";
   import { mapCommands, spriteSize } from "../../lib/map/view/commands";
   import { loadMapData, map } from "../../lib/map/state.svelte";
@@ -78,19 +77,7 @@
   });
 </script>
 
-<main class="maplayout" class:nomap={app.open && !map.maps.length} bind:this={layout} style="--left-w:{sides.left}px;--right-w:{sides.right}px">
-  {#if !app.open}
-    <div class="welcome">
-      <section class="t-window card">
-        <div class="t-window-title">Map editor</div>
-        <p>The map editor draws maps with the sprites of a client. Open the client of your server first.</p>
-        <div class="row">
-          <button class="t-btn primary" onclick={() => commands.browseOpen()}>Open client…</button>
-          <button class="t-btn" onclick={() => mapCommands.setMode("objects")}>Back to objects</button>
-        </div>
-      </section>
-    </div>
-  {:else}
+<main class="maplayout" class:nomap={!map.maps.length} bind:this={layout} style="--left-w:{sides.left}px;--right-w:{sides.right}px">
     <div class="left">
       <MiniWindow title={map.side === "library" ? "Draw with" : "On this map"} class="side">
         {#snippet actions()}
@@ -173,7 +160,6 @@
       <Inspector />
     </div>
     {/if}
-  {/if}
 </main>
 
 <MapDialogs />
@@ -351,20 +337,5 @@
     border: 1px solid #555;
     padding: 8px 16px;
     color: var(--gold);
-  }
-  .welcome {
-    grid-column: 1 / -1;
-    display: grid;
-    place-items: center;
-  }
-  .card {
-    width: 420px;
-    padding: 16px 20px 14px;
-    align-items: center;
-    text-align: center;
-    gap: 10px;
-  }
-  .card p {
-    margin: 0;
   }
 </style>

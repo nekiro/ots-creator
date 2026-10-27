@@ -25,8 +25,9 @@
   import ExportSpritesDialog from "./features/tools/ExportSpritesDialog.svelte";
   import ItemsOtbDialog from "./features/dialogs/ItemsOtbDialog.svelte";
   import ShareDialog from "./features/market/ShareDialog.svelte";
-  import { listPanelWidth, loadPrefs, prefs, recentDir, removeRecent, shortPath } from "./lib/state/prefs.svelte";
+  import { listPanelWidth, loadPrefs, prefs } from "./lib/state/prefs.svelte";
   import { setMinLayoutWidth } from "./lib/pixelscale";
+  import StartScreen from "./features/StartScreen.svelte";
   import SpriteList from "./features/SpriteList.svelte";
   import StatusBar from "./features/StatusBar.svelte";
   import ThingList from "./features/ThingList.svelte";
@@ -99,7 +100,10 @@
     };
   });
 
-  const recent = $derived((prefs.settings.recent ?? []).slice(0, 6));
+  // Without a client only the start screen is shown; it opens the editor asked for.
+  $effect(() => {
+    if (!app.open) map.mode = "objects";
+  });
 
   const listWidth = $derived(listPanelWidth(prefs.settings.listColumns || 7));
   $effect(() => setMinLayoutWidth(listWidth + 740));
@@ -110,55 +114,26 @@
 
 <div class="shell" data-file-drop-target>
   <MenuBar />
-  {#if map.mode === "map"}
+  {#if !app.open}
+    <main><StartScreen /></main>
+  {:else if map.mode === "map"}
     <MapEditor bind:hoverText={mapHover} />
   {:else}
   <main style="--list-w:{listWidth}px">
-    {#if app.open}
-      <div class="left">
-        <ThingList />
-      </div>
-      <div class="center" bind:this={center} style="--sprites-h:{spritesHeight}px">
-        <section class="t-window editor">
-          <div class="t-window-title">Preview</div>
-          <Preview bind:group />
-        </section>
-        <Splitter ondrag={resizeSprites} onend={saveHeight} />
-        <SpriteList />
-      </div>
-      <div class="right">
-        {#if app.selection.length > 1}<BulkEdit />{:else}<Properties bind:group />{/if}
-      </div>
-    {:else}
-      <div class="welcome">
-        <section class="t-window card">
-          <div class="t-window-title">OTS Creator</div>
-          <img class="pixel" src="/icon.png" alt="" width="48" height="48" />
-          <p>Open a client (Tibia.dat + Tibia.spr) or start a new one.</p>
-          <div class="row">
-            <button class="t-btn primary" onclick={() => commands.browseOpen()}>Open client…</button>
-            <button class="t-btn" onclick={commands.create}>New client…</button>
-          </div>
-          {#if recent.length}
-            <div class="recent">
-              <div class="t-label rtitle">Recent clients</div>
-              <div class="t-panel rlist">
-                {#each recent as recentClient (recentClient.datPath)}
-                  <div class="ritem">
-                    <button class="ropen" title={recentClient.datPath} onclick={() => commands.openRecent(recentClient)}>
-                      <span class="rver">{recentClient.version.name}</span>
-                      <span class="rdir">{shortPath(recentDir(recentClient), 44)}</span>
-                    </button>
-                    <button class="rdel" title="Remove from list" aria-label="Remove from list" onclick={() => removeRecent(recentClient)}>×</button>
-                  </div>
-                {/each}
-              </div>
-            </div>
-          {/if}
-          <p class="t-label hint"><kbd>Ctrl+O</kbd> open · <kbd>Ctrl+N</kbd> new · drop a client folder, .dat, .otobj or .obd here</p>
-        </section>
-      </div>
-    {/if}
+    <div class="left">
+      <ThingList />
+    </div>
+    <div class="center" bind:this={center} style="--sprites-h:{spritesHeight}px">
+      <section class="t-window editor">
+        <div class="t-window-title">Preview</div>
+        <Preview bind:group />
+      </section>
+      <Splitter ondrag={resizeSprites} onend={saveHeight} />
+      <SpriteList />
+    </div>
+    <div class="right">
+      {#if app.selection.length > 1}<BulkEdit />{:else}<Properties bind:group />{/if}
+    </div>
   </main>
   {/if}
   <StatusBar {mapHover} />
@@ -231,82 +206,5 @@
     flex: 1;
     min-height: 260px;
     padding: 8px 10px 8px;
-  }
-  .welcome {
-    grid-column: 1 / -1;
-    display: grid;
-    place-items: center;
-  }
-  .card {
-    width: 400px;
-    padding: 16px 20px 14px;
-    align-items: center;
-    text-align: center;
-    gap: 10px;
-  }
-  .card p {
-    margin: 0;
-  }
-  .hint {
-    font: var(--fs-small) / 10px var(--font-small);
-  }
-  .recent {
-    width: 100%;
-    text-align: left;
-  }
-  .rtitle {
-    margin-bottom: 3px;
-  }
-  .rlist {
-    padding: 2px;
-  }
-  .ritem {
-    display: flex;
-    align-items: center;
-  }
-  .ritem:hover {
-    background: rgba(255, 255, 255, 0.06);
-  }
-  .ropen {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    gap: 8px;
-    padding: 3px 6px;
-    background: none;
-    border: 0;
-    font: inherit;
-    color: var(--text);
-    text-align: left;
-    cursor: pointer;
-  }
-  .ropen:hover .rdir {
-    color: var(--text-bright);
-  }
-  .rver {
-    color: var(--gold);
-    flex: none;
-    min-width: 34px;
-  }
-  .rdir {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .rdel {
-    flex: none;
-    width: 18px;
-    background: none;
-    border: 0;
-    color: var(--text-dim);
-    font: inherit;
-    cursor: pointer;
-    visibility: hidden;
-  }
-  .ritem:hover .rdel {
-    visibility: visible;
-  }
-  .rdel:hover {
-    color: #ff9c9c;
   }
 </style>

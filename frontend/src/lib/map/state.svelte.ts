@@ -53,7 +53,6 @@ const DEFAULT_CAMERA: Readonly<Camera> = { x: 0, y: 0, zoom: 1, floor: GROUND_FL
 
 const VIEW_KEY = "map:view";
 const BRUSH_KEY = "map:brush";
-const MODE_KEY = "map:mode";
 
 export const DEFAULT_VIEW: ViewOptions = {
   grid: false,
@@ -82,7 +81,8 @@ export const DEFAULT_VIEW: ViewOptions = {
 };
 
 class MapState {
-  mode = $state<EditorMode>(loadJson<{ mode: EditorMode }>(MODE_KEY, { mode: "objects" }).mode);
+  /** Not remembered: each start shows the start screen, which picks the editor. */
+  mode = $state<EditorMode>("objects");
   data = $state<DataInfo | null>(null);
   maps = $state.raw<MapInfo[]>([]);
   recent = $state<RecentMap[]>([]);
@@ -155,7 +155,6 @@ export const map = new MapState();
 
 $effect.root(() => {
   $effect(() => saveJson(VIEW_KEY, map.view));
-  $effect(() => saveJson(MODE_KEY, { mode: map.mode }));
   $effect(() => saveJson(BRUSH_KEY, { size: map.size, shape: map.shape }));
 });
 
