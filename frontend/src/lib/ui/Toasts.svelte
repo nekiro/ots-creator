@@ -17,13 +17,16 @@
 <style>
   .toasts {
     position: fixed;
-    right: 14px;
+    left: 50%;
     bottom: 34px;
+    transform: translateX(-50%);
     z-index: 100;
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 6px;
-    max-width: 420px;
+    width: max-content;
+    max-width: min(520px, calc(100vw - 28px));
     pointer-events: none;
   }
   .toast {
@@ -48,7 +51,7 @@
   }
   @keyframes slide {
     from {
-      transform: translateX(20px);
+      transform: translateY(10px);
       opacity: 0;
     }
   }
