@@ -147,6 +147,29 @@ the open client; object changes show after **Reload from client**.
   update per frame. Plain tiles are stored packed, so maps with millions of tiles stay
   small in memory.
 
+### Server item attributes
+
+Some servers add their own item attributes to OTBM (for example quest numbers on chests
+and doors). The editor cannot skip an attribute it does not know, because OTBM does not
+store attribute sizes: it warns and drops that attribute and the ones after it on the item.
+
+To keep them, put `<map>-attributes.json` next to the map (`world-attributes.json` for
+`world.otbm`) and list each attribute with its code and type:
+
+```json
+[
+  { "code": 25, "name": "Door quest number", "type": "u16" },
+  { "code": 26, "name": "Door quest value", "type": "i32" },
+  { "code": 28, "name": "Chest quest number", "type": "u16" }
+]
+```
+
+Types: `u8`, `u16`, `u32`, `i32`, `u64` (little-endian, as the server writes them) and
+`string` (uint16 length, then the text). The file is read when the map opens; listed
+attributes are kept unchanged and written back when the map is saved. Codes of standard
+OTBM attributes (1 to 24 and 128) cannot be redefined. `name` is for you; the editor does
+not use it yet.
+
 ## OTOBJ object format
 
 `.otobj` is a ZIP with a `manifest.json` and one PNG sprite sheet per frame group. Full

@@ -35,13 +35,30 @@ func LoadProgress(path string, items Items, format Format, progress Progress) (*
 	if err != nil {
 		return nil, nil, err
 	}
-	gameMap, warnings, err := readOTBM(data, items, format, progress)
+	dir := filepath.Dir(path)
+	base := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	// Server attributes must be known before the items are read.
+	var warnings []string
+	var customSizes map[byte]int
+	attrsName := base + "-attributes.json"
+	if attrsData, err := os.ReadFile(filepath.Join(dir, attrsName)); err == nil {
+		sizes, attrsWarnings, err := ReadCustomAttrs(attrsData)
+		if err != nil {
+			warnings = append(warnings, fmt.Sprintf("%s: %v", attrsName, err))
+		}
+		for _, warning := range attrsWarnings {
+			warnings = append(warnings, fmt.Sprintf("%s: %s", attrsName, warning))
+		}
+		customSizes = sizes
+	} else if !os.IsNotExist(err) {
+		warnings = append(warnings, fmt.Sprintf("%s: %v", attrsName, err))
+	}
+	gameMap, mapWarnings, err := readOTBM(data, items, format, customSizes, progress)
 	if err != nil {
 		return nil, nil, err
 	}
+	warnings = append(warnings, mapWarnings...)
 	progress(StageFiles, 0, 1)
-	dir := filepath.Dir(path)
-	base := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	files := 0
 	readAux := func(name, fallback string, fn func([]byte) ([]string, error)) string {
 		files++

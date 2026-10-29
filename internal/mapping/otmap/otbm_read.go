@@ -18,12 +18,14 @@ var otbmIdentifiers = []string{"OTBM", "\x00\x00\x00\x00"}
 const streamDepth = 2
 
 type reader struct {
-	gameMap  *Map
-	items    Items
-	format   Format
-	version  uint32
-	warnings []string
-	warned   map[string]int
+	gameMap *Map
+	items   Items
+	format  Format
+	// customSizes are the server attributes from the map's attributes file.
+	customSizes map[byte]int
+	version     uint32
+	warnings    []string
+	warned      map[string]int
 }
 
 func (r *reader) warn(format string, args ...any) {
@@ -40,10 +42,10 @@ func (r *reader) warn(format string, args ...any) {
 }
 
 func ReadOTBM(data []byte, items Items, format Format) (*Map, []string, error) {
-	return readOTBM(data, items, format, nil)
+	return readOTBM(data, items, format, nil, nil)
 }
 
-func readOTBM(data []byte, items Items, format Format, progress Progress) (*Map, []string, error) {
+func readOTBM(data []byte, items Items, format Format, customSizes map[byte]int, progress Progress) (*Map, []string, error) {
 	if len(data) >= 4 {
 		if identifier := string(data[:4]); !slices.Contains(otbmIdentifiers, identifier) {
 			return nil, nil, fmt.Errorf("%w: identifier %q", ErrNotOTBM, identifier)
@@ -61,7 +63,7 @@ func readOTBM(data []byte, items Items, format Format, progress Progress) (*Map,
 	root, _, err := otbnode.Stream(data, streamDepth, reportTiles, func(stack []*otbnode.Node, node *otbnode.Node) error {
 		if r == nil {
 			var err error
-			if r, err = newReader(stack[0], stack[1], items, format); err != nil {
+			if r, err = newReader(stack[0], stack[1], items, format, customSizes); err != nil {
 				return err
 			}
 		}
@@ -88,7 +90,7 @@ func readOTBM(data []byte, items Items, format Format, progress Progress) (*Map,
 		if len(root.Children) > 0 {
 			mapData = root.Children[0]
 		}
-		if r, err = newReader(root, mapData, items, format); err != nil {
+		if r, err = newReader(root, mapData, items, format, customSizes); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -101,7 +103,7 @@ func readOTBM(data []byte, items Items, format Format, progress Progress) (*Map,
 	return r.gameMap, r.warnings, nil
 }
 
-func newReader(root, mapData *otbnode.Node, items Items, format Format) (*reader, error) {
+func newReader(root, mapData *otbnode.Node, items Items, format Format, customSizes map[byte]int) (*reader, error) {
 	header := otbnode.NewReader(root.Props)
 	version := header.U32()
 	width, height := header.U16(), header.U16()
@@ -111,7 +113,7 @@ func newReader(root, mapData *otbnode.Node, items Items, format Format) (*reader
 	}
 	gameMap := New(width, height)
 	gameMap.ItemsMajor, gameMap.ItemsMinor = itemsMajor, itemsMinor
-	r := &reader{gameMap: gameMap, items: items, format: format, version: version, warned: map[string]int{}}
+	r := &reader{gameMap: gameMap, items: items, format: format, customSizes: customSizes, version: version, warned: map[string]int{}}
 	if version > otbmNewest {
 		r.warn("OTBM version %d is newer than the editor knows; the map may load wrong", version)
 	}
@@ -268,7 +270,7 @@ func (r *reader) itemNode(node *otbnode.Node, pos Position) (Item, bool) {
 		r.warn("item without id at %d,%d,%d", pos.X, pos.Y, pos.Z)
 		return item, false
 	}
-	if err := readItemAttrs(props, &item, r.format); err != nil {
+	if err := readItemAttrs(props, &item, r.format, r.customSizes); err != nil {
 		r.warn("item %d at %d,%d,%d: %v", item.ID, pos.X, pos.Y, pos.Z, err)
 	}
 	for _, child := range node.Children {
@@ -284,7 +286,7 @@ func (r *reader) itemNode(node *otbnode.Node, pos Position) (Item, bool) {
 	return item, true
 }
 
-func readItemAttrs(props *otbnode.Reader, item *Item, format Format) error {
+func readItemAttrs(props *otbnode.Reader, item *Item, format Format, customSizes map[byte]int) error {
 	for props.More() {
 		attr := props.U8()
 		switch attr {
@@ -318,7 +320,7 @@ func readItemAttrs(props *otbnode.Reader, item *Item, format Format) error {
 				return err
 			}
 		default:
-			if err := readRawAttr(props, item, attr); err != nil {
+			if err := readRawAttr(props, item, attr, customSizes); err != nil {
 				return err
 			}
 		}
@@ -350,9 +352,12 @@ func readAttributeMap(props *otbnode.Reader, item *Item) error {
 }
 
 // readRawAttr keeps an attribute the editor does not use verbatim (see
-// rawSizes).
-func readRawAttr(props *otbnode.Reader, item *Item, attr byte) error {
+// rawSizes and the map's attributes file).
+func readRawAttr(props *otbnode.Reader, item *Item, attr byte, customSizes map[byte]int) error {
 	size, ok := rawSizes[attr]
+	if !ok {
+		size, ok = customSizes[attr]
+	}
 	if !ok {
 		return fmt.Errorf("unknown attribute %d", attr)
 	}

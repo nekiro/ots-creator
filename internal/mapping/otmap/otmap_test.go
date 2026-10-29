@@ -211,3 +211,34 @@ func TestCountU16(t *testing.T) {
 		t.Fatalf("standard format: count %d", it.Subtype)
 	}
 }
+
+func TestCustomAttributesFile(t *testing.T) {
+	items := testItems()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "world.otbm")
+	m := New(2048, 2048)
+	ground := Item{ID: 100}
+	ground.Ensure().Raw = []RawAttr{{Code: 28, Data: []byte{0x39, 0x05}}, {Code: 26, Data: []byte{1, 0, 0, 0}}}
+	m.SetTile(Position{100, 100, 7}, &Tile{Ground: ground})
+	if _, err := Save(path, m, items, Format{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, warns, err := Load(path, items, Format{}); err != nil || len(warns) != 1 {
+		t.Fatalf("without the attributes file: warnings %v, err %v", warns, err)
+	}
+	attrs := `[{"code": 28, "name": "Chest quest number", "type": "u16"}, {"code": 26, "type": "i32"}, {"code": 4, "type": "u16"}]`
+	if err := os.WriteFile(filepath.Join(dir, "world-attributes.json"), []byte(attrs), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, warns, err := Load(path, items, Format{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(warns) != 1 || !strings.Contains(warns[0], "attribute 4") {
+		t.Fatalf("warnings: %v", warns)
+	}
+	raw := got.Tile(Position{100, 100, 7}).Ground.Ext.Raw
+	if !reflect.DeepEqual(raw, ground.Ext.Raw) {
+		t.Fatalf("raw attributes %v, want %v", raw, ground.Ext.Raw)
+	}
+}
