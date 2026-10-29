@@ -7,6 +7,8 @@ import (
 
 type SettingsService struct {
 	settings *settings.Store
+	// ApplyMCP starts or stops the MCP server for the settings (nil: none).
+	ApplyMCP func(enabled bool, port int) error
 }
 
 func NewSettingsService(store *settings.Store, session *Session) *SettingsService {
@@ -18,7 +20,14 @@ func NewSettingsService(store *settings.Store, session *Session) *SettingsServic
 
 func (ss *SettingsService) Get() settings.Settings { return ss.settings.Get() }
 
-func (ss *SettingsService) Update(prefs settings.Settings) error { return ss.settings.Update(prefs) }
+func (ss *SettingsService) Update(prefs settings.Settings) error {
+	if ss.ApplyMCP != nil {
+		if err := ss.ApplyMCP(prefs.MCPServer, prefs.MCPPort); err != nil {
+			return err
+		}
+	}
+	return ss.settings.Update(prefs)
+}
 
 func (ss *SettingsService) RemoveRecent(datPath string) error {
 	return ss.settings.RemoveRecent(datPath)

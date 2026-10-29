@@ -56,6 +56,10 @@ type Settings struct {
 	// ItemsOTB maps a client (its dat path or asset folder) to the
 	// items.otb kept in sync with it. Like Recent, Update keeps it as stored.
 	ItemsOTB map[string]string `json:"itemsOtb"`
+	// MCPServer runs the local MCP server through which AI agents edit
+	// maps; MCPPort is its port on 127.0.0.1.
+	MCPServer bool `json:"mcpServer"`
+	MCPPort   int  `json:"mcpPort"`
 }
 
 const (
@@ -64,8 +68,10 @@ const (
 	DefaultListColumns = 7
 )
 
+const DefaultMCPPort = 47800
+
 func Defaults() Settings {
-	return Settings{CheckUpdates: true, SheetBackground: BackgroundMagenta, ExportFormat: "png", ObjectFormat: "otobj", ListColumns: DefaultListColumns, Recent: []Recent{}, MarketShared: map[string]string{}, LastDirs: map[string]string{}, ItemsOTB: map[string]string{}}
+	return Settings{CheckUpdates: true, SheetBackground: BackgroundMagenta, ExportFormat: "png", ObjectFormat: "otobj", ListColumns: DefaultListColumns, MCPPort: DefaultMCPPort, Recent: []Recent{}, MarketShared: map[string]string{}, LastDirs: map[string]string{}, ItemsOTB: map[string]string{}}
 }
 
 func (s *Settings) normalize() {
@@ -84,6 +90,9 @@ func (s *Settings) normalize() {
 		s.ListColumns = DefaultListColumns
 	}
 	s.ListColumns = min(max(s.ListColumns, MinListColumns), MaxListColumns)
+	if s.MCPPort <= 0 || s.MCPPort > 0xFFFF {
+		s.MCPPort = DefaultMCPPort
+	}
 	if s.Recent == nil {
 		s.Recent = []Recent{}
 	}

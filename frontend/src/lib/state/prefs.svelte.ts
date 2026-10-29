@@ -9,7 +9,7 @@ export const IMAGE_FORMATS = [
 ];
 
 export const prefs = $state<{ settings: Settings }>({
-  settings: { checkUpdates: true, reopenLast: false, sheetBackground: "magenta", exportFormat: "png", objectFormat: "otobj", listColumns: 7, recent: [], marketAuthor: "", marketAdminToken: "", marketShared: {}, lastDirs: {}, itemsOtb: {} },
+  settings: { checkUpdates: true, reopenLast: false, sheetBackground: "magenta", exportFormat: "png", objectFormat: "otobj", listColumns: 7, recent: [], marketAuthor: "", marketAdminToken: "", marketShared: {}, lastDirs: {}, itemsOtb: {}, mcpServer: false, mcpPort: 47800 },
 });
 
 /** Objects per row in the object list (matches internal/settings). */

@@ -160,6 +160,8 @@ func (e *Editor) Draw(req DrawRequest) (int, error) {
 	return changed, err
 }
 
+func (e *Editor) Area(req DrawRequest) []otmap.Position { return e.area(req).list }
+
 func (e *Editor) area(req DrawRequest) *posSet {
 	tiles := newPosSet()
 	if req.Rect != nil {

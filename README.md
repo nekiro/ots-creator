@@ -14,6 +14,7 @@
 [Download](https://github.com/nekiro/ots-creator/releases/latest) ·
 [Features](#features) ·
 [Map editor](#map-editor) ·
+[AI agents](#ai-agents-mcp) ·
 [OTOBJ format](#otobj-object-format) ·
 [Development](#development)
 
@@ -169,6 +170,33 @@ Types: `u8`, `u16`, `u32`, `i32`, `u64` (little-endian, as the server writes the
 attributes are kept unchanged and written back when the map is saved. Codes of standard
 OTBM attributes (1 to 24 and 128) cannot be redefined. `name` is for you; the editor does
 not use it yet.
+
+## AI agents (MCP)
+
+AI agents such as Claude Code can build maps in the running editor through a local
+[MCP](https://modelcontextprotocol.io) server. Turn it on in **Settings > AI agents**
+(port 47800 by default; only programs on this computer can connect), then add it to the
+agent, for example:
+
+```
+claude mcp add --transport http ots-creator http://127.0.0.1:47800/mcp
+```
+
+The agent's edits show live in the editor and are undone like your own. Its tools cover
+everything a map needs:
+
+- **Files:** open a client, set the server data, new, open, save, close and import maps,
+  map properties, undo and redo.
+- **Catalog:** brushes, tilesets, items (by name, id or flags) and creatures.
+- **Drawing:** any brush at points or over a rectangle, batches of brushes as one undo
+  step, and `paint_grid`, which paints an area from a text plan (one character per tile).
+- **Looking:** `render_area` returns an image of an area drawn with the client's sprites,
+  with a grid and coordinates; also a minimap image, a text listing of tiles, single tiles,
+  find and statistics.
+- **Details:** items and their attributes (action and unique ids, text, teleports,
+  containers), tile flags, houses, towns, waypoints, zones, creatures and spawns.
+- **Selection:** select, copy, cut, paste, delete, move, make a brush from it, and the
+  map tools (borders, randomize, cleanup, replace items).
 
 ## OTOBJ object format
 

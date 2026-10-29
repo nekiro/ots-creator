@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { app } from "../../lib/state/app.svelte";
+  import { app, toast } from "../../lib/state/app.svelte";
   import { IMAGE_FORMATS, LIST_COLUMNS, prefs, removeRecent, savePrefs } from "../../lib/state/prefs.svelte";
   import NumberField from "../../lib/ui/NumberField.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
@@ -7,6 +7,13 @@
 
   const settings = $derived(prefs.settings);
   const recent = $derived(settings.recent?.length ?? 0);
+  const mcpURL = $derived(`http://127.0.0.1:${settings.mcpPort}/mcp`);
+
+  function copyMCPCommand() {
+    void navigator.clipboard
+      ?.writeText(`claude mcp add --transport http ots-creator ${mcpURL}`)
+      .then(() => toast("Copied the command that connects Claude Code."));
+  }
 </script>
 
 <Dialog title="Settings" width={420} onclose={() => (app.dialog = null)}>
@@ -72,6 +79,17 @@
       />
     </label>
     <p class="t-label note">With the admin token every market entry can be deleted.</p>
+
+    <h4>AI agents</h4>
+    <label class="row" title="A local MCP server: agents such as Claude Code draw on the open maps, and you see it here">
+      <input class="t-check" type="checkbox" checked={settings.mcpServer} onchange={(event) => savePrefs({ mcpServer: event.currentTarget.checked })} />Let AI agents edit maps (MCP server)
+    </label>
+    <div class="row">
+      <NumberField label="Port" value={settings.mcpPort} min={1024} max={65535} width={56} onchange={(value) => savePrefs({ mcpPort: value })} />
+      <span class="t-label grow">{mcpURL}</span>
+      <button class="t-btn" onclick={copyMCPCommand}>Copy command</button>
+    </div>
+    <p class="t-label note">Only programs on this computer can connect. Copy command gives the line that adds the server to Claude Code.</p>
 
     <h4>Recent clients</h4>
     <div class="row">

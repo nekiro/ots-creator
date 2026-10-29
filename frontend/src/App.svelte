@@ -32,6 +32,7 @@
   import StatusBar from "./features/StatusBar.svelte";
   import ThingList from "./features/ThingList.svelte";
   import { commands, handlePaste, handleShortcut } from "./lib/commands";
+  import { followAgents } from "./lib/map/agents";
   import { app, initState } from "./lib/state/app.svelte";
   import { readPositive, writeStored } from "./lib/state/storage";
   import Splitter from "./lib/ui/Splitter.svelte";
@@ -94,9 +95,11 @@
     const offDrop = Events.On("app:files-dropped", (event: { data: FilesDropped | null }) =>
       void commands.drop(event.data?.paths ?? [], event.data?.target ?? "", group),
     );
+    const offAgents = followAgents();
     return () => {
       offClose();
       offDrop();
+      offAgents();
     };
   });
 

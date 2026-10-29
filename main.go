@@ -12,6 +12,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/updater/providers/github"
 
 	"github.com/nekiro/ots-creator/internal/app"
+	"github.com/nekiro/ots-creator/internal/mcpserver"
 	"github.com/nekiro/ots-creator/internal/settings"
 )
 
@@ -28,6 +29,7 @@ func init() {
 	application.RegisterEvent[app.Progress](app.EventMapProgress)
 	application.RegisterEvent[app.MapChanged](app.EventMapChanged)
 	application.RegisterEvent[app.PlayMove](app.EventPlayMove)
+	application.RegisterEvent[mcpserver.Event](mcpserver.EventMap)
 }
 
 func main() {
@@ -56,12 +58,22 @@ func main() {
 		}
 	})
 	windows.Maps = maps
+	projects := app.NewProjectService(session)
+	settingsService := app.NewSettingsService(prefs, session)
+	// The MCP server lets AI agents edit maps (opt-in in the settings).
+	agents := mcpserver.New(maps, projects, emit, version)
+	settingsService.ApplyMCP = agents.Apply
+	if current := prefs.Get(); current.MCPServer {
+		if err := agents.Apply(true, current.MCPPort); err != nil {
+			log.Print(err)
+		}
+	}
 
 	wailsApp = application.New(application.Options{
 		Name:        "OTS Creator",
 		Description: "Object editor for Open Tibia clients",
 		Services: []application.Service{
-			application.NewService(app.NewProjectService(session)),
+			application.NewService(projects),
 			application.NewService(app.NewThingService(session)),
 			application.NewService(app.NewSpriteService(session)),
 			application.NewService(app.NewCompareService(session)),
@@ -69,7 +81,7 @@ func main() {
 			application.NewService(&app.ViewerService{}),
 			application.NewService(updates),
 			application.NewService(windows),
-			application.NewService(app.NewSettingsService(prefs, session)),
+			application.NewService(settingsService),
 			application.NewService(app.NewMarketService(session, prefs)),
 			application.NewService(maps),
 		},
@@ -140,7 +152,7 @@ func main() {
 
 	// Open a client passed on the command line (file association, dev runs).
 	if len(os.Args) > 1 {
-		openClient(app.NewProjectService(session), os.Args[1])
+		openClient(projects, os.Args[1])
 	}
 
 	if err := wailsApp.Run(); err != nil {
