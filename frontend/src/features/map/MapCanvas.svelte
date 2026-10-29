@@ -426,7 +426,7 @@
   function onkey(event: KeyboardEvent) {
     const was = { ...modifiers };
     readModifiers(event);
-    if (event.type === "keydown" && event.key === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey && !isTyping(event) && map.mode === "map" && !map.dialog && map.hover) {
+    if (event.type === "keydown" && event.key === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey && !isTyping(event) && map.mode === "map" && !map.dialog && !app.dialog && map.hover) {
       event.preventDefault();
       cycleVariant(event.shiftKey ? -1 : 1);
     }

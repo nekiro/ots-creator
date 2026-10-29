@@ -24,7 +24,7 @@ export interface BrushSel {
   label: string;
 }
 
-export type MapDialog = "data" | "import" | "minimap" | "brush" | "settings" | "tools" | "shortcuts" | "warnings" | "text" | null;
+export type MapDialog = "data" | "import" | "minimap" | "brush" | "tools" | "shortcuts" | "warnings" | "text" | null;
 
 export type Focus =
   | { kind: "tile" }
@@ -91,7 +91,6 @@ class MapState {
   /** Keyboard shortcuts changed by the user: action id -> key combinations. */
   keys = $state.raw<Record<string, string[]>>({});
   loadWarnings = $state.raw<Record<number, string[]>>({});
-  settingsTab = $state<"general" | "keys">("general");
   items = $state.raw<ItemIndex | null>(null);
   palette = $state.raw<Palette | null>(null);
   dataRev = $state(0);
@@ -218,6 +217,21 @@ export async function refreshTile(): Promise<void> {
   }
 }
 
+function setEditorPrefs(prefs: { settings: EditorSettings; keys: Record<string, string[] | null | undefined> | null }): void {
+  map.settings = prefs.settings;
+  map.keys = Object.fromEntries(Object.entries(prefs.keys ?? {}).map(([key, keys]) => [key, keys ?? []]));
+}
+
+/** Loads the map editor settings and keys when the map editor has not loaded them yet. */
+export async function loadEditorPrefs(): Promise<void> {
+  if (map.settings) return;
+  try {
+    setEditorPrefs(await MapService.EditorPrefs());
+  } catch (err) {
+    toast(errorMessage(err), "error");
+  }
+}
+
 let dataRequest = 0;
 
 export async function loadMapData(force = false, activate = true): Promise<void> {
@@ -226,8 +240,7 @@ export async function loadMapData(force = false, activate = true): Promise<void>
     const status = await MapService.Status();
     if (request !== dataRequest) return;
     map.recent = status.recent ?? [];
-    map.settings = status.settings;
-    map.keys = Object.fromEntries(Object.entries(status.keys ?? {}).map(([key, keys]) => [key, keys ?? []]));
+    setEditorPrefs(status);
     map.maps = status.maps ?? [];
     if (map.activeId === null || !map.maps.some((open) => open.id === map.activeId)) map.activeId = map.maps[0]?.id ?? null;
     const id = map.activeId;

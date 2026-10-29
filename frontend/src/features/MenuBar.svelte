@@ -3,7 +3,7 @@
   import { commands } from "../lib/commands";
   import { checkForUpdates, REPO_URL, updates } from "../lib/state/updates.svelte";
   import { getMode, SCALE_MODES, setMode } from "../lib/pixelscale";
-  import { app } from "../lib/state/app.svelte";
+  import { app, openSettings } from "../lib/state/app.svelte";
   import type { MenuEntry, MenuItem } from "../lib/menu.svelte";
   import { editMenu, objectMenu, spriteMenu, toolsMenu } from "../lib/menus";
   import { prefs, recentDir, shortPath } from "../lib/state/prefs.svelte";
@@ -46,6 +46,8 @@
         { label: "Compile", keys: "Ctrl+S", action: commands.compile, disabled: nothingToCompile },
         { label: "Compile as…", keys: "Ctrl+Shift+S", action: commands.compileAs, disabled: noProject },
         { label: "Server items (items.otb)…", action: () => (app.dialog = "itemsOtb"), disabled: noProject },
+        "-",
+        { label: "Settings…", action: () => openSettings() },
         "-",
         { label: "Close client", action: commands.close, disabled: noProject },
       ],
@@ -144,7 +146,7 @@
     <button class="t-icon-btn" title="Go to anything: positions, places, brushes, commands (Ctrl+K)" onclick={() => mapCommands.commandPalette()}><Icon name="command" /></button>
     <button class="t-icon-btn" title="Find on the map (Ctrl+F)" disabled={!map.active} onclick={() => mapCommands.find({ inSelection: !!map.active?.selection })}><Icon name="search" /></button>
     <button class="t-icon-btn" title="Keyboard shortcuts (F1)" onclick={() => (map.dialog = "shortcuts")}><Icon name="info" /></button>
-    <button class="t-icon-btn" title="Map editor settings" onclick={() => (map.dialog = "settings")}><Icon name="gear" /></button>
+    <button class="t-icon-btn" title="Settings" onclick={() => openSettings()}><Icon name="gear" /></button>
   </div>
   {:else}
   <div class="toolbar">
@@ -157,7 +159,7 @@
     <button class="t-icon-btn" title="Import objects (Ctrl+I)" disabled={!app.open} onclick={() => commands.importObd()}><Icon name="import" /></button>
     <button class="t-icon-btn" title="Export selected objects (Ctrl+E)" disabled={!app.open || app.focused === null} onclick={() => commands.exportObd()}><Icon name="export" /></button>
     <span class="t-vsep"></span>
-    <button class="t-icon-btn" title="Settings" onclick={() => (app.dialog = "settings")}><Icon name="gear" /></button>
+    <button class="t-icon-btn" title="Settings" onclick={() => openSettings()}><Icon name="gear" /></button>
     <span class="t-vsep"></span>
     <button class="t-btn market" title="Browse objects and sprites shared by other users" onclick={commands.market}><Icon name="market" />Market</button>
   </div>

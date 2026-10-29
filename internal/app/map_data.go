@@ -327,6 +327,17 @@ func (ms *MapService) Reload() (DataInfo, error) {
 	return data.info(), nil
 }
 
+type EditorPrefs struct {
+	Settings mapedit.Settings    `json:"settings"`
+	Keys     map[string][]string `json:"keys"`
+}
+
+// EditorPrefs gives the map editor settings and keys without loading the
+// server data, for the settings dialog of the object editor.
+func (ms *MapService) EditorPrefs() EditorPrefs {
+	return EditorPrefs{Settings: ms.store.EditorSettings(), Keys: ms.store.Keys()}
+}
+
 func (ms *MapService) SetEditorSettings(settings mapedit.Settings) error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()

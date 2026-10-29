@@ -34,6 +34,8 @@ export type DialogName =
   | "itemsOtb"
   | null;
 
+export type SettingsSection = "general" | "objects" | "map" | "keys" | "agents";
+
 export type ShareTarget = (
   | { kind: "object"; category: Category; id: number }
   | { kind: "sprites"; ids: number[] }
@@ -56,6 +58,8 @@ class AppState {
   readonly selectedSpriteSet = $derived(new Set(this.selectedSprites));
   toasts = $state<Toast[]>([]);
   dialog = $state<DialogName>(null);
+  /** Section the settings open at; null: the one of the open editor. */
+  settingsSection = $state<SettingsSection | null>(null);
   busy = $state<string | null>(null);
   progress = $state<{ done: number; total: number } | null>(null);
   /** Label of the running operation that blocks the window with a loader (see run). */
@@ -154,6 +158,12 @@ export function toast(text: string, kind: ToastKind = "info", duration = 3500, k
       kind === "error" ? duration * 2 : duration,
     ),
   );
+}
+
+/** Opens the settings of both editors, at a section or at the one of the open editor. */
+export function openSettings(section: SettingsSection | null = null): void {
+  app.settingsSection = section;
+  app.dialog = "settings";
 }
 
 export function hasToast(key: string): boolean {

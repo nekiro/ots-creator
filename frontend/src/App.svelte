@@ -12,7 +12,7 @@
   import Preview from "./features/Preview.svelte";
   import Properties from "./features/Properties.svelte";
   import BulkEdit from "./features/BulkEdit.svelte";
-  import SettingsDialog from "./features/dialogs/SettingsDialog.svelte";
+  import SettingsDialog from "./features/dialogs/settings/SettingsDialog.svelte";
   import DurationsDialog from "./features/tools/DurationsDialog.svelte";
   import ObdViewerDialog from "./features/tools/ObdViewerDialog.svelte";
   import OptimizeDialog from "./features/tools/OptimizeDialog.svelte";

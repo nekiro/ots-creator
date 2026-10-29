@@ -1,6 +1,7 @@
 <script lang="ts">
   import { FIXED_KEYS, KEY_ACTIONS, KEY_GROUPS, keysOf } from "../../../lib/map/view/keys";
   import { map } from "../../../lib/map/state.svelte";
+  import { openSettings } from "../../../lib/state/app.svelte";
   import Dialog from "../../../lib/ui/Dialog.svelte";
 
   const groups = $derived(
@@ -26,7 +27,7 @@
     {/each}
   </div>
   {#snippet footer()}
-    <button class="t-btn" onclick={() => ((map.settingsTab = "keys"), (map.dialog = "settings"))}>Change keys…</button>
+    <button class="t-btn" onclick={() => ((map.dialog = null), openSettings("keys"))}>Change keys…</button>
     <span class="grow"></span>
     <button class="t-btn" onclick={() => (map.dialog = null)}>Close</button>
   {/snippet}

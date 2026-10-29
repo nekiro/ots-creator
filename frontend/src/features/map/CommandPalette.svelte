@@ -40,7 +40,6 @@
         out.push({ group: "Commands", label: menuItem.label.replace(/…$/, ""), detail: menu.label, keys: menuItem.keys, run: menuItem.action });
       }
     }
-    out.push({ group: "Commands", label: "Editor settings", detail: "Settings", run: () => (map.dialog = "settings") });
     return out;
   });
 

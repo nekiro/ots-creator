@@ -1,4 +1,4 @@
-import { app, toast } from "../../state/app.svelte";
+import { app, openSettings, toast } from "../../state/app.svelte";
 import type { MenuEntry } from "../../menu.svelte";
 import { MapService, fmtPos, type Position } from "../data/api";
 import { ItemFlags, TileFlags, type TileData } from "../data/chunks";
@@ -48,6 +48,8 @@ export function mapMenus(): { label: string; items: MenuEntry[] }[] {
         { label: "Import a map into this one…", action: () => (map.dialog = "import"), disabled: noMap },
         { label: "Export minimap images…", action: () => (map.dialog = "minimap"), disabled: noMap },
         { label: "Save screenshot of the view…", action: mapCommands.exportImage, disabled: noMap },
+        "-",
+        { label: "Settings…", action: () => openSettings() },
         "-",
         { label: "Close map", keys: keyLabel("close"), action: () => mapCommands.close(), disabled: noMap },
       ],
