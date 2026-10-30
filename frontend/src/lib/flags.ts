@@ -1,8 +1,8 @@
 import type { Properties } from "./api";
 import { clamp } from "./util/math";
 
-/** mask: a bit set, one checkbox per option (option values are bits). */
-export type FieldKind = "u16" | "i16" | "text" | "select" | "mask";
+/** mask: a bit set, one checkbox per option (option values are bits). color: an 8-bit client color. */
+export type FieldKind = "u16" | "i16" | "text" | "select" | "mask" | "color";
 
 export interface Field {
   key: string; // path inside Properties, e.g. "groundSpeed" or "market.name"
@@ -93,10 +93,10 @@ export const FLAG_GROUPS: FlagGroup[] = [
   {
     title: "Appearance",
     flags: [
-      { key: "hasLight", label: "Light", fields: [{ key: "lightLevel", label: "Level", kind: "u16" }, { key: "lightColor", label: "Color", kind: "u16" }] },
+      { key: "hasLight", label: "Light", fields: [{ key: "lightLevel", label: "Level", kind: "u16" }, { key: "lightColor", label: "Color", kind: "color" }] },
       { key: "hasOffset", label: "Offset", fields: [{ key: "offsetX", label: "X", kind: "i16" }, { key: "offsetY", label: "Y", kind: "i16" }] },
       { key: "hasElevation", label: "Elevation", fields: [{ key: "elevation", label: "Height", kind: "u16" }] },
-      { key: "miniMap", label: "Minimap", fields: [{ key: "miniMapColor", label: "Color", kind: "u16" }] },
+      { key: "miniMap", label: "Minimap", fields: [{ key: "miniMapColor", label: "Color", kind: "color" }] },
       { key: "lyingObject", label: "Lying object" },
       { key: "animateAlways", label: "Animate always" },
       { key: "dontHide", label: "Don't hide" },

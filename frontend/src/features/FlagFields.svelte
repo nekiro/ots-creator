@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Field } from "../lib/flags";
+  import ColorField from "../lib/ui/ColorField.svelte";
   import NumberField from "../lib/ui/NumberField.svelte";
   import Select from "../lib/ui/Select.svelte";
 
@@ -38,6 +39,8 @@
         </span>
       {:else if field.kind === "select"}
         <Select grow value={value(field)} options={options(field)} onchange={(selected) => onset(field, selected)} />
+      {:else if field.kind === "color"}
+        <ColorField value={value(field)} onchange={(next) => onset(field, next)} />
       {:else if field.kind === "text"}
         <input class="t-input grow" value={value(field)} onchange={(event) => onset(field, event.currentTarget.value)} />
       {:else}
