@@ -82,6 +82,8 @@ func (im *importer) brush(node *xmltree.Node) {
 	switch brushType {
 	case "wall decoration":
 		brushType = TypeDecoration
+	case "border":
+		brushType = TypeGround
 	case "ground", "wall", "doodad", "carpet", "table", "":
 	default:
 		im.warn("brush %q has unknown type %q", name, brushType)
