@@ -3,11 +3,14 @@ package app
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/nekiro/ots-creator/internal/core/project"
 	"github.com/nekiro/ots-creator/internal/core/thing"
 	"github.com/nekiro/ots-creator/internal/formats/obd"
+	"github.com/nekiro/ots-creator/internal/fsutil"
 )
 
 type ThingService struct {
@@ -222,6 +225,40 @@ func (ts *ThingService) ExportObjects(category thing.Category, ids []uint32, dir
 		written = append(written, path)
 	}
 	return written, nil
+}
+
+// CopyObjectFiles exports things into a temporary folder (emptied on each
+// copy) and puts the files on the system clipboard, so they paste as files
+// outside the program. text goes along as plain text. Windows only; it
+// fails elsewhere.
+func (ts *ThingService) CopyObjectFiles(category thing.Category, ids []uint32, format, text string) error {
+	dir := filepath.Join(os.TempDir(), "ots-creator", "clipboard")
+	if err := os.RemoveAll(dir); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dir, fsutil.DirMode); err != nil {
+		return err
+	}
+	paths, err := ts.ExportObjects(category, ids, dir, format)
+	if err != nil {
+		return err
+	}
+	return setClipboardFiles(paths, text)
+}
+
+// ImportClipboardObjects imports the object files (.otobj or .obd) copied
+// to the system clipboard, like ImportObjects; none when it holds none.
+// Windows only; it fails elsewhere.
+func (ts *ThingService) ImportClipboardObjects() ([]ImportResult, error) {
+	paths, err := clipboardFiles()
+	if err != nil {
+		return nil, err
+	}
+	paths = slices.DeleteFunc(paths, func(path string) bool { return !isObjectFile(path) })
+	if len(paths) == 0 {
+		return nil, nil
+	}
+	return ts.ImportObjects(paths, 0)
 }
 
 func (ts *ThingService) ReadObject(path string) (*ObjectFile, error) {

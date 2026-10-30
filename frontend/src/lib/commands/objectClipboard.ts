@@ -1,6 +1,8 @@
-import { CATEGORY_NAMES, ThingService, errorMessage, type PropsPatch, type Thing } from "../api";
+import { CATEGORY_NAMES, OBJECT_EXT, ThingService, errorMessage, type PropsPatch, type Thing } from "../api";
 import { clipboardThing, clipboardThings, copyThings, pasteInto, type PasteMode } from "../clipboard";
 import { app, run, select, toast } from "../state/app.svelte";
+import { prefs } from "../state/prefs.svelte";
+import { reportImported } from "./objects";
 import { sheetCommands } from "./sheets";
 import { OBJECT_CLIP, confirmDiscard, guard, snapshot } from "./shared";
 
@@ -13,8 +15,9 @@ export const clipboardCommands = {
     const things = await run("Copying", () => Promise.all(ids.map(async (id) => (id === draft.id ? snapshot(draft) : ((await ThingService.Get(category, id)) as Thing)))));
     if (!things) return;
     copyThings(things);
-    // Replaces an image on the system clipboard (see handlePaste).
-    navigator.clipboard?.writeText(OBJECT_CLIP).catch(() => {});
+    // Replaces an image on the system clipboard (see handlePaste). The saved
+    // objects go along as files, so they paste in a file manager (Windows).
+    ThingService.CopyObjectFiles(category, ids, prefs.settings.objectFormat, OBJECT_CLIP).catch(() => navigator.clipboard?.writeText(OBJECT_CLIP).catch(() => {}));
     toast(things.length === 1 ? `Copied ${CATEGORY_NAMES[draft.category]} #${draft.id}.` : `Copied ${things.length} ${CATEGORY_NAMES[draft.category]}(s).`);
   },
 
@@ -94,6 +97,11 @@ export function handlePaste(event: ClipboardEvent, group: number): void {
   }
   if (image && data?.getData("text/plain") !== OBJECT_CLIP && app.open) {
     toast("Select an object to paste the sprite sheet into.");
+    return;
+  }
+  // Object files copied in a file manager are imported, like a drop.
+  if (app.open && data?.getData("text/plain") !== OBJECT_CLIP && [...(data?.files ?? [])].some((file) => OBJECT_EXT.test(file.name))) {
+    void run("Importing", () => ThingService.ImportClipboardObjects()).then((results) => (results?.length ? reportImported(results) : undefined));
     return;
   }
   clipboardCommands.paste("object").catch((err) => toast(errorMessage(err), "error"));
