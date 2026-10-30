@@ -18,12 +18,16 @@ type TexturePos struct {
 	Frame    int
 	// Addons are extra pattern Y values drawn over the texture (outfit addons).
 	Addons []int
+	// AllLayers draws every layer over the first one, as the client does
+	// with items (outfit layers are color masks instead).
+	AllLayers bool
 }
 
 // ThumbnailPos returns the texture shown in lists: outfits face south
-// with all their addons, everything else uses the first texture.
+// with all their addons, items show all their layers, everything else
+// uses the first texture.
 func ThumbnailPos(object *thing.Thing) TexturePos {
-	pos := TexturePos{}
+	pos := TexturePos{AllLayers: object.Category == thing.CategoryItem}
 	if object.Category == thing.CategoryOutfit {
 		if group := object.Group(thing.FrameGroupDefault); group != nil {
 			if int(group.PatternX) > int(thing.South) {
@@ -60,10 +64,24 @@ func (p *Project) Render(category thing.Category, id uint32, pos TexturePos) (*i
 			patternYs = append(patternYs, addon)
 		}
 	}
-	for pass, patternY := range patternYs {
+	layers := []int{pos.Layer}
+	if pos.AllLayers {
+		layers = layers[:0]
+		for layer := range int(group.Layers) {
+			layers = append(layers, layer)
+		}
+	}
+	type texturePass struct{ layer, patternY int }
+	var passes []texturePass
+	for _, patternY := range patternYs {
+		for _, layer := range layers {
+			passes = append(passes, texturePass{layer, patternY})
+		}
+	}
+	for index, pass := range passes {
 		for tileY := 0; tileY < int(group.Height); tileY++ {
 			for tileX := 0; tileX < int(group.Width); tileX++ {
-				spriteID := group.Sprites[group.SpriteIndex(tileX, tileY, pos.Layer, pos.PatternX, patternY, pos.PatternZ, pos.Frame)]
+				spriteID := group.Sprites[group.SpriteIndex(tileX, tileY, pass.layer, pos.PatternX, pass.patternY, pos.PatternZ, pos.Frame)]
 				if spriteID == 0 {
 					continue
 				}
@@ -75,7 +93,7 @@ func (p *Project) Render(category thing.Category, id uint32, pos TexturePos) (*i
 					continue
 				}
 				x, y := (int(group.Width)-1-tileX)*size, (int(group.Height)-1-tileY)*size
-				if pass == 0 {
+				if index == 0 {
 					imaging.PutTile(img, x, y, size, buf)
 				} else {
 					imaging.BlendTile(img, x, y, size, buf)

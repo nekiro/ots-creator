@@ -339,8 +339,40 @@ func TestThumbnailPos(t *testing.T) {
 	if addons := ThumbnailPos(o).Addons; len(addons) != 2 || addons[0] != 1 || addons[1] != 2 {
 		t.Fatalf("outfit thumbnail addons %v", addons)
 	}
-	if ThumbnailPos(thing.New(100, thing.CategoryItem)).PatternX != 0 {
-		t.Fatal("item thumbnail")
+	if pos := ThumbnailPos(thing.New(100, thing.CategoryItem)); pos.PatternX != 0 || !pos.AllLayers {
+		t.Fatalf("item thumbnail %+v", pos)
+	}
+	if ThumbnailPos(o).AllLayers {
+		t.Fatal("outfit layers are color masks")
+	}
+}
+
+func TestRenderAllLayers(t *testing.T) {
+	project := New(v1098(), client.Features{})
+	item, _ := project.Thing(thing.CategoryItem, 100)
+	item.Group(thing.FrameGroupDefault).Layers = 2
+	item.Group(thing.FrameGroupDefault).Sprites = []uint32{0, 0}
+	project.UpdateThing(item)
+	half := make([]byte, 32*32*4)
+	for i := 0; i < len(half)/2; i += 4 {
+		copy(half[i:], []byte{4, 5, 6, 255})
+	}
+	if err := project.SetGroupPixels(thing.CategoryItem, 100, 0, [][]byte{solid(1, 2, 3), half}); err != nil {
+		t.Fatal(err)
+	}
+	first, err := project.Render(thing.CategoryItem, 100, TexturePos{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := first.NRGBAAt(0, 0); got.R != 1 {
+		t.Fatalf("first layer only %v", got)
+	}
+	both, err := project.Render(thing.CategoryItem, 100, TexturePos{AllLayers: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if top, bottom := both.NRGBAAt(0, 0), both.NRGBAAt(0, 31); top.R != 4 || bottom.R != 1 {
+		t.Fatalf("all layers top %v bottom %v", top, bottom)
 	}
 }
 
