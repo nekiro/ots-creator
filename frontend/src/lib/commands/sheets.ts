@@ -16,6 +16,10 @@ async function importSheetWith(load: (id: number) => Promise<void>): Promise<voi
   if (ok) toast("Sprite sheet imported.", "success");
 }
 
+/** Selects every frame group in one sheet: idle then walking frames (needs
+ * one layout for both). */
+export const ALL_GROUPS = -1;
+
 export const sheetCommands = {
   exportSheet(group = 0) {
     if (!guard() || app.focused === null) return;
@@ -54,16 +58,28 @@ export const sheetCommands = {
     await importSheetWith((id) => ThingService.PasteSheet(app.category, id, group, encodeBytes(data)));
   },
 
-  async copySheet(group = 0) {
+  /** Copies the sheet of the whole object (every frame group); when the
+   * groups have different layouts, only the idle group. */
+  async copySheet() {
     if (!guard() || app.focused === null) return;
     const category = app.category;
     const id = app.focused;
+    const fetchSheet = (group: number) => fetch(res.sheet(category, id, group, true, versions.thing(category, id)));
     try {
-      const response = await fetch(res.sheet(category, id, group, true, versions.thing(category, id)));
+      let whole = true;
+      let response = await fetchSheet(ALL_GROUPS);
+      if (!response.ok) {
+        whole = false;
+        response = await fetchSheet(0);
+      }
       if (!response.ok) throw new Error((await response.text()) || response.statusText);
       const blob = await response.blob();
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-      toast(`Copied the sprite sheet of ${CATEGORY_NAMES[category]} #${id}.`);
+      toast(
+        whole
+          ? `Copied the sprite sheet of ${CATEGORY_NAMES[category]} #${id}.`
+          : `Copied the idle frames of ${CATEGORY_NAMES[category]} #${id}: its walking frames have another layout.`,
+      );
     } catch (err) {
       toast(errorMessage(err), "error");
     }

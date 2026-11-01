@@ -42,7 +42,7 @@ export function handleShortcut(event: KeyboardEvent): void {
   if (mod && key === "d") return run(commands.duplicate);
   if (mod && key === "i") return run(() => commands.importObd());
   if (mod && key === "e") return run(() => commands.exportObd());
-  if (mod && event.shiftKey && key === "c") return run(() => commands.copySheet(0));
+  if (mod && event.shiftKey && key === "c") return run(() => commands.copySheet());
   if (mod && key === "c") return run(commands.copyObject);
   if (mod && event.shiftKey && key === "v") return run(() => commands.paste("properties"));
   // Plain Ctrl+V arrives as a paste event (handlePaste) with the clipboard.

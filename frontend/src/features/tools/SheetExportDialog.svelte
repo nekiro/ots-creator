@@ -4,6 +4,7 @@
   // rows = frames × pattern Y).
   import { CATEGORY_NAMES, ThingService, normalizeThing, res, type Thing } from "../../lib/api";
   import { commands } from "../../lib/commands";
+  import { ALL_GROUPS } from "../../lib/commands/sheets";
   import { IMAGE_FORMATS, prefs } from "../../lib/state/prefs.svelte";
   import { app, applyDraft, versions } from "../../lib/state/app.svelte";
   import Dialog from "../../lib/ui/Dialog.svelte";
@@ -32,8 +33,6 @@
     ThingService.Get(category, id).then((saved) => (thing = saved ? normalizeThing(saved) : null));
   });
 
-  // ALL_GROUPS: idle and walking frames in one sheet (needs one layout).
-  const ALL_GROUPS = -1;
   const groups = $derived(thing?.frameGroups ?? []);
   const sameLayout = $derived(
     groups.length === 2 &&
