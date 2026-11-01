@@ -19,7 +19,30 @@ import (
 // 100 (a ground) and 101 (a common item).
 func testSession(t *testing.T) (*mcp.ClientSession, *[]Event) {
 	t.Helper()
+	var events []Event
+	notify := func(name string, data any) {
+		if name == EventMap {
+			events = append(events, data.(Event))
+		}
+	}
+	return connect(t, testServer(t, true, notify).newMCPServer()), &events
+}
+
+// testServer returns a server, with the test client open when withClient.
+func testServer(t *testing.T, withClient bool, notify app.Notifier) *Server {
+	t.Helper()
 	session := app.NewSession(nil)
+	if withClient {
+		session.Set(testClient(t))
+	}
+	maps := app.NewMapService(session, app.NewMapStore(filepath.Join(t.TempDir(), "mapeditor.json")))
+	return New(maps, app.NewProjectService(session), notify, "test")
+}
+
+// testClient returns a client with items 100 (a ground) and 101 (a common
+// item).
+func testClient(t *testing.T) *project.Project {
+	t.Helper()
 	proj := project.New(client.FindByValue(1098)[0], client.Features{})
 	for range 2 {
 		if _, err := proj.AddThing(thing.CategoryItem); err != nil {
@@ -31,18 +54,15 @@ func testSession(t *testing.T) (*mcp.ClientSession, *[]Event) {
 	if err := proj.UpdateThing(ground); err != nil {
 		t.Fatal(err)
 	}
-	session.Set(proj)
-	maps := app.NewMapService(session, app.NewMapStore(filepath.Join(t.TempDir(), "mapeditor.json")))
-	var events []Event
-	notify := func(name string, data any) {
-		if name == EventMap {
-			events = append(events, data.(Event))
-		}
-	}
-	server := New(maps, app.NewProjectService(session), notify, "test")
+	return proj
+}
+
+// connect connects an MCP client to server.
+func connect(t *testing.T, server *mcp.Server) *mcp.ClientSession {
+	t.Helper()
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	ctx := context.Background()
-	if _, err := server.newMCPServer().Connect(ctx, serverTransport, nil); err != nil {
+	if _, err := server.Connect(ctx, serverTransport, nil); err != nil {
 		t.Fatal(err)
 	}
 	clientSession, err := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "1"}, nil).Connect(ctx, clientTransport, nil)
@@ -50,7 +70,7 @@ func testSession(t *testing.T) (*mcp.ClientSession, *[]Event) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { clientSession.Close() })
-	return clientSession, &events
+	return clientSession
 }
 
 // call runs a tool and returns its text; failing tools fail the test

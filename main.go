@@ -37,6 +37,9 @@ func main() {
 	// is open. With the default GOGC the heap may grow to twice that before
 	// a collection; 50 keeps it at one and a half.
 	debug.SetGCPercent(50)
+	if len(os.Args) > 1 && os.Args[1] == mcpCommand {
+		os.Exit(runMCP())
+	}
 	var wailsApp *application.App
 	emit := func(name string, data any) {
 		if wailsApp != nil {

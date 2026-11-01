@@ -1,6 +1,7 @@
 // Package mcpserver lets AI agents edit maps through the Model Context
 // Protocol: a local server (streamable HTTP on 127.0.0.1) whose tools call
-// the map editor of the running app. Edits go through the same services as
+// the map editor of the running app, and a stdio server (RunStdio) that
+// passes the calls to it or edits maps without a window. Edits go through the same services as
 // the editor's own, so they show in its window and can be undone there.
 package mcpserver
 
@@ -69,6 +70,8 @@ type Server struct {
 	stroke int64
 	// terrain keeps the rules of learn_terrain.
 	terrain ruleStore
+	// standalone: served over stdio (RunStdio), maybe without the editor.
+	standalone bool
 }
 
 // New returns a stopped server. notify may be nil.
@@ -144,8 +147,12 @@ func (s *Server) nextStroke() int64 {
 }
 
 func (s *Server) newMCPServer() *mcp.Server {
+	text := instructions
+	if s.standalone {
+		text += standaloneNote
+	}
 	server := mcp.NewServer(&mcp.Implementation{Name: "ots-creator", Title: "OTS Creator map editor", Version: s.version}, &mcp.ServerOptions{
-		Instructions: instructions,
+		Instructions: text,
 		Capabilities: &mcp.ServerCapabilities{},
 	})
 	s.addSessionTools(server)

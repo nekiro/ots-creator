@@ -2,6 +2,7 @@
   // Settings of both editors in one place; it opens at the section of the
   // open editor. Every change is saved at once.
   import { onMount } from "svelte";
+  import { SettingsService } from "../../../lib/api";
   import { app, toast, type SettingsSection } from "../../../lib/state/app.svelte";
   import { IMAGE_FORMATS, LIST_COLUMNS, prefs, removeRecent, savePrefs } from "../../../lib/state/prefs.svelte";
   import { KEY_ACTIONS } from "../../../lib/map/view/keys";
@@ -51,10 +52,9 @@
   const recent = $derived(settings.recent?.length ?? 0);
   const mcpURL = $derived(`http://127.0.0.1:${settings.mcpPort}/mcp`);
 
-  function copyMCPCommand() {
-    void navigator.clipboard
-      ?.writeText(`claude mcp add --transport http ots-creator ${mcpURL}`)
-      .then(() => toast("Copied the command that connects Claude Code."));
+  async function copyMCPCommand() {
+    await navigator.clipboard?.writeText(await SettingsService.MCPSetupCommand());
+    toast("Copied the command that connects Claude Code.");
   }
 </script>
 
@@ -98,7 +98,7 @@
           <span class="t-label grow">{mcpURL}</span>
           <button class="t-btn" onclick={copyMCPCommand}>Copy command</button>
         </div>
-        <p class="t-label note">Only programs on this computer can connect. Copy command gives the line that adds the server to Claude Code.</p>
+        <p class="t-label note">Copy command gives the line that adds OTS Creator to Claude Code. The agent starts it by itself and works with the editor closed too; while this server is on, its edits go to the open editor and show here. Only programs on this computer can connect.</p>
       {:else if section === "objects"}
         <h4>Layout</h4>
         <div class="row">

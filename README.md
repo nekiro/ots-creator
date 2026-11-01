@@ -173,17 +173,21 @@ not use it yet.
 
 ## AI agents (MCP)
 
-AI agents such as Claude Code can build maps in the running editor through a local
-[MCP](https://modelcontextprotocol.io) server. Turn it on in **Settings > AI agents**
-(port 47800 by default; only programs on this computer can connect), then add it to the
-agent, for example:
+AI agents such as Claude Code can build maps through an
+[MCP](https://modelcontextprotocol.io) server. The agent starts OTS Creator by itself as a
+command (**Settings > AI agents > Copy command** gives the line), for example:
 
 ```
-claude mcp add --transport http ots-creator http://127.0.0.1:47800/mcp
+claude mcp add ots-creator -- "C:\Users\you\AppData\Local\Programs\OTS Creator\otscreator.exe" mcp
 ```
 
-The agent's edits show live in the editor and are undone like your own. Its tools cover
-everything a map needs:
+This works with the editor closed: the agent opens the client and maps without a window
+and saves them with `save_map`. To watch the agent work, turn on the MCP server in
+**Settings > AI agents** (port 47800 by default; only programs on this computer can
+connect): while the editor runs, the agent's edits go to it, show live and are undone like
+your own. Agents that connect over HTTP can use `http://127.0.0.1:47800/mcp` directly.
+
+Its tools cover everything a map needs:
 
 - **Files:** open a client, set the server data, new, open, save, close and import maps,
   map properties, undo and redo.

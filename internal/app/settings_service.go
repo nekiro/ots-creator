@@ -1,6 +1,8 @@
 package app
 
 import (
+	"os"
+
 	"github.com/nekiro/ots-creator/internal/core/project"
 	"github.com/nekiro/ots-creator/internal/settings"
 )
@@ -27,6 +29,20 @@ func (ss *SettingsService) Update(prefs settings.Settings) error {
 		}
 	}
 	return ss.settings.Update(prefs)
+}
+
+// MCPCommand is the argument that runs the app as a stdio MCP server.
+const MCPCommand = "mcp"
+
+// MCPSetupCommand returns the line that adds the app's MCP server to Claude
+// Code: the app started as a stdio server, which works with the editor
+// closed too.
+func (ss *SettingsService) MCPSetupCommand() string {
+	exe, err := os.Executable()
+	if err != nil {
+		exe = "otscreator"
+	}
+	return `claude mcp add ots-creator -- "` + exe + `" ` + MCPCommand
 }
 
 func (ss *SettingsService) RemoveRecent(datPath string) error {
