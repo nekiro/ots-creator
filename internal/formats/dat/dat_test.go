@@ -286,9 +286,26 @@ func TestDecodeErrors(t *testing.T) {
 			t.Fatalf("truncated at %d must fail", cut)
 		}
 	}
-	bad := []byte{0, 0, 0, 0, 100, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0, 1, 1, 1, 1, 1, 1}
-	if _, err := Decode(bad, opts); err == nil {
-		t.Fatal("zero layout must fail")
+}
+
+// A layout with a zero dimension stores no sprite ids; the client skips it,
+// so it decodes as one blank sprite and the next thing still reads right.
+func TestDecodeZeroFrames(t *testing.T) {
+	opts := OptionsFor(760, client.Features{})
+	data := []byte{0, 0, 0, 0, 101, 0, 0, 0, 0, 0, 0, 0,
+		0xFF, 1, 1, 1, 1, 1, 1, 0, // item 100: frames=0, no sprite ids
+		0xFF, 1, 1, 1, 1, 1, 1, 1, 7, 0, // item 101: sprite 7
+	}
+	got, err := Decode(data, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	empty := got.Get(thing.CategoryItem, 100).FrameGroups[0]
+	if empty.Frames != 1 || len(empty.Sprites) != 1 || empty.Sprites[0] != 0 {
+		t.Fatalf("empty group = %+v", empty)
+	}
+	if sprites := got.Get(thing.CategoryItem, 101).FrameGroups[0].Sprites; len(sprites) != 1 || sprites[0] != 7 {
+		t.Fatalf("next item sprites = %v", sprites)
 	}
 }
 

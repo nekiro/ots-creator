@@ -116,7 +116,7 @@ func readGroups(r *binio.Reader, object *thing.Thing, opts Options) error {
 }
 
 func ReadGroup(r *binio.Reader, group *thing.FrameGroup, patternZ, durations, extended bool, defaultDuration uint32) error {
-	if err := ReadLayout(r, group, patternZ, durations, defaultDuration); err != nil {
+	if err := readLayout(r, group, patternZ, durations, defaultDuration); err != nil {
 		return err
 	}
 	for i := range group.Sprites {
@@ -126,12 +126,40 @@ func ReadGroup(r *binio.Reader, group *thing.FrameGroup, patternZ, durations, ex
 			group.Sprites[i] = uint32(r.U16())
 		}
 	}
+	if len(group.Sprites) == 0 {
+		repairEmptyLayout(group)
+	}
 	return r.Err()
+}
+
+// repairEmptyLayout turns a layout with a zero dimension, which stores no
+// sprite ids, into one blank sprite. Some edited dat files have such things
+// (e.g. frames=0); the game client reads them as having no sprites.
+func repairEmptyLayout(group *thing.FrameGroup) {
+	for _, value := range []*uint8{&group.Width, &group.Height, &group.Layers, &group.PatternX, &group.PatternY, &group.PatternZ, &group.Frames} {
+		if *value == 0 {
+			*value = 1
+		}
+	}
+	group.Sprites = make([]uint32, group.TotalSprites())
 }
 
 // ReadLayout reads the dimensions and animation of a frame group and
 // allocates group.Sprites without reading sprite ids. Shared with the OBD codec.
 func ReadLayout(r *binio.Reader, group *thing.FrameGroup, patternZ, durations bool, defaultDuration uint32) error {
+	if err := readLayout(r, group, patternZ, durations, defaultDuration); err != nil {
+		return err
+	}
+	if len(group.Sprites) == 0 {
+		return fmt.Errorf("invalid sprite count 0 (%dx%d layers=%d patterns=%dx%dx%d frames=%d)",
+			group.Width, group.Height, group.Layers, group.PatternX, group.PatternY, group.PatternZ, group.Frames)
+	}
+	return nil
+}
+
+// readLayout is ReadLayout that accepts a layout without sprites, leaving
+// group.Sprites empty.
+func readLayout(r *binio.Reader, group *thing.FrameGroup, patternZ, durations bool, defaultDuration uint32) error {
 	group.Width = r.U8()
 	group.Height = r.U8()
 	if group.Width > 1 || group.Height > 1 {
@@ -166,7 +194,7 @@ func ReadLayout(r *binio.Reader, group *thing.FrameGroup, patternZ, durations bo
 		}
 	}
 	total := group.TotalSprites()
-	if total == 0 || total > maxSpritesPerGroup {
+	if total > maxSpritesPerGroup {
 		return fmt.Errorf("invalid sprite count %d (%dx%d layers=%d patterns=%dx%dx%d frames=%d)",
 			total, group.Width, group.Height, group.Layers, group.PatternX, group.PatternY, group.PatternZ, group.Frames)
 	}
