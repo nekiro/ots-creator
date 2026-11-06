@@ -24,13 +24,38 @@
     }
   });
 
-  /** Items top first, with their index in the tile (-1 ground). */
+  // The client draws a tile in stack layers whatever the item order in the
+  // map: borders, bottom items (walls, tables...), common items, top items.
+  // Only items of the same layer can be reordered.
+  const LAYER_RANK: Record<number, number> = { 1: 0, 2: 1, 0: 2, 3: 3 };
+  const LAYER_LABEL: Record<number, string> = { 1: "border", 2: "bottom", 3: "top" };
+  const layerRank = (item: TileItem) => LAYER_RANK[item.topOrder] ?? LAYER_RANK[0];
+
+  /** Items top first as the client draws them, with their index in the tile (-1 ground). */
   const stack = $derived.by(() => {
     if (!tile) return [] as { item: TileItem; index: number }[];
-    const out = (tile.items ?? []).map((item, index) => ({ item, index })).reverse();
+    const out = (tile.items ?? [])
+      .map((item, index) => ({ item, index }))
+      .sort((left, right) => layerRank(left.item) - layerRank(right.item) || left.index - right.index)
+      .reverse();
     if (tile.ground) out.push({ item: tile.ground, index: -1 });
     return out;
   });
+
+  function sameLayer(from: number, to: number) {
+    const items = tile?.items ?? [];
+    return from >= 0 && to >= 0 && !!items[from] && !!items[to] && layerRank(items[from]) === layerRank(items[to]);
+  }
+
+  /** Whether moving from → to passes an item of the same layer (else the client draws the tile the same). */
+  function changesDrawing(from: number, to: number) {
+    const items = tile?.items ?? [];
+    if (!items[from]) return false;
+    for (let index = Math.min(from, to); index <= Math.max(from, to); index++) {
+      if (index !== from && items[index] && layerRank(items[index]) === layerRank(items[from])) return true;
+    }
+    return false;
+  }
 
   function itemAt(index: number, path: number[]): TileItem | null {
     if (!tile) return null;
@@ -72,16 +97,20 @@
     if (selection?.index === index) selection = { index: to, path: [] };
   }
 
-  // Dragging a row changes the stack order. Rows are top first, so "above
-  // a row" means a higher index in the tile.
+  // Dragging a row changes the stack order within its layer. Rows are top
+  // first, so "above a row" means a higher index in the tile.
   let dragFrom = $state<number | null>(null);
   let dropAt = $state<{ index: number; above: boolean } | null>(null);
   function dragOver(event: DragEvent, index: number) {
     if (dragFrom === null) return;
+    if (!sameLayer(dragFrom, index)) {
+      dropAt = null;
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "none";
+      return;
+    }
     event.preventDefault();
     const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    // Nothing goes under the ground.
-    dropAt = { index, above: index < 0 || event.clientY < bounds.top + bounds.height / 2 };
+    dropAt = { index, above: event.clientY < bounds.top + bounds.height / 2 };
   }
   function drop() {
     const from = dragFrom;
@@ -91,7 +120,7 @@
     const target = dropTarget.index;
     let to = dropTarget.above ? (from < target ? target : target + 1) : from < target ? target - 1 : target;
     to = clamp(to, 0, (tile?.items?.length ?? 1) - 1);
-    if (to !== from) void move(from, to);
+    if (to !== from && changesDrawing(from, to)) void move(from, to);
   }
 
   async function addItem() {
@@ -170,7 +199,7 @@
             class:dropabove={dropAt?.index === index && dropAt.above}
             class:dropbelow={dropAt?.index === index && !dropAt.above}
             draggable={index >= 0}
-            title={index >= 0 ? "Drag to change the order" : undefined}
+            title={index >= 0 ? `Drag to change the order among ${LAYER_LABEL[item.topOrder] ?? "common"} items` : undefined}
             ondragstart={(event) => {
               dragFrom = index;
               event.dataTransfer?.setData("text/plain", String(index));
@@ -183,7 +212,7 @@
             <button class="pickbtn" title="{item.name} · server id {item.id}, client id {item.clientId}" onclick={() => pick(index)} ondblclick={() => selectBrush({ kind: "raw", item: item.id, look: item.id, label: item.name })}>
               <span class="t-slot"><ItemIcon id={item.id} /></span>
               <span class="nm">
-                <span class="n">{item.name}</span>
+                <span class="n">{item.name}{#if index >= 0 && LAYER_LABEL[item.topOrder]}<span class="layer" title="The client always draws {LAYER_LABEL[item.topOrder]} items in their own layer, whatever the order in the map">{LAYER_LABEL[item.topOrder]}</span>{/if}</span>
                 <span class="d">
                   {item.id}{#if item.subtype}{` · ${item.kind === "fluid" ? "fluid" : "count"} ${item.subtype}`}{/if}{#if item.ext?.actionId}{` · aid ${item.ext.actionId}`}{/if}{#if item.ext?.uniqueId}{` · uid ${item.ext.uniqueId}`}{/if}{#if item.ext?.dest}{` · → ${fmtPos(item.ext.dest)}`}{/if}{#if item.contents?.length}{` · ${item.contents.length} inside`}{/if}{#if item.brush}{` · ${item.brush}`}{/if}
                 </span>
@@ -419,6 +448,12 @@
   .d {
     font: var(--fs-small) / 11px var(--font-small);
     color: var(--text-dim);
+  }
+  .layer {
+    margin-left: 6px;
+    font: var(--fs-small) / 11px var(--font-small);
+    color: var(--text-dim);
+    text-transform: uppercase;
   }
   .del {
     flex: none;

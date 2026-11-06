@@ -988,6 +988,25 @@ func TestMoveItemReordersStack(t *testing.T) {
 	}
 }
 
+func TestMoveItemKeepsStackLayers(t *testing.T) {
+	e := testEditor(t)
+	toolsPut(e, at(5, 5), sandID, otmap.Item{ID: rugC}, otmap.Item{ID: wallH}, otmap.Item{ID: stoneID})
+
+	if err := e.MoveItem(at(5, 5), 1, 2); !errors.Is(err, ErrStackLayer) {
+		t.Fatalf("moving a wall past a common item = %v, want ErrStackLayer", err)
+	}
+	if got := itemIDs(e.Map.Tile(at(5, 5))); !slices.Equal(got, []uint16{rugC, wallH, stoneID}) || e.CanUndo() {
+		t.Fatalf("stack = %v canUndo=%v, want unchanged and no undo step", got, e.CanUndo())
+	}
+	// Common items reorder among themselves even with a wall between them.
+	if err := e.MoveItem(at(5, 5), 0, 2); err != nil {
+		t.Fatal(err)
+	}
+	if got := itemIDs(e.Map.Tile(at(5, 5))); !slices.Equal(got, []uint16{wallH, stoneID, rugC}) {
+		t.Fatalf("stack = %v, want the rug moved above the stone", got)
+	}
+}
+
 func TestMoveItemIgnoresInvalidMoves(t *testing.T) {
 	cases := []struct {
 		name     string

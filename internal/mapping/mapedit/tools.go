@@ -682,10 +682,36 @@ func (e *Editor) AddToContainer(ref ItemRef, id uint16) error {
 	return nil
 }
 
+// ErrStackLayer is returned when an item would move past an item of another
+// stack layer: the client always draws borders, then bottom items, then
+// common items, then top items, whatever their order in the map.
+var ErrStackLayer = errors.New("items of different stack layers (border, bottom, common, top) keep the client's order; only items of the same layer can be reordered")
+
+// stackLayer is the client's stack layer of an item, as the renderer uses it.
+func (e *Editor) stackLayer(id uint16) uint8 {
+	if itemType := e.itemType(id); itemType != nil {
+		return itemType.TopOrder
+	}
+	return commonTopOrder
+}
+
 func (e *Editor) MoveItem(pos otmap.Position, from, to int) error {
 	current := e.Map.Tile(pos)
 	if current == nil || from < 0 || from >= len(current.Items) || to < 0 || to >= len(current.Items) || from == to {
 		return nil
+	}
+	// The move must pass an item of the same layer, else the client draws
+	// the tile the same.
+	layer := e.stackLayer(current.Items[from].ID)
+	passesLayer := false
+	for index := min(from, to); index <= max(from, to); index++ {
+		if index != from && e.stackLayer(current.Items[index].ID) == layer {
+			passesLayer = true
+			break
+		}
+	}
+	if !passesLayer {
+		return ErrStackLayer
 	}
 	tx := e.Begin("Reorder items", 0)
 	defer tx.Commit()

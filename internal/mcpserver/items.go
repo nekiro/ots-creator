@@ -191,7 +191,7 @@ func (s *Server) addItemTools(server *mcp.Server) {
 			return s.edit(args.MapID, func(id int) (app.MapChange, error) { return s.maps.RemoveItem(id, ref) })
 		})
 
-	addTool(server, "move_item", "Moves an item to another place in its tile's stack.",
+	addTool(server, "move_item", "Moves an item to another place in its tile's stack. Only items of the same stack layer (border, bottom, common, top) can pass each other: the client draws the layers in a fixed order.",
 		func(_ context.Context, args moveItemArgs) (any, error) {
 			pos, err := args.Pos.position()
 			if err != nil {
