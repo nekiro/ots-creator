@@ -4,6 +4,7 @@ import (
 	"embed"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime/debug"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -155,12 +156,22 @@ func main() {
 
 	// Open a client passed on the command line (file association, dev runs).
 	if len(os.Args) > 1 {
-		openClient(projects, os.Args[1])
+		openClient(projects, commandLinePath(os.Args[1]))
 	}
 
 	if err := wailsApp.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// commandLinePath resolves a relative path from the command line. The
+// AppImage starts the app in its own directory and keeps the directory it
+// was started from in $OWD.
+func commandLinePath(path string) string {
+	if start := os.Getenv("OWD"); start != "" && os.Getenv("APPIMAGE") != "" && !filepath.IsAbs(path) {
+		return filepath.Join(start, path)
+	}
+	return path
 }
 
 func openClient(projects *app.ProjectService, path string) {

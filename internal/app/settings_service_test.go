@@ -44,3 +44,18 @@ func solidPx(size int) []byte {
 	}
 	return px
 }
+
+func TestMCPCommandNamesTheAppImage(t *testing.T) {
+	mount := filepath.Join(t.TempDir(), ".mount_otscreator")
+	image := filepath.Join(t.TempDir(), "otscreator-linux-amd64.AppImage")
+	t.Setenv("APPDIR", mount)
+	t.Setenv("APPIMAGE", image)
+	if got := appImageOr(filepath.Join(mount, "usr", "bin", "otscreator")); got != image {
+		t.Fatalf("inside the mount: %q, want %q", got, image)
+	}
+	// A child started from the AppImage inherits APPIMAGE but runs elsewhere.
+	other := filepath.Join(t.TempDir(), "otscreator")
+	if got := appImageOr(other); got != other {
+		t.Fatalf("outside the mount: %q, want %q", got, other)
+	}
+}

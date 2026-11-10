@@ -8,7 +8,7 @@
 
 [![Latest release](https://img.shields.io/github/v/release/nekiro/ots-creator?style=flat-square&color=e8c46a)](https://github.com/nekiro/ots-creator/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/nekiro/ots-creator/total?style=flat-square&color=d4930a)](https://github.com/nekiro/ots-creator/releases)
-![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-555?style=flat-square)
+![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-555?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache%202.0%20%2B%20Commons%20Clause-555?style=flat-square)](LICENSE)
 
 [Download](https://github.com/nekiro/ots-creator/releases/latest) ·
@@ -35,6 +35,11 @@ Later versions install from the built-in updater.
   (Intel). Move `otscreator.app` to Applications. The app is not notarized, so the first
   start is blocked: click "Open Anyway" in System Settings > Privacy & Security, or run
   `xattr -dr com.apple.quarantine /Applications/otscreator.app`.
+- **Linux** (x86_64 and arm64, GTK 4 and WebKitGTK 6.0: Ubuntu 24.04+, Debian 13+, Fedora
+  40+): `otscreator-linux-amd64.AppImage` / `otscreator-linux-arm64.AppImage`, made
+  executable with `chmod +x`. The built-in updater replaces the AppImage file. The `.deb`
+  and `.rpm` packages install the app system-wide instead; update them by installing the
+  package of the next version.
 
 ## Features
 
@@ -241,6 +246,8 @@ OBD stays fully supported for ObjectBuilder, and the market keeps storing object
 ## Development
 
 Requirements: Go 1.26+, Node 22+, `wails3` CLI (`go install github.com/wailsapp/wails/v3/cmd/wails3@latest`).
+On Linux also a C compiler and the GTK 4 / WebKitGTK 6.0 headers (Debian/Ubuntu:
+`sudo apt install build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev`).
 
 ```sh
 wails3 task dev        # run with hot reload

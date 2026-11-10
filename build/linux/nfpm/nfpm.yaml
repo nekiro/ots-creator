@@ -1,7 +1,5 @@
-# Feel free to remove those if you don't want/need to use them.
-# Make sure to check the documentation at https://nfpm.goreleaser.com
-#
-# The lines below are called `modelines`. See `:help modeline`
+# Package definition for the deb and rpm packages (wails3 tool package).
+# See https://nfpm.goreleaser.com. The release workflow replaces the version.
 
 name: "otscreator"
 arch: ${GOARCH}
@@ -9,18 +7,19 @@ platform: "linux"
 version: "0.1.0"
 section: "default"
 priority: "extra"
-maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
+maintainer: "nekiro"
 description: "Object editor for Open Tibia clients"
 vendor: "nekiro"
-homepage: "https://wails.io"
-license: "MIT"
+homepage: "https://github.com/nekiro/ots-creator"
+license: "Apache-2.0 WITH Commons-Clause"
 release: "1"
 
 contents:
   - src: "./bin/otscreator"
-    dst: "/usr/local/bin/otscreator"
+    dst: "/usr/bin/otscreator"
+  # appicon.png is 1024x1024, larger than the hicolor theme's sizes.
   - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/128x128/apps/otscreator.png"
+    dst: "/usr/share/pixmaps/otscreator.png"
   - src: "./build/linux/otscreator.desktop"
     dst: "/usr/share/applications/otscreator.desktop"
 

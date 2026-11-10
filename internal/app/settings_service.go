@@ -2,6 +2,8 @@ package app
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/nekiro/ots-creator/internal/core/project"
 	"github.com/nekiro/ots-creator/internal/settings"
@@ -42,7 +44,18 @@ func (ss *SettingsService) MCPSetupCommand() string {
 	if err != nil {
 		exe = "otscreator"
 	}
-	return `claude mcp add ots-creator -- "` + exe + `" ` + MCPCommand
+	return `claude mcp add ots-creator -- "` + appImageOr(exe) + `" ` + MCPCommand
+}
+
+// appImageOr returns the AppImage file ($APPIMAGE) when exe runs from its
+// mount ($APPDIR). The mount is temporary and exists only while the app
+// runs, so commands that start the app later must name the AppImage.
+func appImageOr(exe string) string {
+	image, mount := os.Getenv("APPIMAGE"), os.Getenv("APPDIR")
+	if image == "" || mount == "" || !strings.HasPrefix(exe, filepath.Clean(mount)+string(filepath.Separator)) {
+		return exe
+	}
+	return image
 }
 
 func (ss *SettingsService) RemoveRecent(datPath string) error {

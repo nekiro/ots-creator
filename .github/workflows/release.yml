@@ -1,15 +1,22 @@
-# Builds Windows and macOS releases when a version tag (v1.2.3) is pushed.
+# Builds Windows, macOS and Linux releases when a version tag (v1.2.3) is pushed.
 #
 # Release assets:
 #   otscreator-amd64-installer.exe  NSIS installer for first installs
 #   otscreator-windows-amd64.exe    plain executable, used by the in-app updater
 #   otscreator-darwin-arm64.zip     .app bundle for Apple Silicon Macs
 #   otscreator-darwin-amd64.zip     .app bundle for Intel Macs
+#   otscreator-linux-amd64.AppImage portable Linux app, used by the in-app updater
+#   otscreator-linux-arm64.AppImage
+#   otscreator_<version>_amd64.deb  packages for Debian/Ubuntu and Fedora/RHEL
+#   otscreator_<version>_arm64.deb  (no "linux" in the name, so the updater
+#   otscreator-<version>.x86_64.rpm  skips them)
+#   otscreator-<version>.aarch64.rpm
 #   checksums.txt                   SHA-256 of all of them, checked by the updater
 #
 # The in-app updater (Wails updater, GitHub provider) picks the asset whose name
 # contains the running OS and architecture and skips "-installer." assets. On
-# macOS it needs a .zip with exactly one top-level .app (no .dmg).
+# macOS it needs a .zip with exactly one top-level .app (no .dmg). On Linux it
+# replaces the AppImage file it runs from.
 name: Release
 
 on:
@@ -20,7 +27,7 @@ permissions:
   contents: write
 
 env:
-  WAILS_VERSION: v3.0.0-beta.28
+  WAILS_VERSION: v3.0.0
 
 jobs:
   windows:
@@ -143,8 +150,85 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  linux:
+    # Native runners for both architectures: cgo needs the GTK and WebKit
+    # libraries of the target, and the AppImage bundles the runner's copies.
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Version from tag
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          # deb and rpm versions cannot hold "-", so a pre-release keeps only x.y.z.
+          numeric="${version%%[-+]*}"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "NUMERIC_VERSION=$numeric" >> "$GITHUB_ENV"
+          sed -i "s/^version: \"0\.1\.0\"/version: \"$numeric\"/" build/linux/nfpm/nfpm.yaml
+          grep -c "^version: \"$numeric\"" build/linux/nfpm/nfpm.yaml
+
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          # GTK 4 and WebKitGTK 6.0 for cgo; file and desktop-file-utils for linuxdeploy.
+          sudo apt-get install -y --no-install-recommends             build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev             file desktop-file-utils
+
+      - name: Install tools
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@$WAILS_VERSION
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Test
+        run: |
+          wails3 task common:generate:bindings
+          # main.go embeds frontend/dist, which exists only after the frontend build.
+          mkdir -p frontend/dist && touch frontend/dist/.keep
+          go test ./...
+
+      - name: Build packages
+        run: wails3 task linux:package ARCH="${{ matrix.arch }}" VERSION="$VERSION"
+
+      - name: Collect assets
+        run: |
+          mkdir dist
+          ls -l bin
+          case "${{ matrix.arch }}" in
+            amd64) appimage_arch=x86_64; rpm_arch=x86_64 ;;
+            arm64) appimage_arch=aarch64; rpm_arch=aarch64 ;;
+          esac
+          cp "bin/otscreator-$appimage_arch.AppImage" "dist/otscreator-linux-${{ matrix.arch }}.AppImage"
+          chmod +x dist/*.AppImage
+          cp bin/otscreator.deb "dist/otscreator_${NUMERIC_VERSION}_${{ matrix.arch }}.deb"
+          cp bin/otscreator.rpm "dist/otscreator-${NUMERIC_VERSION}.$rpm_arch.rpm"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
+
   release:
-    needs: [windows, macos]
+    needs: [windows, macos, linux]
     runs-on: ubuntu-latest
     steps:
       # Full history and tags, for the commit list in the release notes.
