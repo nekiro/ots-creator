@@ -72,6 +72,15 @@ func (ms *MapService) Replace(id int, from, to []uint16, inSelection bool) (MapC
 	})
 }
 
+// SetSpawnTimes sets the spawn time of the creatures in the selection or
+// the whole map; a non-empty name limits it to creatures of that name.
+// Count is the number of creatures changed.
+func (ms *MapService) SetSpawnTimes(id int, seconds int32, name string, inSelection bool) (MapChange, error) {
+	return ms.edit(id, func(editor *mapedit.Editor, _ *mapData) (int, error) {
+		return editor.SetSpawnTimes(seconds, name, inSelection)
+	})
+}
+
 func (ms *MapService) Stats(id int) (stats mapedit.Statistics, err error) {
 	err = ms.withMap(id, func(opened *openMap, _ *mapData) error {
 		stats = opened.editor.Stats()

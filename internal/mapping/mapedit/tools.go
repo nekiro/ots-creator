@@ -825,6 +825,35 @@ func (e *Editor) UpdateCreature(pos otmap.Position, index int, patch CreaturePat
 	return nil
 }
 
+// SetSpawnTimes sets the spawn time of every creature in the selection or
+// the whole map; a non-empty name limits it to creatures of that name (any
+// case). It returns how many creatures changed, in one undo step.
+func (e *Editor) SetSpawnTimes(seconds int32, name string, inSelection bool) (int, error) {
+	if seconds <= 0 {
+		return 0, errors.New("spawn time must be at least 1 second")
+	}
+	name = strings.TrimSpace(name)
+	shouldChange := func(creature otmap.Creature) bool {
+		return creature.SpawnTime != seconds && (name == "" || strings.EqualFold(creature.Name, name))
+	}
+	tx := e.Begin("Set spawn times", 0)
+	changed := 0
+	e.eachTile(inSelection, func(pos otmap.Position, tile *otmap.Tile) {
+		if !slices.ContainsFunc(tile.Creatures(), shouldChange) {
+			return
+		}
+		editTile := tx.Edit(pos)
+		for i := range editTile.Ext.Creatures {
+			if shouldChange(editTile.Ext.Creatures[i]) {
+				editTile.Ext.Creatures[i].SpawnTime = seconds
+				changed++
+			}
+		}
+	})
+	tx.Commit()
+	return changed, nil
+}
+
 // UpdateSpawn sets the radius of a spawn (0 removes it).
 func (e *Editor) UpdateSpawn(pos otmap.Position, npc bool, radius int32) error {
 	current := e.Map.Tile(pos)

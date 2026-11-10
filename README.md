@@ -146,7 +146,7 @@ the open client; object changes show after **Reload from client**.
 - **Selection** over one or several floors, with a floating bar (copy, move between floors,
   redo borders, find, make a brush) and an undo history you can jump back in.
 - **Find and tools:** a find panel with replace and remove; map tools (unknown items,
-  corpses, empty spawns, unseen tiles, borders) on the selection or the whole map; import
+  corpses, empty spawns, spawn times, unseen tiles, borders) on the selection or the whole map; import
   of another map at an offset; minimap export.
 - **Big maps:** the backend builds the drawing data of each 32×32 chunk once and the GPU
   keeps it (WebGL2), so panning and zooming only move the camera and only animated sprites

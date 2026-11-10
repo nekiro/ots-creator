@@ -1150,6 +1150,56 @@ func TestUpdateCreatureChangesFields(t *testing.T) {
 	}
 }
 
+func TestSetSpawnTimesChangesEveryCreatureInOneStep(t *testing.T) {
+	e := creatureEditor(t)
+	e.Map.SetTile(at(9, 9), &otmap.Tile{Ground: otmap.Item{ID: sandID}, Ext: &otmap.TileExt{Creatures: []otmap.Creature{{Name: "Rat", SpawnTime: 120}}}})
+
+	changed, err := e.SetSpawnTimes(120, "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed != 2 {
+		t.Fatalf("changed = %d, want 2 (the rat at 5,5 and Tom; the rat at 9,9 has 120 already)", changed)
+	}
+	for _, creature := range e.Map.Tile(at(5, 5)).Creatures() {
+		if creature.SpawnTime != 120 {
+			t.Fatalf("%s spawn time = %d, want 120", creature.Name, creature.SpawnTime)
+		}
+	}
+	if undo, _ := e.History(); len(undo) != 1 {
+		t.Fatalf("undo steps = %d, want 1", len(undo))
+	}
+	e.Undo()
+	if got := e.Map.Tile(at(5, 5)).Creatures()[0].SpawnTime; got != 60 {
+		t.Fatalf("spawn time after undo = %d, want 60", got)
+	}
+}
+
+func TestSetSpawnTimesFiltersByNameAndSelection(t *testing.T) {
+	e := creatureEditor(t)
+	e.Map.SetTile(at(9, 9), &otmap.Tile{Ground: otmap.Item{ID: sandID}, Ext: &otmap.TileExt{Creatures: []otmap.Creature{{Name: "Rat", SpawnTime: 60}}}})
+	e.SelectTiles([]otmap.Position{at(5, 5)}, false)
+
+	changed, err := e.SetSpawnTimes(300, "rat", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	creatures := e.Map.Tile(at(5, 5)).Creatures()
+	if changed != 1 || creatures[0].SpawnTime != 300 || creatures[1].SpawnTime != 0 {
+		t.Fatalf("changed = %d, creatures = %+v, want only the selected rat at 300", changed, creatures)
+	}
+	if got := e.Map.Tile(at(9, 9)).Creatures()[0].SpawnTime; got != 60 {
+		t.Fatalf("unselected rat spawn time = %d, want 60", got)
+	}
+}
+
+func TestSetSpawnTimesRejectsZero(t *testing.T) {
+	e := creatureEditor(t)
+	if _, err := e.SetSpawnTimes(0, "", false); err == nil {
+		t.Fatal("SetSpawnTimes(0) gave no error")
+	}
+}
+
 func TestUpdateCreatureIgnoresEmptyName(t *testing.T) {
 	e := creatureEditor(t)
 	if err := e.UpdateCreature(at(5, 5), 0, CreaturePatch{Name: ptr("")}); err != nil {

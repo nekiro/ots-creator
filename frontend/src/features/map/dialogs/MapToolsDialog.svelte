@@ -2,9 +2,12 @@
   // Batch tools. They work on the selection when there is one, otherwise on
   // the whole map; everything can be undone.
   import { ask } from "../../../lib/confirm.svelte";
+  import { MapService } from "../../../lib/map/data/api";
   import { mapCommands } from "../../../lib/map/view/commands";
-  import { map } from "../../../lib/map/state.svelte";
+  import { edit, map } from "../../../lib/map/state.svelte";
+  import { toast } from "../../../lib/state/app.svelte";
   import Dialog from "../../../lib/ui/Dialog.svelte";
+  import NumberField from "../../../lib/ui/NumberField.svelte";
 
   interface Tool {
     label: string;
@@ -33,6 +36,15 @@
     const name = useSelection ? tool.selection! : tool.all;
     await mapCommands.tool(name, useSelection && (name === "removeInvalid" || name === "removeCorpses"));
   }
+
+  let spawnSeconds = $state(map.settings?.defaultSpawnTime ?? 60);
+  let spawnCreature = $state("");
+
+  async function setSpawnTimes() {
+    const inSelection = onSelection && hasSelection;
+    const change = await edit((id) => MapService.SetSpawnTimes(id, spawnSeconds, spawnCreature.trim(), inSelection));
+    if (change) toast(`${change.count.toLocaleString()} ${change.count === 1 ? "creature" : "creatures"} changed.`);
+  }
 </script>
 
 <Dialog title="Map tools" width={480} onclose={() => (map.dialog = null)}>
@@ -51,6 +63,13 @@
         <button class="t-btn" disabled={off} onclick={() => run(tool)}>Run</button>
       </div>
     {/each}
+    <div class="tool">
+      <span class="col grow"><span>Set spawn time</span><span class="t-label hint">Respawn time of every creature, or only of the named one.</span></span>
+      <NumberField value={spawnSeconds} min={1} max={86400} width={56} title="Seconds" onchange={(value) => (spawnSeconds = value)} />
+      <span class="t-label">s</span>
+      <input class="t-input name" placeholder="All creatures" bind:value={spawnCreature} />
+      <button class="t-btn" onclick={setSpawnTimes}>Run</button>
+    </div>
     <p class="t-label hint">Every tool is one step in the undo history.</p>
   </div>
   {#snippet footer()}
@@ -72,6 +91,9 @@
     gap: 10px;
     padding: 4px 0;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  .tool .name {
+    width: 110px;
   }
   .tool.off {
     opacity: 0.55;

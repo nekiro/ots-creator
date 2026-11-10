@@ -328,7 +328,7 @@
             <div class="col grow">
               <span class:unknown={creature.unknown} title={creature.unknown ? "Not in the creature list" : ""}>{creature.name}{creature.npc ? " (NPC)" : ""}</span>
               <div class="row">
-                <input class="t-input sp" title="Spawn time (seconds)" value={creature.spawnTime} onchange={(event) => inspected && edit((id) => MapService.UpdateCreature(id, inspected!, creatureIndex, { spawnTime: Math.max(1, Math.trunc(+event.currentTarget.value) || 60), remove: false }))} />
+                <input class="t-input sp" title="Spawn time (seconds)" value={creature.spawnTime} onchange={(event) => inspected && edit((id) => MapService.UpdateCreature(id, inspected!, creatureIndex, { spawnTime: Math.max(1, Math.trunc(+event.currentTarget.value) || (map.settings?.defaultSpawnTime ?? 60)), remove: false }))} />
                 <span class="t-label">s</span>
                 <Select value={creature.direction} width={70} options={DIRECTION_OPTIONS} onchange={(value) => inspected && edit((id) => MapService.UpdateCreature(id, inspected!, creatureIndex, { direction: value, remove: false }))} />
               </div>
