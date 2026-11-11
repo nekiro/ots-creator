@@ -75,7 +75,11 @@
 		const useSelection = onSelection && hasSelection && tool.selection !== null;
 		if (tool.confirm && !(await ask({ title: tool.label, message: tool.confirm, ok: "Continue" }))) return;
 		const name = useSelection ? tool.selection! : tool.all;
-		await mapCommands.tool(name, useSelection && (name === "removeInvalid" || name === "removeCorpses"));
+		await mapCommands.tool(
+			name,
+			useSelection && (name === "removeInvalid" || name === "removeCorpses"),
+			tool.label,
+		);
 	}
 
 	let spawnSeconds = $state(map.settings?.defaultSpawnTime ?? 60);

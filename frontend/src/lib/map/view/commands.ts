@@ -26,6 +26,8 @@ const OTBM = { name: "OTBM maps (*.otbm)", pattern: "*.otbm" };
 const OTMAP = { name: "OTMAP maps (*.otmap)", pattern: "*.otmap" };
 const MAPS = [{ name: "Maps (*.otbm, *.otmap)", pattern: "*.otbm;*.otmap" }, OTBM, OTMAP];
 const isOTMAP = (name: string) => /\.otmap$/i.test(name);
+/** Quick map tools finish before their progress window would show. */
+const TOOL_PROGRESS_DELAY_MS = 250;
 
 export function spriteSize(): number {
 	return app.project?.info.features.spriteSize || 32;
@@ -350,11 +352,25 @@ export const mapCommands = {
 	selectAll: () => edit((id) => MapService.SelectAll(id, map.floor)),
 	clearSelection: () => edit((id) => MapService.ClearSelection(id)),
 
-	tool(name: string, inSelection = false) {
-		return edit((id) => MapService.Tool(id, name, inSelection)).then((change) => {
+	/** Runs a map tool; the progress window shows when it takes longer than TOOL_PROGRESS_DELAY_MS. */
+	async tool(name: string, inSelection = false, title = "Running map tool") {
+		const mapName = map.active?.name ?? "";
+		let hideProgress = (): void => {};
+		const showProgress = setTimeout(() => {
+			const stopProgress = trackProgress(mapName, title);
+			hideProgress = () => {
+				stopProgress();
+				map.loading = null;
+			};
+		}, TOOL_PROGRESS_DELAY_MS);
+		try {
+			const change = await edit((id) => MapService.Tool(id, name, inSelection));
 			if (change && change.count >= 0 && name !== "clearModified")
 				toast(`${change.count.toLocaleString()} changed.`);
-		});
+		} finally {
+			clearTimeout(showProgress);
+			hideProgress();
+		}
 	},
 
 	floor(z: number) {

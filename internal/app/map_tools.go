@@ -31,13 +31,20 @@ var mapTools = map[string]mapTool{
 // Tool runs a map tool: "borderizeSelection", "borderizeMap",
 // "randomizeSelection", "randomizeMap", "removeCorpses", "removeInvalid",
 // "removeUnreachable", "removeEmptySpawns", "clearInvalidHouses",
-// "clearModified". inSelection limits item tools to the selection.
+// "clearModified". inSelection limits item tools to the selection. Tools
+// that go through the whole map send EventMapProgress.
 func (ms *MapService) Tool(id int, name string, inSelection bool) (MapChange, error) {
 	tool, ok := mapTools[name]
 	if !ok {
 		return MapChange{}, fmt.Errorf("unknown tool %q", name)
 	}
+	report := ms.mapProgress()
+	report("Going through the map", 0)
 	change, err := ms.edit(id, func(editor *mapedit.Editor, _ *mapData) (int, error) {
+		editor.Progress = func(done, total int) {
+			report("Going through the map", progressTotal*done/max(total, 1))
+		}
+		defer func() { editor.Progress = nil }()
 		return tool.run(editor, inSelection), nil
 	})
 	change.All = change.All || tool.redrawAll

@@ -190,7 +190,11 @@ func (e *Editor) eachTile(inSelection bool, fn func(pos otmap.Position, tile *ot
 		}
 		return
 	}
-	e.Map.Each(fn)
+	progress := e.progressOver(e.Map.TileCount())
+	e.Map.Each(func(pos otmap.Position, tile *otmap.Tile) {
+		fn(pos, tile)
+		progress()
+	})
 }
 
 // rewriteItems rewrites items of the selection or the whole map,
@@ -302,38 +306,6 @@ func (e *Editor) RemoveInvalid(inSelection bool) int {
 	})
 }
 
-// RemoveUnreachable removes tiles no player can see: tiles farther than
-// the client view (9x7 tiles) from any walkable tile within two floors.
-func (e *Editor) RemoveUnreachable() int {
-	walkable := func(x, y, z int) bool {
-		tile := e.Map.At(x, y, z)
-		return tile != nil && !e.blocking(tile)
-	}
-	var unreachable []otmap.Position
-	e.Map.Each(func(pos otmap.Position, _ *otmap.Tile) {
-		x, y, z := int(pos.X), int(pos.Y), int(pos.Z)
-		for floor := max(z-clientViewFloorsRange, 0); floor <= min(z+clientViewFloorsRange, otmap.MaxFloor); floor++ {
-			for dy := -clientViewRangeY; dy <= clientViewRangeY; dy++ {
-				for dx := -clientViewRangeX; dx <= clientViewRangeX; dx++ {
-					if walkable(x+dx, y+dy, floor) {
-						return
-					}
-				}
-			}
-		}
-		unreachable = append(unreachable, pos)
-	})
-	if len(unreachable) == 0 {
-		return 0
-	}
-	tx := e.Begin("Remove unreachable tiles", 0)
-	for _, pos := range unreachable {
-		tile := tx.Edit(pos)
-		*tile = otmap.Tile{}
-	}
-	return tx.Commit()
-}
-
 func (e *Editor) RemoveEmptySpawns() int {
 	type spawnRef struct {
 		pos otmap.Position
@@ -416,17 +388,21 @@ func (e *Editor) RandomizeMap() int {
 
 func (e *Editor) borderizePositions(label string, positions []otmap.Position) int {
 	tx := e.Begin(label, 0)
+	progress := e.progressOver(len(positions))
 	for _, pos := range positions {
 		e.reborder(tx, pos, true)
 		e.fitWalls(tx, pos)
+		progress()
 	}
 	return tx.Commit()
 }
 
 func (e *Editor) randomizePositions(label string, positions []otmap.Position) int {
 	tx := e.Begin(label, 0)
+	progress := e.progressOver(len(positions))
 	for _, pos := range positions {
 		e.randomize(tx, pos)
+		progress()
 	}
 	return tx.Commit()
 }

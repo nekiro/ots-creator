@@ -119,6 +119,9 @@ type Editor struct {
 	Items    *otitems.DB
 	Brushes  *Brushes
 	Settings Settings
+	// Progress, when set, is called by the map-wide tools as they work
+	// through the map (see progressOver).
+	Progress func(done, total int)
 
 	undo []*Action
 	redo []*Action
