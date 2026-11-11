@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from "svelte";
+  import { tick, untrack } from "svelte";
   import { errorMessage } from "../../lib/api";
   import { ask, askText } from "../../lib/confirm.svelte";
   import { openContextMenu } from "../../lib/menu.svelte";
@@ -7,7 +7,7 @@
   import { readJson, saveJson } from "../../lib/state/storage";
   import { MapService, SpawnFormat, type CreatureType, type PaletteBrush } from "../../lib/map/data/api";
   import { mapCommands } from "../../lib/map/view/commands";
-  import { creatureOutfit, isBrushActive, map, reloadPalette, selectBrush, type BrushSel } from "../../lib/map/state.svelte";
+  import { creatureOutfit, isBrushActive, map, namedBrush, reloadPalette, selectBrush, type BrushSel } from "../../lib/map/state.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import SearchField from "../../lib/ui/SearchField.svelte";
   import Select from "../../lib/ui/Select.svelte";
@@ -127,6 +127,22 @@
       revealed = request.id;
     });
   });
+  // A brush picked from the map: open its tab, drop the filters that hide
+  // it and scroll to its row.
+  let libraryRoot = $state<HTMLDivElement>();
+  $effect(() => {
+    const request = map.revealBrush;
+    if (!request) return;
+    untrack(() => {
+      map.revealBrush = null;
+      const decorBrush = request.kind === "doodad";
+      view = decorBrush ? "decor" : "terrain";
+      if (!(decorBrush ? decor : terrain).some((brush) => brush.name === request.name)) query = "";
+      if (!(decorBrush ? decorAll : terrainAll).some((brush) => brush.name === request.name)) collection = "";
+      void tick().then(() => libraryRoot?.querySelector(".m-row.on, .stamp.on")?.scrollIntoView({ block: "nearest" }));
+    });
+  });
+
   const revealIndex = $derived.by(() => {
     if (revealed === null || map.brush?.kind !== "raw" || map.brush.item !== revealed) return null;
     const index = items.indexOf(revealed);
@@ -139,10 +155,7 @@
 
   const counts = $derived<Record<View, number>>({ terrain: terrain.length, decor: decor.length, items: baseItems.length, creatures: matchedCreatures.length });
 
-  function brushSel(brush: PaletteBrush): BrushSel {
-    const kind = brush.kind === "decoration" ? "wall" : brush.kind;
-    return { kind, name: brush.name, look: brush.look, label: brush.name };
-  }
+  const brushSel = (brush: PaletteBrush): BrushSel => namedBrush(brush.name, brush.kind, brush.look);
   function itemSel(id: number): BrushSel {
     return { kind: "raw", item: id, look: id, label: map.items?.name(id) ?? `item ${id}` };
   }
@@ -256,7 +269,7 @@
   </div>
 {/snippet}
 
-<div class="lib">
+<div class="lib" bind:this={libraryRoot}>
   <SearchField bind:value={query} placeholder="Search by name or id" />
 
   <div class="t-tabs views" role="tablist">

@@ -1,9 +1,9 @@
 import { app, openSettings, toast } from "../../state/app.svelte";
 import type { MenuEntry } from "../../menu.svelte";
-import { MapService, fmtPos, type Position } from "../data/api";
+import { MapService, fmtPos, type Position, type TileInfo, type TileItem } from "../data/api";
 import { ItemFlags, TileFlags, type TileData } from "../data/chunks";
 import { goTo, mapCommands, selectionScope } from "./commands";
-import { edit, map, selectBrush, useCreature, warningCount } from "../state.svelte";
+import { edit, map, namedBrush, selectBrush, useCreature, warningCount, type BrushSel } from "../state.svelte";
 import { addHouse, addTown, addWaypoint } from "../editor/world";
 import { keyLabel } from "./keys";
 import type { ViewOptions } from "../render/scene";
@@ -152,7 +152,51 @@ export function openText(pos: Position, index: number): void {
   map.dialog = "text";
 }
 
-export function mapContextMenu(position: Position, tileData: TileData | null, actions: { pick: () => void }): MenuEntry[] {
+export interface TilePicks {
+  /** The brushes of the tile's items, topmost first, each once. */
+  brushes: BrushSel[];
+  /** The topmost item, placed as is. */
+  raw: BrushSel | null;
+  /** What Ctrl+Alt+click picks: the brush of the topmost item that has
+   * one, looking under brushless items that stay on top (borders); a
+   * brushless item above that is picked as is. */
+  click: BrushSel | null;
+}
+
+const rawItem = (item: TileItem): BrushSel => ({ kind: "raw", item: item.id, look: item.id, label: item.name });
+
+export function tilePicks(info: TileInfo | null): TilePicks {
+  const stack = [...(info?.items ?? [])].reverse();
+  if (info?.ground) stack.push(info.ground);
+  const picks: TilePicks = { brushes: [], raw: stack.length ? rawItem(stack[0]) : null, click: null };
+  const seen = new Set<string>();
+  for (const item of stack) {
+    if (item.brush) {
+      const brush = namedBrush(item.brush, item.brushKind);
+      const key = `${brush.kind}:${brush.name}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        picks.brushes.push(brush);
+      }
+      picks.click ??= brush;
+    } else if (!item.topOrder) {
+      picks.click ??= rawItem(item);
+    }
+  }
+  picks.click ??= picks.raw;
+  return picks;
+}
+
+/** Makes a brush picked from the map the brush and shows it in the library. */
+export function usePick(pick: BrushSel): void {
+  selectBrush(pick);
+  map.side = "library";
+  if (pick.kind === "raw") map.revealItem = { id: pick.item! };
+  else map.revealBrush = { name: pick.name!, kind: pick.kind };
+  toast(pick.kind === "raw" ? `Item: ${pick.label}` : `Brush: ${pick.label}`);
+}
+
+export function mapContextMenu(position: Position, tileData: TileData | null, picks: TilePicks): MenuEntry[] {
   const items = map.items;
   const top = tileData && tileData.ids.length ? tileData.ids[tileData.ids.length - 1] : 0;
   const topIndex = tileData ? tileData.ids.length - 1 - (tileData.flags & TileFlags.ground ? 1 : 0) : -1;
@@ -168,10 +212,14 @@ export function mapContextMenu(position: Position, tileData: TileData | null, ac
   if (tileData?.creatures?.length) {
     out.push("-", ...tileData.creatures.map((creature): MenuEntry => ({ label: `Use creature: ${creature.name}`, action: () => useCreature(creature) })));
   }
+  const pickEntry = (pick: BrushSel, label: string): MenuEntry => ({ label, keys: pick === picks.click ? "Ctrl+Alt+click" : undefined, action: () => usePick(pick) });
+  if (picks.brushes.length || picks.raw) {
+    out.push("-", ...picks.brushes.map((brush) => pickEntry(brush, `Use brush: ${brush.label}`)));
+    if (picks.raw) out.push(pickEntry(picks.raw, `Use raw item: ${picks.raw.label}`));
+  }
   if (top && items) {
     out.push(
       "-",
-      { label: `Use brush: ${items.name(top)}`, keys: "Ctrl+Alt+click", action: actions.pick },
       { label: "Copy item id", action: () => copy(String(top)) },
       { label: "Copy item name", action: () => copy(items.name(top)) },
     );

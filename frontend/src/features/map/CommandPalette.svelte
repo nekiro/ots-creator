@@ -5,7 +5,7 @@
   import { parsePos, fmtPos, type CreatureType, type PaletteBrush } from "../../lib/map/data/api";
   import { goTo, mapCommands } from "../../lib/map/view/commands";
   import { mapMenus } from "../../lib/map/view/menus";
-  import { map, selectBrush } from "../../lib/map/state.svelte";
+  import { map, namedBrush, selectBrush } from "../../lib/map/state.svelte";
   import { goHouse, houses, towns } from "../../lib/map/editor/world";
   import { backdrop, pop } from "../../lib/ui/motion";
   import ItemIcon from "./ItemIcon.svelte";
@@ -57,7 +57,7 @@
       for (const waypoint of map.active?.waypoints ?? []) if (waypoint && match(waypoint.name)) out.push({ group: "Places", label: waypoint.name, detail: "waypoint", run: () => (mapCommands.focus({ kind: "waypoint", name: waypoint.name }), goTo(waypoint.pos)) });
     }
     const brushes = (map.palette?.brushes ?? []).filter((brush): brush is PaletteBrush => !!brush && match(brush.name)).slice(0, 30);
-    for (const brush of brushes) out.push({ group: "Brushes", label: brush.name, detail: brush.kind, icon: { id: brush.look }, run: () => selectBrush({ kind: brush.kind === "decoration" ? "wall" : brush.kind, name: brush.name, look: brush.look, label: brush.name }) });
+    for (const brush of brushes) out.push({ group: "Brushes", label: brush.name, detail: brush.kind, icon: { id: brush.look }, run: () => selectBrush(namedBrush(brush.name, brush.kind, brush.look)) });
     for (const creature of (map.palette?.creatures ?? []).filter((creature): creature is CreatureType => !!creature && match(creature.name)).slice(0, 20)) {
       out.push({ group: "Creatures", label: creature.name, detail: creature.npc ? "NPC" : "monster", icon: { outfit: creature.outfit.lookItem ? 0 : creature.outfit.lookType, id: creature.outfit.lookItem }, run: () => selectBrush({ kind: "creature", creature: creature.name, npc: !!creature.npc, label: creature.name }) });
     }

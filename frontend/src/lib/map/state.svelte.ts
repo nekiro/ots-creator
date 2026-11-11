@@ -110,6 +110,8 @@ class MapState {
   recentBrushes = $state<BrushSel[]>([]);
   /** Item the library should show and scroll to (set by picking a brush from the map). */
   revealItem = $state<{ id: number } | null>(null);
+  /** A brush picked from the map: the library shows its tab. */
+  revealBrush = $state<{ name: string; kind: string } | null>(null);
 
   view = $state<ViewOptions>(loadJson(VIEW_KEY, DEFAULT_VIEW));
   cams = $state<Record<number, Camera>>({});
@@ -299,6 +301,13 @@ export function selectBrush(brush: BrushSel): void {
   if (brush.kind !== "raw" || brush.item) {
     map.recentBrushes = [brush, ...map.recentBrushes.filter((recent) => brushKey(recent) !== brushKey(brush))].slice(0, 12);
   }
+}
+
+/** Selection of a brush from the brush data by name and kind (a
+ * decoration brush paints as a wall). */
+export function namedBrush(name: string, kind: string, look?: number): BrushSel {
+  look ??= map.palette?.brushes?.find((brush) => brush?.name === name)?.look;
+  return { kind: kind === "decoration" ? "wall" : kind, name, look, label: name };
 }
 
 export function useCreature(creature: { name: string; npc?: boolean }): void {

@@ -2,7 +2,7 @@
   import { ask } from "../../lib/confirm.svelte";
   import { MapService, TILE_FLAGS, fmtPos, parsePos, type Attr, type ItemRef, type TileItem, type Position, type ItemPatch } from "../../lib/map/data/api";
   import { goTo, mapCommands } from "../../lib/map/view/commands";
-  import { edit, map, selectBrush, useCreature } from "../../lib/map/state.svelte";
+  import { edit, map, namedBrush, selectBrush, useCreature } from "../../lib/map/state.svelte";
   import Icon from "../../lib/ui/Icon.svelte";
   import Select from "../../lib/ui/Select.svelte";
   import ItemIcon from "./ItemIcon.svelte";
@@ -209,7 +209,7 @@
             ondrop={(event) => (event.preventDefault(), drop())}
             ondragend={() => (dragFrom = dropAt = null)}
           >
-            <button class="pickbtn" title="{item.name} · server id {item.id}, client id {item.clientId}" onclick={() => pick(index)} ondblclick={() => selectBrush({ kind: "raw", item: item.id, look: item.id, label: item.name })}>
+            <button class="pickbtn" title="{item.name} · server id {item.id}, client id {item.clientId} · double-click to use it as a raw item" onclick={() => pick(index)} ondblclick={() => selectBrush({ kind: "raw", item: item.id, look: item.id, label: item.name })}>
               <span class="t-slot"><ItemIcon id={item.id} /></span>
               <span class="nm">
                 <span class="n">{item.name}{#if index >= 0 && LAYER_LABEL[item.topOrder]}<span class="layer" title="The client always draws {LAYER_LABEL[item.topOrder]} items in their own layer, whatever the order in the map">{LAYER_LABEL[item.topOrder]}</span>{/if}</span>
@@ -239,7 +239,11 @@
             <span class="grow title">{item.name}{#if selection.path.length}<span class="t-label"> (in container)</span>{/if}</span>
             {#if item.rotateTo}<button class="t-icon-btn" title="Rotate" onclick={() => ref && edit((id) => MapService.RotateItem(id, ref!))}><Icon name="refresh" /></button>{/if}
             {#if item.kind === "door" && !selection.path.length}<button class="t-icon-btn" title="Open or close" onclick={() => inspected && selection && edit((id) => MapService.SwitchDoor(id, inspected!, selection!.index))}><Icon name="replace" /></button>{/if}
-            <button class="t-icon-btn" title="Use as brush" onclick={() => selectBrush({ kind: "raw", item: item.id, look: item.id, label: item.name })}><Icon name="pencil" /></button>
+            {#if item.brush}
+              <button class="t-icon-btn" title="Use brush: {item.brush}" onclick={() => selectBrush(namedBrush(item.brush, item.brushKind))}><Icon name="pencil" /></button>
+            {:else}
+              <button class="t-icon-btn" title="Use as raw item" onclick={() => selectBrush({ kind: "raw", item: item.id, look: item.id, label: item.name })}><Icon name="pencil" /></button>
+            {/if}
             <button class="t-icon-btn danger" title="Remove (Del)" onclick={removeSelected}><Icon name="trash" /></button>
           </div>
           <div class="grid2">

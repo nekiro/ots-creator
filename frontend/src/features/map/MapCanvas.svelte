@@ -19,8 +19,8 @@
   import { bresenhamLine, screenToTile } from "../../lib/map/editor/tileGeometry";
   import { clamp } from "../../lib/util/math";
   import { isTyping } from "../../lib/ui/typing";
-  import { applyChange, edit, map, onMapChange, selectBrush, setCam, useCreature, type BrushSel } from "../../lib/map/state.svelte";
-  import { mapContextMenu, openText, readableIndex } from "../../lib/map/view/menus";
+  import { applyChange, edit, map, onMapChange, setCam, useCreature, type BrushSel } from "../../lib/map/state.svelte";
+  import { mapContextMenu, openText, readableIndex, tilePicks, usePick, type TilePicks } from "../../lib/map/view/menus";
   import { TOP_ORDER } from "../../lib/map/data/items";
   import { toCss } from "../../lib/pixelscale";
   import FloorLadder from "./FloorLadder.svelte";
@@ -280,7 +280,7 @@
       return;
     }
     if (modifiers.ctrl && modifiers.alt) {
-      pickBrush(tile);
+      void pickBrush(tile);
       return;
     }
     if (map.tool === "select") {
@@ -382,7 +382,7 @@
         if (map.pick) map.pick = null;
         else if (map.pasting) map.pasting = false;
         else if (map.tool === "brush") map.tool = "select";
-        else showMenu(event, tile);
+        else void showMenu(event, tile);
       }
     } else if (ended.kind === "paint" && !ended.erase && map.brush && samePos(paintStart, ended.last)) {
       const brush = map.brush;
@@ -575,17 +575,22 @@
     hoverText = describeTile(tile, store(id).peekTile(tile.x, tile.y, tile.z), (itemId) => items.name(itemId), map.active?.houses);
   }
 
-  function pickBrush(tile: Position) {
+  /** The brushes and items of a tile to pick from (the tile chunks do not
+   * know which brush owns an item). */
+  async function picksAt(id: number, tile: Position): Promise<TilePicks> {
+    try {
+      return tilePicks(await MapService.Tile(id, tile));
+    } catch (err) {
+      toast(errorMessage(err), "error");
+      return tilePicks(null);
+    }
+  }
+
+  async function pickBrush(tile: Position) {
     const id = map.activeId;
-    const items = map.items;
-    if (id === null || !items) return;
-    const tileData = store(id).peekTile(tile.x, tile.y, tile.z);
-    if (!tileData || !tileData.ids.length) return;
-    const top = tileData.ids[tileData.ids.length - 1];
-    selectBrush({ kind: "raw", item: top, look: top, label: items.name(top) });
-    map.side = "library";
-    map.revealItem = { id: top };
-    toast(`Brush: ${items.name(top)}`);
+    if (id === null) return;
+    const pick = (await picksAt(id, tile)).click;
+    if (pick && map.activeId === id) usePick(pick);
   }
 
   function ondblclick(event: MouseEvent) {
@@ -602,11 +607,13 @@
     } else mapCommands.inspect(tile);
   }
 
-  function showMenu(event: MouseEvent, tile: Position) {
+  async function showMenu(event: MouseEvent, tile: Position) {
     const id = map.activeId;
     if (id === null) return;
+    const picks = await picksAt(id, tile);
+    if (map.activeId !== id) return;
     const tileData = store(id).peekTile(tile.x, tile.y, tile.z);
-    const entries: MenuEntry[] = mapContextMenu(tile, tileData ?? null, { pick: () => pickBrush(tile) });
+    const entries: MenuEntry[] = mapContextMenu(tile, tileData ?? null, picks);
     openContextMenu(event, entries);
   }
 
