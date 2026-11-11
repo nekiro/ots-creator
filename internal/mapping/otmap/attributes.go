@@ -15,29 +15,54 @@ type CustomAttr struct {
 	Type string `json:"type"`
 }
 
+const attrsFileSuffix = "-attributes.json"
+
 var customAttrSizes = map[string]int{
 	"u8": 1, "u16": 2, "u32": 4, "i32": 4, "u64": 8, "string": -1,
 }
 
-// ReadCustomAttrs parses an attributes file into payload sizes by code (see
-// rawSizes). Bad entries are skipped with a warning.
-func ReadCustomAttrs(data []byte) (map[byte]int, []string, error) {
+// ReadCustomAttrs parses an attributes file into the valid declarations.
+// Bad entries are skipped with a warning.
+func ReadCustomAttrs(data []byte) ([]CustomAttr, []string, error) {
 	var attrs []CustomAttr
 	if err := json.Unmarshal(data, &attrs); err != nil {
 		return nil, nil, err
 	}
-	sizes := map[byte]int{}
+	var valid []CustomAttr
 	var warnings []string
+	codes := map[byte]bool{}
 	for _, attr := range attrs {
-		size, ok := customAttrSizes[attr.Type]
+		_, ok := customAttrSizes[attr.Type]
 		switch {
 		case !ok:
 			warnings = append(warnings, fmt.Sprintf("attribute %d: unknown type %q", attr.Code, attr.Type))
 		case attr.Code <= attrZoneFile || attr.Code == attrAttributeMap:
 			warnings = append(warnings, fmt.Sprintf("attribute %d: the code is a standard OTBM attribute", attr.Code))
+		case codes[attr.Code]:
+			warnings = append(warnings, fmt.Sprintf("attribute %d: declared twice", attr.Code))
 		default:
-			sizes[attr.Code] = size
+			codes[attr.Code] = true
+			valid = append(valid, attr)
 		}
 	}
-	return sizes, warnings, nil
+	return valid, warnings, nil
+}
+
+// customSizes gives the payload size of every declared attribute by code
+// (see rawSizes).
+func customSizes(attrs []CustomAttr) map[byte]int {
+	sizes := make(map[byte]int, len(attrs))
+	for _, attr := range attrs {
+		sizes[attr.Code] = customAttrSizes[attr.Type]
+	}
+	return sizes
+}
+
+// WriteCustomAttrs encodes declarations as an attributes file.
+func WriteCustomAttrs(attrs []CustomAttr) ([]byte, error) {
+	data, err := json.MarshalIndent(attrs, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return append(data, '\n'), nil
 }

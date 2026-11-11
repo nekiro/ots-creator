@@ -167,7 +167,7 @@ func (s *Server) newMCPServer() *mcp.Server {
 	return server
 }
 
-const instructions = `OTS Creator edits Open Tibia maps (OTBM) with the sprites of an open client. The edits show live in the editor window and can be undone there.
+const instructions = `OTS Creator edits Open Tibia maps (OTBM, or the OTMAP text format) with the sprites of an open client. The edits show live in the editor window and can be undone there.
 
 Coordinates: x grows east, y grows south, z is the floor: 7 is the ground level, 0-6 are above it, 8-15 underground. Every tool takes mapId; 0 or none means the map shown in the editor.
 

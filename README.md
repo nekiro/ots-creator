@@ -16,6 +16,7 @@
 [Map editor](#map-editor) ·
 [AI agents](#ai-agents-mcp) ·
 [OTOBJ format](#otobj-object-format) ·
+[OTMAP format](#otmap-map-format) ·
 [Development](#development)
 
 </div>
@@ -127,7 +128,10 @@ the open client; object changes show after **Reload from client**.
 
 - **Files:** OTBM versions 1 to 4 open and are saved as version 2 (what servers load), with
   houses, spawns (one file, or separate monster and NPC files), zones, towns and
-  waypoints. Several maps open in tabs.
+  waypoints. The text format OTMAP (see [below](#otmap-map-format)) holds the same data
+  in files that git can diff and merge. A map is saved in the format it was opened in;
+  **Save as** picks the format by the extension (`.otbm` or `.otmap`). Several maps open
+  in tabs.
 - **Item ids:** server ids (translated with `items.otb`) or client ids, detected
   automatically. Names and types come from `items.xml`.
 - **Brushes:** grounds with automatic borders, walls with doors and windows, doodads,
@@ -173,8 +177,11 @@ To keep them, put `<map>-attributes.json` next to the map (`world-attributes.jso
 Types: `u8`, `u16`, `u32`, `i32`, `u64` (little-endian, as the server writes them) and
 `string` (uint16 length, then the text). The file is read when the map opens; listed
 attributes are kept unchanged and written back when the map is saved. Codes of standard
-OTBM attributes (1 to 24 and 128) cannot be redefined. `name` is for you; the editor does
-not use it yet.
+OTBM attributes (1 to 24 and 128) cannot be redefined. In OTBM, `name` is only for you.
+
+An OTMAP map declares these attributes in its world file instead, and its sector files
+write them by a key made from `name` (`door_quest_number=12`). Saving an OTMAP map as OTBM
+writes the attributes file when it does not exist yet.
 
 ## AI agents (MCP)
 
@@ -242,6 +249,52 @@ Measured on the current CipSoft client (one file at a time, one core):
 Files can be up to 3 times larger, because LZMA compresses raw pixels better than PNG.
 Sheets with at most 256 colors use a palette, which brings most outfits to the size of OBD.
 OBD stays fully supported for ObjectBuilder, and the market keeps storing objects as OBD.
+
+## OTMAP map format
+
+OTMAP is a map as text: a world file and one file per 32×32 sector, one line per tile.
+Full specification: [docs/otmap.md](docs/otmap.md).
+
+```
+map.otmap                  item ids, size, server attributes, towns, houses, zones, waypoints
+sectors/1011_1007.sector   tiles, spawn areas and creatures of x 32352-32383, y 32224-32255
+```
+
+```
+32353 32224 7 [pz] 4515 1209(aid=1001)
+32354 32224 7 4515 1387(dest=32360,32230,8)
+32358 32224 7 4515 1739(uid=5000 chest_quest_number=7){3031:100 2853{3046}}
+spawn 32362 32228 7 radius=3
+monster 32362 32228 7 "Rat" spawntime=60
+```
+
+Why not OTBM:
+
+- **Diffable:** an edited tile is one changed line, with its world position. OTBM is one
+  binary file that changes as a whole.
+- **Mergeable:** edits to different tiles merge in git without conflicts.
+- **One place:** houses, spawns, zones and server attributes are in the same folder and
+  syntax, not in XML and JSON side files.
+- **Canonical:** opening and saving writes the same bytes, so a save without changes gives
+  an empty diff. Unchanged sector files are not rewritten.
+- **Lossless:** OTBM → OTMAP → OTBM keeps every tile, item, attribute, house, town, zone,
+  waypoint and spawn.
+
+Measured on an 8.0 map with 8 million tiles (all cores):
+
+| | OTBM | OTMAP |
+|---|---|---|
+| Open | 1.1 s | 0.36 s |
+| Save | – | 1.2 s, 0.1 s without changes |
+| On disk | 75 MB | 182 MB in 2 155 files |
+| Git repository after the first commit | 19.4 MiB | 23.5 MiB |
+
+Keep LF line endings in the repository that holds the map (`.gitattributes`):
+
+```
+*.otmap  text eol=lf
+*.sector text eol=lf
+```
 
 ## Development
 

@@ -11,7 +11,10 @@ import { whenRendered } from "../render/rendered";
 import { panTiles, startPosition, stepZoom, zoomAround } from "./camera";
 import { applyChange, edit, loadMapData, map, refreshTile, selectBrush, setCam, warningCount, type Focus } from "../state.svelte";
 
-const MAPS = [{ name: "OTBM maps (*.otbm)", pattern: "*.otbm" }];
+const OTBM = { name: "OTBM maps (*.otbm)", pattern: "*.otbm" };
+const OTMAP = { name: "OTMAP maps (*.otmap)", pattern: "*.otmap" };
+const MAPS = [{ name: "Maps (*.otbm, *.otmap)", pattern: "*.otbm;*.otmap" }, OTBM, OTMAP];
+const isOTMAP = (name: string) => /\.otmap$/i.test(name);
 
 export function spriteSize(): number {
   return app.project?.info.features.spriteSize || 32;
@@ -159,7 +162,8 @@ export const mapCommands = {
     if (!active) return false;
     let path = active.path;
     if (as || !path) {
-      path = await DialogService.SaveFile("saveMap", "Save map", active.name, MAPS);
+      // The format follows the extension; the map's own format is offered first.
+      path = await DialogService.SaveFile("saveMap", "Save map", active.name, isOTMAP(active.name) ? [OTMAP, OTBM] : [OTBM, OTMAP]);
       if (!path) return false;
     }
     const name = path.split(/[\\/]/).pop() ?? path;

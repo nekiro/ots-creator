@@ -30,6 +30,9 @@ func LoadProgress(path string, items Items, format Format, progress Progress) (*
 	if progress == nil {
 		progress = func(Stage, int, int) {}
 	}
+	if IsOTMAP(path) {
+		return loadOTMAP(path, items, progress)
+	}
 	progress(StageRead, 0, 1)
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -39,24 +42,25 @@ func LoadProgress(path string, items Items, format Format, progress Progress) (*
 	base := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	// Server attributes must be known before the items are read.
 	var warnings []string
-	var customSizes map[byte]int
-	attrsName := base + "-attributes.json"
+	var declared []CustomAttr
+	attrsName := base + attrsFileSuffix
 	if attrsData, err := os.ReadFile(filepath.Join(dir, attrsName)); err == nil {
-		sizes, attrsWarnings, err := ReadCustomAttrs(attrsData)
+		attrs, attrsWarnings, err := ReadCustomAttrs(attrsData)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf("%s: %v", attrsName, err))
 		}
 		for _, warning := range attrsWarnings {
 			warnings = append(warnings, fmt.Sprintf("%s: %s", attrsName, warning))
 		}
-		customSizes = sizes
+		declared = attrs
 	} else if !os.IsNotExist(err) {
 		warnings = append(warnings, fmt.Sprintf("%s: %v", attrsName, err))
 	}
-	gameMap, mapWarnings, err := readOTBM(data, items, format, customSizes, progress)
+	gameMap, mapWarnings, err := readOTBM(data, items, format, customSizes(declared), progress)
 	if err != nil {
 		return nil, nil, err
 	}
+	gameMap.Attributes = declared
 	warnings = append(warnings, mapWarnings...)
 	progress(StageFiles, 0, 1)
 	files := 0
@@ -112,8 +116,22 @@ func SaveProgress(path string, gameMap *Map, items Items, format Format, progres
 	if progress == nil {
 		progress = func(Stage, int, int) {}
 	}
+	if IsOTMAP(path) {
+		return saveOTMAP(path, gameMap, items, progress)
+	}
 	dir := filepath.Dir(path)
 	base := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	// A map with server attributes cannot be read back without its
+	// attributes file; one the user keeps is not rewritten.
+	if attrsPath := filepath.Join(dir, base+attrsFileSuffix); len(gameMap.Attributes) > 0 && !fsutil.FileExists(attrsPath) {
+		data, err := WriteCustomAttrs(gameMap.Attributes)
+		if err != nil {
+			return nil, err
+		}
+		if err := fsutil.WriteAtomic(attrsPath, data); err != nil {
+			return nil, err
+		}
+	}
 	defaultName := func(name *string, suffix string) {
 		if *name == "" {
 			*name = base + suffix

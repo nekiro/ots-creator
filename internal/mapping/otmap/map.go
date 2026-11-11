@@ -43,6 +43,9 @@ type Map struct {
 	Houses    map[uint32]*House `json:"-"`
 	Waypoints []*Waypoint       `json:"-"`
 	Zones     []Zone            `json:"-"`
+	// Attributes are the server item attributes the map declares (OTBM:
+	// <map>-attributes.json).
+	Attributes []CustomAttr `json:"-"`
 
 	chunks map[ChunkKey]*Chunk
 	tiles  int

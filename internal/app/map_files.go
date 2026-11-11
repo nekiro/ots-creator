@@ -174,7 +174,15 @@ func (ms *MapService) SaveMap(id int, path string) (MapChange, error) {
 	if path == "" {
 		return MapChange{}, errors.New("choose where to save the map")
 	}
-	path = fsutil.EnsureExt(path, ".otbm")
+	// The extension picks the format; a path without one keeps the format
+	// the map was opened in.
+	if !otmap.IsOTMAP(path) {
+		if filepath.Ext(path) == "" && otmap.IsOTMAP(opened.path) {
+			path += otmap.OTMAPExt
+		} else {
+			path = fsutil.EnsureExt(path, ".otbm")
+		}
+	}
 	if path != opened.path && opened.path != "" {
 		opened.editor.Map.ForgetAuxFileNames()
 	}

@@ -77,7 +77,7 @@ type pathArgs struct {
 
 type saveMapArgs struct {
 	MapArg
-	Path string `json:"path,omitempty" jsonschema:"where to save (.otbm); empty: the map's own file. Houses, spawns and zones are written next to it"`
+	Path string `json:"path,omitempty" jsonschema:"where to save; the extension picks the format: .otbm (houses, spawns and zones are written next to it) or .otmap (sector files go to the sectors folder next to it). Empty: the map's own file"`
 }
 
 type closeMapArgs struct {
@@ -100,7 +100,7 @@ type propertiesArgs struct {
 
 type importArgs struct {
 	MapArg
-	Path    string `json:"path" jsonschema:"OTBM file to merge into the map"`
+	Path    string `json:"path" jsonschema:"OTBM or OTMAP file to merge into the map"`
 	DX      int    `json:"dx,omitempty" jsonschema:"x offset of the imported tiles"`
 	DY      int    `json:"dy,omitempty"`
 	DZ      int    `json:"dz,omitempty"`
@@ -203,7 +203,7 @@ func (s *Server) addSessionTools(server *mcp.Server) {
 			return summarize(info, info.ID), nil
 		})
 
-	addTool(server, "open_map", "Opens an OTBM map (with its houses, spawns and zones) and shows it in the editor. Returns its id and load warnings.",
+	addTool(server, "open_map", "Opens an OTBM map (with its houses, spawns and zones) or an OTMAP map (its .otmap world file) and shows it in the editor. Returns its id and load warnings.",
 		func(_ context.Context, args pathArgs) (any, error) {
 			opened, err := s.maps.OpenMap(args.Path)
 			if err != nil {
@@ -213,7 +213,7 @@ func (s *Server) addSessionTools(server *mcp.Server) {
 			return map[string]any{"map": summarize(opened.Info, opened.Info.ID), "warnings": opened.Warnings}, nil
 		})
 
-	addTool(server, "save_map", "Saves a map as OTBM with its house, spawn and zone files.",
+	addTool(server, "save_map", "Saves a map in the format of its file, or of the extension of path: OTBM with its house, spawn and zone files, or OTMAP.",
 		func(_ context.Context, args saveMapArgs) (any, error) {
 			return s.edit(args.MapID, func(id int) (app.MapChange, error) { return s.maps.SaveMap(id, args.Path) })
 		})
@@ -276,7 +276,7 @@ func (s *Server) addSessionTools(server *mcp.Server) {
 			return s.edit(id, func(id int) (app.MapChange, error) { return s.maps.SetProperties(id, props) })
 		})
 
-	addTool(server, "import_map", "Merges another OTBM map file into a map at an offset.",
+	addTool(server, "import_map", "Merges another OTBM or OTMAP map into a map at an offset.",
 		func(_ context.Context, args importArgs) (any, error) {
 			options := mapedit.ImportOptions{DX: args.DX, DY: args.DY, DZ: args.DZ, Houses: args.Houses, Replace: args.Replace, Towns: args.Towns}
 			return s.edit(args.MapID, func(id int) (app.MapChange, error) { return s.maps.ImportMap(id, args.Path, options) })

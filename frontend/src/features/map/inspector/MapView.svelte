@@ -76,10 +76,12 @@
   <details class="files">
     <summary class="t-label">Files saved with the map</summary>
     <div class="m-form inner">
+      {#if !/\.otmap$/i.test(info.name)}
       <div class="m-field"><span class="m-lbl">Houses</span><input class="t-input" value={properties.houseFile} placeholder="{info.name.replace(/\.otbm$/i, '')}-house.xml" onchange={(event) => set({ houseFile: event.currentTarget.value })} /></div>
       <div class="m-field"><span class="m-lbl">{separate ? "Monsters" : "Spawns"}</span><input class="t-input" value={properties.spawnFile} placeholder="{info.name.replace(/\.otbm$/i, '')}-{separate ? 'monster' : 'spawn'}.xml" onchange={(event) => set({ spawnFile: event.currentTarget.value })} /></div>
       {#if separate}<div class="m-field"><span class="m-lbl">NPCs</span><input class="t-input" value={properties.npcFile} placeholder="{info.name.replace(/\.otbm$/i, '')}-npc.xml" onchange={(event) => set({ npcFile: event.currentTarget.value })} /></div>{/if}
       <div class="m-field"><span class="m-lbl">Zones</span><input class="t-input" value={properties.zoneFile} placeholder="{info.name.replace(/\.otbm$/i, '')}-zones.xml" onchange={(event) => set({ zoneFile: event.currentTarget.value })} /></div>
+      {/if}
       <div class="t-label path">{info.path || "Not saved yet"}</div>
     </div>
   </details>

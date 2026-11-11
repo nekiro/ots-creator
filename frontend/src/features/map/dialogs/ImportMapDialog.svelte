@@ -17,7 +17,7 @@
   let busy = $state(false);
 
   async function browse() {
-    const paths = await DialogService.OpenFiles("importMap", "Map to import", [{ name: "OTBM maps (*.otbm)", pattern: "*.otbm" }], false);
+    const paths = await DialogService.OpenFiles("importMap", "Map to import", [{ name: "Maps (*.otbm, *.otmap)", pattern: "*.otbm;*.otmap" }], false);
     if (paths?.length) path = paths[0];
   }
 
