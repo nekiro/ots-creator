@@ -17,6 +17,7 @@ import (
 	"github.com/nekiro/ots-creator/internal/core/imaging"
 	"github.com/nekiro/ots-creator/internal/core/thing"
 	"github.com/nekiro/ots-creator/internal/formats/obd"
+	"github.com/nekiro/ots-creator/internal/fsutil"
 	"github.com/nekiro/ots-creator/internal/market"
 	"github.com/nekiro/ots-creator/internal/settings"
 )
@@ -180,6 +181,40 @@ func (m *MarketService) Read(id string) (*ObjectFile, error) {
 		return nil, err
 	}
 	return newObjectFile(entry.File, object), nil
+}
+
+// Save downloads an entry to a file and returns the path written. Objects
+// are written as OBD when path ends with .obd, else as OTOBJ; sprite packs
+// as PNG. A missing extension is added. No client needs to be open.
+func (m *MarketService) Save(id, path string) (string, error) {
+	entry, data, err := m.download(id)
+	if err != nil {
+		return "", err
+	}
+	switch entry.Kind {
+	case market.KindObject:
+		object, _, err := market.ReadObject(&entry.Meta, data)
+		if err != nil {
+			return "", err
+		}
+		format := ObjectOTOBJ
+		if strings.EqualFold(filepath.Ext(path), ".obd") {
+			format = ObjectOBD
+		}
+		encoded, ext, err := encodeObject(object, format)
+		if err != nil {
+			return "", err
+		}
+		path, data = fsutil.EnsureExt(path, ext), encoded
+	case market.KindSprites:
+		if _, _, err := market.ReadPack(&entry.Meta, data); err != nil {
+			return "", err
+		}
+		path = fsutil.EnsureExt(path, ".png")
+	default:
+		return "", fmt.Errorf("unknown entry kind %q", entry.Kind)
+	}
+	return path, fsutil.WriteAtomic(path, data)
 }
 
 type MarketImport struct {

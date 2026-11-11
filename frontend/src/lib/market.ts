@@ -303,6 +303,18 @@ export function topTags(entries: MarketEntry[], limit = 24): { tag: string; coun
 		.slice(0, limit);
 }
 
+/** A file name for saving an entry: its name without characters that
+ * file systems refuse, or "entry" when nothing is left. */
+export function entryFileName(entry: MarketEntry): string {
+	const name = entry.name
+		// eslint-disable-next-line no-control-regex
+		.replace(/[<>:"/\\|?*\x00-\x1f]/g, "")
+		.replace(/\s+/g, " ")
+		.trim()
+		.replace(/[. ]+$/, "");
+	return name || "entry";
+}
+
 /** Splits a typed tag list ("Big rat, sewer") like the Go side does. */
 export function parseTags(text: string): string[] {
 	const out: string[] = [];

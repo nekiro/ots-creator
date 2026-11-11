@@ -102,9 +102,28 @@ func TestMarketShareImportDelete(t *testing.T) {
 			if f, err := srv2.Read(e.ID); err != nil || len(f.Sprites) != 1 {
 				t.Fatalf("read %v", err)
 			}
+			for _, name := range []string{"box", "box.obd", "box.otobj"} {
+				path, err := srv2.Save(e.ID, filepath.Join(t.TempDir(), name))
+				if err != nil {
+					t.Fatalf("save %s: %v", name, err)
+				}
+				if ext := filepath.Ext(path); ext != ".obd" && ext != ".otobj" {
+					t.Fatalf("saved as %s", path)
+				}
+				if object, err := readObject(path); err != nil || object.Thing.Category != thing.CategoryItem {
+					t.Fatalf("read saved %s: %v", path, err)
+				}
+			}
 		case market.KindSprites:
 			if len(res.Sprites) != 2 {
 				t.Fatalf("sprites %+v", res)
+			}
+			path, err := srv2.Save(e.ID, filepath.Join(t.TempDir(), "tiles"))
+			if err != nil || filepath.Ext(path) != ".png" {
+				t.Fatalf("save %s: %v", path, err)
+			}
+			if img, err := loadSpriteImage(path); err != nil || img.Rect.Dx() == 0 {
+				t.Fatalf("read saved %s: %v", path, err)
 			}
 		}
 	}

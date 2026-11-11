@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { onMount } from "svelte";
-	import { MarketService, errorMessage, type MarketIndex } from "../../lib/api";
+	import { DialogService, MarketService, errorMessage, type MarketIndex } from "../../lib/api";
 	import { commands } from "../../lib/commands";
+	import { OBJECT_FILTERS } from "../../lib/commands/shared";
 	import { ask } from "../../lib/confirm.svelte";
 	import { formatDate, formatKb } from "../../lib/util/format";
 	import {
+		entryFileName,
 		filterEntries,
 		licenseLabel,
 		sectionCounts,
@@ -17,6 +19,7 @@
 	import { nextIndex } from "../../lib/ui/listNav";
 	import { isTyping } from "../../lib/ui/typing";
 	import { app, run, select, setCategory, toast } from "../../lib/state/app.svelte";
+	import { prefs } from "../../lib/state/prefs.svelte";
 	import Dialog from "../../lib/ui/Dialog.svelte";
 	import Icon from "../../lib/ui/Icon.svelte";
 	import Select from "../../lib/ui/Select.svelte";
@@ -146,6 +149,28 @@
 		);
 		if (imported.category !== app.category) await setCategory(imported.category);
 		await select(imported.id);
+	}
+
+	/** Saves the entry to a file: objects as .otobj or .obd (the object
+	 * file format setting picks the default), sprite packs as .png. */
+	async function downloadEntry() {
+		const entry = selected;
+		if (!entry) return;
+		const objectFilters =
+			prefs.settings.objectFormat === "obd" ? [OBJECT_FILTERS[2], OBJECT_FILTERS[1]] : OBJECT_FILTERS.slice(1);
+		const [ext, filters] =
+			entry.kind === "sprites"
+				? ["png", [{ name: "PNG images (*.png)", pattern: "*.png" }]]
+				: [prefs.settings.objectFormat === "obd" ? "obd" : "otobj", objectFilters];
+		const path = await DialogService.SaveFile(
+			"marketDownload",
+			`Download ${entry.name}`,
+			`${entryFileName(entry)}.${ext}`,
+			filters,
+		);
+		if (!path) return;
+		const saved = await run(`Downloading ${entry.name}`, () => MarketService.Save(entry.id, path));
+		if (saved) toast(`${entry.name} saved to ${saved}.`, "success");
 	}
 
 	async function deleteEntry() {
@@ -343,6 +368,14 @@
 						disabled={!app.open || sizeMismatch || !!app.busy}
 						title={app.open ? "Double clicking a card does the same" : "Open a client to import"}
 						onclick={importEntry}>{selected.kind === "sprites" ? "Import sprites" : "Import object"}</button
+					>
+					<button
+						class="t-btn wide"
+						disabled={!!app.busy}
+						title={selected.kind === "sprites"
+							? "Save the sprite pack as a PNG image"
+							: "Save the object as an .otobj or .obd file"}
+						onclick={downloadEntry}>Download…</button
 					>
 					{#if canDelete}<button class="t-btn danger wide" disabled={!!app.busy} onclick={deleteEntry}
 							>Delete from market</button

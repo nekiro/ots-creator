@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	entryFileName,
 	filterEntries,
 	formatIds,
 	groupOptions,
@@ -124,5 +125,14 @@ describe("market filter", () => {
 		expect(tags("two handed")).toEqual(["two-handed"]);
 		expect(tags("map")).toEqual(["swamp", "water"]);
 		expect(tags("s", ["sword"])).toEqual(["shield", "swamp"]);
+	});
+});
+
+describe("entryFileName", () => {
+	it("drops characters file systems refuse", () => {
+		expect(entryFileName(entry("a", { name: ' Red: box / "big"?  ' }))).toBe("Red box big");
+		expect(entryFileName(entry("a", { name: "dots..." }))).toBe("dots");
+		expect(entryFileName(entry("a", { name: "back\\slash" }))).toBe("backslash");
+		expect(entryFileName(entry("a", { name: "<>|*" }))).toBe("entry");
 	});
 });
