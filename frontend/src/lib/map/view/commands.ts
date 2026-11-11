@@ -8,6 +8,7 @@ import { MapService, SpawnFormat, type Position } from "../data/api";
 import { MAX_FLOOR } from "../constants";
 import { tileToWorld, worldToTile } from "./coords";
 import { whenRendered } from "../render/rendered";
+import { CollabService, collab } from "../collab.svelte";
 import { panTiles, startPosition, stepZoom, zoomAround } from "./camera";
 import {
 	applyChange,
@@ -52,8 +53,8 @@ export function selectionScope(): { inSelection: boolean } {
 }
 
 /** Shows the backend's map:progress events in the loader (map.loading) until the returned function is called. */
-function trackProgress(name: string, title?: string): () => void {
-	map.loading = { name, step: "Starting", percent: 0, title };
+function trackProgress(name: string, title?: string, cancel?: () => void): () => void {
+	map.loading = { name, step: "Starting", percent: 0, title, cancel };
 	return Events.On("map:progress", (event: { data: { label: string; done: number; total: number } }) => {
 		const progress = event.data;
 		if (map.loading)
@@ -62,6 +63,7 @@ function trackProgress(name: string, title?: string): () => void {
 				step: progress.label,
 				percent: progress.total > 0 ? (progress.done / progress.total) * 100 : 0,
 				title,
+				cancel,
 			};
 	});
 }
@@ -183,6 +185,35 @@ export const mapCommands = {
 		}
 	},
 
+	/** Joins a map shared by another editor (an invite code or an address); true when joined. */
+	async join(code: string, password = "", name = "", fingerprint = ""): Promise<boolean> {
+		if (!needClient()) return false;
+		const title = "Joining a shared map";
+		const stopProgress = trackProgress(code.startsWith("ots:") ? "Invite code" : code, title, () => {
+			void CollabService.CancelJoin();
+		});
+		try {
+			const info = await CollabService.Join({ code, password, name, fingerprint });
+			stopProgress();
+			map.mode = "map";
+			map.loading = { name: info.name, step: "Preparing the view", percent: 98, title };
+			await loadMapData(!map.items);
+			if (!map.maps.some((open) => open.id === info.id)) map.maps = [...map.maps, info];
+			await afterOpen(info.id);
+			map.loading = { name: info.name, step: "Drawing the map", percent: 99, title };
+			await whenRendered(info.id);
+			toast(`Joined ${info.name}. Edits of everyone show live.`, "success");
+			return true;
+		} catch (err) {
+			const message = errorMessage(err);
+			if (message !== "canceled") toast(message, "error", 10000);
+			return false;
+		} finally {
+			stopProgress();
+			map.loading = null;
+		}
+	},
+
 	async created(id: number) {
 		await loadMapData();
 		await afterOpen(id);
@@ -225,7 +256,23 @@ export const mapCommands = {
 	async close(id = map.activeId) {
 		const closing = map.maps.find((open) => open.id === id);
 		if (!closing) return;
-		if (closing.changed) {
+		const shared = collab.mapId === closing.id;
+		if (shared && collab.role === "guest") {
+			const ok = await ask({
+				title: "Shared map",
+				message: `Leave the session and close ${closing.name}? Your copy of the map is not saved.`,
+				ok: "Leave",
+			});
+			if (!ok) return;
+		} else if (shared && collab.others.length) {
+			const ok = await ask({
+				title: "Shared map",
+				message: `Closing ${closing.name} ends the session for the ${collab.others.length} other mapper${collab.others.length > 1 ? "s" : ""}. Close it?`,
+				ok: "End session",
+			});
+			if (!ok) return;
+		}
+		if (closing.changed && !(shared && collab.role === "guest")) {
 			const ok = await ask({
 				title: "Unsaved map",
 				message: `${closing.name} has unsaved changes. Close it anyway?`,

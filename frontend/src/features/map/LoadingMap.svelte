@@ -21,6 +21,9 @@
 			<div class="name" title={loading.name}>{loading.name}</div>
 			<ProgressBar percent={loading.percent} label="{Math.floor(loading.percent)}%" />
 			<div class="t-label step">{loading.step}…</div>
+			{#if loading.cancel}
+				<button class="t-btn cancel" onclick={loading.cancel}>Cancel</button>
+			{/if}
 		</div>
 	</div>
 </div>
@@ -39,6 +42,9 @@
 		width: 360px;
 		padding: 10px 12px 12px;
 		box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+	}
+	.cancel {
+		align-self: flex-end;
 	}
 	.body {
 		display: flex;

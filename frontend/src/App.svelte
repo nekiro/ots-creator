@@ -33,6 +33,7 @@
 	import ThingList from "./features/ThingList.svelte";
 	import { commands, handlePaste, handleShortcut } from "./lib/commands";
 	import { followAgents } from "./lib/map/agents";
+	import { followCollab } from "./lib/map/collab.svelte";
 	import { app, initState } from "./lib/state/app.svelte";
 	import { readPositive, writeStored } from "./lib/state/storage";
 	import Splitter from "./lib/ui/Splitter.svelte";
@@ -98,10 +99,12 @@
 				void commands.drop(event.data?.paths ?? [], event.data?.target ?? "", group),
 		);
 		const offAgents = followAgents();
+		const offCollab = followCollab();
 		return () => {
 			offClose();
 			offDrop();
 			offAgents();
+			offCollab();
 		};
 	});
 

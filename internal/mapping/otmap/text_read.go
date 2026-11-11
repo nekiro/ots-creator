@@ -597,12 +597,16 @@ func readSector(path string, sectorX, sectorY uint16, attrs map[string]CustomAtt
 	if err != nil {
 		return sectorResult{err: err}
 	}
+	return parseSector(filepath.Join(sectorsDirName, filepath.Base(path)), data, sectorX, sectorY, attrs)
+}
+
+func parseSector(file string, data []byte, sectorX, sectorY uint16, attrs map[string]CustomAttr) sectorResult {
 	p := &sectorParser{
-		file: filepath.Join(sectorsDirName, filepath.Base(path)), sectorX: sectorX, sectorY: sectorY, attrs: attrs,
+		file: file, sectorX: sectorX, sectorY: sectorY, attrs: attrs,
 		tiles: map[Position]*Tile{}, written: map[Position]bool{}, areas: map[Position]uint8{},
 	}
 	header := false
-	err = eachLine(p.file, data, func(c *cursor) error {
+	err := eachLine(p.file, data, func(c *cursor) error {
 		if !header {
 			if string(c.text) != sectorHeader {
 				return c.errorf("expected the header %q", sectorHeader)
@@ -1097,23 +1101,8 @@ func loadOTMAP(path string, items Items, progress Progress) (*Map, []string, err
 	if err != nil {
 		return nil, nil, err
 	}
-	gameMap := New(0, 0)
-	world, warnings, err := readWorld(path, data, gameMap)
-	if err != nil {
-		return nil, nil, err
-	}
-	if db, ok := items.(*otitems.DB); ok && world.clientIDs != (db.Mode == otitems.ModeClient) {
-		if world.clientIDs {
-			warnings = append(warnings, "the map uses client item ids, but the loaded items use server ids")
-		} else {
-			warnings = append(warnings, "the map uses server item ids, but the loaded items use client ids")
-		}
-	}
-	type sectorFile struct {
-		path             string
-		sectorX, sectorY uint16
-	}
-	var files []sectorFile
+	var sources []sectorSource
+	var skipped []string
 	sectorsDir := filepath.Join(filepath.Dir(path), sectorsDirName)
 	entries, err := os.ReadDir(sectorsDir)
 	if err != nil && !os.IsNotExist(err) {
@@ -1126,15 +1115,62 @@ func loadOTMAP(path string, items Items, progress Progress) (*Map, []string, err
 		}
 		sectorX, sectorY, ok := parseSectorFileName(name)
 		if !ok {
-			warnings = append(warnings, fmt.Sprintf("%s: not a sector file name, skipped", name))
+			skipped = append(skipped, fmt.Sprintf("%s: not a sector file name, skipped", name))
 			continue
 		}
-		files = append(files, sectorFile{filepath.Join(sectorsDir, name), sectorX, sectorY})
+		file := filepath.Join(sectorsDir, name)
+		sources = append(sources, sectorSource{sectorX: sectorX, sectorY: sectorY, read: func(attrs map[string]CustomAttr) sectorResult {
+			return readSector(file, sectorX, sectorY, attrs)
+		}})
+	}
+	gameMap, warnings, err := decodeOTMAP(path, data, sources, items, progress)
+	return gameMap, append(skipped, warnings...), err
+}
+
+// DecodeOTMAP reads a map from the world file and the sector files by name
+// in memory, as EncodeOTMAP returns them.
+func DecodeOTMAP(world []byte, sectors map[string][]byte, items Items, progress Progress) (*Map, []string, error) {
+	if progress == nil {
+		progress = func(Stage, int, int) {}
+	}
+	var sources []sectorSource
+	var skipped []string
+	for name, data := range sectors {
+		sectorX, sectorY, ok := parseSectorFileName(name)
+		if !ok {
+			skipped = append(skipped, fmt.Sprintf("%s: not a sector file name, skipped", name))
+			continue
+		}
+		sources = append(sources, sectorSource{sectorX: sectorX, sectorY: sectorY, read: func(attrs map[string]CustomAttr) sectorResult {
+			return parseSector(filepath.Join(sectorsDirName, name), data, sectorX, sectorY, attrs)
+		}})
+	}
+	gameMap, warnings, err := decodeOTMAP("world"+OTMAPExt, world, sources, items, progress)
+	return gameMap, append(skipped, warnings...), err
+}
+
+type sectorSource struct {
+	sectorX, sectorY uint16
+	read             func(attrs map[string]CustomAttr) sectorResult
+}
+
+func decodeOTMAP(path string, data []byte, sources []sectorSource, items Items, progress Progress) (*Map, []string, error) {
+	gameMap := New(0, 0)
+	world, warnings, err := readWorld(path, data, gameMap)
+	if err != nil {
+		return nil, nil, err
+	}
+	if db, ok := items.(*otitems.DB); ok && world.clientIDs != (db.Mode == otitems.ModeClient) {
+		if world.clientIDs {
+			warnings = append(warnings, "the map uses client item ids, but the loaded items use server ids")
+		} else {
+			warnings = append(warnings, "the map uses server item ids, but the loaded items use client ids")
+		}
 	}
 	// Sectors are parsed on all cores and put into the map here, one at a
 	// time: the map is not safe for concurrent use. The channel bounds how
 	// many parsed sectors wait.
-	workers := max(min(len(files), runtime.GOMAXPROCS(0)), 1)
+	workers := max(min(len(sources), runtime.GOMAXPROCS(0)), 1)
 	results := make(chan sectorResult, workers)
 	var next atomic.Int64
 	var stop atomic.Bool
@@ -1145,11 +1181,10 @@ func loadOTMAP(path string, items Items, progress Progress) (*Map, []string, err
 			defer wg.Done()
 			for !stop.Load() {
 				index := int(next.Add(1) - 1)
-				if index >= len(files) {
+				if index >= len(sources) {
 					return
 				}
-				file := files[index]
-				results <- readSector(file.path, file.sectorX, file.sectorY, world.attrs)
+				results <- sources[index].read(world.attrs)
 			}
 		}()
 	}
@@ -1161,7 +1196,7 @@ func loadOTMAP(path string, items Items, progress Progress) (*Map, []string, err
 	done := 0
 	for result := range results {
 		done++
-		progress(StageTiles, done, len(files))
+		progress(StageTiles, done, len(sources))
 		if firstErr != nil {
 			continue
 		}

@@ -5,6 +5,7 @@
 	import { MapService } from "../../lib/map/data/api";
 	import { mapCommands, spriteSize } from "../../lib/map/view/commands";
 	import { loadMapData, map } from "../../lib/map/state.svelte";
+	import { collab } from "../../lib/map/collab.svelte";
 	import Icon from "../../lib/ui/Icon.svelte";
 	import MiniWindow from "../../lib/ui/MiniWindow.svelte";
 	import Splitter from "../../lib/ui/Splitter.svelte";
@@ -18,6 +19,7 @@
 	import LoadingMap from "./LoadingMap.svelte";
 	import Minimap from "./Minimap.svelte";
 	import World from "./World.svelte";
+	import SessionPanel from "./SessionPanel.svelte";
 	import MapDialogs from "./dialogs/MapDialogs.svelte";
 	import "./map.css";
 
@@ -138,7 +140,11 @@
 									class="tabname"
 									title={openMap.path || "Not saved yet"}
 									onclick={() => (map.activeId = openMap.id)}
-									>{openMap.name}{openMap.changed ? " ●" : ""}</button
+									>{#if collab.mapId === openMap.id}<span
+											class="live"
+											title={collab.role === "host" ? "Shared: you host this map" : "Shared map"}
+											><Icon name="people" /></span
+										>{/if}{openMap.name}{openMap.changed ? " ●" : ""}</button
 								>
 								<button
 									class="x"
@@ -152,6 +158,12 @@
 						>
 						<button class="t-icon-btn add" title="Open map (Ctrl+O)" onclick={() => mapCommands.open()}
 							><Icon name="open" /></button
+						>
+						<button
+							class="t-icon-btn add"
+							class:sharing={collab.active}
+							title="Map together: host this map or join a friend's"
+							onclick={() => (map.dialog = "collab")}><Icon name="people" /></button
 						>
 					</div>
 					<MapToolbar />
@@ -176,6 +188,7 @@
 						<div class="row">
 							<button class="t-btn primary" onclick={mapCommands.newMap}>New map</button>
 							<button class="t-btn" onclick={() => mapCommands.open()}>Open map…</button>
+							<button class="t-btn" onclick={() => (map.dialog = "collab")}>Join a shared map…</button>
 						</div>
 						{#if map.recent.length}
 							<div class="t-label rtitle">Recent maps</div>
@@ -236,6 +249,7 @@
 	{#if map.maps.length}
 		<Splitter vertical ondrag={(dx) => resizeSide("right", dx)} onend={saveSides} />
 		<div class="right">
+			{#if collab.active}<SessionPanel />{/if}
 			<Minimap />
 			{#if map.findOpen}<FindPanel />{/if}
 			<Inspector />
@@ -271,6 +285,9 @@
 	}
 	.sidetabs {
 		margin-bottom: 4px;
+	}
+	.right :global(.session) {
+		flex: none;
 	}
 	.right :global(.inspector) {
 		flex: 1;
@@ -337,6 +354,16 @@
 	}
 	.add {
 		transform: scale(0.85);
+	}
+	.add.sharing {
+		color: #6c6;
+	}
+	.live {
+		display: inline-flex;
+		vertical-align: -2px;
+		margin-right: 3px;
+		color: #6c6;
+		transform: scale(0.8);
 	}
 	.start {
 		flex: 1;

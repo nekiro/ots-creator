@@ -55,6 +55,8 @@
 		type TilePicks,
 	} from "../../lib/map/view/menus";
 	import { TOP_ORDER } from "../../lib/map/data/items";
+	import { collab, sendPresence } from "../../lib/map/collab.svelte";
+	import { drawPeers } from "../../lib/map/render/peers";
 	import { toCss } from "../../lib/pixelscale";
 	import FloorLadder from "./FloorLadder.svelte";
 	import SelectionBar from "./SelectionBar.svelte";
@@ -193,7 +195,20 @@
 			return;
 		}
 		const ctx = overlay?.getContext("2d");
-		if (ctx && overlay) drawLabels(ctx, overlay.width, overlay.height, result.labels, window.devicePixelRatio);
+		if (ctx && overlay) {
+			drawLabels(ctx, overlay.width, overlay.height, result.labels, window.devicePixelRatio);
+			if (collab.mapId === id)
+				drawPeers(ctx, collab.others, {
+					width,
+					height,
+					camX: cam.x,
+					camY: cam.y,
+					scale,
+					floor: cam.floor,
+					tileSize,
+					pixelRatio: dpr,
+				});
+		}
 		clearTimeout(animTimer);
 		if (result.more) requestDraw();
 		else if (result.pending) animTimer = window.setTimeout(requestDraw, REDRAW_DELAY.pending);
@@ -440,6 +455,7 @@
 		if (changed) {
 			map.hover = tile;
 			updateHoverText(tile);
+			sendPresence(map.activeId, tile);
 		}
 		if (drag?.kind === "paint" && changed) {
 			drag.pending.push(...bresenhamLine(drag.last, tile));
@@ -806,6 +822,12 @@
 		requestDraw();
 	});
 
+	// The cursors of the other mappers of a shared map.
+	$effect(() => {
+		void collab.others;
+		requestDraw();
+	});
+
 	// Object edits change items and sprites: reload their appearances.
 	// Marked items are drawn into the geometry too.
 	$effect(() => {
@@ -837,7 +859,7 @@
 		{onpointerdown}
 		{onpointermove}
 		{onpointerup}
-		onpointerleave={() => ((map.hover = null), (hoverText = ""), requestDraw())}
+		onpointerleave={() => ((map.hover = null), (hoverText = ""), sendPresence(map.activeId, null), requestDraw())}
 		{onwheel}
 		oncontextmenu={(event) => event.preventDefault()}
 		{ondblclick}

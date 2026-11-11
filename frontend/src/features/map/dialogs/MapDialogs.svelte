@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { map } from "../../../lib/map/state.svelte";
 	import BrushEditorDialog from "./BrushEditorDialog.svelte";
+	import CollabDialog from "./CollabDialog.svelte";
 	import DataDialog from "./DataDialog.svelte";
 	import ImportMapDialog from "./ImportMapDialog.svelte";
 	import MapToolsDialog from "./MapToolsDialog.svelte";
@@ -15,6 +16,7 @@
 {#if map.dialog === "data"}<DataDialog />{/if}
 {#if map.dialog === "shortcuts"}<ShortcutsDialog />{/if}
 {#if map.dialog === "brush"}<BrushEditorDialog />{/if}
+{#if map.dialog === "collab"}<CollabDialog />{/if}
 {#if has}
 	{#if map.dialog === "import"}<ImportMapDialog />{/if}
 	{#if map.dialog === "minimap"}<MinimapExportDialog />{/if}

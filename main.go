@@ -29,6 +29,7 @@ func init() {
 	application.RegisterEvent[app.Progress](app.EventProgress)
 	application.RegisterEvent[app.Progress](app.EventMapProgress)
 	application.RegisterEvent[app.MapChanged](app.EventMapChanged)
+	application.RegisterEvent[app.CollabEvent](app.EventCollab)
 	application.RegisterEvent[app.PlayMove](app.EventPlayMove)
 	application.RegisterEvent[mcpserver.Event](mcpserver.EventMap)
 }
@@ -53,6 +54,7 @@ func main() {
 	resources := app.NewResources(session)
 	maps := app.NewMapService(session, app.OpenMapStore())
 	resources.Maps = maps
+	collabService := app.NewCollabService(maps)
 	var selfUpdater app.Updater // set below for release builds
 	updates := app.NewUpdateService(version, func() app.Updater { return selfUpdater })
 	var mainWindow *application.WebviewWindow // set below
@@ -88,6 +90,7 @@ func main() {
 			application.NewService(settingsService),
 			application.NewService(app.NewMarketService(session, prefs)),
 			application.NewService(maps),
+			application.NewService(collabService),
 		},
 		Assets: application.AssetOptions{
 			Handler:        application.AssetFileServerFS(assets),

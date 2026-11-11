@@ -132,6 +132,10 @@ type Editor struct {
 	replace           strokeReplace
 	peekScratch       otmap.Tile
 	peekItems         [32]otmap.Item
+	// observer sees the changes of a shared map (see shared.go); foreign is
+	// set when other editors changed the map since the last save.
+	observer func(Commit)
+	foreign  bool
 }
 
 // peek returns the map tile at x, y, z for a read-only look that ends
@@ -161,9 +165,12 @@ func (e *Editor) SetBrushes(brushes *Brushes) {
 
 func (e *Editor) Seed(seed uint64) { e.rng = rand.New(rand.NewPCG(seed, seed)) }
 
-func (e *Editor) Changed() bool { return len(e.undo) != e.clean }
+func (e *Editor) Changed() bool { return len(e.undo) != e.clean || e.foreign }
 
-func (e *Editor) MarkSaved() { e.clean = len(e.undo) }
+func (e *Editor) MarkSaved() {
+	e.clean = len(e.undo)
+	e.foreign = false
+}
 
 func (e *Editor) MarkUnsaved() { e.clean = -1 }
 
@@ -197,22 +204,37 @@ func (e *Editor) Undo() string {
 		return ""
 	}
 	action := e.undo[len(e.undo)-1]
+	if action.itemsBefore != nil && e.Shared() {
+		return ""
+	}
 	e.undo = e.undo[:len(e.undo)-1]
+	var shared []TileState
 	for i := len(action.changes) - 1; i >= 0; i-- {
 		tileChange := action.changes[i]
+		// On a shared map a tile changed by another editor since keeps
+		// their change.
+		if e.Shared() && !SameTile(e.peekPos(tileChange.pos), tileChange.after) {
+			continue
+		}
 		e.Map.SetTile(tileChange.pos, tileChange.before.Clone())
 		e.markDirty(tileChange.pos)
 		e.syncSelection(tileChange.pos)
+		if e.Shared() {
+			shared = append(shared, sharedState(tileChange.pos, tileChange.before))
+		}
 	}
+	var meta *MetaData
 	if action.metaBefore != nil {
 		action.metaBefore.restore(e.Map)
 		e.metaDirty = true
+		meta = e.sharedMetaIfObserved()
 	}
 	if action.itemsBefore != nil {
 		e.Items = action.itemsBefore
 		e.SetBrushes(action.brushesBefore)
 	}
 	e.redo = append(e.redo, action)
+	e.notify("Undo "+action.Label, shared, meta)
 	return action.Label
 }
 
@@ -221,22 +243,42 @@ func (e *Editor) Redo() string {
 		return ""
 	}
 	action := e.redo[len(e.redo)-1]
+	if action.itemsAfter != nil && e.Shared() {
+		return ""
+	}
 	e.redo = e.redo[:len(e.redo)-1]
+	var shared []TileState
 	for _, tileChange := range action.changes {
+		if e.Shared() && !SameTile(e.peekPos(tileChange.pos), tileChange.before) {
+			continue
+		}
 		e.Map.SetTile(tileChange.pos, tileChange.after.Clone())
 		e.markDirty(tileChange.pos)
 		e.syncSelection(tileChange.pos)
+		if e.Shared() {
+			shared = append(shared, sharedState(tileChange.pos, tileChange.after))
+		}
 	}
+	var meta *MetaData
 	if action.metaAfter != nil {
 		action.metaAfter.restore(e.Map)
 		e.metaDirty = true
+		meta = e.sharedMetaIfObserved()
 	}
 	if action.itemsAfter != nil {
 		e.Items = action.itemsAfter
 		e.SetBrushes(action.brushesAfter)
 	}
 	e.undo = append(e.undo, action)
+	e.notify("Redo "+action.Label, shared, meta)
 	return action.Label
+}
+
+func (e *Editor) sharedMetaIfObserved() *MetaData {
+	if !e.Shared() {
+		return nil
+	}
+	return metaDataOf(e.Map)
 }
 
 // Tx collects the changes of one action. Tiles are copied on first write,
@@ -313,6 +355,17 @@ func (t *Tx) Commit() int {
 	changes := t.collectChanges()
 	if t.noUndo || (len(changes) == 0 && t.meta == nil) {
 		return len(changes)
+	}
+	if editor.Shared() {
+		shared := make([]TileState, len(changes))
+		for i, tileChange := range changes {
+			shared[i] = sharedState(tileChange.pos, tileChange.after)
+		}
+		var meta *MetaData
+		if t.meta != nil {
+			meta = metaDataOf(editor.Map)
+		}
+		editor.notify(t.label, shared, meta)
 	}
 	var metaAfter *metaState
 	if t.meta != nil {

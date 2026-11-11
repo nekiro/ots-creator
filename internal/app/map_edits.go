@@ -8,11 +8,21 @@ import (
 )
 
 func (ms *MapService) Undo(id int) (MapChange, error) {
-	return ms.editMap(id, func(editor *mapedit.Editor) error { editor.Undo(); return nil })
+	return ms.editMap(id, func(editor *mapedit.Editor) error {
+		if editor.Undo() == "" && editor.CanUndo() {
+			return mapedit.ErrShared
+		}
+		return nil
+	})
 }
 
 func (ms *MapService) Redo(id int) (MapChange, error) {
-	return ms.editMap(id, func(editor *mapedit.Editor) error { editor.Redo(); return nil })
+	return ms.editMap(id, func(editor *mapedit.Editor) error {
+		if editor.Redo() == "" && editor.CanRedo() {
+			return mapedit.ErrShared
+		}
+		return nil
+	})
 }
 
 func (ms *MapService) History(id int) (steps map[string][]mapedit.ActionInfo, err error) {

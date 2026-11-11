@@ -208,6 +208,9 @@ func (ms *MapService) CloseMap(id int) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 	delete(ms.maps, id)
+	for _, closed := range ms.closed {
+		closed(id)
+	}
 	go debug.FreeOSMemory()
 }
 

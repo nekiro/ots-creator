@@ -26,9 +26,14 @@ type openMap struct {
 	// indexing is set while a goroutine counts the changed chunks.
 	suggestions *suggest.Index
 	indexing    atomic.Bool
+	// title names a map without a file (a map shared by another editor).
+	title string
 }
 
 func (m *openMap) name() string {
+	if m.path == "" && m.title != "" {
+		return m.title
+	}
 	if m.path == "" {
 		return fmt.Sprintf("untitled-%d.otbm", m.id)
 	}
@@ -53,6 +58,8 @@ type MapService struct {
 	activeID      int
 	// looks keeps the sprite looks of items for finding look-alikes.
 	looks lookCache
+	// closed is called (under the lock) when a map closes.
+	closed []func(id int)
 }
 
 func NewMapService(session *Session, store *MapStore) *MapService {

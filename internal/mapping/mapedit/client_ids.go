@@ -10,6 +10,9 @@ import (
 // ConvertToClientIDs converts the current working map as one undo step.
 // Validate every item before touching any tile, including container contents.
 func (e *Editor) ConvertToClientIDs(items *otitems.DB, brushes *Brushes) (int, error) {
+	if e.Shared() {
+		return 0, ErrShared
+	}
 	if e.Items.Mode != otitems.ModeOTB {
 		return 0, fmt.Errorf("this map already uses client IDs")
 	}

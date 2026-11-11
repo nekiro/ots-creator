@@ -34,7 +34,8 @@ export interface BrushSel {
 	label: string;
 }
 
-export type MapDialog = "data" | "import" | "minimap" | "brush" | "tools" | "shortcuts" | "warnings" | "text" | null;
+export type MapDialog =
+	"data" | "import" | "minimap" | "brush" | "tools" | "shortcuts" | "warnings" | "text" | "collab" | null;
 
 export type Focus =
 	| { kind: "tile" }
@@ -150,7 +151,7 @@ class MapState {
 	/** A click on the map picks a position for this callback (teleport destinations). */
 	pick = $state<{ label: string; done: (position: Position) => void } | null>(null);
 	busy = $state<string | null>(null);
-	loading = $state<{ name: string; step: string; percent: number; title?: string } | null>(null);
+	loading = $state<{ name: string; step: string; percent: number; title?: string; cancel?: () => void } | null>(null);
 
 	readonly active = $derived<MapInfo | null>(this.maps.find((open) => open.id === this.activeId) ?? null);
 
