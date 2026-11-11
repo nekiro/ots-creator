@@ -1,18 +1,18 @@
 export function toggleId(selection: number[], id: number): number[] {
-  return selection.includes(id) ? selection.filter((selected) => selected !== id) : [...selection, id];
+	return selection.includes(id) ? selection.filter((selected) => selected !== id) : [...selection, id];
 }
 
 export function sliceBetween<T>(items: T[], fromIndex: number, toIndex: number): T[] {
-  return items.slice(Math.min(fromIndex, toIndex), Math.max(fromIndex, toIndex) + 1);
+	return items.slice(Math.min(fromIndex, toIndex), Math.max(fromIndex, toIndex) + 1);
 }
 
 export function idRange(from: number, to: number): number[] {
-  const [low, high] = from < to ? [from, to] : [to, from];
-  return Array.from({ length: high - low + 1 }, (_, i) => low + i);
+	const [low, high] = from < to ? [from, to] : [to, from];
+	return Array.from({ length: high - low + 1 }, (_, i) => low + i);
 }
 
 export function anchoredRange(anchor: number, range: number[]): number[] {
-  return [anchor, ...range.filter((id) => id !== anchor)];
+	return [anchor, ...range.filter((id) => id !== anchor)];
 }
 
 /**
@@ -21,15 +21,15 @@ export function anchoredRange(anchor: number, range: number[]): number[] {
  * it. rangeFrom gives the ids from the anchor to the clicked item.
  */
 export function clickSelection(
-  event: MouseEvent,
-  selection: number[],
-  anchor: number | null,
-  id: number,
-  rangeFrom: (anchor: number) => number[],
+	event: MouseEvent,
+	selection: number[],
+	anchor: number | null,
+	id: number,
+	rangeFrom: (anchor: number) => number[],
 ): { selection: number[]; anchor: number | null } {
-  if (event.shiftKey && anchor !== null) {
-    const range = rangeFrom(anchor);
-    return { selection: event.ctrlKey ? [...new Set([...selection, ...range])] : range, anchor };
-  }
-  return { selection: event.ctrlKey || event.metaKey ? toggleId(selection, id) : [id], anchor: id };
+	if (event.shiftKey && anchor !== null) {
+		const range = rangeFrom(anchor);
+		return { selection: event.ctrlKey ? [...new Set([...selection, ...range])] : range, anchor };
+	}
+	return { selection: event.ctrlKey || event.metaKey ? toggleId(selection, id) : [id], anchor: id };
 }

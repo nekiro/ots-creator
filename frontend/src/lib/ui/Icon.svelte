@@ -1,66 +1,76 @@
 <script lang="ts" module>
-  const PATHS: Record<string, string> = {
-    open: "M2 4h4l1 1h7v8H2z M2 6h12",
-    save: "M3 2h8l2 2v10H3z M5 2v4h6V2 M5 9h6v5H5z",
-    new: "M4 2h6l3 3v9H4z M10 2v3h3 M8.5 7v5 M6 9.5h5",
-    undo: "M5 5L2 8l3 3 M2 8h8a3 3 0 0 1 0 6H8",
-    redo: "M11 5l3 3-3 3 M14 8H6a3 3 0 0 0 0 6h2",
-    plus: "M8 3v10 M3 8h10",
-    refresh: "M13 8a5 5 0 1 1-1.5-3.6 M13 2v3h-3",
-    market: "M2 6l1.5-4h9L14 6z M2 6a2 2 0 0 0 4 0a2 2 0 0 0 4 0a2 2 0 0 0 4 0 M3 8v6h10V8 M6.5 14v-3.5h3V14",
-    copy: "M5 5h8v8H5z M3 11V3h8",
-    trash: "M3 4h10 M6 4V2h4v2 M4 4l1 10h6l1-10",
-    import: "M8 2v8 M5 7l3 3 3-3 M3 12v2h10v-2",
-    export: "M8 10V2 M5 5l3-3 3 3 M3 12v2h10v-2",
-    play: "M5 3l8 5-8 5z",
-    pause: "M4 3h3v10H4z M9 3h3v10H9z",
-    stop: "M4 4h8v8H4z",
-    prev: "M11 3L5 8l6 5z M4 3v10",
-    next: "M5 3l6 5-6 5z M12 3v10",
-    sun: "M8 5a3 3 0 1 1 0 6a3 3 0 1 1 0-6 M8 1v2 M8 13v2 M1 8h2 M13 8h2 M3 3l1.5 1.5 M11.5 11.5L13 13 M3 13l1.5-1.5 M11.5 4.5L13 3",
-    grid: "M2 2h12v12H2z M6 2v12 M10 2v12 M2 6h12 M2 10h12",
-    pencil: "M3 13l1-3 7-7 2 2-7 7z M10 4l2 2 M3 13h3",
-    eraser: "M6 13l-3-3 6-6 4 4-5 5z M6 6l4 4 M6 13h7",
-    picker: "M11 2l3 3-2 2-3-3z M9 4l-6 6v3h3l6-6",
-    pixels: "M2 2h12v12H2z M4.5 2v12 M7 2v12 M9.5 2v12 M12 2v12 M2 4.5h12 M2 7h12 M2 9.5h12 M2 12h12",
-    zoomin: "M7 3a4 4 0 1 1 0 8a4 4 0 1 1 0-8 M10 10l4 4 M5 7h4 M7 5v4",
-    zoomout: "M7 3a4 4 0 1 1 0 8a4 4 0 1 1 0-8 M10 10l4 4 M5 7h4",
-    check: "M3 8l3 3 7-7",
-    close: "M4 4l8 8 M12 4l-8 8",
-    search: "M7 3a4 4 0 1 1 0 8a4 4 0 1 1 0-8 M10 10l4 4",
-    film: "M2 3h12v10H2z M5 3v10 M11 3v10 M2 6h3 M2 10h3 M11 6h3 M11 10h3",
-    sheet: "M2 2h12v12H2z M2 8h12 M8 2v12",
-    image: "M2 3h12v10H2z M2 11l4-4 3 3 2-2 3 3 M10 6a1 1 0 1 1 0 .1",
-    arrowN: "M8 3l4 5H4z M8 8v5",
-    arrowE: "M13 8l-5 4V4z M8 8H3",
-    arrowS: "M8 13l4-5H4z M8 8V3",
-    arrowW: "M3 8l5 4V4z M8 8h5",
-    replace: "M3 6h9 M9 3l3 3-3 3 M13 10H4 M7 7l-3 3 3 3",
-    info: "M8 2a6 6 0 1 1 0 12A6 6 0 1 1 8 2 M8 7v4 M8 5v.5",
-    home: "M2 8l6-5 6 5 M4 7v7h8V7 M7 14v-4h2v4",
-    flag: "M4 14V2 M4 3h8l-2 3 2 3H4",
-    layers: "M8 2l6 3-6 3-6-3z M2 8l6 3 6-3 M2 11l6 3 6-3",
-    history: "M8 3a5 5 0 1 1-4.6 3 M3 2v4h4 M8 5v3l2 2",
-    tools: "M10 2a3 3 0 0 0-2.8 4L2.5 10.7a1.4 1.4 0 0 0 2 2L9.2 8A3 3 0 0 0 13 5.2l-2 1-1.5-1.5 1-2z",
-    cursor: "M3 2l9 6-4 1 2 5-2 1-2-5-3 3z",
-    command: "M2 3h12v10H2z M4.5 6l2 2-2 2 M8 10h3.5",
-    chevronDown: "M4 6l4 4 4-4",
-    hash: "M6 2.5l-1.5 11 M11.5 2.5L10 13.5 M3 6h11 M2 10.5h11",
-    warn:"M8 2l6.5 11.5h-13z M8 6.5v3.5 M8 12v.3",
-    text:"M3 4V3h10v1 M8 3v10 M6 13h4",
-    person:"M8 2a2.5 2.5 0 1 1 0 5a2.5 2.5 0 1 1 0-5 M3 14c0-3 2-5 5-5s5 2 5 5",
-    target: "M8 2a6 6 0 1 1 0 12A6 6 0 1 1 8 2 M8 6a2 2 0 1 1 0 4a2 2 0 1 1 0-4",
-    shield: "M8 2l5 2v4c0 3-2 5-5 6c-3-1-5-3-5-6V4z",
-    stairs: "M2 14h4v-4h4V6h4V2",
-    dashed: "M2 5V2h3 M7 2h2 M11 2h3v3 M14 7v2 M14 11v3h-3 M9 14H7 M5 14H2v-3 M2 9V7",
-    gear: "M6.3 3L6.5 1.2L9.5 1.2L9.7 3L11.5 4L13.2 3.3L14.7 5.8L13.2 7L13.2 9L14.7 10.2L13.2 12.7L11.5 12L9.7 13L9.5 14.8L6.5 14.8L6.3 13L4.5 12L2.8 12.7L1.3 10.2L2.8 9L2.8 7L1.3 5.8L2.8 3.3L4.5 4z M8 6a2 2 0 1 1 0 4a2 2 0 1 1 0-4",
-  };
+	const PATHS: Record<string, string> = {
+		open: "M2 4h4l1 1h7v8H2z M2 6h12",
+		save: "M3 2h8l2 2v10H3z M5 2v4h6V2 M5 9h6v5H5z",
+		new: "M4 2h6l3 3v9H4z M10 2v3h3 M8.5 7v5 M6 9.5h5",
+		undo: "M5 5L2 8l3 3 M2 8h8a3 3 0 0 1 0 6H8",
+		redo: "M11 5l3 3-3 3 M14 8H6a3 3 0 0 0 0 6h2",
+		plus: "M8 3v10 M3 8h10",
+		refresh: "M13 8a5 5 0 1 1-1.5-3.6 M13 2v3h-3",
+		market: "M2 6l1.5-4h9L14 6z M2 6a2 2 0 0 0 4 0a2 2 0 0 0 4 0a2 2 0 0 0 4 0 M3 8v6h10V8 M6.5 14v-3.5h3V14",
+		copy: "M5 5h8v8H5z M3 11V3h8",
+		trash: "M3 4h10 M6 4V2h4v2 M4 4l1 10h6l1-10",
+		import: "M8 2v8 M5 7l3 3 3-3 M3 12v2h10v-2",
+		export: "M8 10V2 M5 5l3-3 3 3 M3 12v2h10v-2",
+		play: "M5 3l8 5-8 5z",
+		pause: "M4 3h3v10H4z M9 3h3v10H9z",
+		stop: "M4 4h8v8H4z",
+		prev: "M11 3L5 8l6 5z M4 3v10",
+		next: "M5 3l6 5-6 5z M12 3v10",
+		sun: "M8 5a3 3 0 1 1 0 6a3 3 0 1 1 0-6 M8 1v2 M8 13v2 M1 8h2 M13 8h2 M3 3l1.5 1.5 M11.5 11.5L13 13 M3 13l1.5-1.5 M11.5 4.5L13 3",
+		grid: "M2 2h12v12H2z M6 2v12 M10 2v12 M2 6h12 M2 10h12",
+		pencil: "M3 13l1-3 7-7 2 2-7 7z M10 4l2 2 M3 13h3",
+		eraser: "M6 13l-3-3 6-6 4 4-5 5z M6 6l4 4 M6 13h7",
+		picker: "M11 2l3 3-2 2-3-3z M9 4l-6 6v3h3l6-6",
+		pixels: "M2 2h12v12H2z M4.5 2v12 M7 2v12 M9.5 2v12 M12 2v12 M2 4.5h12 M2 7h12 M2 9.5h12 M2 12h12",
+		zoomin: "M7 3a4 4 0 1 1 0 8a4 4 0 1 1 0-8 M10 10l4 4 M5 7h4 M7 5v4",
+		zoomout: "M7 3a4 4 0 1 1 0 8a4 4 0 1 1 0-8 M10 10l4 4 M5 7h4",
+		check: "M3 8l3 3 7-7",
+		close: "M4 4l8 8 M12 4l-8 8",
+		search: "M7 3a4 4 0 1 1 0 8a4 4 0 1 1 0-8 M10 10l4 4",
+		film: "M2 3h12v10H2z M5 3v10 M11 3v10 M2 6h3 M2 10h3 M11 6h3 M11 10h3",
+		sheet: "M2 2h12v12H2z M2 8h12 M8 2v12",
+		image: "M2 3h12v10H2z M2 11l4-4 3 3 2-2 3 3 M10 6a1 1 0 1 1 0 .1",
+		arrowN: "M8 3l4 5H4z M8 8v5",
+		arrowE: "M13 8l-5 4V4z M8 8H3",
+		arrowS: "M8 13l4-5H4z M8 8V3",
+		arrowW: "M3 8l5 4V4z M8 8h5",
+		replace: "M3 6h9 M9 3l3 3-3 3 M13 10H4 M7 7l-3 3 3 3",
+		info: "M8 2a6 6 0 1 1 0 12A6 6 0 1 1 8 2 M8 7v4 M8 5v.5",
+		home: "M2 8l6-5 6 5 M4 7v7h8V7 M7 14v-4h2v4",
+		flag: "M4 14V2 M4 3h8l-2 3 2 3H4",
+		layers: "M8 2l6 3-6 3-6-3z M2 8l6 3 6-3 M2 11l6 3 6-3",
+		history: "M8 3a5 5 0 1 1-4.6 3 M3 2v4h4 M8 5v3l2 2",
+		tools: "M10 2a3 3 0 0 0-2.8 4L2.5 10.7a1.4 1.4 0 0 0 2 2L9.2 8A3 3 0 0 0 13 5.2l-2 1-1.5-1.5 1-2z",
+		cursor: "M3 2l9 6-4 1 2 5-2 1-2-5-3 3z",
+		command: "M2 3h12v10H2z M4.5 6l2 2-2 2 M8 10h3.5",
+		chevronDown: "M4 6l4 4 4-4",
+		hash: "M6 2.5l-1.5 11 M11.5 2.5L10 13.5 M3 6h11 M2 10.5h11",
+		warn: "M8 2l6.5 11.5h-13z M8 6.5v3.5 M8 12v.3",
+		text: "M3 4V3h10v1 M8 3v10 M6 13h4",
+		person: "M8 2a2.5 2.5 0 1 1 0 5a2.5 2.5 0 1 1 0-5 M3 14c0-3 2-5 5-5s5 2 5 5",
+		target: "M8 2a6 6 0 1 1 0 12A6 6 0 1 1 8 2 M8 6a2 2 0 1 1 0 4a2 2 0 1 1 0-4",
+		shield: "M8 2l5 2v4c0 3-2 5-5 6c-3-1-5-3-5-6V4z",
+		stairs: "M2 14h4v-4h4V6h4V2",
+		dashed: "M2 5V2h3 M7 2h2 M11 2h3v3 M14 7v2 M14 11v3h-3 M9 14H7 M5 14H2v-3 M2 9V7",
+		gear: "M6.3 3L6.5 1.2L9.5 1.2L9.7 3L11.5 4L13.2 3.3L14.7 5.8L13.2 7L13.2 9L14.7 10.2L13.2 12.7L11.5 12L9.7 13L9.5 14.8L6.5 14.8L6.3 13L4.5 12L2.8 12.7L1.3 10.2L2.8 9L2.8 7L1.3 5.8L2.8 3.3L4.5 4z M8 6a2 2 0 1 1 0 4a2 2 0 1 1 0-4",
+	};
 </script>
 
 <script lang="ts">
-  let { name, size = 14 }: { name: string; size?: number } = $props();
+	let { name, size = 14 }: { name: string; size?: number } = $props();
 </script>
 
-<svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <path d={PATHS[name] ?? ""} />
+<svg
+	width={size}
+	height={size}
+	viewBox="0 0 16 16"
+	fill="none"
+	stroke="currentColor"
+	stroke-width="1.5"
+	stroke-linecap="round"
+	stroke-linejoin="round"
+	aria-hidden="true"
+>
+	<path d={PATHS[name] ?? ""} />
 </svg>

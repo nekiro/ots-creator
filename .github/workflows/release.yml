@@ -74,7 +74,7 @@ jobs:
           # main.go embeds frontend/dist, which exists only after the frontend build.
           mkdir -p frontend/dist && touch frontend/dist/.keep
           go test ./...
-          cd frontend && npx vitest run && npx svelte-check --threshold error
+          cd frontend && npx prettier --check . && npx vitest run && npx svelte-check --threshold error
 
       - name: Build installer
         run: wails3 task windows:package VERSION="$VERSION" INSTALLER_VERSION="$NUMERIC_VERSION"

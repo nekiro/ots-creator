@@ -5,16 +5,16 @@
 
 /** Name and health bar colors, rgb (Creature::setHealthPercent, drawInformation): NPCs too take the health color. */
 export const INFO_COLORS = {
-  /** Above 92 % health. */
-  fullHealth: [0, 0xbc, 0],
-  /** Creatures covered by a floor above: light grey. */
-  covered: [192, 192, 192],
+	/** Above 92 % health. */
+	fullHealth: [0, 0xbc, 0],
+	/** Creatures covered by a floor above: light grey. */
+	covered: [192, 192, 192],
 } as const;
 
 /** Bar colors (rgba 0..1); the health bar takes the name's color. */
 export const BAR_COLORS = {
-  background: [0, 0, 0, 1],
-  mana: [0, 0, 1, 1],
+	background: [0, 0, 0, 1],
+	mana: [0, 0, 1, 1],
 } as const;
 
 /** Sizes in screen pixels. */
@@ -30,23 +30,23 @@ const UNDER_BAR = 5;
 const MANA_BARS = 6;
 
 export interface Rect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+	x: number;
+	y: number;
+	width: number;
+	height: number;
 }
 
 export interface InfoLayout {
-  /** The bar's black background; the health bar is inside it, 1 pixel in. */
-  bar: Rect;
-  nameTop: number;
-  nameCenter: number;
+	/** The bar's black background; the health bar is inside it, 1 pixel in. */
+	bar: Rect;
+	nameTop: number;
+	nameCenter: number;
 }
 
 export interface InfoParts {
-  names: boolean;
-  bars: boolean;
-  manaBar: boolean;
+	names: boolean;
+	bars: boolean;
+	manaBar: boolean;
 }
 
 /**
@@ -57,18 +57,31 @@ export interface InfoParts {
  * the bar stays a pixel inside and keeps room for the name over it and
  * the player's mana bar under it.
  */
-export function infoLayout(x: number, y: number, px: number, viewWidth: number, viewHeight: number, isLocalPlayer: boolean, parts: InfoParts): InfoLayout {
-  const bar: Rect = { x: Math.trunc(x - BAR_CENTER * px), y: Math.trunc(y), width: BAR_WIDTH * px, height: BAR_HEIGHT * px };
-  const manaBars = parts.bars && parts.manaBar && isLocalPlayer ? MANA_BARS : 0;
-  const minBarY = (parts.names ? NAME_OVER_BAR + 1 : 1) * px;
-  const maxBarY = viewHeight - ((parts.names ? UNDER_BAR_WITH_NAME : UNDER_BAR) + manaBars) * px;
-  bar.x = clamp(bar.x, px, Math.max(px, viewWidth - (BAR_WIDTH + 1) * px));
-  bar.y = clamp(bar.y, minBarY, Math.max(minBarY, maxBarY));
-  return { bar, nameTop: bar.y - NAME_OVER_BAR * px, nameCenter: bar.x + BAR_CENTER * px };
+export function infoLayout(
+	x: number,
+	y: number,
+	px: number,
+	viewWidth: number,
+	viewHeight: number,
+	isLocalPlayer: boolean,
+	parts: InfoParts,
+): InfoLayout {
+	const bar: Rect = {
+		x: Math.trunc(x - BAR_CENTER * px),
+		y: Math.trunc(y),
+		width: BAR_WIDTH * px,
+		height: BAR_HEIGHT * px,
+	};
+	const manaBars = parts.bars && parts.manaBar && isLocalPlayer ? MANA_BARS : 0;
+	const minBarY = (parts.names ? NAME_OVER_BAR + 1 : 1) * px;
+	const maxBarY = viewHeight - ((parts.names ? UNDER_BAR_WITH_NAME : UNDER_BAR) + manaBars) * px;
+	bar.x = clamp(bar.x, px, Math.max(px, viewWidth - (BAR_WIDTH + 1) * px));
+	bar.y = clamp(bar.y, minBarY, Math.max(minBarY, maxBarY));
+	return { bar, nameTop: bar.y - NAME_OVER_BAR * px, nameCenter: bar.x + BAR_CENTER * px };
 }
 
 export function nameLeft(center: number, nameWidth: number, px: number, viewWidth: number): number {
-  return clamp(center - Math.trunc(nameWidth / 2), px, Math.max(px, viewWidth - nameWidth - px));
+	return clamp(center - Math.trunc(nameWidth / 2), px, Math.max(px, viewWidth - nameWidth - px));
 }
 
 const clamp = (value: number, low: number, high: number) => Math.min(Math.max(value, low), high);
@@ -79,19 +92,28 @@ const clamp = (value: number, low: number, high: number) => Math.min(Math.max(va
  * itself in at least its own light, 2 to 5 levels of 51 (client:
  * Creature::drawInformation).
  */
-export function litInfoColor(rgb: readonly [number, number, number], brightness: number, playerLight?: number): [number, number, number] {
-  if (playerLight !== undefined) brightness = Math.max(brightness, clamp(playerLight, 2, 5) * 51);
-  const level = Math.trunc(brightness / 5);
-  return [Math.trunc((level * rgb[0]) / 51), Math.trunc((level * rgb[1]) / 51), Math.trunc((level * rgb[2]) / 51)];
+export function litInfoColor(
+	rgb: readonly [number, number, number],
+	brightness: number,
+	playerLight?: number,
+): [number, number, number] {
+	if (playerLight !== undefined) brightness = Math.max(brightness, clamp(playerLight, 2, 5) * 51);
+	const level = Math.trunc(brightness / 5);
+	return [Math.trunc((level * rgb[0]) / 51), Math.trunc((level * rgb[1]) / 51), Math.trunc((level * rgb[2]) / 51)];
 }
 
 export function healthRect(bar: Rect, px: number, healthPercent: number): Rect {
-  return { x: bar.x + px, y: bar.y + px, width: Math.round((healthPercent / 100) * (BAR_WIDTH - 2) * px), height: bar.height - 2 * px };
+	return {
+		x: bar.x + px,
+		y: bar.y + px,
+		width: Math.round((healthPercent / 100) * (BAR_WIDTH - 2) * px),
+		height: bar.height - 2 * px,
+	};
 }
 
 /** The local player's mana bar: under the health bar, overlapping its last row. */
 export function manaBar(bar: Rect, px: number): Rect {
-  return { ...bar, y: bar.y + bar.height - px };
+	return { ...bar, y: bar.y + bar.height - px };
 }
 
 /** The name's letters stand on this row under its top: the font's

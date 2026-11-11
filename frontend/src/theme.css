@@ -7,74 +7,74 @@
    They render 1:1 only at their em size: --fs (14px) and --fs-small (9px). */
 
 @font-face {
-  font-family: "Tibia Verdana";
-  src: url("./assets/fonts/tibia-verdana.ttf") format("truetype");
-  font-weight: 400;
+	font-family: "Tibia Verdana";
+	src: url("./assets/fonts/tibia-verdana.ttf") format("truetype");
+	font-weight: 400;
 }
 @font-face {
-  font-family: "Tibia Verdana";
-  src: url("./assets/fonts/tibia-verdana-bold.ttf") format("truetype");
-  font-weight: 700;
+	font-family: "Tibia Verdana";
+	src: url("./assets/fonts/tibia-verdana-bold.ttf") format("truetype");
+	font-weight: 700;
 }
 @font-face {
-  font-family: "Tibia Small";
-  src: url("./assets/fonts/tibia-small.ttf") format("truetype");
+	font-family: "Tibia Small";
+	src: url("./assets/fonts/tibia-small.ttf") format("truetype");
 }
 
 :root {
-  --font: "Tibia Verdana", Verdana, Tahoma, sans-serif;
-  --font-small: "Tibia Small", "Tibia Verdana", Verdana, sans-serif;
-  --fs: 14px;
-  --fs-small: 9px;
-  --text: #c0c0c0;
-  --text-bright: #dfdfdf;
-  --text-dim: #8a8a8a;
-  --text-disabled: #6b6b6b;
-  --accent: #f4f4f4;
-  --gold: #e8c46a;
-  --green: #44ad25;
-  --red: #d33c3c;
-  --blue: #6aa6e8;
-  --select: rgba(255, 255, 255, 0.16);
-  --select-strong: rgba(130, 170, 255, 0.35);
-  --line-dark: #191919;
-  --line-bright: #5c5c5c;
-  color-scheme: dark;
+	--font: "Tibia Verdana", Verdana, Tahoma, sans-serif;
+	--font-small: "Tibia Small", "Tibia Verdana", Verdana, sans-serif;
+	--fs: 14px;
+	--fs-small: 9px;
+	--text: #c0c0c0;
+	--text-bright: #dfdfdf;
+	--text-dim: #8a8a8a;
+	--text-disabled: #6b6b6b;
+	--accent: #f4f4f4;
+	--gold: #e8c46a;
+	--green: #44ad25;
+	--red: #d33c3c;
+	--blue: #6aa6e8;
+	--select: rgba(255, 255, 255, 0.16);
+	--select-strong: rgba(130, 170, 255, 0.35);
+	--line-dark: #191919;
+	--line-bright: #5c5c5c;
+	color-scheme: dark;
 }
 
 * {
-  box-sizing: border-box;
+	box-sizing: border-box;
 }
 
 html,
 body,
 #app {
-  margin: 0;
-  height: 100%;
-  overflow: hidden;
+	margin: 0;
+	height: 100%;
+	overflow: hidden;
 }
 
 /* Wails: never show the webview's own context menu. */
 html {
-  --default-contextmenu: hide;
+	--default-contextmenu: hide;
 }
 
 /* A transparent composited layer makes Chromium use grayscale text
    antialiasing instead of ClearType, so pixel fonts get no color fringes. */
 #app {
-  will-change: transform;
+	will-change: transform;
 }
 
 body {
-  font: var(--fs) / 16px var(--font);
-  font-synthesis: none;
-  color: var(--text);
-  /* Smaller than the 96px tile: at 2x the client shows it at ~135 screen pixels,
+	font: var(--fs) / 16px var(--font);
+	font-synthesis: none;
+	color: var(--text);
+	/* Smaller than the 96px tile: at 2x the client shows it at ~135 screen pixels,
      where a full-size tile makes the pattern stand out. */
-  background: #232323 url("./assets/ui/background.png") 0 0 / 67.5px repeat;
-  user-select: none;
-  -webkit-font-smoothing: none;
-  text-rendering: optimizeSpeed;
+	background: #232323 url("./assets/ui/background.png") 0 0 / 67.5px repeat;
+	user-select: none;
+	-webkit-font-smoothing: none;
+	text-rendering: optimizeSpeed;
 }
 
 /* Pixel art skin: never smooth when the window is scaled (125%, 150% DPI). */
@@ -94,7 +94,7 @@ body {
 .t-slot,
 .t-sep,
 .t-vsep {
-  image-rendering: pixelated;
+	image-rendering: pixelated;
 }
 .t-window,
 .t-mini,
@@ -107,483 +107,488 @@ body {
 .t-btn,
 .t-input,
 .t-tab {
-  border-image-repeat: repeat;
+	border-image-repeat: repeat;
 }
 
 /* dialog-frame-borderimage: 2px bevel, 14px title bar, 1px line; 4px sides. */
 .t-window {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  border-style: solid;
-  border-width: 17px 4px 4px 4px;
-  border-image: url("./assets/ui/dialog-frame-borderimage.png") 17 4 4 4 fill / 17px 4px 4px 4px repeat;
-  min-height: 0;
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	border-style: solid;
+	border-width: 17px 4px 4px 4px;
+	border-image: url("./assets/ui/dialog-frame-borderimage.png") 17 4 4 4 fill / 17px 4px 4px 4px repeat;
+	min-height: 0;
 }
 .t-window > .t-window-title {
-  position: absolute;
-  top: -16px;
-  left: 0;
-  right: 0;
-  height: 14px;
-  line-height: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-bright);
-  font-weight: bold;
-  text-shadow: 1px 1px 0 #000;
-  pointer-events: none;
+	position: absolute;
+	top: -16px;
+	left: 0;
+	right: 0;
+	height: 14px;
+	line-height: 14px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-bright);
+	font-weight: bold;
+	text-shadow: 1px 1px 0 #000;
+	pointer-events: none;
 }
 
 /* widget-borderimage (sidebar widget): 2px bevel, 12px header, 1px line;
    4px sides. The header sits in the top border. */
 .t-mini {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  border-style: solid;
-  border-width: 15px 4px 4px 4px;
-  border-image: url("./assets/ui/widget-borderimage.png") 15 4 4 4 fill / 15px 4px 4px 4px repeat;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	border-style: solid;
+	border-width: 15px 4px 4px 4px;
+	border-image: url("./assets/ui/widget-borderimage.png") 15 4 4 4 fill / 15px 4px 4px 4px repeat;
 }
 .t-mini-header {
-  flex: none;
-  height: 12px;
-  margin: -13px -2px 1px;
-  padding: 0 4px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-bright);
-  font-weight: bold;
-  font-size: var(--fs);
-  line-height: 12px;
-  text-shadow: 1px 1px 0 #000;
+	flex: none;
+	height: 12px;
+	margin: -13px -2px 1px;
+	padding: 0 4px;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--text-bright);
+	font-weight: bold;
+	font-size: var(--fs);
+	line-height: 12px;
+	text-shadow: 1px 1px 0 #000;
 }
 .t-mini-header .t-icon-btn {
-  width: 13px;
-  height: 12px;
+	width: 13px;
+	height: 12px;
 }
 .t-mini-header .t-icon-btn svg {
-  width: 9px;
-  height: 9px;
+	width: 9px;
+	height: 9px;
 }
 .t-mini-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 4px 2px 2px;
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	padding: 4px 2px 2px;
 }
 
 .t-flat {
-  border-style: solid;
-  border-width: 1px;
-  border-image: url("./assets/ui/panel_flat.png") 1 fill / 1px repeat;
+	border-style: solid;
+	border-width: 1px;
+	border-image: url("./assets/ui/panel_flat.png") 1 fill / 1px repeat;
 }
 /* OTClient FlatPanel: panel_flat, image-border 1, center tiled.
    (The darker look in the client comes from image-color, not the texture.) */
 .t-panel {
-  border-style: solid;
-  border-width: 1px;
-  border-image: url("./assets/ui/panel_flat.png") 1 fill / 1px repeat;
+	border-style: solid;
+	border-width: 1px;
+	border-image: url("./assets/ui/panel_flat.png") 1 fill / 1px repeat;
 }
 .t-lightflat {
-  border-style: solid;
-  border-width: 1px;
-  border-image: url("./assets/ui/panel_lightflat.png") 1 fill / 1px repeat;
+	border-style: solid;
+	border-width: 1px;
+	border-image: url("./assets/ui/panel_lightflat.png") 1 fill / 1px repeat;
 }
 .t-frame-down {
-  border-style: solid;
-  border-width: 1px;
-  border-image: url("./assets/ui/1pixel-down-frame.png") 1 fill / 1px repeat;
+	border-style: solid;
+	border-width: 1px;
+	border-image: url("./assets/ui/1pixel-down-frame.png") 1 fill / 1px repeat;
 }
 .t-frame-up {
-  border-style: solid;
-  border-width: 2px;
-  border-image: url("./assets/ui/2pixel-up-frame-borderimage.png") 2 fill / 2px repeat;
+	border-style: solid;
+	border-width: 2px;
+	border-image: url("./assets/ui/2pixel-up-frame-borderimage.png") 2 fill / 2px repeat;
 }
 
 .t-sep {
-  height: 2px;
-  background:
-    url("./assets/ui/horizontal-line-dark.png") 0 0 / auto 1px repeat-x,
-    url("./assets/ui/horizontal-line-bright.png") 0 1px / auto 1px repeat-x;
-  margin: 6px 0;
-  flex: none;
+	height: 2px;
+	background:
+		url("./assets/ui/horizontal-line-dark.png") 0 0 / auto 1px repeat-x,
+		url("./assets/ui/horizontal-line-bright.png") 0 1px / auto 1px repeat-x;
+	margin: 6px 0;
+	flex: none;
 }
 .t-vsep {
-  width: 2px;
-  align-self: stretch;
-  background:
-    url("./assets/ui/vertical-line-dark.png") 0 0 / 1px auto repeat-y,
-    url("./assets/ui/vertical-line-bright.png") 1px 0 / 1px auto repeat-y;
+	width: 2px;
+	align-self: stretch;
+	background:
+		url("./assets/ui/vertical-line-dark.png") 0 0 / 1px auto repeat-y,
+		url("./assets/ui/vertical-line-bright.png") 1px 0 / 1px auto repeat-y;
 }
 
 .t-btn {
-  font: inherit;
-  color: var(--text-bright);
-  min-width: 43px;
-  height: 20px;
-  padding: 0 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  white-space: nowrap;
-  background: transparent;
-  border-style: solid;
-  border-width: 1px;
-  border-image: url("./assets/ui/button-grey-up.png") 1 fill / 1px repeat;
-  cursor: pointer;
-  text-shadow: 1px 1px 0 #000;
-  outline: none;
+	font: inherit;
+	color: var(--text-bright);
+	min-width: 43px;
+	height: 20px;
+	padding: 0 10px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	white-space: nowrap;
+	background: transparent;
+	border-style: solid;
+	border-width: 1px;
+	border-image: url("./assets/ui/button-grey-up.png") 1 fill / 1px repeat;
+	cursor: pointer;
+	text-shadow: 1px 1px 0 #000;
+	outline: none;
 }
 .t-btn:hover:not(:disabled) {
-  filter: brightness(1.18);
+	filter: brightness(1.18);
 }
 .t-btn:active:not(:disabled),
 .t-btn.on {
-  border-image-source: url("./assets/ui/button-grey-down.png");
-  padding: 2px 9px 0 11px;
+	border-image-source: url("./assets/ui/button-grey-down.png");
+	padding: 2px 9px 0 11px;
 }
 .t-btn:disabled {
-  color: #dfdfdf88;
-  opacity: 0.75;
-  cursor: default;
+	color: #dfdfdf88;
+	opacity: 0.75;
+	cursor: default;
 }
 .t-btn:focus-visible {
-  box-shadow: 0 0 0 1px #9a9a9a;
+	box-shadow: 0 0 0 1px #9a9a9a;
 }
 .t-btn.primary {
-  color: #fff;
+	color: #fff;
 }
 .t-btn.green {
-  color: #fff;
-  border-image-source: url("./assets/ui/button-green-up.png");
+	color: #fff;
+	border-image-source: url("./assets/ui/button-green-up.png");
 }
 .t-btn.green:active:not(:disabled),
 .t-btn.green.on {
-  border-image-source: url("./assets/ui/button-green-down.png");
+	border-image-source: url("./assets/ui/button-green-down.png");
 }
 .t-btn.danger {
-  color: #fff;
-  border-image: url("./assets/ui/btn-danger-idle.png") 3 fill / 3px stretch;
+	color: #fff;
+	border-image: url("./assets/ui/btn-danger-idle.png") 3 fill / 3px stretch;
 }
 .t-btn.danger:active:not(:disabled) {
-  border-image-source: url("./assets/ui/btn-danger-pressed.png");
+	border-image-source: url("./assets/ui/btn-danger-pressed.png");
 }
 .t-icon-btn.danger:hover:not(:disabled) {
-  color: #ff8a8a;
+	color: #ff8a8a;
 }
 
 .t-icon-btn {
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-bright);
-  background: none;
-  border-style: solid;
-  border-width: 1px;
-  border-image: url("./assets/ui/button-textured-up.png") 1 fill / 1px repeat;
-  cursor: pointer;
-  outline: none;
-  flex: none;
+	width: 20px;
+	height: 20px;
+	padding: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-bright);
+	background: none;
+	border-style: solid;
+	border-width: 1px;
+	border-image: url("./assets/ui/button-textured-up.png") 1 fill / 1px repeat;
+	cursor: pointer;
+	outline: none;
+	flex: none;
 }
 .t-icon-btn:hover:not(:disabled) {
-  filter: brightness(1.18);
+	filter: brightness(1.18);
 }
 .t-icon-btn:active:not(:disabled),
 .t-icon-btn.on {
-  border-image-source: url("./assets/ui/button-textured-down.png");
+	border-image-source: url("./assets/ui/button-textured-down.png");
 }
 .t-icon-btn:active:not(:disabled) > *,
 .t-icon-btn.on > * {
-  transform: translate(1px, 1px);
+	transform: translate(1px, 1px);
 }
 .t-icon-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
+	opacity: 0.4;
+	cursor: default;
 }
 .t-icon-btn svg {
-  width: 14px;
-  height: 14px;
+	width: 14px;
+	height: 14px;
 }
 
 .t-input {
-  font: bold var(--fs) var(--font);
-  color: #c0c0c0;
-  height: 20px;
-  padding: 0 4px;
-  background: transparent;
-  border-style: solid;
-  border-width: 1px;
-  border-image: url("./assets/ui/textedit.png") 1 fill / 1px repeat;
-  outline: none;
-  min-width: 0;
+	font: bold var(--fs) var(--font);
+	color: #c0c0c0;
+	height: 20px;
+	padding: 0 4px;
+	background: transparent;
+	border-style: solid;
+	border-width: 1px;
+	border-image: url("./assets/ui/textedit.png") 1 fill / 1px repeat;
+	outline: none;
+	min-width: 0;
 }
 .t-input:focus {
-  color: var(--text-bright);
-  box-shadow: inset 0 0 0 1px #6d6d6d;
+	color: var(--text-bright);
+	box-shadow: inset 0 0 0 1px #6d6d6d;
 }
 .t-input:disabled {
-  color: #27272788;
+	color: #27272788;
 }
 .t-input::placeholder {
-  color: var(--text-dim);
-  font-weight: normal;
+	color: var(--text-dim);
+	font-weight: normal;
 }
 .t-input::selection {
-  background: #808080;
+	background: #808080;
 }
 /* Numbers change with the mouse wheel (focused) or keyboard; native spinners clash with the skin. */
 input[type="number"].t-input::-webkit-inner-spin-button,
 input[type="number"].t-input::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
+	-webkit-appearance: none;
+	margin: 0;
 }
 
 .t-check {
-  appearance: none;
-  width: 12px;
-  height: 12px;
-  margin: 0;
-  flex: none;
-  background: url("./assets/ui/checkbox-unchecked.png");
-  cursor: pointer;
+	appearance: none;
+	width: 12px;
+	height: 12px;
+	margin: 0;
+	flex: none;
+	background: url("./assets/ui/checkbox-unchecked.png");
+	cursor: pointer;
 }
 .t-check:checked {
-  background-image: url("./assets/ui/checkbox-checked.png");
+	background-image: url("./assets/ui/checkbox-checked.png");
 }
 .t-check[type="radio"] {
-  background-image: url("./assets/ui/radiobutton-unchecked.png");
+	background-image: url("./assets/ui/radiobutton-unchecked.png");
 }
 .t-check[type="radio"]:checked {
-  background-image: url("./assets/ui/radiobutton-checked.png");
+	background-image: url("./assets/ui/radiobutton-checked.png");
 }
 .t-check:disabled {
-  opacity: 0.5;
-  cursor: default;
+	opacity: 0.5;
+	cursor: default;
 }
 .t-check:checked:disabled {
-  opacity: 1;
-  background-image: url("./assets/ui/checkbox-checked-disabled.png");
+	opacity: 1;
+	background-image: url("./assets/ui/checkbox-checked-disabled.png");
 }
 .t-check[type="radio"]:checked:disabled {
-  background-image: url("./assets/ui/radiobutton-checked-disabled.png");
+	background-image: url("./assets/ui/radiobutton-checked-disabled.png");
 }
 
 .t-tabs {
-  display: flex;
-  gap: 2px;
-  flex: none;
+	display: flex;
+	gap: 2px;
+	flex: none;
 }
 .t-tab {
-  flex: 1;
-  font: inherit;
-  color: var(--text);
-  height: 18px;
-  padding: 0 6px;
-  background: transparent;
-  border-style: solid;
-  border-width: 2px 2px 0 2px;
-  border-image: url("./assets/ui/console-tab-passive.png") 2 2 2 2 fill / 2px 2px 0 2px repeat;
-  cursor: pointer;
-  white-space: nowrap;
-  text-shadow: 1px 1px 0 #000;
+	flex: 1;
+	font: inherit;
+	color: var(--text);
+	height: 18px;
+	padding: 0 6px;
+	background: transparent;
+	border-style: solid;
+	border-width: 2px 2px 0 2px;
+	border-image: url("./assets/ui/console-tab-passive.png") 2 2 2 2 fill / 2px 2px 0 2px repeat;
+	cursor: pointer;
+	white-space: nowrap;
+	text-shadow: 1px 1px 0 #000;
 }
 .t-tab:hover {
-  color: var(--text-bright);
-  filter: brightness(1.15);
+	color: var(--text-bright);
+	filter: brightness(1.15);
 }
 .t-tab.on {
-  border-image: url("./assets/ui/console-tab-active.png") 2 2 0 2 fill / 2px 2px 0 2px repeat;
-  color: #fff;
-  filter: none;
+	border-image: url("./assets/ui/console-tab-active.png") 2 2 0 2 fill / 2px 2px 0 2px repeat;
+	color: #fff;
+	filter: none;
 }
 
 .t-slot {
-  width: 34px;
-  height: 34px;
-  background: url("./assets/ui/item.png");
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
+	width: 34px;
+	height: 34px;
+	background: url("./assets/ui/item.png");
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
 }
 /* Tibia-style hourglass (flips every 650ms) while the slot's image loads; delayed so
    cached images never flash it. .t-loader marks other image holders (map item icons). */
 .t-slot.loading,
 .t-loader.loading {
-  position: relative;
+	position: relative;
 }
 .t-slot.loading::after,
 .t-loader.loading::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  width: 16px;
-  height: 16px;
-  background: url("./assets/ui/hourglass.png") center / contain no-repeat;
-  image-rendering: auto;
-  opacity: 0;
-  animation:
-    t-loading-in 0s 120ms forwards,
-    t-hourglass 1.3s steps(2) infinite;
+	content: "";
+	position: absolute;
+	inset: 0;
+	margin: auto;
+	width: 16px;
+	height: 16px;
+	background: url("./assets/ui/hourglass.png") center / contain no-repeat;
+	image-rendering: auto;
+	opacity: 0;
+	animation:
+		t-loading-in 0s 120ms forwards,
+		t-hourglass 1.3s steps(2) infinite;
 }
 @keyframes t-loading-in {
-  to {
-    opacity: 1;
-  }
+	to {
+		opacity: 1;
+	}
 }
 @keyframes t-hourglass {
-  to {
-    transform: rotate(360deg);
-  }
+	to {
+		transform: rotate(360deg);
+	}
 }
 .t-spinner {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border: 2px solid rgba(232, 196, 106, 0.25);
-  border-top-color: var(--gold);
-  border-radius: 50%;
-  animation: t-spin 0.7s linear infinite;
+	display: inline-block;
+	width: 12px;
+	height: 12px;
+	border: 2px solid rgba(232, 196, 106, 0.25);
+	border-top-color: var(--gold);
+	border-radius: 50%;
+	animation: t-spin 0.7s linear infinite;
 }
 @keyframes t-spin {
-  to {
-    transform: rotate(360deg);
-  }
+	to {
+		transform: rotate(360deg);
+	}
 }
 
 .t-label {
-  color: var(--text-dim);
+	color: var(--text-dim);
 }
 .t-value {
-  color: var(--text-bright);
+	color: var(--text-bright);
 }
 
 ::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+	width: 12px;
+	height: 12px;
 }
 ::-webkit-scrollbar-track:vertical {
-  background: url("./assets/ui/scrollbar-texture-vertical.png") repeat-y;
+	background: url("./assets/ui/scrollbar-texture-vertical.png") repeat-y;
 }
 ::-webkit-scrollbar-track:horizontal {
-  background: url("./assets/ui/scrollbar-texture-horizontal.png") repeat-x;
+	background: url("./assets/ui/scrollbar-texture-horizontal.png") repeat-x;
 }
 ::-webkit-scrollbar-thumb:vertical {
-  min-height: 14px;
-  border-style: solid;
-  border-width: 6px 0;
-  border-image: url("./assets/ui/scrollbar-handle-vertical.png") 6 0 fill / 6px 0 stretch;
+	min-height: 14px;
+	border-style: solid;
+	border-width: 6px 0;
+	border-image: url("./assets/ui/scrollbar-handle-vertical.png") 6 0 fill / 6px 0 stretch;
 }
 ::-webkit-scrollbar-thumb:horizontal {
-  min-width: 14px;
-  border-style: solid;
-  border-width: 0 6px;
-  border-image: url("./assets/ui/scrollbar-handle-horizontal.png") 0 6 fill / 0 6px stretch;
+	min-width: 14px;
+	border-style: solid;
+	border-width: 0 6px;
+	border-image: url("./assets/ui/scrollbar-handle-horizontal.png") 0 6 fill / 0 6px stretch;
 }
 ::-webkit-scrollbar-button:single-button:vertical:decrement {
-  height: 12px;
-  background: url("./assets/ui/scrollbar-buttonup-up.png");
+	height: 12px;
+	background: url("./assets/ui/scrollbar-buttonup-up.png");
 }
 ::-webkit-scrollbar-button:single-button:vertical:decrement:active {
-  background-image: url("./assets/ui/scrollbar-buttonup-down.png");
+	background-image: url("./assets/ui/scrollbar-buttonup-down.png");
 }
 ::-webkit-scrollbar-button:single-button:vertical:increment {
-  height: 12px;
-  background: url("./assets/ui/scrollbar-buttondown-up.png");
+	height: 12px;
+	background: url("./assets/ui/scrollbar-buttondown-up.png");
 }
 ::-webkit-scrollbar-button:single-button:vertical:increment:active {
-  background-image: url("./assets/ui/scrollbar-buttondown-down.png");
+	background-image: url("./assets/ui/scrollbar-buttondown-down.png");
 }
 ::-webkit-scrollbar-button:single-button:horizontal:decrement {
-  width: 12px;
-  background: url("./assets/ui/scrollbar-buttonleft-up.png");
+	width: 12px;
+	background: url("./assets/ui/scrollbar-buttonleft-up.png");
 }
 ::-webkit-scrollbar-button:single-button:horizontal:decrement:active {
-  background-image: url("./assets/ui/scrollbar-buttonleft-down.png");
+	background-image: url("./assets/ui/scrollbar-buttonleft-down.png");
 }
 ::-webkit-scrollbar-button:single-button:horizontal:increment {
-  width: 12px;
-  background: url("./assets/ui/scrollbar-buttonright-up.png");
+	width: 12px;
+	background: url("./assets/ui/scrollbar-buttonright-up.png");
 }
 ::-webkit-scrollbar-button:single-button:horizontal:increment:active {
-  background-image: url("./assets/ui/scrollbar-buttonright-down.png");
+	background-image: url("./assets/ui/scrollbar-buttonright-down.png");
 }
 /* WKWebView / WebKitGTK never draw scrollbar buttons, so the arrows are
    painted on the scrollbar itself and the track is shortened to make room;
    lib/ui/scrollbuttons.ts makes them clickable. */
 html.sb-fake-buttons ::-webkit-scrollbar:vertical {
-  background:
-    url("./assets/ui/scrollbar-buttonup-up.png") top / 12px 12px no-repeat,
-    url("./assets/ui/scrollbar-buttondown-up.png") bottom / 12px 12px no-repeat;
+	background:
+		url("./assets/ui/scrollbar-buttonup-up.png") top / 12px 12px no-repeat,
+		url("./assets/ui/scrollbar-buttondown-up.png") bottom / 12px 12px no-repeat;
 }
 html.sb-fake-buttons ::-webkit-scrollbar-track:vertical {
-  margin: 12px 0;
+	margin: 12px 0;
 }
 html.sb-fake-buttons ::-webkit-scrollbar:horizontal {
-  background:
-    url("./assets/ui/scrollbar-buttonleft-up.png") left / 12px 12px no-repeat,
-    url("./assets/ui/scrollbar-buttonright-up.png") right / 12px 12px no-repeat;
+	background:
+		url("./assets/ui/scrollbar-buttonleft-up.png") left / 12px 12px no-repeat,
+		url("./assets/ui/scrollbar-buttonright-up.png") right / 12px 12px no-repeat;
 }
 html.sb-fake-buttons ::-webkit-scrollbar-track:horizontal {
-  margin: 0 12px;
+	margin: 0 12px;
 }
 ::-webkit-scrollbar-corner {
-  background: #2a2a2a;
+	background: #2a2a2a;
 }
 
 .row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+	display: flex;
+	align-items: center;
+	gap: 6px;
 }
 .col {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
 }
 .grow {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
+	flex: 1;
+	min-width: 0;
+	min-height: 0;
 }
 .pixel {
-  image-rendering: pixelated;
+	image-rendering: pixelated;
 }
 .checker {
-  background-color: #3a3a3a;
-  background-image: linear-gradient(45deg, #333 25%, transparent 25%), linear-gradient(-45deg, #333 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #333 75%), linear-gradient(-45deg, transparent 75%, #333 75%);
-  background-size: 16px 16px;
-  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+	background-color: #3a3a3a;
+	background-image:
+		linear-gradient(45deg, #333 25%, transparent 25%), linear-gradient(-45deg, #333 25%, transparent 25%),
+		linear-gradient(45deg, transparent 75%, #333 75%), linear-gradient(-45deg, transparent 75%, #333 75%);
+	background-size: 16px 16px;
+	background-position:
+		0 0,
+		0 8px,
+		8px -8px,
+		-8px 0;
 }
 kbd {
-  font: var(--fs-small) var(--font-small);
-  color: var(--text-dim);
+	font: var(--fs-small) var(--font-small);
+	color: var(--text-dim);
 }
 
 .t-small {
-  font: var(--fs-small) / 10px var(--font-small);
+	font: var(--fs-small) / 10px var(--font-small);
 }
 
 /* 3pixel_frame_borderimage, image-border 4 */
 .t-menu {
-  padding: 1px;
-  border-style: solid;
-  border-width: 4px;
-  border-image: url("./assets/ui/popupmenu.png") 4 fill / 4px repeat;
-  image-rendering: pixelated;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-  display: flex;
-  flex-direction: column;
+	padding: 1px;
+	border-style: solid;
+	border-width: 4px;
+	border-image: url("./assets/ui/popupmenu.png") 4 fill / 4px repeat;
+	image-rendering: pixelated;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+	display: flex;
+	flex-direction: column;
 }
 /* QtComboBoxPopupMenu: the frame of combobox_new (image-clip 0 60 91 20,
    image-border 2). Its 87x16 center has edges that do not match, which a
@@ -592,45 +597,45 @@ kbd {
    lighter so the list stands out from the window behind it. A background, not a
    border-image fill: border-image tiles show seams at fractional zoom. */
 .t-popup {
-  border-style: solid;
-  border-width: 2px;
-  border-image: url("./assets/ui/qcombo-popup.png") 2 / 2px repeat;
-  background:
-    linear-gradient(rgba(76, 76, 76, 0.7), rgba(76, 76, 76, 0.7)),
-    #4c4c4c url("./assets/ui/background.png") repeat;
-  background-clip: padding-box;
-  image-rendering: pixelated;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+	border-style: solid;
+	border-width: 2px;
+	border-image: url("./assets/ui/qcombo-popup.png") 2 / 2px repeat;
+	background:
+		linear-gradient(rgba(76, 76, 76, 0.7), rgba(76, 76, 76, 0.7)),
+		#4c4c4c url("./assets/ui/background.png") repeat;
+	background-clip: padding-box;
+	image-rendering: pixelated;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
 }
 .t-menu-sep {
-  height: 2px;
-  margin: 2px 3px;
-  background: url("./assets/ui/context-menu-separator.png") 0 0 / auto 2px repeat-x;
+	height: 2px;
+	margin: 2px 3px;
+	background: url("./assets/ui/context-menu-separator.png") 0 0 / auto 2px repeat-x;
 }
 .t-menu-entry {
-  font: inherit;
-  color: #ffffff;
-  background: none;
-  border: 0;
-  text-align: left;
-  height: 18px;
-  padding: 0 4px;
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: center;
-  cursor: pointer;
-  white-space: nowrap;
+	font: inherit;
+	color: #ffffff;
+	background: none;
+	border: 0;
+	text-align: left;
+	height: 18px;
+	padding: 0 4px;
+	display: flex;
+	justify-content: space-between;
+	gap: 16px;
+	align-items: center;
+	cursor: pointer;
+	white-space: nowrap;
 }
 .t-menu-entry:hover:not(:disabled) {
-  background: #ffffff36;
+	background: #ffffff36;
 }
 .t-menu-entry:disabled {
-  color: #c0c0c0;
-  opacity: 0.55;
-  cursor: default;
+	color: #c0c0c0;
+	opacity: 0.55;
+	cursor: default;
 }
 .t-menu-entry kbd {
-  color: #c0c0c0;
-  text-shadow: 1px 1px 0 #000;
+	color: #c0c0c0;
+	text-shadow: 1px 1px 0 #000;
 }

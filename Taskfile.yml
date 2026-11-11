@@ -70,12 +70,18 @@ tasks:
     cmds:
       - task: common:run:docker
 
+  fmt:
+    summary: Formats the frontend (tabs, prettier rules in frontend/.prettierrc.json) and Go code
+    cmds:
+      - gofmt -w .
+      - cd frontend && npx prettier --write .
+
   test:
     summary: Runs Go and frontend unit tests
     cmds:
       - go test ./...
       - task: common:generate:bindings
-      - cd frontend && npx vitest run && npx svelte-check --tsconfig ./tsconfig.json
+      - cd frontend && npx prettier --check . && npx vitest run && npx svelte-check --tsconfig ./tsconfig.json
 
   sample:
     summary: Generates a demo client in testdata/sample

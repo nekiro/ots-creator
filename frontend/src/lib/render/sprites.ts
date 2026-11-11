@@ -4,72 +4,72 @@
 import { res } from "../api";
 
 export interface SpriteEntry {
-  pixels: Uint8ClampedArray;
+	pixels: Uint8ClampedArray;
 }
 
 const BATCH = 512;
 
 export class SpriteCache {
-  constructor(private url: (ids: number[], rev: number) => string = res.sprites) {}
-  size = 32;
-  // Bumped on every invalidation; batches fetched under an older generation
-  // are discarded because they may hold stale pixels.
-  private gen = 0;
-  private entries = new Map<number, SpriteEntry>();
-  private inflight = new Map<number, Promise<void>>();
-  private listeners = new Set<(ids: number[] | null) => void>();
+	constructor(private url: (ids: number[], rev: number) => string = res.sprites) {}
+	size = 32;
+	// Bumped on every invalidation; batches fetched under an older generation
+	// are discarded because they may hold stale pixels.
+	private gen = 0;
+	private entries = new Map<number, SpriteEntry>();
+	private inflight = new Map<number, Promise<void>>();
+	private listeners = new Set<(ids: number[] | null) => void>();
 
-  invalidate(ids: number[] | null): void {
-    this.gen++;
-    this.inflight.clear();
-    if (ids === null) this.entries.clear();
-    else for (const id of ids) this.entries.delete(id);
-    for (const listener of this.listeners) listener(ids);
-  }
+	invalidate(ids: number[] | null): void {
+		this.gen++;
+		this.inflight.clear();
+		if (ids === null) this.entries.clear();
+		else for (const id of ids) this.entries.delete(id);
+		for (const listener of this.listeners) listener(ids);
+	}
 
-  onInvalidate(listener: (ids: number[] | null) => void): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
+	onInvalidate(listener: (ids: number[] | null) => void): () => void {
+		this.listeners.add(listener);
+		return () => this.listeners.delete(listener);
+	}
 
-  get(id: number): SpriteEntry | undefined {
-    return this.entries.get(id);
-  }
+	get(id: number): SpriteEntry | undefined {
+		return this.entries.get(id);
+	}
 
-  /** Loads missing sprites; id 0 is always empty and never fetched. */
-  async load(ids: Iterable<number>): Promise<void> {
-    const missing: number[] = [];
-    const waits: Promise<void>[] = [];
-    for (const id of new Set(ids)) {
-      if (id === 0 || this.entries.has(id)) continue;
-      const pending = this.inflight.get(id);
-      if (pending) waits.push(pending);
-      else missing.push(id);
-    }
-    for (let i = 0; i < missing.length; i += BATCH) {
-      const chunk = missing.slice(i, i + BATCH);
-      const pending = this.fetchChunk(chunk, this.gen);
-      for (const id of chunk) this.inflight.set(id, pending);
-      waits.push(pending);
-    }
-    await Promise.all(waits);
-  }
+	/** Loads missing sprites; id 0 is always empty and never fetched. */
+	async load(ids: Iterable<number>): Promise<void> {
+		const missing: number[] = [];
+		const waits: Promise<void>[] = [];
+		for (const id of new Set(ids)) {
+			if (id === 0 || this.entries.has(id)) continue;
+			const pending = this.inflight.get(id);
+			if (pending) waits.push(pending);
+			else missing.push(id);
+		}
+		for (let i = 0; i < missing.length; i += BATCH) {
+			const chunk = missing.slice(i, i + BATCH);
+			const pending = this.fetchChunk(chunk, this.gen);
+			for (const id of chunk) this.inflight.set(id, pending);
+			waits.push(pending);
+		}
+		await Promise.all(waits);
+	}
 
-  private async fetchChunk(ids: number[], gen: number): Promise<void> {
-    try {
-      const response = await fetch(this.url(ids, gen));
-      if (!response.ok) throw new Error(await response.text());
-      const size = Number(response.headers.get("X-Sprite-Size")) || 32;
-      this.size = size;
-      const pixels = new Uint8ClampedArray(await response.arrayBuffer());
-      if (gen !== this.gen) return;
-      const bytes = size * size * 4;
-      // Views into one buffer: no per-sprite copies.
-      ids.forEach((id, i) => this.entries.set(id, { pixels: pixels.subarray(i * bytes, (i + 1) * bytes) }));
-    } finally {
-      if (gen === this.gen) for (const id of ids) this.inflight.delete(id);
-    }
-  }
+	private async fetchChunk(ids: number[], gen: number): Promise<void> {
+		try {
+			const response = await fetch(this.url(ids, gen));
+			if (!response.ok) throw new Error(await response.text());
+			const size = Number(response.headers.get("X-Sprite-Size")) || 32;
+			this.size = size;
+			const pixels = new Uint8ClampedArray(await response.arrayBuffer());
+			if (gen !== this.gen) return;
+			const bytes = size * size * 4;
+			// Views into one buffer: no per-sprite copies.
+			ids.forEach((id, i) => this.entries.set(id, { pixels: pixels.subarray(i * bytes, (i + 1) * bytes) }));
+		} finally {
+			if (gen === this.gen) for (const id of ids) this.inflight.delete(id);
+		}
+	}
 }
 
 export const spriteCache = new SpriteCache();

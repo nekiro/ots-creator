@@ -5,21 +5,21 @@
 const waiters = new Map<number, Set<() => void>>();
 
 export function whenRendered(id: number, timeout = 20000): Promise<void> {
-  return new Promise((resolve) => {
-    let set = waiters.get(id);
-    if (!set) waiters.set(id, (set = new Set()));
-    const done = () => {
-      clearTimeout(timer);
-      set.delete(done);
-      resolve();
-    };
-    const timer = setTimeout(done, timeout);
-    set.add(done);
-  });
+	return new Promise((resolve) => {
+		let set = waiters.get(id);
+		if (!set) waiters.set(id, (set = new Set()));
+		const done = () => {
+			clearTimeout(timer);
+			set.delete(done);
+			resolve();
+		};
+		const timer = setTimeout(done, timeout);
+		set.add(done);
+	});
 }
 
 export function rendered(id: number): void {
-  const set = waiters.get(id);
-  if (!set?.size) return;
-  for (const done of [...set]) done();
+	const set = waiters.get(id);
+	if (!set?.size) return;
+	for (const done of [...set]) done();
 }

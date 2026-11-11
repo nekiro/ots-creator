@@ -2,143 +2,147 @@
 // always passed in, so the animator is deterministic and testable.
 
 export enum AnimationMode {
-  Async = 0,
-  Sync = 1,
+	Async = 0,
+	Sync = 1,
 }
 
 export interface Duration {
-  min: number;
-  max: number;
+	min: number;
+	max: number;
 }
 
 export const FRAME_AUTOMATIC = -1;
 
 export class Animator {
-  readonly frames: number;
-  readonly mode: AnimationMode;
-  readonly loopCount: number;
-  readonly startFrame: number;
-  private readonly durations: number[];
-  private current = 0;
-  private remaining = 0;
-  private lastTime = 0;
-  private loop = 0;
-  private forward = true;
-  private complete = false;
-  private readonly random: () => number;
+	readonly frames: number;
+	readonly mode: AnimationMode;
+	readonly loopCount: number;
+	readonly startFrame: number;
+	private readonly durations: number[];
+	private current = 0;
+	private remaining = 0;
+	private lastTime = 0;
+	private loop = 0;
+	private forward = true;
+	private complete = false;
+	private readonly random: () => number;
 
-  /**
-   * @param loopCount 0 = infinite, n > 0 = play n times, < 0 = ping-pong
-   * @param startFrame -1 = random start frame
-   */
-  constructor(
-    mode: AnimationMode,
-    loopCount: number,
-    startFrame: number,
-    durations: Duration[],
-    now: number,
-    random: () => number = Math.random,
-  ) {
-    if (durations.length === 0) throw new Error("animator needs at least one frame");
-    if (startFrame < -1 || startFrame >= durations.length) throw new Error(`invalid start frame ${startFrame}`);
-    this.frames = durations.length;
-    this.mode = mode;
-    this.loopCount = loopCount;
-    this.startFrame = startFrame;
-    this.random = random;
-    // Duration of a frame is picked once, between min and max.
-    this.durations = durations.map((duration) => (duration.max > duration.min ? duration.min + Math.floor(random() * (duration.max - duration.min + 1)) : duration.min));
-    this.reset(now);
-  }
+	/**
+	 * @param loopCount 0 = infinite, n > 0 = play n times, < 0 = ping-pong
+	 * @param startFrame -1 = random start frame
+	 */
+	constructor(
+		mode: AnimationMode,
+		loopCount: number,
+		startFrame: number,
+		durations: Duration[],
+		now: number,
+		random: () => number = Math.random,
+	) {
+		if (durations.length === 0) throw new Error("animator needs at least one frame");
+		if (startFrame < -1 || startFrame >= durations.length) throw new Error(`invalid start frame ${startFrame}`);
+		this.frames = durations.length;
+		this.mode = mode;
+		this.loopCount = loopCount;
+		this.startFrame = startFrame;
+		this.random = random;
+		// Duration of a frame is picked once, between min and max.
+		this.durations = durations.map((duration) =>
+			duration.max > duration.min
+				? duration.min + Math.floor(random() * (duration.max - duration.min + 1))
+				: duration.min,
+		);
+		this.reset(now);
+	}
 
-  get frame(): number {
-    return this.current;
-  }
+	get frame(): number {
+		return this.current;
+	}
 
-  get isComplete(): boolean {
-    return this.complete;
-  }
+	get isComplete(): boolean {
+		return this.complete;
+	}
 
-  get totalDuration(): number {
-    return this.durations.reduce((sum, duration) => sum + duration, 0);
-  }
+	get totalDuration(): number {
+		return this.durations.reduce((sum, duration) => sum + duration, 0);
+	}
 
-  reset(now: number): void {
-    this.loop = 0;
-    this.forward = true;
-    this.complete = false;
-    this.lastTime = now;
-    if (this.mode === AnimationMode.Sync) {
-      this.syncTo(now);
-    } else {
-      this.current = this.startFrame >= 0 ? this.startFrame : Math.floor(this.random() * this.frames);
-      this.remaining = this.durations[this.current];
-    }
-  }
+	reset(now: number): void {
+		this.loop = 0;
+		this.forward = true;
+		this.complete = false;
+		this.lastTime = now;
+		if (this.mode === AnimationMode.Sync) {
+			this.syncTo(now);
+		} else {
+			this.current = this.startFrame >= 0 ? this.startFrame : Math.floor(this.random() * this.frames);
+			this.remaining = this.durations[this.current];
+		}
+	}
 
-  setFrame(frame: number, now: number): void {
-    this.current = ((frame % this.frames) + this.frames) % this.frames;
-    this.remaining = this.durations[this.current];
-    this.lastTime = now;
-    this.complete = false;
-  }
+	setFrame(frame: number, now: number): void {
+		this.current = ((frame % this.frames) + this.frames) % this.frames;
+		this.remaining = this.durations[this.current];
+		this.lastTime = now;
+		this.complete = false;
+	}
 
-  /** Synchronous animations are driven by absolute time so all instances match. */
-  private syncTo(now: number): void {
-    const total = this.totalDuration;
-    let elapsed = total > 0 ? now % total : 0;
-    for (let i = 0; i < this.frames; i++) {
-      if (elapsed < this.durations[i]) {
-        this.current = i;
-        this.remaining = this.durations[i] - elapsed;
-        return;
-      }
-      elapsed -= this.durations[i];
-    }
-    this.current = this.frames - 1;
-    this.remaining = 0;
-  }
+	/** Synchronous animations are driven by absolute time so all instances match. */
+	private syncTo(now: number): void {
+		const total = this.totalDuration;
+		let elapsed = total > 0 ? now % total : 0;
+		for (let i = 0; i < this.frames; i++) {
+			if (elapsed < this.durations[i]) {
+				this.current = i;
+				this.remaining = this.durations[i] - elapsed;
+				return;
+			}
+			elapsed -= this.durations[i];
+		}
+		this.current = this.frames - 1;
+		this.remaining = 0;
+	}
 
-  update(now: number): number {
-    if (this.complete || this.frames < 2) {
-      this.lastTime = now;
-      return this.current;
-    }
-    let elapsed = now - this.lastTime;
-    this.lastTime = now;
-    let guard = 0;
-    while (elapsed >= this.remaining && !this.complete && guard++ < 10000) {
-      elapsed -= this.remaining;
-      const next = this.loopCount < 0 ? this.pingPongNext() : this.loopNext();
-      if (next === this.current && this.complete) break;
-      this.current = next;
-      this.remaining = this.durations[next];
-    }
-    if (!this.complete) this.remaining -= elapsed;
-    return this.current;
-  }
+	update(now: number): number {
+		if (this.complete || this.frames < 2) {
+			this.lastTime = now;
+			return this.current;
+		}
+		let elapsed = now - this.lastTime;
+		this.lastTime = now;
+		let guard = 0;
+		while (elapsed >= this.remaining && !this.complete && guard++ < 10000) {
+			elapsed -= this.remaining;
+			const next = this.loopCount < 0 ? this.pingPongNext() : this.loopNext();
+			if (next === this.current && this.complete) break;
+			this.current = next;
+			this.remaining = this.durations[next];
+		}
+		if (!this.complete) this.remaining -= elapsed;
+		return this.current;
+	}
 
-  private loopNext(): number {
-    const next = this.current + 1;
-    if (next < this.frames) return next;
-    if (this.loopCount === 0) return 0;
-    if (this.loop < this.loopCount - 1) {
-      this.loop++;
-      return 0;
-    }
-    this.complete = true;
-    return this.current;
-  }
+	private loopNext(): number {
+		const next = this.current + 1;
+		if (next < this.frames) return next;
+		if (this.loopCount === 0) return 0;
+		if (this.loop < this.loopCount - 1) {
+			this.loop++;
+			return 0;
+		}
+		this.complete = true;
+		return this.current;
+	}
 
-  private pingPongNext(): number {
-    const step = this.forward ? 1 : -1;
-    const next = this.current + step;
-    if (next < 0 || next >= this.frames) {
-      this.forward = !this.forward;
-      return this.current - step;
-    }
-    return next;
-  }
+	private pingPongNext(): number {
+		const step = this.forward ? 1 : -1;
+		const next = this.current + step;
+		if (next < 0 || next >= this.frames) {
+			this.forward = !this.forward;
+			return this.current - step;
+		}
+		return next;
+	}
 }
 
 /**
@@ -155,19 +159,19 @@ export const WALK_STEP_MS = 700;
  * cycle, so they cycle 1.5x slower.
  */
 export function footDelay(walkFrames: number, step = WALK_STEP_MS): number {
-  const cycle = walkFrames > 2 ? Math.floor(((step + 20) * 3) / 2) : step + 20;
-  return Math.max(Math.floor(cycle / walkFrames) + 10, 20);
+	const cycle = walkFrames > 2 ? Math.floor(((step + 20) * 3) / 2) : step + 20;
+	return Math.max(Math.floor(cycle / walkFrames) + 10, 20);
 }
 
 export interface PreviewContext {
-  outfit: boolean;
-  groups: number;
-  animateAlways: boolean;
-  /**
-   * The client stores frame durations (improved animations); without them
-   * the stored durations are made-up defaults.
-   */
-  improved: boolean;
+	outfit: boolean;
+	groups: number;
+	animateAlways: boolean;
+	/**
+	 * The client stores frame durations (improved animations); without them
+	 * the stored durations are made-up defaults.
+	 */
+	improved: boolean;
 }
 
 const fixed = (frames: number, ms: number): Duration[] => Array.from({ length: frames }, () => ({ min: ms, max: ms }));
@@ -181,15 +185,18 @@ const fixed = (frames: number, ms: number): Duration[] => Array.from({ length: f
  *   unless it animates always: then a whole cycle takes one second;
  * - everything else uses the stored durations, or 100 ms without them.
  */
-export function previewDurations(group: { frames: number; durations: Duration[] | null; type: number }, ctx: PreviewContext): Duration[] {
-  if (ctx.outfit && group.type === 1) return fixed(group.frames, footDelay(group.frames));
-  if (ctx.outfit && ctx.groups === 1 && !ctx.improved) {
-    if (ctx.animateAlways) return fixed(group.frames, Math.round(1000 / group.frames));
-    if (group.frames > 2) return [{ min: 0, max: 0 }, ...fixed(group.frames - 1, footDelay(group.frames - 1))];
-    return fixed(group.frames, footDelay(group.frames));
-  }
-  if (group.durations?.length === group.frames) return group.durations;
-  return fixed(group.frames, 100);
+export function previewDurations(
+	group: { frames: number; durations: Duration[] | null; type: number },
+	ctx: PreviewContext,
+): Duration[] {
+	if (ctx.outfit && group.type === 1) return fixed(group.frames, footDelay(group.frames));
+	if (ctx.outfit && ctx.groups === 1 && !ctx.improved) {
+		if (ctx.animateAlways) return fixed(group.frames, Math.round(1000 / group.frames));
+		if (group.frames > 2) return [{ min: 0, max: 0 }, ...fixed(group.frames - 1, footDelay(group.frames - 1))];
+		return fixed(group.frames, footDelay(group.frames));
+	}
+	if (group.durations?.length === group.frames) return group.durations;
+	return fixed(group.frames, 100);
 }
 
 /**
@@ -197,6 +204,8 @@ export function previewDurations(group: { frames: number; durations: Duration[] 
  * durations other than the 300 ms placeholder mean stored durations.
  */
 export function guessImproved(thing: { frameGroups: { durations: Duration[] | null }[] }): boolean {
-  if (thing.frameGroups.length > 1) return true;
-  return thing.frameGroups.some((group) => (group.durations ?? []).some((duration) => duration.min !== 300 || duration.max !== 300));
+	if (thing.frameGroups.length > 1) return true;
+	return thing.frameGroups.some((group) =>
+		(group.durations ?? []).some((duration) => duration.min !== 300 || duration.max !== 300),
+	);
 }

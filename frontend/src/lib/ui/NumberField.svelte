@@ -1,141 +1,155 @@
 <script lang="ts">
-  import { clamp } from "../util/math";
-  let {
-    label,
-    value,
-    min = 0,
-    max = 65535,
-    width = 56,
-    disabled = false,
-    title = "",
-    onchange,
-  }: {
-    label?: string;
-    value: number;
-    min?: number;
-    max?: number;
-    width?: number;
-    disabled?: boolean;
-    title?: string;
-    onchange: (next: number) => void;
-  } = $props();
+	import { clamp } from "../util/math";
+	let {
+		label,
+		value,
+		min = 0,
+		max = 65535,
+		width = 56,
+		disabled = false,
+		title = "",
+		onchange,
+	}: {
+		label?: string;
+		value: number;
+		min?: number;
+		max?: number;
+		width?: number;
+		disabled?: boolean;
+		title?: string;
+		onchange: (next: number) => void;
+	} = $props();
 
-  let current = $state(0);
-  $effect.pre(() => {
-    current = value;
-  });
+	let current = $state(0);
+	$effect.pre(() => {
+		current = value;
+	});
 
-  function commit(next: number) {
-    if (!Number.isFinite(next)) next = min;
-    next = clamp(Math.trunc(next), min, max);
-    current = next;
-    if (next !== value) onchange(next);
-  }
+	function commit(next: number) {
+		if (!Number.isFinite(next)) next = min;
+		next = clamp(Math.trunc(next), min, max);
+		current = next;
+		if (next !== value) onchange(next);
+	}
 
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  function hold(delta: number, event: PointerEvent) {
-    if (disabled || event.button !== 0) return;
-    event.preventDefault();
-    const step = () => commit(current + delta);
-    step();
-    let wait = 350;
-    const again = () => {
-      step();
-      wait = Math.max(30, wait * 0.8);
-      timer = setTimeout(again, wait);
-    };
-    timer = setTimeout(again, wait);
-  }
-  function release() {
-    clearTimeout(timer);
-  }
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	function hold(delta: number, event: PointerEvent) {
+		if (disabled || event.button !== 0) return;
+		event.preventDefault();
+		const step = () => commit(current + delta);
+		step();
+		let wait = 350;
+		const again = () => {
+			step();
+			wait = Math.max(30, wait * 0.8);
+			timer = setTimeout(again, wait);
+		};
+		timer = setTimeout(again, wait);
+	}
+	function release() {
+		clearTimeout(timer);
+	}
 
-  function onwheel(event: WheelEvent) {
-    if (disabled || document.activeElement !== event.currentTarget) return;
-    event.preventDefault();
-    commit(current + (event.deltaY < 0 ? 1 : -1) * (event.shiftKey ? 10 : 1));
-  }
+	function onwheel(event: WheelEvent) {
+		if (disabled || document.activeElement !== event.currentTarget) return;
+		event.preventDefault();
+		commit(current + (event.deltaY < 0 ? 1 : -1) * (event.shiftKey ? 10 : 1));
+	}
 
-  function onkeydown(event: KeyboardEvent) {
-    const input = event.currentTarget as HTMLInputElement;
-    if (event.key === "Enter") commit(Number(input.value));
-    else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
-      event.preventDefault();
-      commit(current + (event.key === "ArrowUp" ? 1 : -1) * (event.shiftKey ? 10 : 1));
-    }
-  }
+	function onkeydown(event: KeyboardEvent) {
+		const input = event.currentTarget as HTMLInputElement;
+		if (event.key === "Enter") commit(Number(input.value));
+		else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+			event.preventDefault();
+			commit(current + (event.key === "ArrowUp" ? 1 : -1) * (event.shiftKey ? 10 : 1));
+		}
+	}
 </script>
 
 <svelte:window onpointerup={release} onblur={release} />
 
 <label class="nf" {title}>
-  {#if label}<span class="t-label">{label}</span>{/if}
-  <span class="spin" class:disabled style="width:{width + 11}px">
-    <input
-      class="t-input"
-      inputmode="numeric"
-      {disabled}
-      value={current}
-      onchange={(event) => commit(Number(event.currentTarget.value))}
-      {onkeydown}
-      {onwheel}
-    />
-    <button type="button" class="up" tabindex="-1" aria-label="Increase" {disabled} onpointerdown={(event) => hold(1, event)}></button>
-    <button type="button" class="down" tabindex="-1" aria-label="Decrease" {disabled} onpointerdown={(event) => hold(-1, event)}></button>
-  </span>
+	{#if label}<span class="t-label">{label}</span>{/if}
+	<span class="spin" class:disabled style="width:{width + 11}px">
+		<input
+			class="t-input"
+			inputmode="numeric"
+			{disabled}
+			value={current}
+			onchange={(event) => commit(Number(event.currentTarget.value))}
+			{onkeydown}
+			{onwheel}
+		/>
+		<button
+			type="button"
+			class="up"
+			tabindex="-1"
+			aria-label="Increase"
+			{disabled}
+			onpointerdown={(event) => hold(1, event)}
+		></button>
+		<button
+			type="button"
+			class="down"
+			tabindex="-1"
+			aria-label="Decrease"
+			{disabled}
+			onpointerdown={(event) => hold(-1, event)}
+		></button>
+	</span>
 </label>
 
 <style>
-  .nf {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .spin {
-    position: relative;
-    display: inline-block;
-    height: 20px;
-    flex: none;
-  }
-  .spin input {
-    width: 100%;
-    height: 20px;
-    padding-right: 13px;
-  }
-  .up,
-  .down {
-    position: absolute;
-    right: 0;
-    width: 10px;
-    height: 10px;
-    padding: 0;
-    border: 0;
-    background: url("../../assets/ui/spin-up-idle.png");
-    image-rendering: pixelated;
-    cursor: pointer;
-  }
-  .up {
-    top: 0;
-  }
-  .down {
-    bottom: 0;
-    background-image: url("../../assets/ui/spin-down-idle.png");
-  }
-  .up:hover:not(:disabled) {
-    background-image: url("../../assets/ui/spin-up-hover.png");
-  }
-  .up:active:not(:disabled) {
-    background-image: url("../../assets/ui/spin-up-pressed.png");
-  }
-  .down:hover:not(:disabled) {
-    background-image: url("../../assets/ui/spin-down-hover.png");
-  }
-  .down:active:not(:disabled) {
-    background-image: url("../../assets/ui/spin-down-pressed.png");
-  }
-  .spin.disabled .up,
-  .spin.disabled .down {
-    opacity: 0.5;
-    cursor: default;
-  }
+	.nf {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+	}
+	.spin {
+		position: relative;
+		display: inline-block;
+		height: 20px;
+		flex: none;
+	}
+	.spin input {
+		width: 100%;
+		height: 20px;
+		padding-right: 13px;
+	}
+	.up,
+	.down {
+		position: absolute;
+		right: 0;
+		width: 10px;
+		height: 10px;
+		padding: 0;
+		border: 0;
+		background: url("../../assets/ui/spin-up-idle.png");
+		image-rendering: pixelated;
+		cursor: pointer;
+	}
+	.up {
+		top: 0;
+	}
+	.down {
+		bottom: 0;
+		background-image: url("../../assets/ui/spin-down-idle.png");
+	}
+	.up:hover:not(:disabled) {
+		background-image: url("../../assets/ui/spin-up-hover.png");
+	}
+	.up:active:not(:disabled) {
+		background-image: url("../../assets/ui/spin-up-pressed.png");
+	}
+	.down:hover:not(:disabled) {
+		background-image: url("../../assets/ui/spin-down-hover.png");
+	}
+	.down:active:not(:disabled) {
+		background-image: url("../../assets/ui/spin-down-pressed.png");
+	}
+	.spin.disabled .up,
+	.spin.disabled .down {
+		opacity: 0.5;
+		cursor: default;
+	}
 </style>

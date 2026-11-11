@@ -4,10 +4,10 @@
  * to that ancestor and clipped by its scrolling content.
  */
 export function portal(node: HTMLElement) {
-  document.body.appendChild(node);
-  return {
-    destroy() {
-      node.remove();
-    },
-  };
+	document.body.appendChild(node);
+	return {
+		destroy() {
+			node.remove();
+		},
+	};
 }

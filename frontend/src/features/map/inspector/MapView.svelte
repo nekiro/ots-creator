@@ -1,171 +1,230 @@
 <script lang="ts">
-  import { errorMessage } from "../../../lib/api";
-  import { MapService, SpawnFormat, type MapInfo, type Properties, type Statistics } from "../../../lib/map/data/api";
-  import { edit, map } from "../../../lib/map/state.svelte";
-  import Icon from "../../../lib/ui/Icon.svelte";
-  import NumberField from "../../../lib/ui/NumberField.svelte";
-  import Select from "../../../lib/ui/Select.svelte";
+	import { errorMessage } from "../../../lib/api";
+	import { MapService, SpawnFormat, type MapInfo, type Properties, type Statistics } from "../../../lib/map/data/api";
+	import { edit, map } from "../../../lib/map/state.svelte";
+	import Icon from "../../../lib/ui/Icon.svelte";
+	import NumberField from "../../../lib/ui/NumberField.svelte";
+	import Select from "../../../lib/ui/Select.svelte";
 
-  let { info }: { info: MapInfo } = $props();
-  const properties = $derived(info.props);
+	let { info }: { info: MapInfo } = $props();
+	const properties = $derived(info.props);
 
-  function set(patch: Partial<Properties>) {
-    const next = { ...properties, ...patch };
-    void edit((id) => MapService.SetProperties(id, next));
-  }
+	function set(patch: Partial<Properties>) {
+		const next = { ...properties, ...patch };
+		void edit((id) => MapService.SetProperties(id, next));
+	}
 
-  let stats = $state<Statistics | null>(null);
-  let statsRev = $state(-1);
-  let error = $state("");
-  let counting = $state(false);
-  async function count() {
-    if (counting) return;
-    counting = true;
-    try {
-      stats = await MapService.Stats(info.id);
-      statsRev = info.rev;
-      error = "";
-    } catch (err) {
-      error = errorMessage(err);
-    } finally {
-      counting = false;
-    }
-  }
-  // Counts when shown and again a moment after edits; big maps only on
-  // request since counting them takes a while.
-  $effect(() => {
-    const rev = info.rev;
-    if (statsRev === rev) return;
-    if (statsRev >= 0 && info.tiles > 400_000) return;
-    const timer = setTimeout(() => void count(), statsRev < 0 ? 0 : 700);
-    return () => clearTimeout(timer);
-  });
+	let stats = $state<Statistics | null>(null);
+	let statsRev = $state(-1);
+	let error = $state("");
+	let counting = $state(false);
+	async function count() {
+		if (counting) return;
+		counting = true;
+		try {
+			stats = await MapService.Stats(info.id);
+			statsRev = info.rev;
+			error = "";
+		} catch (err) {
+			error = errorMessage(err);
+		} finally {
+			counting = false;
+		}
+	}
+	// Counts when shown and again a moment after edits; big maps only on
+	// request since counting them takes a while.
+	$effect(() => {
+		const rev = info.rev;
+		if (statsRev === rev) return;
+		if (statsRev >= 0 && info.tiles > 400_000) return;
+		const timer = setTimeout(() => void count(), statsRev < 0 ? 0 : 700);
+		return () => clearTimeout(timer);
+	});
 
-  const separate = $derived(properties.spawnFormat === SpawnFormat.SpawnsSeparate);
-  const rows = $derived(
-    stats
-      ? [
-          ["Tiles", stats.tiles],
-          ["Items", stats.items + stats.containerItems],
-          ["Walkable", stats.walkable],
-          ["Protection zone", stats.pz],
-          ["Houses", stats.houses],
-          ["House tiles", stats.houseTiles],
-          ["Spawns", stats.spawns],
-          ["Monsters", stats.monsters],
-          ["NPCs", stats.npcs],
-          ["Teleports", stats.teleports],
-          ["Action ids", stats.actionIds],
-          ["Unique ids", stats.uniqueIds],
-        ]
-      : [],
-  );
+	const separate = $derived(properties.spawnFormat === SpawnFormat.SpawnsSeparate);
+	const rows = $derived(
+		stats
+			? [
+					["Tiles", stats.tiles],
+					["Items", stats.items + stats.containerItems],
+					["Walkable", stats.walkable],
+					["Protection zone", stats.pz],
+					["Houses", stats.houses],
+					["House tiles", stats.houseTiles],
+					["Spawns", stats.spawns],
+					["Monsters", stats.monsters],
+					["NPCs", stats.npcs],
+					["Teleports", stats.teleports],
+					["Action ids", stats.actionIds],
+					["Unique ids", stats.uniqueIds],
+				]
+			: [],
+	);
 </script>
 
 <div class="m-form">
-  <label class="col"><span class="t-label">Description</span><textarea class="t-input text" value={properties.description} placeholder="Shown to players by some servers" onchange={(event) => set({ description: event.currentTarget.value })}></textarea></label>
-  <div class="m-field">
-    <span class="m-lbl">Spawns</span>
-    <Select grow value={properties.spawnFormat} options={[{ value: SpawnFormat.SpawnsSingle, label: "One file (monsters and NPCs)" }, { value: SpawnFormat.SpawnsSeparate, label: "Separate monster and NPC files" }]} onchange={(value) => set({ spawnFormat: value })} />
-  </div>
-  <div class="m-field">
-    <span class="m-lbl">Size</span>
-    <NumberField value={properties.width} min={1} max={65535} width={64} onchange={(value) => set({ width: value })} /><span>×</span><NumberField value={properties.height} min={1} max={65535} width={64} onchange={(value) => set({ height: value })} />
-  </div>
+	<label class="col"
+		><span class="t-label">Description</span><textarea
+			class="t-input text"
+			value={properties.description}
+			placeholder="Shown to players by some servers"
+			onchange={(event) => set({ description: event.currentTarget.value })}></textarea></label
+	>
+	<div class="m-field">
+		<span class="m-lbl">Spawns</span>
+		<Select
+			grow
+			value={properties.spawnFormat}
+			options={[
+				{ value: SpawnFormat.SpawnsSingle, label: "One file (monsters and NPCs)" },
+				{ value: SpawnFormat.SpawnsSeparate, label: "Separate monster and NPC files" },
+			]}
+			onchange={(value) => set({ spawnFormat: value })}
+		/>
+	</div>
+	<div class="m-field">
+		<span class="m-lbl">Size</span>
+		<NumberField
+			value={properties.width}
+			min={1}
+			max={65535}
+			width={64}
+			onchange={(value) => set({ width: value })}
+		/><span>×</span><NumberField
+			value={properties.height}
+			min={1}
+			max={65535}
+			width={64}
+			onchange={(value) => set({ height: value })}
+		/>
+	</div>
 
-  <details class="files">
-    <summary class="t-label">Files saved with the map</summary>
-    <div class="m-form inner">
-      {#if !/\.otmap$/i.test(info.name)}
-      <div class="m-field"><span class="m-lbl">Houses</span><input class="t-input" value={properties.houseFile} placeholder="{info.name.replace(/\.otbm$/i, '')}-house.xml" onchange={(event) => set({ houseFile: event.currentTarget.value })} /></div>
-      <div class="m-field"><span class="m-lbl">{separate ? "Monsters" : "Spawns"}</span><input class="t-input" value={properties.spawnFile} placeholder="{info.name.replace(/\.otbm$/i, '')}-{separate ? 'monster' : 'spawn'}.xml" onchange={(event) => set({ spawnFile: event.currentTarget.value })} /></div>
-      {#if separate}<div class="m-field"><span class="m-lbl">NPCs</span><input class="t-input" value={properties.npcFile} placeholder="{info.name.replace(/\.otbm$/i, '')}-npc.xml" onchange={(event) => set({ npcFile: event.currentTarget.value })} /></div>{/if}
-      <div class="m-field"><span class="m-lbl">Zones</span><input class="t-input" value={properties.zoneFile} placeholder="{info.name.replace(/\.otbm$/i, '')}-zones.xml" onchange={(event) => set({ zoneFile: event.currentTarget.value })} /></div>
-      {/if}
-      <div class="t-label path">{info.path || "Not saved yet"}</div>
-    </div>
-  </details>
+	<details class="files">
+		<summary class="t-label">Files saved with the map</summary>
+		<div class="m-form inner">
+			{#if !/\.otmap$/i.test(info.name)}
+				<div class="m-field">
+					<span class="m-lbl">Houses</span><input
+						class="t-input"
+						value={properties.houseFile}
+						placeholder="{info.name.replace(/\.otbm$/i, '')}-house.xml"
+						onchange={(event) => set({ houseFile: event.currentTarget.value })}
+					/>
+				</div>
+				<div class="m-field">
+					<span class="m-lbl">{separate ? "Monsters" : "Spawns"}</span><input
+						class="t-input"
+						value={properties.spawnFile}
+						placeholder="{info.name.replace(/\.otbm$/i, '')}-{separate ? 'monster' : 'spawn'}.xml"
+						onchange={(event) => set({ spawnFile: event.currentTarget.value })}
+					/>
+				</div>
+				{#if separate}<div class="m-field">
+						<span class="m-lbl">NPCs</span><input
+							class="t-input"
+							value={properties.npcFile}
+							placeholder="{info.name.replace(/\.otbm$/i, '')}-npc.xml"
+							onchange={(event) => set({ npcFile: event.currentTarget.value })}
+						/>
+					</div>{/if}
+				<div class="m-field">
+					<span class="m-lbl">Zones</span><input
+						class="t-input"
+						value={properties.zoneFile}
+						placeholder="{info.name.replace(/\.otbm$/i, '')}-zones.xml"
+						onchange={(event) => set({ zoneFile: event.currentTarget.value })}
+					/>
+				</div>
+			{/if}
+			<div class="t-label path">{info.path || "Not saved yet"}</div>
+		</div>
+	</details>
 
-  <div class="m-sect">
-    On the map <span class="grow"></span>
-    <button class="t-icon-btn" title={statsRev === info.rev ? "Up to date" : "Count again"} disabled={counting} onclick={count}><Icon name="refresh" /></button>
-  </div>
-  {#if error}
-    <p class="warn">{error}</p>
-  {:else if stats}
-    <div class="stats" class:stale={statsRev !== info.rev}>
-      {#each rows as [k, v]}
-        <span class="k">{k}</span><span class="v">{Number(v).toLocaleString()}</span>
-      {/each}
-    </div>
-  {:else}
-    <p class="t-label">Counting…</p>
-  {/if}
+	<div class="m-sect">
+		On the map <span class="grow"></span>
+		<button
+			class="t-icon-btn"
+			title={statsRev === info.rev ? "Up to date" : "Count again"}
+			disabled={counting}
+			onclick={count}><Icon name="refresh" /></button
+		>
+	</div>
+	{#if error}
+		<p class="warn">{error}</p>
+	{:else if stats}
+		<div class="stats" class:stale={statsRev !== info.rev}>
+			{#each rows as [k, v]}
+				<span class="k">{k}</span><span class="v">{Number(v).toLocaleString()}</span>
+			{/each}
+		</div>
+	{:else}
+		<p class="t-label">Counting…</p>
+	{/if}
 
-  <div class="acts">
-    <button class="t-btn" onclick={() => (map.dialog = "tools")}><Icon name="tools" /> Map tools…</button>
-    <button class="t-btn" onclick={() => (map.dialog = "import")}>Import a map…</button>
-  </div>
+	<div class="acts">
+		<button class="t-btn" onclick={() => (map.dialog = "tools")}><Icon name="tools" /> Map tools…</button>
+		<button class="t-btn" onclick={() => (map.dialog = "import")}>Import a map…</button>
+	</div>
 </div>
 
 <style>
-  .col {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .text {
-    height: 44px;
-    resize: vertical;
-    font-weight: normal;
-    padding: 3px;
-  }
-  .warn {
-    margin: 0;
-    color: var(--gold);
-    font-size: 12px;
-  }
-  .files summary {
-    cursor: pointer;
-    padding: 2px 0;
-  }
-  .inner {
-    padding: 4px 0 2px;
-  }
-  .path {
-    font-size: 11px;
-    word-break: break-all;
-  }
-  .stats {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr auto;
-    gap: 1px 8px;
-    font-size: 12px;
-  }
-  .stats.stale .v {
-    color: var(--text-dim);
-  }
-  .k {
-    color: var(--text-dim);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .v {
-    text-align: right;
-    color: var(--text-bright);
-  }
-  .acts {
-    display: flex;
-    gap: 3px;
-    flex-wrap: wrap;
-    margin-top: 4px;
-  }
-  .acts .t-btn {
-    min-width: 0;
-    padding: 0 8px;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
+	.col {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.text {
+		height: 44px;
+		resize: vertical;
+		font-weight: normal;
+		padding: 3px;
+	}
+	.warn {
+		margin: 0;
+		color: var(--gold);
+		font-size: 12px;
+	}
+	.files summary {
+		cursor: pointer;
+		padding: 2px 0;
+	}
+	.inner {
+		padding: 4px 0 2px;
+	}
+	.path {
+		font-size: 11px;
+		word-break: break-all;
+	}
+	.stats {
+		display: grid;
+		grid-template-columns: 1fr auto 1fr auto;
+		gap: 1px 8px;
+		font-size: 12px;
+	}
+	.stats.stale .v {
+		color: var(--text-dim);
+	}
+	.k {
+		color: var(--text-dim);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.v {
+		text-align: right;
+		color: var(--text-bright);
+	}
+	.acts {
+		display: flex;
+		gap: 3px;
+		flex-wrap: wrap;
+		margin-top: 4px;
+	}
+	.acts .t-btn {
+		min-width: 0;
+		padding: 0 8px;
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+	}
 </style>

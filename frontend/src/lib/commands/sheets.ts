@@ -3,17 +3,17 @@ import { app, applyDraft, run, toast, versions } from "../state/app.svelte";
 import { IMAGE_FILTERS, guard, imageFilters } from "./shared";
 
 async function importSheetWith(load: (id: number) => Promise<void>): Promise<void> {
-  if (!guard() || app.focused === null) return;
-  if (app.dirty) {
-    await applyDraft();
-    if (app.dirty) return; // the edit was rejected
-  }
-  const id = app.focused;
-  const ok = await run("Importing", async () => {
-    await load(id);
-    return true;
-  });
-  if (ok) toast("Sprite sheet imported.", "success");
+	if (!guard() || app.focused === null) return;
+	if (app.dirty) {
+		await applyDraft();
+		if (app.dirty) return; // the edit was rejected
+	}
+	const id = app.focused;
+	const ok = await run("Importing", async () => {
+		await load(id);
+		return true;
+	});
+	if (ok) toast("Sprite sheet imported.", "success");
 }
 
 /** Selects every frame group in one sheet: idle then walking frames (needs
@@ -21,67 +21,67 @@ async function importSheetWith(load: (id: number) => Promise<void>): Promise<voi
 export const ALL_GROUPS = -1;
 
 export const sheetCommands = {
-  exportSheet(group = 0) {
-    if (!guard() || app.focused === null) return;
-    app.sheetGroup = group;
-    app.dialog = "sheet";
-  },
+	exportSheet(group = 0) {
+		if (!guard() || app.focused === null) return;
+		app.sheetGroup = group;
+		app.dialog = "sheet";
+	},
 
-  async saveSheet(group: number, format: string, transparent: boolean): Promise<boolean> {
-    if (!guard() || app.focused === null) return false;
-    const name = `${CATEGORY_NAMES[app.category]}_${app.focused}.${format}`;
-    const path = await DialogService.SaveFile("exportSheet", "Export sprite sheet", name, imageFilters(format));
-    if (!path) return false;
-    const ok = await run("Exporting", async () => {
-      await ThingService.ExportSheet(app.category, app.focused!, group, path, transparent && format === "png");
-      return true;
-    });
-    if (ok) toast(`Sprite sheet saved to ${path}.`, "success");
-    return !!ok;
-  },
+	async saveSheet(group: number, format: string, transparent: boolean): Promise<boolean> {
+		if (!guard() || app.focused === null) return false;
+		const name = `${CATEGORY_NAMES[app.category]}_${app.focused}.${format}`;
+		const path = await DialogService.SaveFile("exportSheet", "Export sprite sheet", name, imageFilters(format));
+		if (!path) return false;
+		const ok = await run("Exporting", async () => {
+			await ThingService.ExportSheet(app.category, app.focused!, group, path, transparent && format === "png");
+			return true;
+		});
+		if (ok) toast(`Sprite sheet saved to ${path}.`, "success");
+		return !!ok;
+	},
 
-  async importSheet(group = 0) {
-    if (!guard() || app.focused === null) return;
-    const paths = await DialogService.OpenFiles("importSheet", "Import sprite sheet", IMAGE_FILTERS, false);
-    if (paths?.length) await sheetCommands.loadSheet(paths[0], group);
-  },
+	async importSheet(group = 0) {
+		if (!guard() || app.focused === null) return;
+		const paths = await DialogService.OpenFiles("importSheet", "Import sprite sheet", IMAGE_FILTERS, false);
+		if (paths?.length) await sheetCommands.loadSheet(paths[0], group);
+	},
 
-  /** Puts a sheet image into the focused object. A sheet with the size of
-   * the group's layout (the edited one: unapplied changes are applied
-   * first, like ObjectBuilder) fills it; any other sheet sets the layout
-   * from the image. */
-  async loadSheet(path: string, group = 0) {
-    await importSheetWith((id) => ThingService.ImportSheet(app.category, id, group, path));
-  },
+	/** Puts a sheet image into the focused object. A sheet with the size of
+	 * the group's layout (the edited one: unapplied changes are applied
+	 * first, like ObjectBuilder) fills it; any other sheet sets the layout
+	 * from the image. */
+	async loadSheet(path: string, group = 0) {
+		await importSheetWith((id) => ThingService.ImportSheet(app.category, id, group, path));
+	},
 
-  async pasteSheet(data: Uint8Array, group = 0) {
-    await importSheetWith((id) => ThingService.PasteSheet(app.category, id, group, encodeBytes(data)));
-  },
+	async pasteSheet(data: Uint8Array, group = 0) {
+		await importSheetWith((id) => ThingService.PasteSheet(app.category, id, group, encodeBytes(data)));
+	},
 
-  /** Copies the sheet of the whole object (every frame group); when the
-   * groups have different layouts, only the idle group. */
-  async copySheet() {
-    if (!guard() || app.focused === null) return;
-    const category = app.category;
-    const id = app.focused;
-    const fetchSheet = (group: number) => fetch(res.sheet(category, id, group, true, versions.thing(category, id)));
-    try {
-      let whole = true;
-      let response = await fetchSheet(ALL_GROUPS);
-      if (!response.ok) {
-        whole = false;
-        response = await fetchSheet(0);
-      }
-      if (!response.ok) throw new Error((await response.text()) || response.statusText);
-      const blob = await response.blob();
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-      toast(
-        whole
-          ? `Copied the sprite sheet of ${CATEGORY_NAMES[category]} #${id}.`
-          : `Copied the idle frames of ${CATEGORY_NAMES[category]} #${id}: its walking frames have another layout.`,
-      );
-    } catch (err) {
-      toast(errorMessage(err), "error");
-    }
-  },
+	/** Copies the sheet of the whole object (every frame group); when the
+	 * groups have different layouts, only the idle group. */
+	async copySheet() {
+		if (!guard() || app.focused === null) return;
+		const category = app.category;
+		const id = app.focused;
+		const fetchSheet = (group: number) => fetch(res.sheet(category, id, group, true, versions.thing(category, id)));
+		try {
+			let whole = true;
+			let response = await fetchSheet(ALL_GROUPS);
+			if (!response.ok) {
+				whole = false;
+				response = await fetchSheet(0);
+			}
+			if (!response.ok) throw new Error((await response.text()) || response.statusText);
+			const blob = await response.blob();
+			await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+			toast(
+				whole
+					? `Copied the sprite sheet of ${CATEGORY_NAMES[category]} #${id}.`
+					: `Copied the idle frames of ${CATEGORY_NAMES[category]} #${id}: its walking frames have another layout.`,
+			);
+		} catch (err) {
+			toast(errorMessage(err), "error");
+		}
+	},
 };

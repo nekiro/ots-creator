@@ -11,30 +11,30 @@ const FALLBACK_DURATION = 100;
 export type LayoutKey = keyof Layout | "exactSize";
 
 export function syncDurations(group: FrameGroup, category: number): void {
-  if (group.frames <= 1) {
-    group.durations = [];
-    return;
-  }
-  const duration = DEFAULT_DURATION[category] ?? FALLBACK_DURATION;
-  const list = [...(group.durations ?? [])];
-  while (list.length < group.frames) list.push({ min: duration, max: duration });
-  group.durations = list.slice(0, group.frames);
-  if (group.startFrame >= group.frames) group.startFrame = 0;
+	if (group.frames <= 1) {
+		group.durations = [];
+		return;
+	}
+	const duration = DEFAULT_DURATION[category] ?? FALLBACK_DURATION;
+	const list = [...(group.durations ?? [])];
+	while (list.length < group.frames) list.push({ min: duration, max: duration });
+	group.durations = list.slice(0, group.frames);
+	if (group.startFrame >= group.frames) group.startFrame = 0;
 }
 
 export function setAllDurations(group: FrameGroup, min: number, max: number): void {
-  if (!group.durations) return;
-  group.durations = group.durations.map(() => ({ min, max: Math.max(min, max) }));
+	if (!group.durations) return;
+	group.durations = group.durations.map(() => ({ min, max: Math.max(min, max) }));
 }
 
 export function setLayout(group: FrameGroup, key: LayoutKey, value: number, category: number): void {
-  if (key === "exactSize") {
-    group.exactSize = value;
-    return;
-  }
-  const old: Layout = { ...group };
-  const next: Layout = { ...old, [key]: value };
-  group.sprites = resizeSprites(old, group.sprites, next);
-  (group as unknown as Record<string, number>)[key] = value;
-  if (key === "frames") syncDurations(group, category);
+	if (key === "exactSize") {
+		group.exactSize = value;
+		return;
+	}
+	const old: Layout = { ...group };
+	const next: Layout = { ...old, [key]: value };
+	group.sprites = resizeSprites(old, group.sprites, next);
+	(group as unknown as Record<string, number>)[key] = value;
+	if (key === "frames") syncDurations(group, category);
 }

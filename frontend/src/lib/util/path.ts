@@ -1,7 +1,7 @@
 export function basename(path: string): string {
-  return path.replace(/^.*[\\/]/, "");
+	return path.replace(/^.*[\\/]/, "");
 }
 
 export function dirname(path: string): string {
-  return path.replace(/[\\/][^\\/]*$/, "");
+	return path.replace(/[\\/][^\\/]*$/, "");
 }

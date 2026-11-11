@@ -8,352 +8,309 @@ export type MarketSection = string;
 export type MarketSort = "new" | "old" | "name";
 
 export interface MarketFilter {
-  section: MarketSection;
-  tags: string[];
-  query: string;
-  sort: MarketSort;
-  /** Only entries with this sprite size (0 = any). */
-  spriteSize: number;
+	section: MarketSection;
+	tags: string[];
+	query: string;
+	sort: MarketSort;
+	/** Only entries with this sprite size (0 = any). */
+	spriteSize: number;
 }
 
 export const LICENSES = [
-  { value: "CC0-1.0", label: "CC0 (public domain)" },
-  { value: "CC-BY-4.0", label: "CC BY 4.0 (credit me)" },
-  { value: "CC-BY-SA-4.0", label: "CC BY-SA 4.0 (credit, share alike)" },
-  { value: "OTS-free", label: "Free for OT servers" },
+	{ value: "CC0-1.0", label: "CC0 (public domain)" },
+	{ value: "CC-BY-4.0", label: "CC BY 4.0 (credit me)" },
+	{ value: "CC-BY-SA-4.0", label: "CC BY-SA 4.0 (credit, share alike)" },
+	{ value: "OTS-free", label: "Free for OT servers" },
 ];
 
 export function licenseLabel(value: string): string {
-  return LICENSES.find((license) => license.value === value)?.label ?? value;
+	return LICENSES.find((license) => license.value === value)?.label ?? value;
 }
 
 export type TagKind = "item" | "outfit" | "effect" | "missile" | "sprites";
 
 export interface TagGroup {
-  label: string;
-  tags: string[];
+	label: string;
+	tags: string[];
 }
 
 // Curated tags in Tibia terms (bestiary classes, market categories, damage
 // types, cities), so entries are described the same way. Authors can still
 // add their own.
-const ROLE = [
-  "monster",
-  "boss",
-  "npc",
-  "player",
-  "addon",
-  "mount",
-  "familiar",
-  "summon",
-];
+const ROLE = ["monster", "boss", "npc", "player", "addon", "mount", "familiar", "summon"];
 const CLASS = [
-  "amphibic",
-  "aquatic",
-  "bird",
-  "construct",
-  "demon",
-  "dragon",
-  "elemental",
-  "extra-dimensional",
-  "fey",
-  "giant",
-  "human",
-  "humanoid",
-  "lycanthrope",
-  "magical",
-  "mammal",
-  "plant",
-  "reptile",
-  "slime",
-  "undead",
-  "vermin",
+	"amphibic",
+	"aquatic",
+	"bird",
+	"construct",
+	"demon",
+	"dragon",
+	"elemental",
+	"extra-dimensional",
+	"fey",
+	"giant",
+	"human",
+	"humanoid",
+	"lycanthrope",
+	"magical",
+	"mammal",
+	"plant",
+	"reptile",
+	"slime",
+	"undead",
+	"vermin",
 ];
 // Item groups follow items.xml: slotType / weaponType (equipment), type
 // and fluidSource (usable), house items and map pieces (floorchange,
 // magic fields, the most common words of item names).
 const EQUIPMENT = [
-  "helmet",
-  "armor",
-  "legs",
-  "boots",
-  "shield",
-  "spellbook",
-  "quiver",
-  "amulet",
-  "ring",
-  "backpack",
-  "sword",
-  "axe",
-  "club",
-  "two-handed",
-  "bow",
-  "crossbow",
-  "distance",
-  "ammunition",
-  "wand",
-  "rod",
+	"helmet",
+	"armor",
+	"legs",
+	"boots",
+	"shield",
+	"spellbook",
+	"quiver",
+	"amulet",
+	"ring",
+	"backpack",
+	"sword",
+	"axe",
+	"club",
+	"two-handed",
+	"bow",
+	"crossbow",
+	"distance",
+	"ammunition",
+	"wand",
+	"rod",
 ];
 const USABLE = [
-  "rune",
-  "potion",
-  "fluid",
-  "food",
-  "key",
-  "container",
-  "chest",
-  "book",
-  "tool",
-  "valuable",
-  "creature-product",
-  "trophy",
-  "quest",
-  "decoration",
+	"rune",
+	"potion",
+	"fluid",
+	"food",
+	"key",
+	"container",
+	"chest",
+	"book",
+	"tool",
+	"valuable",
+	"creature-product",
+	"trophy",
+	"quest",
+	"decoration",
 ];
 const HOUSE = [
-  "door",
-  "bed",
-  "furniture",
-  "chair",
-  "table",
-  "carpet",
-  "tapestry",
-  "window",
-  "lamp",
-  "sign",
-  "mailbox",
-  "depot",
-  "trash",
+	"door",
+	"bed",
+	"furniture",
+	"chair",
+	"table",
+	"carpet",
+	"tapestry",
+	"window",
+	"lamp",
+	"sign",
+	"mailbox",
+	"depot",
+	"trash",
 ];
 const MAP = [
-  "ground",
-  "border",
-  "wall",
-  "roof",
-  "railing",
-  "archway",
-  "gate",
-  "palisade",
-  "stairs",
-  "ramp",
-  "ladder",
-  "hole",
-  "teleport",
-  "magic-field",
-  "tree",
-  "bush",
-  "plant",
-  "rock",
-  "mountain",
-  "water",
-  "lava",
-  "swamp",
-  "snow",
-  "sand",
-  "grass",
-  "corpse",
-  "bones",
-  "debris",
-  "statue",
-  "ship",
+	"ground",
+	"border",
+	"wall",
+	"roof",
+	"railing",
+	"archway",
+	"gate",
+	"palisade",
+	"stairs",
+	"ramp",
+	"ladder",
+	"hole",
+	"teleport",
+	"magic-field",
+	"tree",
+	"bush",
+	"plant",
+	"rock",
+	"mountain",
+	"water",
+	"lava",
+	"swamp",
+	"snow",
+	"sand",
+	"grass",
+	"corpse",
+	"bones",
+	"debris",
+	"statue",
+	"ship",
 ];
 const STYLE = [
-  "wooden",
-  "stone",
-  "sandstone",
-  "marble",
-  "gold",
-  "frozen",
-  "elven",
-  "dwarven",
-  "orcish",
-  "oriental",
-  "bamboo",
-  "jungle",
-  "desert",
-  "nordic",
-  "demonic",
-  "holy-place",
+	"wooden",
+	"stone",
+	"sandstone",
+	"marble",
+	"gold",
+	"frozen",
+	"elven",
+	"dwarven",
+	"orcish",
+	"oriental",
+	"bamboo",
+	"jungle",
+	"desert",
+	"nordic",
+	"demonic",
+	"holy-place",
 ];
 const EFFECT = [
-  "hit",
-  "block",
-  "blood",
-  "puff",
-  "explosion",
-  "area",
-  "wave",
-  "beam",
-  "strike",
-  "aura",
-  "rings",
-  "sparkles",
-  "bubbles",
-  "sound",
-  "teleport",
-  "healing",
+	"hit",
+	"block",
+	"blood",
+	"puff",
+	"explosion",
+	"area",
+	"wave",
+	"beam",
+	"strike",
+	"aura",
+	"rings",
+	"sparkles",
+	"bubbles",
+	"sound",
+	"teleport",
+	"healing",
 ];
-const MISSILE = [
-  "arrow",
-  "bolt",
-  "spear",
-  "star",
-  "knife",
-  "stone",
-  "snowball",
-  "rune",
-  "spell",
-];
+const MISSILE = ["arrow", "bolt", "spear", "star", "knife", "stone", "snowball", "rune", "spell"];
 const SPRITE = ["creature", "item", "effect", "interface"];
-const ELEMENT = [
-  "physical",
-  "fire",
-  "ice",
-  "energy",
-  "earth",
-  "death",
-  "holy",
-  "drown",
-  "lifedrain",
-  "manadrain",
-];
+const ELEMENT = ["physical", "fire", "ice", "energy", "earth", "death", "holy", "drown", "lifedrain", "manadrain"];
 const REGION = [
-  "rookgaard",
-  "thais",
-  "carlin",
-  "venore",
-  "abdendriel",
-  "kazordoon",
-  "edron",
-  "darashia",
-  "ankrahmun",
-  "port-hope",
-  "liberty-bay",
-  "svargrond",
-  "yalahar",
-  "zao",
-  "farmine",
-  "roshamuul",
-  "oramond",
-  "feyrist",
-  "issavi",
+	"rookgaard",
+	"thais",
+	"carlin",
+	"venore",
+	"abdendriel",
+	"kazordoon",
+	"edron",
+	"darashia",
+	"ankrahmun",
+	"port-hope",
+	"liberty-bay",
+	"svargrond",
+	"yalahar",
+	"zao",
+	"farmine",
+	"roshamuul",
+	"oramond",
+	"feyrist",
+	"issavi",
 ];
 const ORIGIN = ["custom", "edited", "remake", "animated", "oldschool", "event"];
 
 const GROUPS: Record<TagKind, TagGroup[]> = {
-  outfit: [
-    { label: "Role", tags: ROLE },
-    { label: "Class", tags: CLASS },
-    { label: "Element", tags: ELEMENT },
-    { label: "Region", tags: REGION },
-    { label: "Origin", tags: ORIGIN },
-  ],
-  item: [
-    { label: "Equip", tags: EQUIPMENT },
-    { label: "Usable", tags: USABLE },
-    { label: "House", tags: HOUSE },
-    { label: "Map", tags: MAP },
-    { label: "Style", tags: STYLE },
-    { label: "Element", tags: ELEMENT },
-    { label: "Region", tags: REGION },
-    { label: "Origin", tags: ORIGIN },
-  ],
-  effect: [
-    { label: "Effect", tags: EFFECT },
-    { label: "Element", tags: ELEMENT },
-    { label: "Origin", tags: ORIGIN },
-  ],
-  missile: [
-    { label: "Missile", tags: MISSILE },
-    { label: "Element", tags: ELEMENT },
-    { label: "Origin", tags: ORIGIN },
-  ],
-  sprites: [
-    { label: "Type", tags: SPRITE },
-    { label: "Map", tags: MAP },
-    { label: "House", tags: HOUSE },
-    { label: "Style", tags: STYLE },
-    { label: "Region", tags: REGION },
-    { label: "Origin", tags: ORIGIN },
-  ],
+	outfit: [
+		{ label: "Role", tags: ROLE },
+		{ label: "Class", tags: CLASS },
+		{ label: "Element", tags: ELEMENT },
+		{ label: "Region", tags: REGION },
+		{ label: "Origin", tags: ORIGIN },
+	],
+	item: [
+		{ label: "Equip", tags: EQUIPMENT },
+		{ label: "Usable", tags: USABLE },
+		{ label: "House", tags: HOUSE },
+		{ label: "Map", tags: MAP },
+		{ label: "Style", tags: STYLE },
+		{ label: "Element", tags: ELEMENT },
+		{ label: "Region", tags: REGION },
+		{ label: "Origin", tags: ORIGIN },
+	],
+	effect: [
+		{ label: "Effect", tags: EFFECT },
+		{ label: "Element", tags: ELEMENT },
+		{ label: "Origin", tags: ORIGIN },
+	],
+	missile: [
+		{ label: "Missile", tags: MISSILE },
+		{ label: "Element", tags: ELEMENT },
+		{ label: "Origin", tags: ORIGIN },
+	],
+	sprites: [
+		{ label: "Type", tags: SPRITE },
+		{ label: "Map", tags: MAP },
+		{ label: "House", tags: HOUSE },
+		{ label: "Style", tags: STYLE },
+		{ label: "Region", tags: REGION },
+		{ label: "Origin", tags: ORIGIN },
+	],
 };
 
 export function tagGroups(kind: TagKind): TagGroup[] {
-  return GROUPS[kind];
+	return GROUPS[kind];
 }
 
 export const MAX_TAGS = 8;
 
 /** The section of an entry: "sprites" for packs, else its category. */
 export const sectionOf = (entry: MarketEntry): string =>
-  entry.kind === "sprites" ? "sprites" : (entry.category ?? "");
+	entry.kind === "sprites" ? "sprites" : (entry.category ?? "");
 
 function matches(entry: MarketEntry, words: string[]): boolean {
-  if (words.length === 0) return true;
-  const text = [entry.name, entry.description ?? "", entry.author, ...(entry.tags ?? [])]
-    .join(" ")
-    .toLowerCase();
-  return words.every((word) => text.includes(word));
+	if (words.length === 0) return true;
+	const text = [entry.name, entry.description ?? "", entry.author, ...(entry.tags ?? [])].join(" ").toLowerCase();
+	return words.every((word) => text.includes(word));
 }
 
-export function filterEntries(
-  entries: MarketEntry[],
-  filter: MarketFilter,
-): MarketEntry[] {
-  const words = filter.query.toLowerCase().split(/\s+/).filter(Boolean);
-  const out = entries.filter(
-    (entry) =>
-      (filter.section === "all" || sectionOf(entry) === filter.section) &&
-      (filter.spriteSize === 0 || !entry.spriteSize || entry.spriteSize === filter.spriteSize) &&
-      filter.tags.every((tag) => entry.tags?.includes(tag)) &&
-      matches(entry, words),
-  );
-  const byName = (first: MarketEntry, second: MarketEntry) =>
-    first.name.localeCompare(second.name, undefined, {
-      sensitivity: "base",
-      numeric: true,
-    });
-  switch (filter.sort) {
-    case "name":
-      return out.sort(byName);
-    case "old":
-      return out.sort(
-        (first, second) => first.created.localeCompare(second.created) || byName(first, second),
-      );
-    default:
-      return out.sort(
-        (first, second) => second.created.localeCompare(first.created) || byName(first, second),
-      );
-  }
+export function filterEntries(entries: MarketEntry[], filter: MarketFilter): MarketEntry[] {
+	const words = filter.query.toLowerCase().split(/\s+/).filter(Boolean);
+	const out = entries.filter(
+		(entry) =>
+			(filter.section === "all" || sectionOf(entry) === filter.section) &&
+			(filter.spriteSize === 0 || !entry.spriteSize || entry.spriteSize === filter.spriteSize) &&
+			filter.tags.every((tag) => entry.tags?.includes(tag)) &&
+			matches(entry, words),
+	);
+	const byName = (first: MarketEntry, second: MarketEntry) =>
+		first.name.localeCompare(second.name, undefined, {
+			sensitivity: "base",
+			numeric: true,
+		});
+	switch (filter.sort) {
+		case "name":
+			return out.sort(byName);
+		case "old":
+			return out.sort((first, second) => first.created.localeCompare(second.created) || byName(first, second));
+		default:
+			return out.sort((first, second) => second.created.localeCompare(first.created) || byName(first, second));
+	}
 }
 
 export function sectionCounts(entries: MarketEntry[]): Record<string, number> {
-  const out: Record<string, number> = { all: entries.length };
-  for (const entry of entries) out[sectionOf(entry)] = (out[sectionOf(entry)] ?? 0) + 1;
-  return out;
+	const out: Record<string, number> = { all: entries.length };
+	for (const entry of entries) out[sectionOf(entry)] = (out[sectionOf(entry)] ?? 0) + 1;
+	return out;
 }
 
-export function topTags(
-  entries: MarketEntry[],
-  limit = 24,
-): { tag: string; count: number }[] {
-  const counts = new Map<string, number>();
-  for (const entry of entries)
-    for (const tag of entry.tags ?? []) counts.set(tag, (counts.get(tag) ?? 0) + 1);
-  return [...counts]
-    .map(([tag, count]) => ({ tag, count }))
-    .sort((first, second) => second.count - first.count || first.tag.localeCompare(second.tag))
-    .slice(0, limit);
+export function topTags(entries: MarketEntry[], limit = 24): { tag: string; count: number }[] {
+	const counts = new Map<string, number>();
+	for (const entry of entries) for (const tag of entry.tags ?? []) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+	return [...counts]
+		.map(([tag, count]) => ({ tag, count }))
+		.sort((first, second) => second.count - first.count || first.tag.localeCompare(second.tag))
+		.slice(0, limit);
 }
 
 /** Splits a typed tag list ("Big rat, sewer") like the Go side does. */
 export function parseTags(text: string): string[] {
-  const out: string[] = [];
-  for (const raw of text.split(",")) {
-    const tag = raw.trim().toLowerCase().split(/\s+/).filter(Boolean).join("-");
-    if (tag && !out.includes(tag)) out.push(tag);
-  }
-  return out;
+	const out: string[] = [];
+	for (const raw of text.split(",")) {
+		const tag = raw.trim().toLowerCase().split(/\s+/).filter(Boolean).join("-");
+		if (tag && !out.includes(tag)) out.push(tag);
+	}
+	return out;
 }
 
 /**
@@ -361,50 +318,42 @@ export function parseTags(text: string): string[] {
  * between 1 and max. At most limit ids are returned.
  */
 export function parseIds(text: string, max: number, limit = 1024): number[] {
-  const out = new Set<number>();
-  for (const part of text.split(/[\s,;]+/)) {
-    const match = part.match(/^(\d+)(?:-(\d+))?$/);
-    if (!match) continue;
-    let [from, to] = [+match[1], +(match[2] ?? match[1])];
-    if (from > to) [from, to] = [to, from];
-    for (
-      let id = Math.max(from, 1);
-      id <= Math.min(to, max) && out.size < limit;
-      id++
-    )
-      out.add(id);
-  }
-  return [...out].sort((first, second) => first - second);
+	const out = new Set<number>();
+	for (const part of text.split(/[\s,;]+/)) {
+		const match = part.match(/^(\d+)(?:-(\d+))?$/);
+		if (!match) continue;
+		let [from, to] = [+match[1], +(match[2] ?? match[1])];
+		if (from > to) [from, to] = [to, from];
+		for (let id = Math.max(from, 1); id <= Math.min(to, max) && out.size < limit; id++) out.add(id);
+	}
+	return [...out].sort((first, second) => first - second);
 }
 
 export function formatIds(ids: number[]): string {
-  const parts: string[] = [];
-  for (let i = 0; i < ids.length;) {
-    let j = i;
-    while (j + 1 < ids.length && ids[j + 1] === ids[j] + 1) j++;
-    parts.push(j > i ? `${ids[i]}-${ids[j]}` : `${ids[i]}`);
-    i = j + 1;
-  }
-  return parts.join(", ");
+	const parts: string[] = [];
+	for (let i = 0; i < ids.length;) {
+		let j = i;
+		while (j + 1 < ids.length && ids[j + 1] === ids[j] + 1) j++;
+		parts.push(j > i ? `${ids[i]}-${ids[j]}` : `${ids[i]}`);
+		i = j + 1;
+	}
+	return parts.join(", ");
 }
 
 export function tagProblem(tags: string[]): string {
-  if (tags.length > 8) return "At most 8 tags.";
-  const bad = tags.find(
-    (tag) => tag.length > 24 || !/^[a-z0-9][a-z0-9-]*$/.test(tag),
-  );
-  return bad
-    ? `Tag "${bad}": letters, digits and dashes only, at most 24.`
-    : "";
+	if (tags.length > 8) return "At most 8 tags.";
+	const bad = tags.find((tag) => tag.length > 24 || !/^[a-z0-9][a-z0-9-]*$/.test(tag));
+	return bad ? `Tag "${bad}": letters, digits and dashes only, at most 24.` : "";
 }
 
 export interface TagOption {
-  tag: string;
-  group?: string;
-  count?: number;
+	tag: string;
+	group?: string;
+	count?: number;
 }
 
-export const groupOptions = (groups: TagGroup[]): TagOption[] => groups.flatMap((group) => group.tags.map((tag) => ({ tag, group: group.label })));
+export const groupOptions = (groups: TagGroup[]): TagOption[] =>
+	groups.flatMap((group) => group.tags.map((tag) => ({ tag, group: group.label })));
 
 /**
  * Options matching a typed query, without the picked ones: tags starting
@@ -412,10 +361,14 @@ export const groupOptions = (groups: TagGroup[]): TagOption[] => groups.flatMap(
  * An empty query lists everything.
  */
 export function matchTags(options: TagOption[], query: string, picked: string[], limit = 200): TagOption[] {
-  const typed = query.trim().toLowerCase().replace(/\s+/g, "-");
-  const free = options.filter((option) => !picked.includes(option.tag));
-  if (!typed) return free.slice(0, limit);
-  const starts = free.filter((option) => option.tag.startsWith(typed));
-  const contains = free.filter((option) => !option.tag.startsWith(typed) && (option.tag.includes(typed) || (option.group ?? "").toLowerCase().startsWith(typed)));
-  return [...starts, ...contains].slice(0, limit);
+	const typed = query.trim().toLowerCase().replace(/\s+/g, "-");
+	const free = options.filter((option) => !picked.includes(option.tag));
+	if (!typed) return free.slice(0, limit);
+	const starts = free.filter((option) => option.tag.startsWith(typed));
+	const contains = free.filter(
+		(option) =>
+			!option.tag.startsWith(typed) &&
+			(option.tag.includes(typed) || (option.group ?? "").toLowerCase().startsWith(typed)),
+	);
+	return [...starts, ...contains].slice(0, limit);
 }

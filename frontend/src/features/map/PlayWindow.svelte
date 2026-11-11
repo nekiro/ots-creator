@@ -1,79 +1,96 @@
 <script lang="ts">
-  // The play view in its own window (WindowService.OpenPlayWindow): the
-  // map and start come in the URL, edits made in the editor window come as
-  // map:changed events.
-  import { onMount } from "svelte";
-  import { Events, Window } from "@wailsio/runtime";
-  import { initState } from "../../lib/state/app.svelte";
-  import { loadMapData, map } from "../../lib/map/state.svelte";
-  import { spriteSize } from "../../lib/map/view/commands";
-  import type { Position } from "../../lib/map/play/player";
-  import PlayView from "./PlayView.svelte";
+	// The play view in its own window (WindowService.OpenPlayWindow): the
+	// map and start come in the URL, edits made in the editor window come as
+	// map:changed events.
+	import { onMount } from "svelte";
+	import { Events, Window } from "@wailsio/runtime";
+	import { initState } from "../../lib/state/app.svelte";
+	import { loadMapData, map } from "../../lib/map/state.svelte";
+	import { spriteSize } from "../../lib/map/view/commands";
+	import type { Position } from "../../lib/map/play/player";
+	import PlayView from "./PlayView.svelte";
 
-  const params = new URLSearchParams(location.search);
-  let mapId = $state(Number(params.get("play")));
-  let start = $state<Position>({ x: Number(params.get("x")), y: Number(params.get("y")), z: Number(params.get("z")) });
-  let session = $state(0);
+	const params = new URLSearchParams(location.search);
+	let mapId = $state(Number(params.get("play")));
+	let start = $state<Position>({
+		x: Number(params.get("x")),
+		y: Number(params.get("y")),
+		z: Number(params.get("z")),
+	});
+	let session = $state(0);
 
-  let ready = $state(false);
-  const listeners = new Set<(keys: number[]) => void>();
+	let ready = $state(false);
+	const listeners = new Set<(keys: number[]) => void>();
 
-  function changes(changed: (keys: number[]) => void): () => void {
-    listeners.add(changed);
-    return () => listeners.delete(changed);
-  }
+	function changes(changed: (keys: number[]) => void): () => void {
+		listeners.add(changed);
+		return () => listeners.delete(changed);
+	}
 
-  onMount(() => {
-    const offChanged = Events.On("map:changed", (event: { data: { id: number; chunks: number[] | null; all?: boolean } | null }) => {
-      if (event.data?.id !== mapId) return;
-      if (event.data.all) {
-        map.activeId = mapId;
-        void loadMapData(true, false).then(() => session++);
-        return;
-      }
-      for (const changed of listeners) changed(event.data.chunks ?? []);
-    });
-    const offMove = Events.On("play:move", (event: { data: { map: number; x: number; y: number; z: number } | null }) => {
-      const move = event.data;
-      if (!move) return;
-      mapId = move.map;
-      map.activeId = mapId;
-      void loadMapData(true, false);
-      start = { x: move.x, y: move.y, z: move.z };
-      session++;
-    });
-    void (async () => {
-      await initState();
-      map.activeId = mapId;
-      await loadMapData(true, false);
-      ready = true;
-    })();
-    return () => {
-      offChanged();
-      offMove();
-    };
-  });
+	onMount(() => {
+		const offChanged = Events.On(
+			"map:changed",
+			(event: { data: { id: number; chunks: number[] | null; all?: boolean } | null }) => {
+				if (event.data?.id !== mapId) return;
+				if (event.data.all) {
+					map.activeId = mapId;
+					void loadMapData(true, false).then(() => session++);
+					return;
+				}
+				for (const changed of listeners) changed(event.data.chunks ?? []);
+			},
+		);
+		const offMove = Events.On(
+			"play:move",
+			(event: { data: { map: number; x: number; y: number; z: number } | null }) => {
+				const move = event.data;
+				if (!move) return;
+				mapId = move.map;
+				map.activeId = mapId;
+				void loadMapData(true, false);
+				start = { x: move.x, y: move.y, z: move.z };
+				session++;
+			},
+		);
+		void (async () => {
+			await initState();
+			map.activeId = mapId;
+			await loadMapData(true, false);
+			ready = true;
+		})();
+		return () => {
+			offChanged();
+			offMove();
+		};
+	});
 </script>
 
 <div class="window">
-  {#if ready && map.items}
-    {#key session}
-      <PlayView {mapId} {start} items={map.items} spriteSize={spriteSize()} onexit={() => void Window.Close()} {changes} />
-    {/key}
-  {:else}
-    <div class="loading t-label">Loading the map…</div>
-  {/if}
+	{#if ready && map.items}
+		{#key session}
+			<PlayView
+				{mapId}
+				{start}
+				items={map.items}
+				spriteSize={spriteSize()}
+				onexit={() => void Window.Close()}
+				{changes}
+			/>
+		{/key}
+	{:else}
+		<div class="loading t-label">Loading the map…</div>
+	{/if}
 </div>
 
 <style>
-  .window {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    background: var(--bg, #161616);
-  }
-  .loading {
-    margin: auto;
-  }
+	.window {
+		position: fixed;
+		inset: 0;
+		display: flex;
+		flex-direction: column;
+		background: var(--bg, #161616);
+	}
+	.loading {
+		margin: auto;
+	}
 </style>

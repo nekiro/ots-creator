@@ -6,22 +6,23 @@ const MANY = "application/x-sprite-ids";
  * whole selection is dragged in ascending id order.
  */
 export function startSpriteDrag(event: DragEvent, id: number, selection: number[]): void {
-  const ids = selection.length > 1 && selection.includes(id) ? [...selection].sort((first, second) => first - second) : [id];
-  event.dataTransfer?.setData(ONE, String(ids[0]));
-  event.dataTransfer?.setData(MANY, ids.join(","));
-  if (event.dataTransfer) event.dataTransfer.effectAllowed = "copy";
+	const ids =
+		selection.length > 1 && selection.includes(id) ? [...selection].sort((first, second) => first - second) : [id];
+	event.dataTransfer?.setData(ONE, String(ids[0]));
+	event.dataTransfer?.setData(MANY, ids.join(","));
+	if (event.dataTransfer) event.dataTransfer.effectAllowed = "copy";
 }
 
 export function droppedSprites(event: DragEvent): number[] {
-  const raw = event.dataTransfer?.getData(MANY) || event.dataTransfer?.getData(ONE) || "";
-  return raw
-    .split(",")
-    .filter((part) => part !== "")
-    .map(Number)
-    .filter((id) => Number.isInteger(id) && id >= 0);
+	const raw = event.dataTransfer?.getData(MANY) || event.dataTransfer?.getData(ONE) || "";
+	return raw
+		.split(",")
+		.filter((part) => part !== "")
+		.map(Number)
+		.filter((id) => Number.isInteger(id) && id >= 0);
 }
 
 /** Whether first drag carries several sprites (readable during dragover). */
 export function dragsMany(event: DragEvent): boolean {
-  return !!event.dataTransfer?.types.includes(MANY);
+	return !!event.dataTransfer?.types.includes(MANY);
 }

@@ -7,38 +7,38 @@ import type { WalkWorld } from "./player";
 /** Walking: a tile with a ground and nothing that blocks (client Tile::isWalkable). Creatures of
  * the map stand where they spawn, not where they are in game: they do not block. */
 export function walkWorld(chunks: ChunkStore, items: ItemIndex): WalkWorld {
-  return {
-    isWalkable(x, y, z) {
-      const tile = chunks.tile(x, y, z);
-      return !!tile && (tile.flags & TileFlags.ground) !== 0 && (tile.flags & TileFlags.blocking) === 0;
-    },
-    groundSpeed(x, y, z) {
-      const tile = chunks.peekTile(x, y, z);
-      if (!tile || !(tile.flags & TileFlags.ground)) return null;
-      return items.speed[tile.ids[0]] ?? 0;
-    },
-  };
+	return {
+		isWalkable(x, y, z) {
+			const tile = chunks.tile(x, y, z);
+			return !!tile && (tile.flags & TileFlags.ground) !== 0 && (tile.flags & TileFlags.blocking) === 0;
+		},
+		groundSpeed(x, y, z) {
+			const tile = chunks.peekTile(x, y, z);
+			if (!tile || !(tile.flags & TileFlags.ground)) return null;
+			return items.speed[tile.ids[0]] ?? 0;
+		},
+	};
 }
 
 export function floorWorld(chunks: ChunkStore, items: ItemIndex, looks: Appearances): FloorWorld {
-  return {
-    items(x, y, z) {
-      const tile = chunks.tile(x, y, z);
-      if (tile) return Array.from(tile.ids);
-      if (x >= 0 && y >= 0 && chunks.peek(keyOf(x, y, z)) === undefined) return null;
-      return undefined;
-    },
-    flags(id): FloorItemFlags {
-      const look = looks.items.get(items.client[id]);
-      const top = items.top[id];
-      return {
-        ground: items.is(id, "ground"),
-        border: top === TOP_ORDER.border,
-        bottom: top === TOP_ORDER.bottom,
-        top: top === TOP_ORDER.top,
-        dontHide: !!look && (look.flags & AF.dontHide) !== 0,
-        blockProjectile: items.is(id, "blockMissile"),
-      };
-    },
-  };
+	return {
+		items(x, y, z) {
+			const tile = chunks.tile(x, y, z);
+			if (tile) return Array.from(tile.ids);
+			if (x >= 0 && y >= 0 && chunks.peek(keyOf(x, y, z)) === undefined) return null;
+			return undefined;
+		},
+		flags(id): FloorItemFlags {
+			const look = looks.items.get(items.client[id]);
+			const top = items.top[id];
+			return {
+				ground: items.is(id, "ground"),
+				border: top === TOP_ORDER.border,
+				bottom: top === TOP_ORDER.bottom,
+				top: top === TOP_ORDER.top,
+				dontHide: !!look && (look.flags & AF.dontHide) !== 0,
+				blockProjectile: items.is(id, "blockMissile"),
+			};
+		},
+	};
 }

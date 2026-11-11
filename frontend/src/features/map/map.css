@@ -1,172 +1,172 @@
 .m-row {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 0 4px 0 0;
-  background: none;
-  border: 1px solid transparent;
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  min-height: 20px;
+	width: 100%;
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	padding: 0 4px 0 0;
+	background: none;
+	border: 1px solid transparent;
+	color: var(--text);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+	min-height: 20px;
 }
 /* Rows show a small sunken slot (a full 34px item slot makes lists sparse). */
 .m-row > .t-slot {
-  width: 26px;
-  height: 26px;
-  background: rgba(0, 0, 0, 0.3);
-  border-style: solid;
-  border-width: 1px;
-  border-image: url("../../assets/ui/1pixel-down-frame.png") 1 / 1px repeat;
+	width: 26px;
+	height: 26px;
+	background: rgba(0, 0, 0, 0.3);
+	border-style: solid;
+	border-width: 1px;
+	border-image: url("../../assets/ui/1pixel-down-frame.png") 1 / 1px repeat;
 }
 .m-row:hover {
-  background: rgba(255, 255, 255, 0.06);
+	background: rgba(255, 255, 255, 0.06);
 }
 .m-row.on {
-  background: var(--select);
-  border-color: #b6b6b6;
-  color: #fff;
+	background: var(--select);
+	border-color: #b6b6b6;
+	color: #fff;
 }
 .m-row:disabled {
-  cursor: default;
-  opacity: 0.5;
+	cursor: default;
+	opacity: 0.5;
 }
 .m-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 .m-meta {
-  flex: none;
-  font: var(--fs-small) / 10px var(--font-small);
-  color: var(--text-dim);
+	flex: none;
+	font: var(--fs-small) / 10px var(--font-small);
+	color: var(--text-dim);
 }
 
 .m-cell {
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: 1px solid transparent;
-  background: none;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  position: relative;
+	width: 36px;
+	height: 36px;
+	padding: 0;
+	border: 1px solid transparent;
+	background: none;
+	cursor: pointer;
+	display: grid;
+	place-items: center;
+	position: relative;
 }
 .m-cell * {
-  pointer-events: none;
+	pointer-events: none;
 }
 .m-cell:hover {
-  background: rgba(255, 255, 255, 0.06);
+	background: rgba(255, 255, 255, 0.06);
 }
 .m-cell.on {
-  border-color: #e8e8e8;
-  background: var(--select);
+	border-color: #e8e8e8;
+	background: var(--select);
 }
 
 .m-sect {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 5px 4px 1px;
-  color: var(--text-dim);
-  font: var(--fs-small) / 12px var(--font-small);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 5px 4px 1px;
+	color: var(--text-dim);
+	font: var(--fs-small) / 12px var(--font-small);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
 }
 .m-sect .grow {
-  flex: 1;
+	flex: 1;
 }
 
 .m-body {
-  flex: 1;
-  min-height: 0;
-  padding: 2px;
+	flex: 1;
+	min-height: 0;
+	padding: 2px;
 }
 .m-scroll {
-  overflow-y: auto;
+	overflow-y: auto;
 }
 
 .m-empty {
-  padding: 16px 12px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
-  color: var(--text-dim);
+	padding: 16px 12px;
+	text-align: center;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	align-items: center;
+	color: var(--text-dim);
 }
 
 .m-seg {
-  display: flex;
-  flex: none;
+	display: flex;
+	flex: none;
 }
 .m-seg > button {
-  flex: 1;
-  min-width: 0;
-  padding: 0 6px;
-  height: 20px;
-  background: none;
-  border-style: solid;
-  border-width: 1px;
-  border-image: url("../../assets/ui/button-grey-up.png") 1 fill / 1px repeat;
-  image-rendering: pixelated;
-  color: var(--text-dim);
-  font: inherit;
-  text-shadow: 1px 1px 0 #000;
-  cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+	flex: 1;
+	min-width: 0;
+	padding: 0 6px;
+	height: 20px;
+	background: none;
+	border-style: solid;
+	border-width: 1px;
+	border-image: url("../../assets/ui/button-grey-up.png") 1 fill / 1px repeat;
+	image-rendering: pixelated;
+	color: var(--text-dim);
+	font: inherit;
+	text-shadow: 1px 1px 0 #000;
+	cursor: pointer;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 .m-seg > button:hover {
-  color: var(--text);
-  filter: brightness(1.12);
+	color: var(--text);
+	filter: brightness(1.12);
 }
 .m-seg > button.on {
-  border-image-source: url("../../assets/ui/button-grey-down.png");
-  padding-top: 2px;
-  color: #fff;
-  filter: none;
+	border-image-source: url("../../assets/ui/button-grey-down.png");
+	padding-top: 2px;
+	color: #fff;
+	filter: none;
 }
 
 .m-form {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
 }
 .m-field {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
 }
 .m-field > .m-lbl {
-  width: 74px;
-  flex: none;
-  color: var(--text-dim);
+	width: 74px;
+	flex: none;
+	color: var(--text-dim);
 }
 .m-field > .t-input {
-  flex: 1;
-  min-width: 0;
+	flex: 1;
+	min-width: 0;
 }
 
 .m-swatch {
-  width: 14px;
-  height: 14px;
-  margin: 3px 6px;
-  border: 1px solid #000;
-  flex: none;
+	width: 14px;
+	height: 14px;
+	margin: 3px 6px;
+	border: 1px solid #000;
+	flex: none;
 }
 
 kbd {
-  font: var(--fs-small) / 10px var(--font-small);
-  color: var(--text-dim);
-  border: 1px solid #444;
-  padding: 1px 3px;
-  background: rgba(0, 0, 0, 0.25);
+	font: var(--fs-small) / 10px var(--font-small);
+	color: var(--text-dim);
+	border: 1px solid #444;
+	padding: 1px 3px;
+	background: rgba(0, 0, 0, 0.25);
 }

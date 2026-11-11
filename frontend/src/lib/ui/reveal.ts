@@ -5,9 +5,9 @@
  * (positioned).
  */
 export function reveal(list: HTMLElement | undefined | null, element: HTMLElement | null | undefined): void {
-  if (!list || !element) return;
-  const top = element.offsetTop;
-  const bottom = top + element.offsetHeight;
-  if (top < list.scrollTop) list.scrollTop = top;
-  else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
+	if (!list || !element) return;
+	const top = element.offsetTop;
+	const bottom = top + element.offsetHeight;
+	if (top < list.scrollTop) list.scrollTop = top;
+	else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
 }

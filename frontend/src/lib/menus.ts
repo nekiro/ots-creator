@@ -13,98 +13,118 @@ const noPropsClip = () => noThing() || !clipboardThing();
 const fmt = () => (prefs.settings.objectFormat === "obd" ? "OBD" : "OTOBJ");
 
 function copy(text: string) {
-  navigator.clipboard.writeText(text).then(
-    () => toast(`Copied ${text}`),
-    () => toast("Clipboard is not available.", "error"),
-  );
+	navigator.clipboard.writeText(text).then(
+		() => toast(`Copied ${text}`),
+		() => toast("Clipboard is not available.", "error"),
+	);
 }
 
 export function editMenu(): MenuEntry[] {
-  return [
-    { label: "Undo", keys: "Ctrl+Z", action: commands.undo, disabled: () => !app.project?.info.canUndo },
-    { label: "Redo", keys: "Ctrl+Y", action: commands.redo, disabled: () => !app.project?.info.canRedo },
-    "-",
-    ...clipboardEntries(),
-    "-",
-    { label: "Apply changes", keys: "Ctrl+Enter", action: commands.apply, disabled: () => !app.dirty },
-    { label: "Revert changes", action: commands.revert, disabled: () => !app.dirty },
-  ];
+	return [
+		{ label: "Undo", keys: "Ctrl+Z", action: commands.undo, disabled: () => !app.project?.info.canUndo },
+		{ label: "Redo", keys: "Ctrl+Y", action: commands.redo, disabled: () => !app.project?.info.canRedo },
+		"-",
+		...clipboardEntries(),
+		"-",
+		{ label: "Apply changes", keys: "Ctrl+Enter", action: commands.apply, disabled: () => !app.dirty },
+		{ label: "Revert changes", action: commands.revert, disabled: () => !app.dirty },
+	];
 }
 
 function clipboardEntries(): MenuEntry[] {
-  return [
-    { label: "Copy object", keys: "Ctrl+C", action: commands.copyObject, disabled: () => !app.draft },
-    { label: "Copy sprite sheet", keys: "Ctrl+Shift+C", action: () => commands.copySheet(), disabled: notSingle },
-    { label: "Paste object", keys: "Ctrl+V", action: () => commands.paste("object"), disabled: noClip },
-    { label: "Paste properties", keys: "Ctrl+Shift+V", action: () => commands.paste("properties"), disabled: noPropsClip },
-  ];
+	return [
+		{ label: "Copy object", keys: "Ctrl+C", action: commands.copyObject, disabled: () => !app.draft },
+		{ label: "Copy sprite sheet", keys: "Ctrl+Shift+C", action: () => commands.copySheet(), disabled: notSingle },
+		{ label: "Paste object", keys: "Ctrl+V", action: () => commands.paste("object"), disabled: noClip },
+		{
+			label: "Paste properties",
+			keys: "Ctrl+Shift+V",
+			action: () => commands.paste("properties"),
+			disabled: noPropsClip,
+		},
+	];
 }
 
 export function toolsMenu(): MenuEntry[] {
-  return [
-    { label: "Slicer…", action: () => (app.dialog = "slicer"), disabled: noProject },
-    { label: "Optimize sprites…", action: () => (app.dialog = "optimize"), disabled: noProject },
-    { label: "Frame durations…", action: () => (app.dialog = "durations"), disabled: noProject },
-    "-",
-    { label: "Split outfits into frame groups…", action: () => commands.convertFrameGroups(true), disabled: noProject },
-    { label: "Merge outfit frame groups…", action: () => commands.convertFrameGroups(false), disabled: noProject },
-    "-",
-    { label: "Compare & merge clients…", action: commands.compare, disabled: noProject },
-    { label: "Reorder objects…", action: () => (app.dialog = "reorder"), disabled: noProject },
-    { label: "Object viewer…", action: () => commands.viewObd() },
-    { label: "Market…", action: commands.market },
-  ];
+	return [
+		{ label: "Slicer…", action: () => (app.dialog = "slicer"), disabled: noProject },
+		{ label: "Optimize sprites…", action: () => (app.dialog = "optimize"), disabled: noProject },
+		{ label: "Frame durations…", action: () => (app.dialog = "durations"), disabled: noProject },
+		"-",
+		{
+			label: "Split outfits into frame groups…",
+			action: () => commands.convertFrameGroups(true),
+			disabled: noProject,
+		},
+		{ label: "Merge outfit frame groups…", action: () => commands.convertFrameGroups(false), disabled: noProject },
+		"-",
+		{ label: "Compare & merge clients…", action: commands.compare, disabled: noProject },
+		{ label: "Reorder objects…", action: () => (app.dialog = "reorder"), disabled: noProject },
+		{ label: "Object viewer…", action: () => commands.viewObd() },
+		{ label: "Market…", action: commands.market },
+	];
 }
 
 export function objectMenu(context = false): MenuEntry[] {
-  return [
-    { label: "New object", action: commands.newThing, disabled: noProject },
-    { label: "Duplicate", keys: "Ctrl+D", action: commands.duplicate, disabled: noThing },
-    { label: "Move to…", action: commands.moveTo, disabled: noThing },
-    { label: "Replace with object file…", action: () => commands.importObd(true), disabled: notSingle },
-    { label: "Remove", keys: "Del", action: commands.remove, disabled: noThing },
-    "-",
-    ...(context ? [] : [{ label: "Import objects…", keys: "Ctrl+I", action: () => commands.importObd(), disabled: noProject }]),
-    { label: `Export selected (${fmt()})…`, keys: "Ctrl+E", action: commands.exportObd, disabled: noThing },
-    ...(context ? [] : [{ label: `Export all objects (${fmt()})…`, action: commands.exportAllObjects, disabled: noProject }]),
-    "-",
-    { label: "Import sprite sheet…", action: () => commands.importSheet(0), disabled: notSingle },
-    { label: "Export sprite sheet…", action: () => commands.exportSheet(0), disabled: notSingle },
-    { label: "Publish to market…", action: commands.shareObject, disabled: notSingle },
-    ...(context
-      ? (["-", ...clipboardEntries(), "-", { label: "Copy id", action: () => copy(app.selection.join(", ")), disabled: noThing }] as MenuEntry[])
-      : []),
-  ];
+	return [
+		{ label: "New object", action: commands.newThing, disabled: noProject },
+		{ label: "Duplicate", keys: "Ctrl+D", action: commands.duplicate, disabled: noThing },
+		{ label: "Move to…", action: commands.moveTo, disabled: noThing },
+		{ label: "Replace with object file…", action: () => commands.importObd(true), disabled: notSingle },
+		{ label: "Remove", keys: "Del", action: commands.remove, disabled: noThing },
+		"-",
+		...(context
+			? []
+			: [{ label: "Import objects…", keys: "Ctrl+I", action: () => commands.importObd(), disabled: noProject }]),
+		{ label: `Export selected (${fmt()})…`, keys: "Ctrl+E", action: commands.exportObd, disabled: noThing },
+		...(context
+			? []
+			: [{ label: `Export all objects (${fmt()})…`, action: commands.exportAllObjects, disabled: noProject }]),
+		"-",
+		{ label: "Import sprite sheet…", action: () => commands.importSheet(0), disabled: notSingle },
+		{ label: "Export sprite sheet…", action: () => commands.exportSheet(0), disabled: notSingle },
+		{ label: "Publish to market…", action: commands.shareObject, disabled: notSingle },
+		...(context
+			? ([
+					"-",
+					...clipboardEntries(),
+					"-",
+					{ label: "Copy id", action: () => copy(app.selection.join(", ")), disabled: noThing },
+				] as MenuEntry[])
+			: []),
+	];
 }
 
 export function objectListMenu(): MenuEntry[] {
-  return [
-    { label: "New object", action: commands.newThing, disabled: noProject },
-    { label: "Import objects…", keys: "Ctrl+I", action: () => commands.importObd(), disabled: noProject },
-    { label: "Browse market…", action: commands.market },
-  ];
+	return [
+		{ label: "New object", action: commands.newThing, disabled: noProject },
+		{ label: "Import objects…", keys: "Ctrl+I", action: () => commands.importObd(), disabled: noProject },
+		{ label: "Browse market…", action: commands.market },
+	];
 }
 
 export function spriteListMenu(): MenuEntry[] {
-  return [
-    { label: "Import images…", action: commands.importSprites, disabled: noProject },
-    { label: "Browse market…", action: commands.market },
-  ];
+	return [
+		{ label: "Import images…", action: commands.importSprites, disabled: noProject },
+		{ label: "Browse market…", action: commands.market },
+	];
 }
 
 export function spriteMenu(context = false): MenuEntry[] {
-  return [
-    ...(context ? [] : [{ label: "Import images…", action: commands.importSprites, disabled: noProject }]),
-    { label: "Replace selected…", action: commands.replaceSprite, disabled: noSprite },
-    { label: "Export selected…", action: commands.exportSprites, disabled: noSprite },
-    ...(context ? [] : [{ label: "Export all sprites…", action: commands.exportAllSprites, disabled: noProject }]),
-    { label: "Replace uses with…", action: commands.replaceRefs, disabled: noSprite },
-    { label: "Publish to market…", action: commands.shareSprites, disabled: noSprite },
-    "-",
-    { label: "Clear selected", keys: "Del", action: commands.removeSprites, disabled: noSprite },
-    ...(context
-      ? (["-", { label: "Copy id", action: () => copy(app.selectedSprites.join(", ")), disabled: noSprite }] as MenuEntry[])
-      : []),
-  ];
+	return [
+		...(context ? [] : [{ label: "Import images…", action: commands.importSprites, disabled: noProject }]),
+		{ label: "Replace selected…", action: commands.replaceSprite, disabled: noSprite },
+		{ label: "Export selected…", action: commands.exportSprites, disabled: noSprite },
+		...(context ? [] : [{ label: "Export all sprites…", action: commands.exportAllSprites, disabled: noProject }]),
+		{ label: "Replace uses with…", action: commands.replaceRefs, disabled: noSprite },
+		{ label: "Publish to market…", action: commands.shareSprites, disabled: noSprite },
+		"-",
+		{ label: "Clear selected", keys: "Del", action: commands.removeSprites, disabled: noSprite },
+		...(context
+			? ([
+					"-",
+					{ label: "Copy id", action: () => copy(app.selectedSprites.join(", ")), disabled: noSprite },
+				] as MenuEntry[])
+			: []),
+	];
 }
-

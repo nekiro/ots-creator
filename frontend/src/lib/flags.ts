@@ -5,194 +5,315 @@ import { clamp } from "./util/math";
 export type FieldKind = "u16" | "i16" | "text" | "select" | "mask" | "color";
 
 export interface Field {
-  key: string; // path inside Properties, e.g. "groundSpeed" or "market.name"
-  label: string;
-  kind: FieldKind;
-  options?: [number, string][];
+	key: string; // path inside Properties, e.g. "groundSpeed" or "market.name"
+	label: string;
+	kind: FieldKind;
+	options?: [number, string][];
 }
 
 export interface Flag {
-  key: keyof Properties & string;
-  label: string;
-  hint?: string;
-  fields?: Field[];
+	key: keyof Properties & string;
+	label: string;
+	hint?: string;
+	fields?: Field[];
 }
 
 export interface FlagGroup {
-  title: string;
-  flags: Flag[];
+	title: string;
+	flags: Flag[];
 }
 
 export const CLOTH_SLOTS: [number, string][] = [
-  [0, "None"], [1, "Two-handed"], [2, "Helmet"], [3, "Amulet"], [4, "Backpack"], [5, "Armor"],
-  [6, "Shield"], [7, "One-handed"], [8, "Legs"], [9, "Boots"], [10, "Ring"], [11, "Ammunition"],
+	[0, "None"],
+	[1, "Two-handed"],
+	[2, "Helmet"],
+	[3, "Amulet"],
+	[4, "Backpack"],
+	[5, "Armor"],
+	[6, "Shield"],
+	[7, "One-handed"],
+	[8, "Legs"],
+	[9, "Boots"],
+	[10, "Ring"],
+	[11, "Ammunition"],
 ];
 
 export const MARKET_CATEGORIES: [number, string][] = [
-  [1, "Armors"], [2, "Amulets"], [3, "Boots"], [4, "Containers"], [5, "Decoration"], [6, "Food"],
-  [7, "Helmets & Hats"], [8, "Legs"], [9, "Others"], [10, "Potions"], [11, "Rings"], [12, "Runes"],
-  [13, "Shields"], [14, "Tools"], [15, "Valuables"], [16, "Ammunition"], [17, "Axes"], [18, "Clubs"],
-  [19, "Distance Weapons"], [20, "Swords"], [21, "Wands & Rods"], [22, "Premium Scrolls"], [255, "Meta Weapons"],
+	[1, "Armors"],
+	[2, "Amulets"],
+	[3, "Boots"],
+	[4, "Containers"],
+	[5, "Decoration"],
+	[6, "Food"],
+	[7, "Helmets & Hats"],
+	[8, "Legs"],
+	[9, "Others"],
+	[10, "Potions"],
+	[11, "Rings"],
+	[12, "Runes"],
+	[13, "Shields"],
+	[14, "Tools"],
+	[15, "Valuables"],
+	[16, "Ammunition"],
+	[17, "Axes"],
+	[18, "Clubs"],
+	[19, "Distance Weapons"],
+	[20, "Swords"],
+	[21, "Wands & Rods"],
+	[22, "Premium Scrolls"],
+	[255, "Meta Weapons"],
 ];
 
 /** Vocation bits of market.restrictProfession; none set means any vocation. */
 export const PROFESSIONS: [number, string][] = [
-  [1, "Knight"], [2, "Paladin"], [4, "Sorcerer"], [8, "Druid"], [16, "Monk"],
+	[1, "Knight"],
+	[2, "Paladin"],
+	[4, "Sorcerer"],
+	[8, "Druid"],
+	[16, "Monk"],
 ];
 
 export const FLAG_GROUPS: FlagGroup[] = [
-  {
-    title: "Ground & Stacking",
-    flags: [
-      { key: "ground", label: "Ground", hint: "Walkable tile; speed affects walking", fields: [{ key: "groundSpeed", label: "Speed", kind: "u16" }] },
-      { key: "groundBorder", label: "Ground border", hint: "Drawn above ground (borders)" },
-      { key: "onBottom", label: "On bottom", hint: "Walls, drawn under items" },
-      { key: "onTop", label: "On top", hint: "Drawn above creatures (doors, arches)" },
-      { key: "fullGround", label: "Full ground", hint: "Ground covers the whole tile" },
-    ],
-  },
-  {
-    title: "Behaviour",
-    flags: [
-      { key: "container", label: "Container" },
-      { key: "stackable", label: "Stackable" },
-      { key: "forceUse", label: "Force use" },
-      { key: "multiUse", label: "Multi use" },
-      { key: "hasCharges", label: "Has charges" },
-      { key: "fluidContainer", label: "Fluid container" },
-      { key: "fluid", label: "Splash" },
-      { key: "pickupable", label: "Pickupable" },
-      { key: "rotatable", label: "Rotatable" },
-      { key: "hangable", label: "Hangable" },
-      { key: "hookSouth", label: "Hook south", hint: "Vertical wall hook" },
-      { key: "hookEast", label: "Hook east", hint: "Horizontal wall hook" },
-      { key: "usable", label: "Usable" },
-      { key: "wrappable", label: "Wrappable" },
-      { key: "unwrappable", label: "Unwrappable" },
-      { key: "hasDefaultAction", label: "Default action", fields: [{ key: "defaultAction", label: "Action", kind: "select", options: [[0, "None"], [1, "Look"], [2, "Use"], [3, "Open"], [4, "Autowalk highlight"]] }] },
-    ],
-  },
-  {
-    title: "Blocking",
-    flags: [
-      { key: "unpassable", label: "Unpassable" },
-      { key: "unmoveable", label: "Unmoveable" },
-      { key: "blockMissile", label: "Block missiles" },
-      { key: "blockPathfind", label: "Block pathfinding" },
-      { key: "noMoveAnimation", label: "No move animation" },
-      { key: "floorChange", label: "Floor change" },
-    ],
-  },
-  {
-    title: "Text",
-    flags: [
-      { key: "writable", label: "Writable", fields: [{ key: "maxTextLength", label: "Max length", kind: "u16" }] },
-      { key: "writableOnce", label: "Writable once", fields: [{ key: "maxReadLength", label: "Max length", kind: "u16" }] },
-    ],
-  },
-  {
-    title: "Appearance",
-    flags: [
-      { key: "hasLight", label: "Light", fields: [{ key: "lightLevel", label: "Level", kind: "u16" }, { key: "lightColor", label: "Color", kind: "color" }] },
-      { key: "hasOffset", label: "Offset", fields: [{ key: "offsetX", label: "X", kind: "i16" }, { key: "offsetY", label: "Y", kind: "i16" }] },
-      { key: "hasElevation", label: "Elevation", fields: [{ key: "elevation", label: "Height", kind: "u16" }] },
-      { key: "miniMap", label: "Minimap", fields: [{ key: "miniMapColor", label: "Color", kind: "color" }] },
-      { key: "lyingObject", label: "Lying object" },
-      { key: "animateAlways", label: "Animate always" },
-      { key: "dontHide", label: "Don't hide" },
-      { key: "translucent", label: "Translucent" },
-      { key: "topEffect", label: "Top effect" },
-      { key: "ignoreLook", label: "Ignore look" },
-      { key: "lensHelp", label: "Lens help", fields: [{ key: "lensHelpValue", label: "Value", kind: "u16" }] },
-    ],
-  },
-  {
-    title: "Equipment & Market",
-    flags: [
-      { key: "cloth", label: "Cloth", fields: [{ key: "clothSlot", label: "Slot", kind: "select", options: CLOTH_SLOTS }] },
-      {
-        key: "isMarket",
-        label: "Market",
-        fields: [
-          { key: "market.name", label: "Name", kind: "text" },
-          { key: "market.category", label: "Category", kind: "select", options: MARKET_CATEGORIES },
-          { key: "market.tradeAs", label: "Trade as", kind: "u16" },
-          { key: "market.showAs", label: "Show as", kind: "u16" },
-          { key: "market.restrictProfession", label: "Vocations", kind: "mask", options: PROFESSIONS },
-          { key: "market.restrictLevel", label: "Min level", kind: "u16" },
-        ],
-      },
-    ],
-  },
-  {
-    title: "Outfit",
-    flags: [
-      { key: "hasBones", label: "Bones", hint: "Per-direction attachment offsets" },
-      { key: "reverseAddonsNorth", label: "Reverse addons north", hint: "Addons are drawn under the outfit facing north" },
-      { key: "reverseAddonsEast", label: "Reverse addons east", hint: "Addons are drawn under the outfit facing east" },
-      { key: "reverseAddonsSouth", label: "Reverse addons south", hint: "Addons are drawn under the outfit facing south" },
-      { key: "reverseAddonsWest", label: "Reverse addons west", hint: "Addons are drawn under the outfit facing west" },
-    ],
-  },
-  {
-    title: "Tibia 12+",
-    flags: [
-      { key: "hasUpgradeClassification", label: "Upgrade classification", hint: "Item tier class for upgrades", fields: [{ key: "upgradeClassification", label: "Class", kind: "u16" }] },
-      { key: "cyclopedia", label: "Cyclopedia", hint: "Shown in the item cyclopedia", fields: [{ key: "cyclopediaType", label: "Type", kind: "u16" }] },
-      { key: "changedToExpire", label: "Changed to expire", hint: "Expiring version of another item", fields: [{ key: "formerObjectId", label: "Former id", kind: "u16" }] },
-      { key: "corpse", label: "Corpse" },
-      { key: "playerCorpse", label: "Player corpse" },
-      { key: "ammo", label: "Ammo" },
-      { key: "showOffSocket", label: "Show-off socket" },
-      { key: "reportable", label: "Reportable" },
-      { key: "wearout", label: "Wear out" },
-      { key: "clockExpire", label: "Clock expire" },
-      { key: "expire", label: "Expire" },
-      { key: "expireStop", label: "Expire stop" },
-      { key: "wrapKit", label: "Wrap kit" },
-    ],
-  },
+	{
+		title: "Ground & Stacking",
+		flags: [
+			{
+				key: "ground",
+				label: "Ground",
+				hint: "Walkable tile; speed affects walking",
+				fields: [{ key: "groundSpeed", label: "Speed", kind: "u16" }],
+			},
+			{ key: "groundBorder", label: "Ground border", hint: "Drawn above ground (borders)" },
+			{ key: "onBottom", label: "On bottom", hint: "Walls, drawn under items" },
+			{ key: "onTop", label: "On top", hint: "Drawn above creatures (doors, arches)" },
+			{ key: "fullGround", label: "Full ground", hint: "Ground covers the whole tile" },
+		],
+	},
+	{
+		title: "Behaviour",
+		flags: [
+			{ key: "container", label: "Container" },
+			{ key: "stackable", label: "Stackable" },
+			{ key: "forceUse", label: "Force use" },
+			{ key: "multiUse", label: "Multi use" },
+			{ key: "hasCharges", label: "Has charges" },
+			{ key: "fluidContainer", label: "Fluid container" },
+			{ key: "fluid", label: "Splash" },
+			{ key: "pickupable", label: "Pickupable" },
+			{ key: "rotatable", label: "Rotatable" },
+			{ key: "hangable", label: "Hangable" },
+			{ key: "hookSouth", label: "Hook south", hint: "Vertical wall hook" },
+			{ key: "hookEast", label: "Hook east", hint: "Horizontal wall hook" },
+			{ key: "usable", label: "Usable" },
+			{ key: "wrappable", label: "Wrappable" },
+			{ key: "unwrappable", label: "Unwrappable" },
+			{
+				key: "hasDefaultAction",
+				label: "Default action",
+				fields: [
+					{
+						key: "defaultAction",
+						label: "Action",
+						kind: "select",
+						options: [
+							[0, "None"],
+							[1, "Look"],
+							[2, "Use"],
+							[3, "Open"],
+							[4, "Autowalk highlight"],
+						],
+					},
+				],
+			},
+		],
+	},
+	{
+		title: "Blocking",
+		flags: [
+			{ key: "unpassable", label: "Unpassable" },
+			{ key: "unmoveable", label: "Unmoveable" },
+			{ key: "blockMissile", label: "Block missiles" },
+			{ key: "blockPathfind", label: "Block pathfinding" },
+			{ key: "noMoveAnimation", label: "No move animation" },
+			{ key: "floorChange", label: "Floor change" },
+		],
+	},
+	{
+		title: "Text",
+		flags: [
+			{
+				key: "writable",
+				label: "Writable",
+				fields: [{ key: "maxTextLength", label: "Max length", kind: "u16" }],
+			},
+			{
+				key: "writableOnce",
+				label: "Writable once",
+				fields: [{ key: "maxReadLength", label: "Max length", kind: "u16" }],
+			},
+		],
+	},
+	{
+		title: "Appearance",
+		flags: [
+			{
+				key: "hasLight",
+				label: "Light",
+				fields: [
+					{ key: "lightLevel", label: "Level", kind: "u16" },
+					{ key: "lightColor", label: "Color", kind: "color" },
+				],
+			},
+			{
+				key: "hasOffset",
+				label: "Offset",
+				fields: [
+					{ key: "offsetX", label: "X", kind: "i16" },
+					{ key: "offsetY", label: "Y", kind: "i16" },
+				],
+			},
+			{ key: "hasElevation", label: "Elevation", fields: [{ key: "elevation", label: "Height", kind: "u16" }] },
+			{ key: "miniMap", label: "Minimap", fields: [{ key: "miniMapColor", label: "Color", kind: "color" }] },
+			{ key: "lyingObject", label: "Lying object" },
+			{ key: "animateAlways", label: "Animate always" },
+			{ key: "dontHide", label: "Don't hide" },
+			{ key: "translucent", label: "Translucent" },
+			{ key: "topEffect", label: "Top effect" },
+			{ key: "ignoreLook", label: "Ignore look" },
+			{ key: "lensHelp", label: "Lens help", fields: [{ key: "lensHelpValue", label: "Value", kind: "u16" }] },
+		],
+	},
+	{
+		title: "Equipment & Market",
+		flags: [
+			{
+				key: "cloth",
+				label: "Cloth",
+				fields: [{ key: "clothSlot", label: "Slot", kind: "select", options: CLOTH_SLOTS }],
+			},
+			{
+				key: "isMarket",
+				label: "Market",
+				fields: [
+					{ key: "market.name", label: "Name", kind: "text" },
+					{ key: "market.category", label: "Category", kind: "select", options: MARKET_CATEGORIES },
+					{ key: "market.tradeAs", label: "Trade as", kind: "u16" },
+					{ key: "market.showAs", label: "Show as", kind: "u16" },
+					{ key: "market.restrictProfession", label: "Vocations", kind: "mask", options: PROFESSIONS },
+					{ key: "market.restrictLevel", label: "Min level", kind: "u16" },
+				],
+			},
+		],
+	},
+	{
+		title: "Outfit",
+		flags: [
+			{ key: "hasBones", label: "Bones", hint: "Per-direction attachment offsets" },
+			{
+				key: "reverseAddonsNorth",
+				label: "Reverse addons north",
+				hint: "Addons are drawn under the outfit facing north",
+			},
+			{
+				key: "reverseAddonsEast",
+				label: "Reverse addons east",
+				hint: "Addons are drawn under the outfit facing east",
+			},
+			{
+				key: "reverseAddonsSouth",
+				label: "Reverse addons south",
+				hint: "Addons are drawn under the outfit facing south",
+			},
+			{
+				key: "reverseAddonsWest",
+				label: "Reverse addons west",
+				hint: "Addons are drawn under the outfit facing west",
+			},
+		],
+	},
+	{
+		title: "Tibia 12+",
+		flags: [
+			{
+				key: "hasUpgradeClassification",
+				label: "Upgrade classification",
+				hint: "Item tier class for upgrades",
+				fields: [{ key: "upgradeClassification", label: "Class", kind: "u16" }],
+			},
+			{
+				key: "cyclopedia",
+				label: "Cyclopedia",
+				hint: "Shown in the item cyclopedia",
+				fields: [{ key: "cyclopediaType", label: "Type", kind: "u16" }],
+			},
+			{
+				key: "changedToExpire",
+				label: "Changed to expire",
+				hint: "Expiring version of another item",
+				fields: [{ key: "formerObjectId", label: "Former id", kind: "u16" }],
+			},
+			{ key: "corpse", label: "Corpse" },
+			{ key: "playerCorpse", label: "Player corpse" },
+			{ key: "ammo", label: "Ammo" },
+			{ key: "showOffSocket", label: "Show-off socket" },
+			{ key: "reportable", label: "Reportable" },
+			{ key: "wearout", label: "Wear out" },
+			{ key: "clockExpire", label: "Clock expire" },
+			{ key: "expire", label: "Expire" },
+			{ key: "expireStop", label: "Expire stop" },
+			{ key: "wrapKit", label: "Wrap kit" },
+		],
+	},
 ];
 
 // Flags that make sense outside items (category 1). Items get everything but bones.
 const CATEGORY_FLAGS: Record<number, ReadonlySet<string>> = {
-  2: new Set(["hasLight", "hasOffset", "animateAlways", "hasBones", "reverseAddonsNorth", "reverseAddonsEast", "reverseAddonsSouth", "reverseAddonsWest"]),
-  3: new Set(["hasLight", "hasOffset", "animateAlways", "topEffect"]),
-  4: new Set(["hasLight", "hasOffset"]),
+	2: new Set([
+		"hasLight",
+		"hasOffset",
+		"animateAlways",
+		"hasBones",
+		"reverseAddonsNorth",
+		"reverseAddonsEast",
+		"reverseAddonsSouth",
+		"reverseAddonsWest",
+	]),
+	3: new Set(["hasLight", "hasOffset", "animateAlways", "topEffect"]),
+	4: new Set(["hasLight", "hasOffset"]),
 };
 
 export function flagMatches(filter: string, label: string, key: string): boolean {
-  const query = filter.trim().toLowerCase();
-  return !query || label.toLowerCase().includes(query) || key.toLowerCase().includes(query);
+	const query = filter.trim().toLowerCase();
+	return !query || label.toLowerCase().includes(query) || key.toLowerCase().includes(query);
 }
 
 export function flagVisible(key: string, category: number, set: boolean): boolean {
-  if (set) return true;
-  const allowed = CATEGORY_FLAGS[category];
-  return allowed ? allowed.has(key) : key !== "hasBones" && !key.startsWith("reverseAddons");
+	if (set) return true;
+	const allowed = CATEGORY_FLAGS[category];
+	return allowed ? allowed.has(key) : key !== "hasBones" && !key.startsWith("reverseAddons");
 }
 
 export function getPath(obj: any, path: string): any {
-  return path.split(".").reduce((node, key) => (node == null ? node : node[key]), obj);
+	return path.split(".").reduce((node, key) => (node == null ? node : node[key]), obj);
 }
 
 export function setPath(obj: any, path: string, value: any): void {
-  const keys = path.split(".");
-  const last = keys.pop()!;
-  const target = keys.reduce((node, key) => node[key], obj);
-  target[last] = value;
+	const keys = path.split(".");
+	const last = keys.pop()!;
+	const target = keys.reduce((node, key) => node[key], obj);
+	target[last] = value;
 }
 
 export function clampField(kind: FieldKind, value: number): number {
-  if (!Number.isFinite(value)) return 0;
-  value = Math.trunc(value);
-  if (kind === "i16") return clamp(value, -32768, 32767);
-  return clamp(value, 0, 65535);
+	if (!Number.isFinite(value)) return 0;
+	value = Math.trunc(value);
+	if (kind === "i16") return clamp(value, -32768, 32767);
+	return clamp(value, 0, 65535);
 }
 
 export function flagFields(key: string): Field[] {
-  for (const group of FLAG_GROUPS) for (const flag of group.flags) if (flag.key === key) return flag.fields ?? [];
-  return [];
+	for (const group of FLAG_GROUPS) for (const flag of group.flags) if (flag.key === key) return flag.fields ?? [];
+	return [];
 }
 
 /**
@@ -200,18 +321,21 @@ export function flagFields(key: string): Field[] {
  * only for flags switched on (values default to 0 / ""). Nested fields such
  * as "market.name" become nested objects.
  */
-export function buildPatch(states: Record<string, boolean | undefined>, values: Record<string, number | string>): Record<string, unknown> {
-  const patch: Record<string, any> = {};
-  for (const [key, on] of Object.entries(states)) {
-    if (on === undefined) continue;
-    patch[key] = on;
-    if (!on) continue;
-    for (const field of flagFields(key)) {
-      const value = values[field.key] ?? (field.kind === "text" ? "" : 0);
-      const parts = field.key.split(".");
-      if (parts.length === 1) patch[field.key] = value;
-      else (patch[parts[0]] ??= {})[parts[1]] = value;
-    }
-  }
-  return patch;
+export function buildPatch(
+	states: Record<string, boolean | undefined>,
+	values: Record<string, number | string>,
+): Record<string, unknown> {
+	const patch: Record<string, any> = {};
+	for (const [key, on] of Object.entries(states)) {
+		if (on === undefined) continue;
+		patch[key] = on;
+		if (!on) continue;
+		for (const field of flagFields(key)) {
+			const value = values[field.key] ?? (field.kind === "text" ? "" : 0);
+			const parts = field.key.split(".");
+			if (parts.length === 1) patch[field.key] = value;
+			else (patch[parts[0]] ??= {})[parts[1]] = value;
+		}
+	}
+	return patch;
 }
