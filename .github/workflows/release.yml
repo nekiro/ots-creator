@@ -187,9 +187,18 @@ jobs:
 
       - name: Install system packages
         run: |
-          sudo apt-get update
           # GTK 4 and WebKitGTK 6.0 for cgo; file and desktop-file-utils for linuxdeploy.
-          sudo apt-get install -y --no-install-recommends             build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev             file desktop-file-utils
+          packages="build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev file desktop-file-utils"
+          install_packages() {
+            sudo apt-get update &&
+            sudo apt-get install -y --no-install-recommends -o Acquire::Retries=3 $packages
+          }
+          # The runner's Azure apt mirror sometimes lags behind its index or goes down;
+          # retry once against the main Ubuntu archive.
+          if ! install_packages; then
+            echo "http://archive.ubuntu.com/ubuntu/" | sudo tee /etc/apt/apt-mirrors.txt
+            install_packages
+          fi
 
       - name: Install tools
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@$WAILS_VERSION
