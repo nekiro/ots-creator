@@ -537,7 +537,7 @@ func TestSettingsFormatFollowsCountU16(t *testing.T) {
 }
 
 func TestDefaultSettings(t *testing.T) {
-	want := Settings{Automagic: true, EraserLeaveUnique: true, HouseRemoveItems: true, AutoDoorID: true, DefaultSpawnTime: 60, AutoCreateSpawn: true}
+	want := Settings{Automagic: true, EraserLeaveUnique: true, HouseRemoveItems: true, AutoDoorID: true, DefaultSpawnTime: 60, AutoCreateSpawn: true, ViewRangeX: 9, ViewRangeY: 7, ViewRangeFloors: 2}
 	if got := DefaultSettings(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("DefaultSettings() = %+v, want %+v", got, want)
 	}

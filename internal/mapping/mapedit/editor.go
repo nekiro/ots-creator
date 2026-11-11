@@ -1,6 +1,7 @@
 package mapedit
 
 import (
+	"encoding/json"
 	"math/rand/v2"
 	"slices"
 	"time"
@@ -29,6 +30,24 @@ type Settings struct {
 	// in their minimap color, such as invisible stairs. Nil: the
 	// DefaultMarkedItems of the items mode.
 	MarkedItems []uint16 `json:"markedItems"`
+	// ViewRangeX and ViewRangeY are the tiles a player sees to each side,
+	// ViewRangeFloors the floors seen up and down: tiles out of this view
+	// of every walkable tile are removed by RemoveUnreachable.
+	ViewRangeX      int `json:"viewRangeX"`
+	ViewRangeY      int `json:"viewRangeY"`
+	ViewRangeFloors int `json:"viewRangeFloors"`
+}
+
+// UnmarshalJSON starts from DefaultSettings, so settings saved before a
+// field existed get its default.
+func (s *Settings) UnmarshalJSON(data []byte) error {
+	type plain Settings
+	decoded := plain(DefaultSettings())
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*s = Settings(decoded)
+	return nil
 }
 
 func (s Settings) Format() otmap.Format {
@@ -36,7 +55,11 @@ func (s Settings) Format() otmap.Format {
 }
 
 func DefaultSettings() Settings {
-	return Settings{Automagic: true, EraserLeaveUnique: true, HouseRemoveItems: true, AutoDoorID: true, DefaultSpawnTime: defaultSpawnTimeSeconds, AutoCreateSpawn: true}
+	return Settings{
+		Automagic: true, EraserLeaveUnique: true, HouseRemoveItems: true, AutoDoorID: true,
+		DefaultSpawnTime: defaultSpawnTimeSeconds, AutoCreateSpawn: true,
+		ViewRangeX: defaultViewRangeX, ViewRangeY: defaultViewRangeY, ViewRangeFloors: defaultViewRangeFloors,
+	}
 }
 
 // DefaultMarkedItems returns the items RME marks: the invisible stairs and

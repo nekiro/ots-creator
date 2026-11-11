@@ -100,6 +100,35 @@
 		/><span class="t-label">seconds</span>
 	</div>
 
+	<h4>Client view</h4>
+	<div class="row view">
+		<span>Tiles to each side</span><NumberField
+			value={settings.viewRangeX}
+			min={0}
+			max={64}
+			width={48}
+			title="Horizontally"
+			onchange={(value) => change({ viewRangeX: value })}
+		/><span class="t-label">x</span><NumberField
+			value={settings.viewRangeY}
+			min={0}
+			max={64}
+			width={48}
+			title="Vertically"
+			onchange={(value) => change({ viewRangeY: value })}
+		/><span class="t-label">floors up and down</span><NumberField
+			value={settings.viewRangeFloors}
+			min={0}
+			max={15}
+			width={48}
+			onchange={(value) => change({ viewRangeFloors: value })}
+		/>
+	</div>
+	<span class="t-label hint"
+		>What a player sees around them. Map tools › Remove tiles nobody can see keeps the tiles in this view of a
+		walkable tile. Default: 9 x 7 tiles, 2 floors.</span
+	>
+
 	<h4>Marked items</h4>
 	<input
 		class="t-input"
@@ -130,5 +159,8 @@
 	}
 	.hint {
 		font-size: 12px;
+	}
+	.view {
+		flex-wrap: wrap;
 	}
 </style>

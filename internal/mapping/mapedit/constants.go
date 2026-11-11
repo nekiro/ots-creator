@@ -194,12 +194,15 @@ const (
 	toUnknown = -2
 )
 
-// Client view range used by RemoveUnreachable: tiles seen to each side
-// horizontally and vertically, and floors seen up and down.
+// Default client view of Settings: tiles seen to each side horizontally
+// and vertically, and floors seen up and down.
 const (
-	clientViewRangeX      = 9
-	clientViewRangeY      = 7
-	clientViewFloorsRange = 2
+	defaultViewRangeX      = 9
+	defaultViewRangeY      = 7
+	defaultViewRangeFloors = 2
+	// maxViewRange caps ViewRangeX and ViewRangeY: each visible row is
+	// copied once per row in range.
+	maxViewRange = 64
 )
 
 const creatureDirectionCount = 4

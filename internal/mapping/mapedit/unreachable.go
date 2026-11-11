@@ -24,8 +24,12 @@ func (rows rowSpans) contains(x, y int) bool {
 // each row (y).
 type floorRows [otmap.MaxFloor + 1]map[int][]int
 
-// RemoveUnreachable removes tiles no player can see: tiles farther than
-// the client view (9x7 tiles) from any walkable tile within two floors.
+// viewRange is the client view used by RemoveUnreachable: tiles seen to
+// each side and floors seen up and down.
+type viewRange struct{ x, y, floors int }
+
+// RemoveUnreachable removes tiles no player can see: tiles out of the
+// client view (Settings.ViewRange*) of every walkable tile.
 //
 // The map is read twice: once to collect the walkable tiles, once to test
 // every tile against the area they make visible, kept as row spans.
@@ -42,7 +46,12 @@ func (e *Editor) RemoveUnreachable() int {
 		}
 		progress()
 	})
-	visible := visibleSpans(walkable)
+	view := viewRange{
+		x:      min(max(e.Settings.ViewRangeX, 0), maxViewRange),
+		y:      min(max(e.Settings.ViewRangeY, 0), maxViewRange),
+		floors: min(max(e.Settings.ViewRangeFloors, 0), otmap.MaxFloor),
+	}
+	visible := visibleSpans(walkable, view)
 	var unreachable []otmap.Position
 	e.Map.Each(func(pos otmap.Position, _ *otmap.Tile) {
 		if !visible[pos.Z].contains(int(pos.X), int(pos.Y)) {
@@ -62,9 +71,8 @@ func (e *Editor) RemoveUnreachable() int {
 }
 
 // visibleSpans returns, per floor, the spans of each row that a player on
-// a walkable tile sees: within clientViewRangeX/Y tiles and
-// clientViewFloorsRange floors of it.
-func visibleSpans(walkable floorRows) [otmap.MaxFloor + 1]rowSpans {
+// a walkable tile sees: within view of it.
+func visibleSpans(walkable floorRows, view viewRange) [otmap.MaxFloor + 1]rowSpans {
 	// Walkable tiles widened by the horizontal view range, per floor.
 	var widened [otmap.MaxFloor + 1]rowSpans
 	for floor, rows := range walkable {
@@ -73,7 +81,7 @@ func visibleSpans(walkable floorRows) [otmap.MaxFloor + 1]rowSpans {
 			slices.Sort(xs)
 			var spans []span
 			for _, x := range xs {
-				spans = appendSpan(spans, span{x - clientViewRangeX, x + clientViewRangeX})
+				spans = appendSpan(spans, span{x - view.x, x + view.x})
 			}
 			widened[floor][y] = spans
 		}
@@ -81,9 +89,9 @@ func visibleSpans(walkable floorRows) [otmap.MaxFloor + 1]rowSpans {
 	var visible [otmap.MaxFloor + 1]rowSpans
 	for floor := range visible {
 		rows := rowSpans{}
-		for source := max(floor-clientViewFloorsRange, 0); source <= min(floor+clientViewFloorsRange, otmap.MaxFloor); source++ {
+		for source := max(floor-view.floors, 0); source <= min(floor+view.floors, otmap.MaxFloor); source++ {
 			for y, spans := range widened[source] {
-				for dy := -clientViewRangeY; dy <= clientViewRangeY; dy++ {
+				for dy := -view.y; dy <= view.y; dy++ {
 					rows[y+dy] = append(rows[y+dy], spans...)
 				}
 			}

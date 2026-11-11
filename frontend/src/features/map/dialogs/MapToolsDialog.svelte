@@ -55,7 +55,7 @@
 		},
 		{
 			label: "Remove tiles nobody can see",
-			hint: "Tiles farther than the client view from any walkable tile.",
+			hint: "Tiles out of the client view of every walkable tile (Settings › Map › Client view).",
 			selection: null,
 			all: "removeUnreachable",
 			confirm: "This removes whole tiles from the map. Continue?",

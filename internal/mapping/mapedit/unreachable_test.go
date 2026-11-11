@@ -1,6 +1,7 @@
 package mapedit
 
 import (
+	"encoding/json"
 	"math/rand/v2"
 	"testing"
 	"time"
@@ -13,9 +14,9 @@ import (
 // RemoveUnreachable.
 func seenByScan(e *Editor, pos otmap.Position) bool {
 	x, y, z := int(pos.X), int(pos.Y), int(pos.Z)
-	for floor := max(z-clientViewFloorsRange, 0); floor <= min(z+clientViewFloorsRange, otmap.MaxFloor); floor++ {
-		for dy := -clientViewRangeY; dy <= clientViewRangeY; dy++ {
-			for dx := -clientViewRangeX; dx <= clientViewRangeX; dx++ {
+	for floor := max(z-e.Settings.ViewRangeFloors, 0); floor <= min(z+e.Settings.ViewRangeFloors, otmap.MaxFloor); floor++ {
+		for dy := -e.Settings.ViewRangeY; dy <= e.Settings.ViewRangeY; dy++ {
+			for dx := -e.Settings.ViewRangeX; dx <= e.Settings.ViewRangeX; dx++ {
 				if tile := e.Map.At(x+dx, y+dy, floor); tile != nil && !e.blocking(tile) {
 					return true
 				}
@@ -90,5 +91,42 @@ func TestRemoveUnreachableOnLargeMapIsFast(t *testing.T) {
 	keptColumns, keptRows := 10+19*19, 8+19*15
 	if want := 1000*1000 - keptColumns*keptRows; removed != want {
 		t.Fatalf("removed %d, want %d", removed, want)
+	}
+}
+
+func TestRemoveUnreachableFollowsViewRangeSettings(t *testing.T) {
+	e := testEditor(t)
+	e.Settings.ViewRangeX, e.Settings.ViewRangeY, e.Settings.ViewRangeFloors = 3, 2, 0
+	toolsPut(e, at(100, 100), sandID)
+	seen := []otmap.Position{at(103, 100), at(97, 102)}
+	unseen := []otmap.Position{at(104, 100), at(100, 103), posAt(100, 100, 6)}
+	for _, pos := range append(append([]otmap.Position{}, seen...), unseen...) {
+		toolsPut(e, pos, 0, otmap.Item{ID: treeID})
+	}
+
+	e.RemoveUnreachable()
+
+	for _, pos := range seen {
+		if e.Map.Tile(pos) == nil {
+			t.Fatalf("tile %v in view was removed", pos)
+		}
+	}
+	for _, pos := range unseen {
+		if e.Map.Tile(pos) != nil {
+			t.Fatalf("tile %v out of view was kept", pos)
+		}
+	}
+}
+
+func TestSettingsSavedBeforeViewRangeGetDefaults(t *testing.T) {
+	var settings Settings
+	if err := json.Unmarshal([]byte(`{"automagic":false,"defaultSpawnTime":30}`), &settings); err != nil {
+		t.Fatal(err)
+	}
+	if settings.Automagic || settings.DefaultSpawnTime != 30 {
+		t.Fatalf("saved fields lost: %+v", settings)
+	}
+	if settings.ViewRangeX != 9 || settings.ViewRangeY != 7 || settings.ViewRangeFloors != 2 {
+		t.Fatalf("view range = %d x %d, %d floors, want defaults 9 x 7, 2 floors", settings.ViewRangeX, settings.ViewRangeY, settings.ViewRangeFloors)
 	}
 }
