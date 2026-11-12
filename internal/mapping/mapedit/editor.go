@@ -36,6 +36,8 @@ type Settings struct {
 	ViewRangeX      int `json:"viewRangeX"`
 	ViewRangeY      int `json:"viewRangeY"`
 	ViewRangeFloors int `json:"viewRangeFloors"`
+	// ShowFPS shows the frames drawn per second in the corner of the map.
+	ShowFPS bool `json:"showFps"`
 }
 
 // UnmarshalJSON starts from DefaultSettings, so settings saved before a
@@ -59,6 +61,7 @@ func DefaultSettings() Settings {
 		Automagic: true, EraserLeaveUnique: true, HouseRemoveItems: true, AutoDoorID: true,
 		DefaultSpawnTime: defaultSpawnTimeSeconds, AutoCreateSpawn: true,
 		ViewRangeX: defaultViewRangeX, ViewRangeY: defaultViewRangeY, ViewRangeFloors: defaultViewRangeFloors,
+		ShowFPS: true,
 	}
 }
 
@@ -196,8 +199,6 @@ func (e *Editor) MarkSaved() {
 	e.clean = len(e.undo)
 	e.foreign = false
 }
-
-func (e *Editor) MarkUnsaved() { e.clean = -1 }
 
 func (e *Editor) CanUndo() bool { return len(e.undo) > 0 }
 

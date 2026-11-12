@@ -8,6 +8,7 @@
 	import Icon from "../../lib/ui/Icon.svelte";
 	import MiniWindow from "../../lib/ui/MiniWindow.svelte";
 	import Select from "../../lib/ui/Select.svelte";
+	import VirtualRows from "../../lib/ui/VirtualRows.svelte";
 	import ItemIcon from "./ItemIcon.svelte";
 	import ItemPicker from "./ItemPicker.svelte";
 
@@ -35,23 +36,14 @@
 	let busy = $state(false);
 	let current = $state(-1);
 
-	// Only the rows in view (and a few around) are in the page: a search
-	// finds up to thousands. Rows are one line each, so all have the height
-	// measured on the ones shown.
-	const ROWS_AROUND = 10;
-	let list = $state<HTMLDivElement>();
-	let listScroll = $state(0);
-	let listHeight = $state(0);
-	let rowHeight = $state(22);
+	let rows = $state<{ reveal: (index: number) => void }>();
 	const rowCount = $derived(map.results?.items.length ?? 0);
-	const firstRow = $derived(Math.max(0, Math.min(rowCount, Math.floor(listScroll / rowHeight) - ROWS_AROUND)));
-	const lastRow = $derived(Math.min(rowCount, Math.ceil((listScroll + listHeight) / rowHeight) + ROWS_AROUND));
-	$effect(() => {
-		if (!rowCount) return;
-		const rows = list?.querySelectorAll<HTMLElement>(".res");
-		if (!rows?.length) return;
-		const height = rows.length > 1 ? rows[1].offsetTop - rows[0].offsetTop : rows[0].offsetHeight;
-		if (height > 0) rowHeight = height;
+	/** What every found item is when all are the same: said once over the list, not on every row. */
+	const sameLabel = $derived.by(() => {
+		const items = map.results?.items ?? [];
+		if (items.length < 2) return "";
+		const label = items[0].label;
+		return items.every((item) => item.label === label) ? label : "";
 	});
 
 	$effect(() => {
@@ -119,12 +111,7 @@
 		const result = results?.items[index];
 		if (!result) return;
 		current = index;
-		if (list) {
-			const top = index * rowHeight;
-			if (top < list.scrollTop) list.scrollTop = top;
-			else if (top + rowHeight > list.scrollTop + list.clientHeight)
-				list.scrollTop = top + rowHeight - list.clientHeight;
-		}
+		rows?.reveal(index);
 		goTo(result.pos);
 		mapCommands.inspect(result.pos);
 	}
@@ -228,7 +215,9 @@
 
 		{#if results}
 			<div class="m-sect">
-				{results.items.length.toLocaleString()}{results.more ? "+" : ""} found
+				{results.items.length.toLocaleString()}{results.more ? "+" : ""} found{sameLabel
+					? ` · ${sameLabel}`
+					: ""}
 				<span class="grow"></span>
 				{#if results.items.length}
 					<button
@@ -254,23 +243,17 @@
 					>
 				{/if}
 			</div>
-			<div
-				class="results t-panel"
-				bind:this={list}
-				bind:clientHeight={listHeight}
-				onscroll={(event) => (listScroll = event.currentTarget.scrollTop)}
-			>
+			<div class="results t-panel">
 				{#if rowCount}
-					<div style:height="{firstRow * rowHeight}px"></div>
-					{#each results.items.slice(firstRow, lastRow) as result, offset (firstRow + offset)}
-						{@const i = firstRow + offset}
-						<button class="m-row res" class:on={i === current} onclick={() => show(i)}>
-							<span class="rp">{result.pos.x}, {result.pos.y}, {result.pos.z}</span>
-							<span class="m-name">{result.label}</span>
-							{#if result.detail}<span class="m-meta">{result.detail}</span>{/if}
-						</button>
-					{/each}
-					<div style:height="{(rowCount - lastRow) * rowHeight}px"></div>
+					<VirtualRows bind:this={rows} items={results.items}>
+						{#snippet row(result, i)}
+							<button class="m-row res" class:on={i === current} onclick={() => show(i)}>
+								<span class="rp">{result.pos.x}, {result.pos.y}, {result.pos.z}</span>
+								<span class="m-name">{sameLabel ? "" : result.label}</span>
+								{#if result.detail}<span class="m-meta">{result.detail}</span>{/if}
+							</button>
+						{/snippet}
+					</VirtualRows>
 				{:else}
 					<div class="m-empty">Nothing found.</div>
 				{/if}

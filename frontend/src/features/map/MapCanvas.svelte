@@ -873,7 +873,16 @@
 	{:else if map.pasting}
 		<div class="pickhint">Click to paste · Shift+click pastes again · Esc cancels</div>
 	{/if}
-	<div class="fps t-label">{fps} FPS{loadInfo ? ` · ${loadInfo}` : ""}</div>
+	{#if map.active?.tiles === 0 && !map.pick && !map.pasting && !glError}
+		<div class="emptyhint t-label">
+			{map.brush
+				? "Click or drag here to draw."
+				: "This map is empty. Pick a brush or an item on the left, then click or drag here to draw."}
+		</div>
+	{/if}
+	{#if map.settings?.showFps !== false}
+		<div class="fps t-label">{fps} FPS{loadInfo ? ` · ${loadInfo}` : ""}</div>
+	{/if}
 	{#if glError}
 		<div class="err t-label">The map cannot be drawn: {glError}</div>
 	{/if}
@@ -925,6 +934,15 @@
 		background: rgba(0, 0, 0, 0.75);
 		border: 1px solid var(--gold);
 		color: var(--gold);
+		pointer-events: none;
+	}
+	.emptyhint {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		max-width: 320px;
+		text-align: center;
 		pointer-events: none;
 	}
 	.fps {

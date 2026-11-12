@@ -118,7 +118,6 @@ func (ms *MapService) NewMap(options NewMapOptions) (MapInfo, error) {
 			From: otmap.Position{Z: otmap.GroundFloor}, To: otmap.Position{X: gameMap.Width - 1, Y: gameMap.Height - 1, Z: otmap.GroundFloor},
 		}})
 	}
-	opened.editor.MarkUnsaved()
 	opened.editor.TakeDirty()
 	return ms.info(opened, true), nil
 }

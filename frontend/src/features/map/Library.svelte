@@ -19,6 +19,7 @@
 	import Icon from "../../lib/ui/Icon.svelte";
 	import SearchField from "../../lib/ui/SearchField.svelte";
 	import Select from "../../lib/ui/Select.svelte";
+	import VirtualRows from "../../lib/ui/VirtualRows.svelte";
 	import VirtualGrid from "../../lib/ui/VirtualGrid.svelte";
 	import BrushPreview from "./BrushPreview.svelte";
 	import ItemIcon from "./ItemIcon.svelte";
@@ -493,7 +494,7 @@
 					{who === "npc" ? "NPCs" : who === "monster" ? "Monsters" : "Creatures"}<span class="grow"
 					></span>{shownCreatures.length}
 				</div>
-				{#each shownCreatures as creature (creature.name)}{@render creatureRow(creature)}{/each}
+				<VirtualRows items={shownCreatures} row={creatureRow} />
 			{:else if search}
 				{@render noMatch()}
 			{:else}

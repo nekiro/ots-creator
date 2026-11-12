@@ -48,8 +48,8 @@ func TestMapServiceRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !info.Changed {
-		t.Fatal("new map not marked changed")
+	if info.Changed {
+		t.Fatal("an empty new map has unsaved changes")
 	}
 	ch, err := ms.Draw(info.ID, mapedit.DrawRequest{Kind: mapedit.KindRaw, Item: 100, Points: []otmap.Position{{X: 10, Y: 10, Z: 7}}, Size: 1})
 	if err != nil {

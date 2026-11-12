@@ -113,13 +113,13 @@
 	.start {
 		grid-column: 1 / -1;
 		display: flex;
-		align-items: center;
+		flex-wrap: wrap;
+		align-content: center;
 		justify-content: center;
 		gap: 12px;
 	}
 	.card {
 		width: 400px;
-		align-self: center;
 		padding: 16px 20px 14px;
 		align-items: center;
 		text-align: center;

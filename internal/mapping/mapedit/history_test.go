@@ -226,18 +226,6 @@ func TestChangedFollowsSavedState(t *testing.T) {
 	check("after redoing to the save", false)
 }
 
-func TestMarkUnsavedCountsAsChanged(t *testing.T) {
-	e := testEditor(t)
-	e.MarkUnsaved()
-	if !e.Changed() {
-		t.Fatal("Changed() after MarkUnsaved = false, want true")
-	}
-	e.MarkSaved()
-	if e.Changed() {
-		t.Fatal("Changed() after MarkSaved = true, want false")
-	}
-}
-
 func TestSavedStateUndoneAndReplacedIsChanged(t *testing.T) {
 	cases := []struct {
 		name  string

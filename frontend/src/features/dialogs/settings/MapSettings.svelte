@@ -42,6 +42,11 @@
 			label: "Item counts as 16-bit numbers",
 			hint: "For servers that read the count attribute as uint16 (stacks above 255). Maps open and save in this format; standard servers cannot read them.",
 		},
+		{
+			key: "showFps",
+			label: "Show frames per second",
+			hint: "The frames drawn per second, in the corner of the map.",
+		},
 	];
 </script>
 
