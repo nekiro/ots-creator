@@ -239,3 +239,10 @@ func TestParseProgress(t *testing.T) {
 		t.Fatal("file without node type parsed")
 	}
 }
+
+func TestDeepNestingIsRejected(t *testing.T) {
+	data := append(make([]byte, 4), bytes.Repeat([]byte{nodeStart, 1}, maxNesting+2)...)
+	if _, _, err := Parse(data); !errors.Is(err, ErrFormat) {
+		t.Fatalf("got %v, want ErrFormat", err)
+	}
+}

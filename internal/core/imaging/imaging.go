@@ -23,8 +23,23 @@ import (
 // treated as transparent on import.
 var Magenta = color.NRGBA{R: 0xFF, G: 0x00, B: 0xFF, A: 0xFF}
 
+// maxPixels bounds decoded images: a small file can declare a size that
+// takes gigabytes to decode.
+const maxPixels = 64 << 20
+
 func Decode(reader io.Reader) (*image.NRGBA, error) {
-	img, _, err := image.Decode(reader)
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+	config, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	if config.Width <= 0 || config.Height <= 0 || config.Width > maxPixels/config.Height {
+		return nil, fmt.Errorf("image of %dx%d is too large", config.Width, config.Height)
+	}
+	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}

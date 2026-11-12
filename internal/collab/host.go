@@ -253,7 +253,7 @@ func (h *Host) serve(raw net.Conn) {
 		return
 	}
 	c := newConn(tlsConn)
-	kind, payload, err := c.receive(handshakeTime)
+	kind, payload, err := c.receiveUpTo(maxHello, handshakeTime)
 	if err != nil {
 		_ = c.close()
 		return

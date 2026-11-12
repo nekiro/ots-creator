@@ -69,6 +69,14 @@ func DecodeRaw(raw []byte) (*Data, error) {
 	if err != nil {
 		return nil, fmt.Errorf("obd v%d: %w", max(int(version)/100, 1), err)
 	}
+	want := data.SpriteSize * data.SpriteSize * 4
+	for _, group := range data.Sprites {
+		for _, sprite := range group {
+			if len(sprite.Pixels) != want {
+				return nil, fmt.Errorf("obd: sprites of different sizes")
+			}
+		}
+	}
 	return data, nil
 }
 

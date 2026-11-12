@@ -32,6 +32,9 @@ const DefaultPort = 47816
 
 const (
 	maxFrame = 64 << 20
+	// maxHello bounds the first frame of a connection, read before the
+	// password is checked.
+	maxHello = 64 << 10
 	// maxSnapshotData bounds the size of the uncompressed map a guest
 	// accepts (a hostile host must not fill the memory).
 	maxSnapshotData = 4 << 30
@@ -185,13 +188,18 @@ func (c *conn) sendJSON(kind byte, value any) error {
 }
 
 func (c *conn) receive(timeout time.Duration) (byte, []byte, error) {
+	return c.receiveUpTo(maxFrame, timeout)
+}
+
+// receiveUpTo receives one frame of at most limit bytes.
+func (c *conn) receiveUpTo(limit uint32, timeout time.Duration) (byte, []byte, error) {
 	_ = c.raw.SetReadDeadline(time.Now().Add(timeout))
 	var header [4]byte
 	if _, err := io.ReadFull(c.reader, header[:]); err != nil {
 		return 0, nil, err
 	}
 	length := binary.LittleEndian.Uint32(header[:])
-	if length == 0 || length > maxFrame {
+	if length == 0 || length > limit {
 		return 0, nil, errors.New("a message has a wrong size")
 	}
 	frame := make([]byte, length)

@@ -86,7 +86,11 @@ func parseStunReply(reply, transaction []byte) (netip.Addr, bool) {
 				mapped = netip.AddrFrom4(ip)
 			}
 		}
-		attrs = attrs[4+(size+3)&^3:]
+		next := 4 + (size+3)&^3
+		if next > len(attrs) {
+			break
+		}
+		attrs = attrs[next:]
 	}
 	return mapped, mapped.IsValid()
 }

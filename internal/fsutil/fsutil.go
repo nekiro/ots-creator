@@ -14,6 +14,8 @@ import (
 const (
 	FileMode fs.FileMode = 0o644
 	DirMode  fs.FileMode = 0o755
+	// PrivateFileMode is for files that hold passwords or tokens.
+	PrivateFileMode fs.FileMode = 0o600
 )
 
 func FileExists(path string) bool {
@@ -40,7 +42,7 @@ func ReadOptional(path string) ([]byte, error) {
 // WriteAtomic writes data to a temporary file next to path and renames it
 // over path, so readers never see a half written file.
 func WriteAtomic(path string, data []byte) error {
-	return writeTemp(path, func(tmp *os.File) error {
+	return writeTemp(path, FileMode, func(tmp *os.File) error {
 		_, err := tmp.Write(data)
 		return err
 	})
@@ -49,6 +51,16 @@ func WriteAtomic(path string, data []byte) error {
 // WriteJSON writes value as JSON indented with indent to path, creating
 // its folder, with WriteAtomic. An empty path writes nothing.
 func WriteJSON(path string, value any, indent string) error {
+	return writeJSON(path, value, indent, FileMode)
+}
+
+// WriteJSONPrivate is WriteJSON for files that hold passwords or tokens:
+// only the user can read the file.
+func WriteJSONPrivate(path string, value any, indent string) error {
+	return writeJSON(path, value, indent, PrivateFileMode)
+}
+
+func writeJSON(path string, value any, indent string, mode os.FileMode) error {
 	if path == "" {
 		return nil
 	}
@@ -59,7 +71,10 @@ func WriteJSON(path string, value any, indent string) error {
 	if err := os.MkdirAll(filepath.Dir(path), DirMode); err != nil {
 		return err
 	}
-	return WriteAtomic(path, data)
+	return writeTemp(path, mode, func(tmp *os.File) error {
+		_, err := tmp.Write(data)
+		return err
+	})
 }
 
 // AppendOtherPaths appends to out the entries of list whose path (given by
@@ -90,13 +105,13 @@ func CopyFile(src, dst string) error {
 		return err
 	}
 	defer in.Close()
-	return writeTemp(dst, func(tmp *os.File) error {
+	return writeTemp(dst, FileMode, func(tmp *os.File) error {
 		_, err := io.Copy(tmp, in)
 		return err
 	})
 }
 
-func writeTemp(path string, write func(*os.File) error) error {
+func writeTemp(path string, mode os.FileMode, write func(*os.File) error) error {
 	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp*")
 	if err != nil {
 		return err
@@ -104,7 +119,7 @@ func writeTemp(path string, write func(*os.File) error) error {
 	name := tmp.Name()
 	err = write(tmp)
 	if err == nil {
-		err = tmp.Chmod(FileMode)
+		err = tmp.Chmod(mode)
 	}
 	if closeErr := tmp.Close(); err == nil {
 		err = closeErr

@@ -246,6 +246,11 @@ func putItem(w *binio.Writer, item otmap.Item) {
 	}
 }
 
+// maxItemsAhead bounds the room taken for the items of a container before
+// they are read: nested containers each claim most of the message, and
+// taking it all up front lets a small message use many times its size.
+const maxItemsAhead = 64
+
 func getItem(r *binio.Reader, depth int) otmap.Item {
 	item := otmap.Item{ID: r.U16(), Subtype: r.U16()}
 	if r.U8() == 0 {
@@ -263,12 +268,13 @@ func getItem(r *binio.Reader, depth int) otmap.Item {
 	ext.DepotID = r.U16()
 	ext.DoorID = r.U8()
 	if count := getCount(r, 5); count > 0 {
-		ext.Items = make([]otmap.Item, count)
-		for i := range ext.Items {
-			ext.Items[i] = getItem(r, depth+1)
+		ext.Items = make([]otmap.Item, 0, min(count, maxItemsAhead))
+		for range count {
+			inner := getItem(r, depth+1)
 			if r.Err() != nil {
 				return item
 			}
+			ext.Items = append(ext.Items, inner)
 		}
 	}
 	if count := getCount(r, 22); count > 0 {

@@ -165,7 +165,7 @@ func defaultPeerName() string {
 
 func (cs *CollabService) saveLocked() {
 	if cs.storePath != "" {
-		_ = fsutil.WriteJSON(cs.storePath, cs.store, "\t")
+		_ = fsutil.WriteJSONPrivate(cs.storePath, cs.store, "\t")
 	}
 }
 

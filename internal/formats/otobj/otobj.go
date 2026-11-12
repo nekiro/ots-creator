@@ -33,6 +33,8 @@ const (
 	manifestName = "manifest.json"
 	maxEntry     = 64 << 20
 	maxSprites   = 4096
+	// maxFrameGroups is the most groups a thing has: idle and walking.
+	maxFrameGroups = 2
 )
 
 var ErrNotOTOBJ = errors.New("not an otobj file")
@@ -294,6 +296,9 @@ func Decode(file []byte) (*obd.Data, error) {
 	data := &obd.Data{Version: Version, Thing: object, SpriteSize: meta.SpriteSize}
 	if meta.Source != nil {
 		data.ClientVersion, object.ID = meta.Source.Client, meta.Source.ID
+	}
+	if len(meta.FrameGroups) > maxFrameGroups {
+		return nil, fmt.Errorf("otobj: %d frame groups, at most %d", len(meta.FrameGroups), maxFrameGroups)
 	}
 	for groupIndex, groupManifest := range meta.FrameGroups {
 		frameGroup, err := decodeGroup(groupManifest, groupIndex, category.DefaultDuration())

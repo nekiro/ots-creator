@@ -112,12 +112,20 @@ func DecodeSheet(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("sprite sheet: %w", err)
 	}
-	bmp, err := io.ReadAll(reader)
+	bmp, err := io.ReadAll(io.LimitReader(reader, maxSheetBMP+1))
 	if err != nil {
 		return nil, fmt.Errorf("sprite sheet: %w", err)
 	}
+	if len(bmp) > maxSheetBMP {
+		return nil, errors.New("sprite sheet: image too large")
+	}
 	return decodeBMP(bmp)
 }
+
+// maxSheetBMP bounds the unpacked image of a sheet: a sheet is a 32 bit
+// BMP of SheetSize, well under 1 MB, and a crafted one could unpack to
+// gigabytes.
+const maxSheetBMP = 4 << 20
 
 func decodeBMP(bmp []byte) ([]byte, error) {
 	if len(bmp) < 54 || bmp[0] != 'B' || bmp[1] != 'M' {

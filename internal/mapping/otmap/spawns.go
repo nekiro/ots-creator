@@ -122,10 +122,18 @@ func WriteSpawns(gameMap *Map) (monsters, npcs []byte, unsaved int) {
 		for _, area := range areas {
 			w.elem(areaTag, []xmlAttr{{"centerx", itoa(area.pos.X)}, {"centery", itoa(area.pos.Y)}, {"centerz", itoa(area.pos.Z)}, {"radius", itoa(area.radius)}}, false)
 			radius := int(area.radius)
-			for dy := -radius; dy <= radius; dy++ {
-				for dx := -radius; dx <= radius; dx++ {
+			// Only positions on the map, a chunk at a time where there are no
+			// tiles: a radius read from a file can be far larger than the map.
+			minX, maxX := max(-radius, -int(area.pos.X)), min(radius, 0xFFFF-int(area.pos.X))
+			minY, maxY := max(-radius, -int(area.pos.Y)), min(radius, 0xFFFF-int(area.pos.Y))
+			for dy := minY; dy <= maxY; dy++ {
+				for dx := minX; dx <= maxX; dx++ {
 					pos, ok := area.pos.Add(dx, dy, 0)
 					if !ok {
+						continue
+					}
+					if gameMap.chunks[KeyOf(pos)] == nil {
+						dx += ChunkSize - 1 - int(pos.X&(ChunkSize-1))
 						continue
 					}
 					tile := gameMap.stored(pos)

@@ -47,6 +47,10 @@ var listFields = map[thing.Category]protowire.Number{
 	thing.CategoryMissile: appearancesMissile,
 }
 
+// maxAppearances bounds the ids of a category: the list of a category has
+// an entry for every id up to the largest one in the file.
+const maxAppearances = 1 << 20
+
 func Decode(data []byte, spriteMap SpriteMap) (*File, error) {
 	root, err := parse(data)
 	if err != nil {
@@ -68,6 +72,9 @@ func Decode(data []byte, spriteMap SpriteMap) (*File, error) {
 		}
 		if appearance.ID < category.MinID() {
 			return nil, fmt.Errorf("appearances: %s id %d is below %d", category, appearance.ID, category.MinID())
+		}
+		if appearance.ID-category.MinID() >= maxAppearances {
+			return nil, fmt.Errorf("appearances: %s id %d is too large", category, appearance.ID)
 		}
 		list := file.Things[category]
 		i := int(appearance.ID - category.MinID())

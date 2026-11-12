@@ -77,12 +77,24 @@ type parser struct {
 	depth int
 	visit func(stack []*Node, node *Node) error
 	stack []*Node
+	// nesting is how deep the node being read is, bounded by maxNesting.
+	nesting int
 }
+
+// maxNesting bounds nodes in nodes: real files stay far below it (a map
+// nests a few levels plus containers in containers), and a crafted file
+// would otherwise overflow the stack.
+const maxNesting = 1024
 
 func (p *parser) node() (*Node, error) {
 	if p.pos >= len(p.data) {
 		return nil, fmt.Errorf("%w: truncated node", ErrFormat)
 	}
+	if p.nesting >= maxNesting {
+		return nil, fmt.Errorf("%w: nodes nested too deep", ErrFormat)
+	}
+	p.nesting++
+	defer func() { p.nesting-- }()
 	node := &Node{Type: p.data[p.pos]}
 	p.pos++
 	propsStart := len(p.buf)

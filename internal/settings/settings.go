@@ -262,5 +262,5 @@ func (st *Store) SetItemsOTB(clientPath, otbPath string) error {
 }
 
 func (st *Store) saveLocked() error {
-	return fsutil.WriteJSON(st.path, st.settings, "  ")
+	return fsutil.WriteJSONPrivate(st.path, st.settings, "  ")
 }
