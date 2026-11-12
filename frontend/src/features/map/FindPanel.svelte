@@ -119,6 +119,12 @@
 		const result = results?.items[index];
 		if (!result) return;
 		current = index;
+		if (list) {
+			const top = index * rowHeight;
+			if (top < list.scrollTop) list.scrollTop = top;
+			else if (top + rowHeight > list.scrollTop + list.clientHeight)
+				list.scrollTop = top + rowHeight - list.clientHeight;
+		}
 		goTo(result.pos);
 		mapCommands.inspect(result.pos);
 	}

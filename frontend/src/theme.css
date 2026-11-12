@@ -248,7 +248,7 @@ body {
 .t-btn:focus-visible {
 	box-shadow: 0 0 0 1px #9a9a9a;
 }
-.t-btn.primary {
+.t-btn.primary:not(:disabled) {
 	color: #fff;
 }
 .t-btn.green {

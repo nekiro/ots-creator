@@ -13,8 +13,12 @@
 	let box: HTMLDivElement;
 
 	$effect(() => {
-		const first = box.querySelector<HTMLElement>("input, select, button.primary, button");
-		first?.focus();
+		// A disabled control cannot take the focus: without one that can, the
+		// window itself does, so keys (Escape) reach it and not what is behind.
+		const first = box.querySelector<HTMLElement>(
+			"input:not(:disabled), select:not(:disabled), button.primary:not(:disabled), button:not(:disabled)",
+		);
+		(first ?? box).focus();
 	});
 
 	function onkeydown(event: KeyboardEvent) {
@@ -37,6 +41,7 @@
 		transition:pop|global
 		style="width:{width}px"
 		bind:this={box}
+		tabindex="-1"
 		role="dialog"
 		aria-modal="true"
 		aria-label={title}
