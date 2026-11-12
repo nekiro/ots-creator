@@ -1,4 +1,4 @@
-import { ItemFlags, TileFlags } from "../data/chunks";
+import { ItemFlags, TileFlags, type TileData } from "../data/chunks";
 import { ALPHA, COLORS, LABEL_COLORS, LIMITS, ZOOM } from "../constants";
 import { labelText, wrapText } from "../editor/itemText";
 import { wholePixelRatio } from "./labels";
@@ -14,6 +14,14 @@ interface Overlay {
 	z: number;
 	tilePx: number;
 	lineWidth: number;
+	/** The loaded tiles in and around the view, row by row (see collectTiles). */
+	tiles: SeenTile[];
+}
+
+interface SeenTile {
+	x: number;
+	y: number;
+	tile: TileData;
 }
 
 export function drawOverlays(scene: Scene, result: FrameResult, camera: Camera, batch: QuadBatch): void {
@@ -25,32 +33,62 @@ export function drawOverlays(scene: Scene, result: FrameResult, camera: Camera, 
 		z: scene.floor,
 		tilePx: camera.tilePx,
 		lineWidth: Math.max(1, Math.round(scene.scale)),
+		tiles: [],
 	};
 	const { opts } = scene;
 	const tilePx = camera.tilePx;
 	const near = !result.far;
+	const spawns = opts.spawns && tilePx >= ZOOM.tileData;
+	const labels = tilePx >= ZOOM.labels && near;
+	const creatures = opts.creatures && opts.labels && labels;
+	const texts = opts.labels && labels;
+	const tooltips = opts.tooltips && labels;
+	// One walk over the tiles for all of them, as far around the view as the widest needs.
+	if (spawns) collectTiles(overlay, LIMITS.spawnSearch, LIMITS.spawnSearch);
+	else if (creatures || texts) collectTiles(overlay, 0, 1);
+	else if (tooltips) collectTiles(overlay, 0, 0);
 	if (opts.grid && tilePx >= ZOOM.grid) drawGrid(overlay);
-	if (opts.spawns && tilePx >= ZOOM.tileData) drawSpawns(overlay);
+	if (spawns) drawSpawns(overlay);
 	drawRects(overlay);
 	if (opts.markers) drawMarkers(overlay);
 	if (opts.clientBox) drawClientBox(overlay);
-	if (opts.creatures && opts.labels && tilePx >= ZOOM.labels && near) labelCreatures(overlay);
-	if (opts.labels && tilePx >= ZOOM.labels && near) labelItemTexts(overlay);
+	if (creatures) labelCreatures(overlay);
+	if (texts) labelItemTexts(overlay);
 	if (opts.coords && scene.hover && scene.hover.z === overlay.z) labelHoverPosition(overlay);
-	if (opts.tooltips && tilePx >= ZOOM.labels && near) labelItemTooltips(overlay);
+	if (tooltips) labelItemTooltips(overlay);
 }
 
-/** Calls visit for the tiles of the floor in view, from `before` tiles up
- * and left of the view to `after` tiles down and right of it. */
-function forEachTile(overlay: Overlay, before: number, after: number, visit: (x: number, y: number) => void): void {
+/** The tiles of the floor in view from `before` tiles up and left of the
+ * view to `after` tiles down and right of it. */
+function tileBounds(overlay: Overlay, before: number, after: number) {
 	const { camera, z } = overlay;
 	const halfWidth = camera.halfWidthTiles;
 	const halfHeight = camera.halfHeightTiles;
 	const centerX = camera.centerX(z);
 	const centerY = camera.centerY(z);
-	for (let y = Math.max(0, Math.floor(centerY - halfHeight - before)); y <= centerY + halfHeight + after; y++) {
-		for (let x = Math.max(0, Math.floor(centerX - halfWidth - before)); x <= centerX + halfWidth + after; x++)
-			visit(x, y);
+	return {
+		x0: Math.max(0, Math.floor(centerX - halfWidth - before)),
+		y0: Math.max(0, Math.floor(centerY - halfHeight - before)),
+		x1: Math.floor(centerX + halfWidth + after),
+		y1: Math.floor(centerY + halfHeight + after),
+	};
+}
+
+function collectTiles(overlay: Overlay, before: number, after: number): void {
+	const { x0, y0, x1, y1 } = tileBounds(overlay, before, after);
+	overlay.scene.chunks.eachLoadedTile(x0, y0, x1, y1, overlay.z, (x, y, tile) => overlay.tiles.push({ x, y, tile }));
+}
+
+/** Calls visit for the collected tiles within `before` and `after` tiles of the view (see tileBounds), row by row. */
+function forEachTile(
+	overlay: Overlay,
+	before: number,
+	after: number,
+	visit: (x: number, y: number, tile: TileData) => void,
+): void {
+	const { x0, y0, x1, y1 } = tileBounds(overlay, before, after);
+	for (const { x, y, tile } of overlay.tiles) {
+		if (x >= x0 && x <= x1 && y >= y0 && y <= y1) visit(x, y, tile);
 	}
 }
 
@@ -66,9 +104,8 @@ function drawGrid({ scene, camera, batch, z }: Overlay): void {
 
 function drawSpawns(overlay: Overlay): void {
 	const { scene, camera, batch, z, tilePx, lineWidth } = overlay;
-	forEachTile(overlay, LIMITS.spawnSearch, LIMITS.spawnSearch, (x, y) => {
-		const tile = scene.chunks.peekTile(x, y, z);
-		if (!tile || !(tile.flags & (TileFlags.spawn | TileFlags.spawnNpc))) return;
+	forEachTile(overlay, LIMITS.spawnSearch, LIMITS.spawnSearch, (x, y, tile) => {
+		if (!(tile.flags & (TileFlags.spawn | TileFlags.spawnNpc))) return;
 		for (const spawn of [tile.spawn, tile.spawnNpc]) {
 			if (!spawn) continue;
 			const radius = spawn.radius;
@@ -147,9 +184,8 @@ function drawClientBox({ camera, batch, z, tilePx, lineWidth }: Overlay): void {
 function labelCreatures(overlay: Overlay): void {
 	const { scene, result, camera, z, tilePx } = overlay;
 	const spriteOffset = tilePx / 4;
-	forEachTile(overlay, 0, 1, (x, y) => {
-		const tile = scene.chunks.peekTile(x, y, z);
-		if (!tile?.creatures) return;
+	forEachTile(overlay, 0, 1, (x, y, tile) => {
+		if (!tile.creatures) return;
 		for (const creature of tile.creatures) {
 			result.labels.push({
 				x: camera.tileX(x, z) + tilePx / 2 - spriteOffset,
@@ -165,8 +201,7 @@ function labelCreatures(overlay: Overlay): void {
  * tile, the whole text under the mouse. */
 function labelItemTexts(overlay: Overlay): void {
 	const { scene, result, camera, z, tilePx } = overlay;
-	forEachTile(overlay, 0, 1, (x, y) => {
-		const text = scene.chunks.peekTile(x, y, z)?.text;
+	forEachTile(overlay, 0, 1, (x, y, { text }) => {
 		if (!text) return;
 		const centerX = camera.tileX(x, z) + tilePx / 2;
 		const centerY = camera.tileY(y, z) + tilePx / 2;
@@ -223,9 +258,7 @@ function labelHoverPosition({ scene, result, camera, batch, z, tilePx }: Overlay
  * teleport destination or door id, and what it has. */
 function labelItemTooltips(overlay: Overlay): void {
 	const { scene, result, camera, z, tilePx } = overlay;
-	forEachTile(overlay, 0, 0, (x, y) => {
-		const tile = scene.chunks.peekTile(x, y, z);
-		if (!tile) return;
+	forEachTile(overlay, 0, 0, (x, y, tile) => {
 		for (let i = 0; i < tile.ids.length; i++) {
 			const itemFlags = tile.itemFlags[i];
 			if (!(itemFlags & (ItemFlags.ids | ItemFlags.text | ItemFlags.teleport | ItemFlags.doorId))) continue;

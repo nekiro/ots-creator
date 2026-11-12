@@ -242,6 +242,32 @@ export class ChunkStore {
 		return this.tileIn(x, y, z, false);
 	}
 
+	/** Calls visit for the loaded tiles of a rectangle of floor z, row by row, looking up a chunk once per run of a row. */
+	eachLoadedTile(
+		x0: number,
+		y0: number,
+		x1: number,
+		y1: number,
+		z: number,
+		visit: (x: number, y: number, tile: TileData) => void,
+	): void {
+		if (z < 0 || z > MAX_FLOOR) return;
+		for (let y = Math.max(y0, 0); y <= y1; y++) {
+			const row = (y & (CHUNK - 1)) * CHUNK;
+			for (let x = Math.max(x0, 0); x <= x1;) {
+				const end = Math.min(x1, x | (CHUNK - 1));
+				const chunk = this.chunks.get(keyOf(x, y, z));
+				if (chunk) {
+					for (let tileX = x; tileX <= end; tileX++) {
+						const tile = chunk.tiles[row | (tileX & (CHUNK - 1))];
+						if (tile) visit(tileX, y, tile);
+					}
+				}
+				x = end + 1;
+			}
+		}
+	}
+
 	private tileIn(x: number, y: number, z: number, request: boolean): TileData | undefined {
 		if (x < 0 || y < 0 || z < 0 || z > MAX_FLOOR) return undefined;
 		const key = keyOf(x, y, z);

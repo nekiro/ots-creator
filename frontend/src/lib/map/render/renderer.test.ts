@@ -221,6 +221,21 @@ function fakeChunks(log: string[]): ChunkStore {
 		tile(x: number, y: number, z: number) {
 			return store.peekTile(x, y, z);
 		},
+		eachLoadedTile(
+			x0: number,
+			y0: number,
+			x1: number,
+			y1: number,
+			z: number,
+			visit: (x: number, y: number, tile: TileData) => void,
+		) {
+			for (let y = Math.max(y0, 0); y <= y1; y++) {
+				for (let x = Math.max(x0, 0); x <= x1; x++) {
+					const tile = store.peekTile(x, y, z);
+					if (tile) visit(x, y, tile);
+				}
+			}
+		},
 	};
 	return store as unknown as ChunkStore;
 }

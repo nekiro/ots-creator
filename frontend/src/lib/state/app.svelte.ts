@@ -250,7 +250,7 @@ export async function initState(): Promise<void> {
 		}
 	});
 	applyState(await ProjectService.State());
-	for (const warning of await ProjectService.StartupWarnings()) toast(warning, "error", STARTUP_WARNING_MS);
+	for (const warning of (await ProjectService.StartupWarnings()) ?? []) toast(warning, "error", STARTUP_WARNING_MS);
 	applyOther(await CompareService.State());
 }
 

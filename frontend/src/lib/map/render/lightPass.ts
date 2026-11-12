@@ -9,6 +9,26 @@ import LIGHT_FRAG from "./shaders/light.frag?raw";
 /** Texture unit of the light map (the cell indexes use 2 and 3). */
 const LIGHT_UNIT = 4;
 
+/**
+ * Everything a light map depends on, flat, to tell whether the last one
+ * still holds: most frames only move animations. A chunk counts by its
+ * object, as a chunk that changed arrives as a new one.
+ */
+function inputsOf(
+	grid: LightGrid,
+	floors: LightFloor[],
+	ambient: number,
+	spriteSize: number,
+	viewFloor: number,
+): unknown[] {
+	const inputs: unknown[] = [grid.x, grid.y, grid.width, grid.height, ambient, spriteSize, viewFloor];
+	for (const floor of floors) {
+		inputs.push(floor.z, floor.shift, floor.chunks.length, ...floor.chunks, floor.extra?.length ?? 0);
+		for (const light of floor.extra ?? []) inputs.push(light.x, light.y, light.intensity, light.color);
+	}
+	return inputs;
+}
+
 export class LightPass {
 	private program: WebGLProgram;
 	private vao: WebGLVertexArrayObject;
@@ -19,6 +39,8 @@ export class LightPass {
 	private grid: LightGrid | null = null;
 	private textureWidth = 0;
 	private textureHeight = 0;
+	/** What the light map in the texture was built from (see inputsOf): the same again needs no new one. */
+	private inputs: unknown[] = [];
 
 	constructor(
 		private gl: WebGL2RenderingContext,
@@ -64,17 +86,32 @@ export class LightPass {
 		const size = grid.width * grid.height * 4;
 		if (this.pixels.length < size) this.pixels = new Uint8Array(size);
 		const pixels = this.pixels.subarray(0, size);
-		buildLightMap(pixels, grid, floors, ambient, spriteSize, viewFloor);
+		const inputs = inputsOf(grid, floors, ambient, spriteSize, viewFloor);
+		const same = inputs.length === this.inputs.length && inputs.every((input, i) => input === this.inputs[i]);
 		this.grid = { ...grid };
 		gl.activeTexture(gl.TEXTURE0 + LIGHT_UNIT);
 		gl.bindTexture(gl.TEXTURE_2D, this.texture);
-		gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-		if (grid.width === this.textureWidth && grid.height === this.textureHeight) {
-			gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, grid.width, grid.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-		} else {
-			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, grid.width, grid.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-			this.textureWidth = grid.width;
-			this.textureHeight = grid.height;
+		if (!same) {
+			buildLightMap(pixels, grid, floors, ambient, spriteSize, viewFloor);
+			this.inputs = inputs;
+			gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+			if (grid.width === this.textureWidth && grid.height === this.textureHeight) {
+				gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, grid.width, grid.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+			} else {
+				gl.texImage2D(
+					gl.TEXTURE_2D,
+					0,
+					gl.RGBA8,
+					grid.width,
+					grid.height,
+					0,
+					gl.RGBA,
+					gl.UNSIGNED_BYTE,
+					pixels,
+				);
+				this.textureWidth = grid.width;
+				this.textureHeight = grid.height;
+			}
 		}
 		gl.useProgram(this.program);
 		gl.uniform1i(this.uniforms.u_light, LIGHT_UNIT);

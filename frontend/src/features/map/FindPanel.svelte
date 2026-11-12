@@ -35,6 +35,25 @@
 	let busy = $state(false);
 	let current = $state(-1);
 
+	// Only the rows in view (and a few around) are in the page: a search
+	// finds up to thousands. Rows are one line each, so all have the height
+	// measured on the ones shown.
+	const ROWS_AROUND = 10;
+	let list = $state<HTMLDivElement>();
+	let listScroll = $state(0);
+	let listHeight = $state(0);
+	let rowHeight = $state(22);
+	const rowCount = $derived(map.results?.items.length ?? 0);
+	const firstRow = $derived(Math.max(0, Math.min(rowCount, Math.floor(listScroll / rowHeight) - ROWS_AROUND)));
+	const lastRow = $derived(Math.min(rowCount, Math.ceil((listScroll + listHeight) / rowHeight) + ROWS_AROUND));
+	$effect(() => {
+		if (!rowCount) return;
+		const rows = list?.querySelectorAll<HTMLElement>(".res");
+		if (!rows?.length) return;
+		const height = rows.length > 1 ? rows[1].offsetTop - rows[0].offsetTop : rows[0].offsetHeight;
+		if (height > 0) rowHeight = height;
+	});
+
 	$effect(() => {
 		const preset = map.findPreset;
 		if (!preset) return;
@@ -229,16 +248,26 @@
 					>
 				{/if}
 			</div>
-			<div class="results t-panel">
-				{#each results.items as result, i (i)}
-					<button class="m-row res" class:on={i === current} onclick={() => show(i)}>
-						<span class="rp">{result.pos.x}, {result.pos.y}, {result.pos.z}</span>
-						<span class="m-name">{result.label}</span>
-						{#if result.detail}<span class="m-meta">{result.detail}</span>{/if}
-					</button>
+			<div
+				class="results t-panel"
+				bind:this={list}
+				bind:clientHeight={listHeight}
+				onscroll={(event) => (listScroll = event.currentTarget.scrollTop)}
+			>
+				{#if rowCount}
+					<div style:height="{firstRow * rowHeight}px"></div>
+					{#each results.items.slice(firstRow, lastRow) as result, offset (firstRow + offset)}
+						{@const i = firstRow + offset}
+						<button class="m-row res" class:on={i === current} onclick={() => show(i)}>
+							<span class="rp">{result.pos.x}, {result.pos.y}, {result.pos.z}</span>
+							<span class="m-name">{result.label}</span>
+							{#if result.detail}<span class="m-meta">{result.detail}</span>{/if}
+						</button>
+					{/each}
+					<div style:height="{(rowCount - lastRow) * rowHeight}px"></div>
 				{:else}
 					<div class="m-empty">Nothing found.</div>
-				{/each}
+				{/if}
 			</div>
 		{/if}
 
