@@ -58,7 +58,7 @@ const SPEED_A = 857.36;
 const SPEED_B = 261.29;
 const SPEED_C = -4795.01;
 /** Base speed of every vocation, plus this much per level above 1 (TFS Player::updateBaseSpeed). */
-export const BASE_SPEED = 220;
+const BASE_SPEED = 220;
 const SPEED_PER_LEVEL = 2;
 const MIN_SPEED = 80;
 const MAX_SPEED = 6000;

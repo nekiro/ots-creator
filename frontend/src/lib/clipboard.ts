@@ -16,10 +16,6 @@ export function clipboardThing(): Thing | null {
 	return copied.length === 1 ? copied[0] : null;
 }
 
-export function clearClipboard(): void {
-	copied = [];
-}
-
 /**
  * Returns target with the clipboard pasted in. Pasting a whole object keeps
  * the target id and needs the same category; properties paste anywhere.

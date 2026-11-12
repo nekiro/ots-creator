@@ -23,7 +23,7 @@ export interface FlagGroup {
 	flags: Flag[];
 }
 
-export const CLOTH_SLOTS: [number, string][] = [
+const CLOTH_SLOTS: [number, string][] = [
 	[0, "None"],
 	[1, "Two-handed"],
 	[2, "Helmet"],
@@ -38,7 +38,7 @@ export const CLOTH_SLOTS: [number, string][] = [
 	[11, "Ammunition"],
 ];
 
-export const MARKET_CATEGORIES: [number, string][] = [
+const MARKET_CATEGORIES: [number, string][] = [
 	[1, "Armors"],
 	[2, "Amulets"],
 	[3, "Boots"],
@@ -65,7 +65,7 @@ export const MARKET_CATEGORIES: [number, string][] = [
 ];
 
 /** Vocation bits of market.restrictProfession; none set means any vocation. */
-export const PROFESSIONS: [number, string][] = [
+const PROFESSIONS: [number, string][] = [
 	[1, "Knight"],
 	[2, "Paladin"],
 	[4, "Sorcerer"],
@@ -311,7 +311,7 @@ export function clampField(kind: FieldKind, value: number): number {
 	return clamp(value, 0, 65535);
 }
 
-export function flagFields(key: string): Field[] {
+function flagFields(key: string): Field[] {
 	for (const group of FLAG_GROUPS) for (const flag of group.flags) if (flag.key === key) return flag.fields ?? [];
 	return [];
 }

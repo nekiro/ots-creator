@@ -11,8 +11,6 @@ export interface Duration {
 	max: number;
 }
 
-export const FRAME_AUTOMATIC = -1;
-
 export class Animator {
 	readonly frames: number;
 	readonly mode: AnimationMode;
@@ -150,7 +148,7 @@ export class Animator {
  * on grass (ground speed 150), rounded up to the 50 ms server beat like
  * the client does: 1000 * 150 / 220 = 682 -> 700.
  */
-export const WALK_STEP_MS = 700;
+const WALK_STEP_MS = 700;
 
 /**
  * Delay between walking frames in the client (OTClient

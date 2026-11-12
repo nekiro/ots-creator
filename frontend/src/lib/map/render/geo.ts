@@ -29,7 +29,6 @@ export const GEO = {
  */
 export const GEO_HIDDEN = 0xffffffff;
 export const GEO_COMPOSED = 0x80000000;
-export const GEO_RECT = 0x40000000;
 /** Added to the key of a block's top-left chunk: the key of the block (blocks and chunks share a store). */
 export const GEO_BLOCK = 1 << 28;
 export const LIGHT_BYTES = 8;

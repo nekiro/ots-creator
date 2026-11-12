@@ -49,7 +49,7 @@
 		{#each collab.peers as peer (peer.id)}
 			{@const live = collab.others.find((other) => other.id === peer.id) ?? peer}
 			<div class="peer">
-				<span class="swatch" style="background:{peer.color}"></span>
+				<span class="swatch" style:background={peer.color}></span>
 				<button
 					class="pname"
 					disabled={!live.pos || peer.id === collab.status?.you}
@@ -77,7 +77,7 @@
 			{#each collab.chat as message, index (index)}
 				<div class="msg">
 					<span class="t-label when">{time(message.time)}</span>
-					<span class="who" style="color:{peerColor(message.peer)}">{message.name}:</span>
+					<span class="who" style:color={peerColor(message.peer)}>{message.name}:</span>
 					<span class="text">{message.text}</span>
 				</div>
 			{:else}

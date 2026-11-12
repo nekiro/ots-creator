@@ -65,7 +65,7 @@ const DEFAULT_CAMERA: Readonly<Camera> = { x: 0, y: 0, zoom: 1, floor: GROUND_FL
 const VIEW_KEY = "map:view";
 const BRUSH_KEY = "map:brush";
 
-export const DEFAULT_VIEW: ViewOptions = {
+const DEFAULT_VIEW: ViewOptions = {
 	grid: false,
 	lowerFloors: true,
 	ghostHigher: false,

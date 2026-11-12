@@ -5,7 +5,7 @@ export const PREVIEW_DROP = "preview-drop";
  * object is a sheet for that object. */
 export const thingDropId = (id: number) => `thing-drop-${id}`;
 const THING_DROP = /^thing-drop-(\d+)$/;
-export const IMAGE_EXT = /\.(png|bmp|gif|jpe?g)$/i;
+const IMAGE_EXT = /\.(png|bmp|gif|jpe?g)$/i;
 const CLIENT_EXT = /(\.(dat|spr|otfi)|catalog-content\.json)$/i;
 const HAS_EXT = /\.[^\\/]+$/;
 

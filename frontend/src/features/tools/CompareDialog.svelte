@@ -5,7 +5,6 @@
 		CATEGORY_LABELS,
 		CATEGORY_NAMES,
 		CompareService,
-		Format,
 		normalizeThing,
 		res,
 		ThingService,

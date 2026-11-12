@@ -136,7 +136,6 @@ export const AREA_BRUSH_KINDS: ReadonlySet<string> = new Set([
 ]);
 /** Brush kinds that paint along the mouse while the button is held. */
 export const SMEAR_BRUSH_KINDS: ReadonlySet<string> = new Set([...AREA_BRUSH_KINDS, "creature"]);
-export const RECT_BRUSH_KINDS: ReadonlySet<string> = AREA_BRUSH_KINDS;
 
 type Rgb = [number, number, number];
 type Rgba = [number, number, number, number];

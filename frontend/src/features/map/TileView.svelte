@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { ask } from "../../lib/confirm.svelte";
 	import {
 		MapService,
 		TILE_FLAGS,

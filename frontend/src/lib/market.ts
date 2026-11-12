@@ -353,7 +353,7 @@ export function formatIds(ids: number[]): string {
 }
 
 export function tagProblem(tags: string[]): string {
-	if (tags.length > 8) return "At most 8 tags.";
+	if (tags.length > MAX_TAGS) return `At most ${MAX_TAGS} tags.`;
 	const bad = tags.find((tag) => tag.length > 24 || !/^[a-z0-9][a-z0-9-]*$/.test(tag));
 	return bad ? `Tag "${bad}": letters, digits and dashes only, at most 24.` : "";
 }

@@ -2,7 +2,7 @@ import { textureSlots, type Layout, type TexturePos } from "./layout";
 
 export type RGBA = [number, number, number, number];
 
-export function setPixel(img: ImageData, x: number, y: number, color: RGBA): void {
+function setPixel(img: ImageData, x: number, y: number, color: RGBA): void {
 	if (x < 0 || y < 0 || x >= img.width || y >= img.height) return;
 	img.data.set(color, (y * img.width + x) * 4);
 }

@@ -18,7 +18,7 @@
 	import { clamp } from "../lib/util/math";
 	import { defaultDirection, frameGroupAt, hasImprovedAnimations } from "../lib/thing";
 	import { untrack } from "svelte";
-	import { Category, encodeBytes, errorMessage, Format, normalizeThing, ThingService, type Thing } from "../lib/api";
+	import { Category, encodeBytes, errorMessage, normalizeThing, ThingService, type Thing } from "../lib/api";
 	import { Animator, guessImproved, previewDurations } from "../lib/render/animator";
 	import { PREVIEW_DROP } from "../lib/commands";
 	import { compose, type PixelSource } from "../lib/render/compose";

@@ -5,7 +5,7 @@
 //
 // Wails clamps the webview zoom to >= 1, so shrinking (e.g. 1x on a 200%
 // screen) uses CSS zoom on the root element instead. Code that turns mouse
-// coordinates into CSS pixels divides by cssZoom().
+// coordinates into CSS pixels goes through toCss().
 
 import { Window } from "@wailsio/runtime";
 
@@ -27,7 +27,7 @@ export function zoomFor(systemScale: number, mode: ScaleMode): number {
 	return target / systemScale;
 }
 
-export function loadMode(): ScaleMode {
+function loadMode(): ScaleMode {
 	try {
 		const stored = localStorage.getItem(KEY);
 		if (stored === "system" || stored === "auto") return stored;
@@ -42,10 +42,6 @@ export function loadMode(): ScaleMode {
 let systemScale = 0;
 let current: ScaleMode = "auto";
 let rootZoom = 1;
-
-export function cssZoom(): number {
-	return rootZoom;
-}
 
 export function toCss(distance: number): number {
 	return distance / rootZoom;

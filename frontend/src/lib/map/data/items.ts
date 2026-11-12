@@ -104,8 +104,3 @@ export function minimapCss(color: number): string {
 	const offset = clientColorOffset(color);
 	return `rgb(${CLIENT_COLOR_RGB[offset]},${CLIENT_COLOR_RGB[offset + 1]},${CLIENT_COLOR_RGB[offset + 2]})`;
 }
-
-export function minimapRgb(color: number): [number, number, number] {
-	const offset = clientColorOffset(color);
-	return [CLIENT_COLOR_RGB[offset], CLIENT_COLOR_RGB[offset + 1], CLIENT_COLOR_RGB[offset + 2]];
-}

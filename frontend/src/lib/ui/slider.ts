@@ -2,7 +2,7 @@ import { clamp } from "../util/math";
 
 export { clamp };
 
-export const THUMB_MIN = 12;
+const THUMB_MIN = 12;
 
 /** Thumb width: one step of the track per value, never below THUMB_MIN. */
 export function thumbWidth(track: number, min: number, max: number): number {

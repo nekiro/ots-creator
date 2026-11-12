@@ -139,7 +139,7 @@ export class MapRenderer {
 		const chunksByFloor = new Map<number, GeoChunk[]>();
 		chunksByFloor.set(floor, this.chunksInView(scene, camera, floor, plan));
 		for (const z of floors) if (z !== floor) chunksByFloor.set(z, this.chunksInView(scene, camera, z, plan));
-		const ghostFloor = scene.opts.ghostHigher && floor > 0 && floor !== 8 ? floor - 1 : -1;
+		const ghostFloor = scene.opts.ghostHigher && floor > 0 && floor !== GROUND_FLOOR + 1 ? floor - 1 : -1;
 		if (ghostFloor >= 0) chunksByFloor.set(ghostFloor, this.chunksInView(scene, camera, ghostFloor, plan));
 		for (const chunk of chunksByFloor.get(floor) ?? []) if (!this.chunks.upload(chunk)) plan.notReady++;
 		// What is in view has upload time first; the floors above and below take what is left.
@@ -522,11 +522,10 @@ export class MapRenderer {
 		const out: GeoChunk[] = [];
 		if (range.x1 < 0 || range.y1 < 0) return out;
 		const span = chunkRange(range);
-		for (let chunkY = span.y0; chunkY <= span.y1; chunkY += blockSize) {
-			for (let chunkX = span.x0; chunkX <= span.x1; chunkX += blockSize) {
-				const key =
-					chunkKey(chunkX - (chunkX % blockSize), chunkY - (chunkY % blockSize), z) +
-					(blockSize > 1 ? GEO_BLOCK : 0);
+		const alignToBlock = (chunk: number) => chunk - (chunk % blockSize);
+		for (let chunkY = alignToBlock(span.y0); chunkY <= span.y1; chunkY += blockSize) {
+			for (let chunkX = alignToBlock(span.x0); chunkX <= span.x1; chunkX += blockSize) {
+				const key = chunkKey(chunkX, chunkY, z) + (blockSize > 1 ? GEO_BLOCK : 0);
 				const chunk = scene.geo.get(key, signature);
 				if (chunk) out.push(chunk);
 			}

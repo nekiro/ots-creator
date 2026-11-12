@@ -301,6 +301,7 @@ export class ChunkStore {
 			this.generation++;
 			this.chunks.clear();
 			this.inflight.clear();
+			this.latest.clear();
 			this.queued.clear();
 			return;
 		}

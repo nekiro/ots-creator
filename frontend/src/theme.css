@@ -83,7 +83,6 @@ body {
 .t-mini-header,
 .t-flat,
 .t-panel,
-.t-lightflat,
 .t-frame-down,
 .t-frame-up,
 .t-btn,
@@ -101,7 +100,6 @@ body {
 .t-mini-header,
 .t-flat,
 .t-panel,
-.t-lightflat,
 .t-frame-down,
 .t-frame-up,
 .t-btn,
@@ -187,11 +185,6 @@ body {
 	border-style: solid;
 	border-width: 1px;
 	border-image: url("./assets/ui/panel_flat.png") 1 fill / 1px repeat;
-}
-.t-lightflat {
-	border-style: solid;
-	border-width: 1px;
-	border-image: url("./assets/ui/panel_lightflat.png") 1 fill / 1px repeat;
 }
 .t-frame-down {
 	border-style: solid;

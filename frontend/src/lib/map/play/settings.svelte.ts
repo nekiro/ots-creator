@@ -23,7 +23,7 @@ export interface PlayerSettings {
 	showMana: boolean;
 }
 
-export const DEFAULT_PLAYER: PlayerSettings = {
+const DEFAULT_PLAYER: PlayerSettings = {
 	lookType: 128,
 	head: 78,
 	body: 69,

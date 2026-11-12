@@ -38,7 +38,6 @@ export class ChunkBuffers {
 	private spriteCells: CellIndex;
 	private composedCells: CellIndex;
 	private composedIds = new Map<string, number>();
-	private composedKeys: string[] = [];
 	private frameNumber = 0;
 	/** The chunk program is bound with this alpha (-1: not bound); anything else drawn clears it. */
 	private boundAlpha = -1;
@@ -153,9 +152,8 @@ export class ChunkBuffers {
 				const key = composedKey(composed[i + 1], composed[i + 2], composed[i + 3]);
 				let index = this.composedIds.get(key);
 				if (index === undefined) {
-					index = this.composedKeys.length;
+					index = this.composedIds.size;
 					this.composedIds.set(key, index);
-					this.composedKeys.push(key);
 				}
 				view.setUint32(composed[i] * QUAD_BYTES + 4, (GEO_COMPOSED | index) >>> 0, true);
 			}

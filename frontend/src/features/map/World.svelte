@@ -202,7 +202,7 @@
 						title="{area.title} · paint it on the map, Ctrl removes"
 						onclick={() => selectBrush(brush)}
 					>
-						<span class="m-swatch" style="background:{area.color}"></span>
+						<span class="m-swatch" style:background={area.color}></span>
 						<span class="m-name">{area.label}</span>
 					</button>
 				{/each}

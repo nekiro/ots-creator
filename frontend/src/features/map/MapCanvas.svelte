@@ -19,12 +19,12 @@
 	import { rendered } from "../../lib/map/render/rendered";
 	import { mapCommands, spriteSize } from "../../lib/map/view/commands";
 	import {
+		AREA_BRUSH_KINDS,
 		DRAG_THRESHOLD,
 		FPS_POLL_MS,
 		GHOST_ALPHA,
 		MAX_BRUSH_SIZE,
 		PREVIEW_COLORS,
-		RECT_BRUSH_KINDS,
 		REDRAW_DELAY,
 		SMEAR_BRUSH_KINDS,
 		WHEEL_PAN_TILES,
@@ -37,15 +37,7 @@
 	import { bresenhamLine, screenToTile } from "../../lib/map/editor/tileGeometry";
 	import { clamp } from "../../lib/util/math";
 	import { isTyping } from "../../lib/ui/typing";
-	import {
-		applyChange,
-		edit,
-		map,
-		onMapChange,
-		setCam,
-		useCreature,
-		type BrushSel,
-	} from "../../lib/map/state.svelte";
+	import { edit, map, onMapChange, setCam, useCreature, type BrushSel } from "../../lib/map/state.svelte";
 	import {
 		mapContextMenu,
 		openText,
@@ -401,7 +393,7 @@
 			void send(request(brush, { points: [tile], fill: true, erase: false }));
 			return;
 		}
-		if (modifiers.shift && RECT_BRUSH_KINDS.has(brush.kind)) {
+		if (modifiers.shift && AREA_BRUSH_KINDS.has(brush.kind)) {
 			drag = { kind: "rect", start: tile, cur: tile, erase: modifiers.ctrl, alt: modifiers.alt };
 			requestDraw();
 			return;

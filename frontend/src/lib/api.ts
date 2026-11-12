@@ -45,7 +45,7 @@ export type {
 	NpcSale,
 	Properties,
 } from "../../bindings/github.com/nekiro/ots-creator/internal/core/thing/models";
-export { Category, AnimationMode } from "../../bindings/github.com/nekiro/ots-creator/internal/core/thing/models";
+export { Category } from "../../bindings/github.com/nekiro/ots-creator/internal/core/thing/models";
 
 import {
 	Category,
