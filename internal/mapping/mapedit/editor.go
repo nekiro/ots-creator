@@ -129,7 +129,6 @@ type Action struct {
 	metaBefore *metaState
 	metaAfter  *metaState
 	stroke     int64
-	at         time.Time
 }
 
 type ActionInfo struct {
@@ -310,14 +309,13 @@ func (e *Editor) sharedMetaIfObserved() *MetaData {
 // Tx collects the changes of one action. Tiles are copied on first write,
 // so the map never shares tiles with the history.
 type Tx struct {
-	editor  *Editor
-	label   string
-	stroke  int64
-	before  map[otmap.Position]*otmap.Tile
-	order   []otmap.Position
-	meta    *metaState
-	noUndo  bool
-	written map[otmap.Position]bool
+	editor *Editor
+	label  string
+	stroke int64
+	before map[otmap.Position]*otmap.Tile
+	order  []otmap.Position
+	meta   *metaState
+	noUndo bool
 }
 
 func (t *Tx) Label() string { return t.label }
@@ -325,7 +323,7 @@ func (t *Tx) Label() string { return t.label }
 // Begin starts an action. Actions with the same non-zero stroke merge into
 // one undo step (a brush stroke sent in several requests).
 func (e *Editor) Begin(label string, stroke int64) *Tx {
-	return &Tx{editor: e, label: label, stroke: stroke, before: map[otmap.Position]*otmap.Tile{}, written: map[otmap.Position]bool{}}
+	return &Tx{editor: e, label: label, stroke: stroke, before: map[otmap.Position]*otmap.Tile{}}
 }
 
 // BeginSelection starts a change that is not recorded in the history
@@ -349,10 +347,11 @@ func (t *Tx) Prior(pos otmap.Position) *otmap.Tile {
 // The copy is stored in the map right away so neighbors see it.
 func (t *Tx) Edit(pos otmap.Position) *otmap.Tile {
 	current := t.editor.Map.Tile(pos)
-	if t.written[pos] && current != nil {
+	_, seen := t.before[pos]
+	if seen && current != nil {
 		return current
 	}
-	if _, seen := t.before[pos]; !seen {
+	if !seen {
 		t.before[pos] = current
 		t.order = append(t.order, pos)
 	}
@@ -364,7 +363,6 @@ func (t *Tx) Edit(pos otmap.Position) *otmap.Tile {
 		tile.State |= otmap.StateModified
 	}
 	t.editor.Map.Put(pos, tile)
-	t.written[pos] = true
 	t.editor.markDirty(pos)
 	return tile
 }
@@ -414,7 +412,7 @@ func (t *Tx) Commit() int {
 		top.mergeStroke(changes, t.meta, metaAfter)
 		return len(changes)
 	}
-	editor.undo = append(editor.undo, &Action{Label: t.label, changes: changes, metaBefore: t.meta, metaAfter: metaAfter, stroke: t.stroke, at: time.Now()})
+	editor.undo = append(editor.undo, &Action{Label: t.label, changes: changes, metaBefore: t.meta, metaAfter: metaAfter, stroke: t.stroke})
 	editor.trimHistory()
 	return len(changes)
 }
@@ -423,7 +421,7 @@ func (t *Tx) Commit() int {
 // in the order they were first written.
 func (t *Tx) collectChanges() []change {
 	editor := t.editor
-	var changes []change
+	changes := make([]change, 0, len(t.order))
 	for _, pos := range t.order {
 		editor.Map.Prune(pos)
 		editor.syncSelection(pos)

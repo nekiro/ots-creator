@@ -206,21 +206,6 @@ func (cs *CollabService) statusChanged() {
 	cs.notify(CollabEvent{Kind: "status", Status: &status})
 }
 
-func (cs *CollabService) SetSettings(settings CollabSettings) CollabSettings {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	settings.Name = strings.TrimSpace(settings.Name)
-	if settings.Name == "" {
-		settings.Name = defaultPeerName()
-	}
-	if settings.Port <= 0 || settings.Port > 0xFFFF {
-		settings.Port = collab.DefaultPort
-	}
-	cs.store.Settings = settings
-	cs.saveLocked()
-	return settings
-}
-
 // compat describes the item data of a map.
 func (ms *MapService) compat(opened *openMap) collab.Compat { return compatOf(ms.dataFor(opened)) }
 

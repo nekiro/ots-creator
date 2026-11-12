@@ -68,7 +68,6 @@ type specificCase struct {
 type borderBlock struct {
 	outer    bool
 	to       int // brush id, toAll or toNone
-	super    bool
 	border   *autoBorder
 	specific []specificCase
 }
@@ -116,7 +115,6 @@ type wallDoor struct {
 	id       uint16
 	doorType int
 	open     bool
-	hate     bool
 }
 
 type WallBrush struct {
@@ -447,7 +445,7 @@ func (b *Brushes) resolveBorderRule(ground *GroundBrush, rule materials.BorderRu
 // buildBorderBlock builds one border rule of a ground and records on the
 // ground which kinds of borders it has.
 func (b *Brushes) buildBorderBlock(ground *GroundBrush, rule materials.BorderRule, borders map[uint32]*autoBorder, idOf func(string) int) *borderBlock {
-	block := &borderBlock{outer: rule.Align != "inner", super: rule.Super, border: b.resolveBorderRule(ground, rule, borders)}
+	block := &borderBlock{outer: rule.Align != "inner", border: b.resolveBorderRule(ground, rule, borders)}
 	block.to = idOf(rule.To)
 	if rule.To == "" {
 		block.to = toAll
@@ -521,7 +519,7 @@ func (b *Brushes) buildWall(wall *WallBrush, material *materials.Brush, idOf fun
 		}
 		for _, door := range part.Doors {
 			doorType := slices.Index(materials.DoorTypes, door.Type) + 1
-			wall.nodes[align].doors = append(wall.nodes[align].doors, wallDoor{id: door.ID, doorType: doorType, open: door.Open, hate: door.Hate})
+			wall.nodes[align].doors = append(wall.nodes[align].doors, wallDoor{id: door.ID, doorType: doorType, open: door.Open})
 			info := b.infoFor(door.ID)
 			info.wall, info.wallAlign, info.door, info.doorOpen, info.wallHate = wall, align, true, door.Open, door.Hate
 			if info.doorType == doorUndefined {

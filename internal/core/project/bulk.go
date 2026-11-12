@@ -21,25 +21,26 @@ func (p *Project) PatchThings(category thing.Category, ids []uint32, patch Props
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	edit := p.record(fmt.Sprintf("Edit %d %s(s)", len(ids), category))
-	changed := 0
+	if err := p.checkThingsExist(category, ids); err != nil {
+		return 0, err
+	}
+	patched := make([]*thing.Thing, 0, len(ids))
 	for _, id := range ids {
 		current := p.things.Get(category, id)
-		if current == nil {
-			return 0, fmt.Errorf("%s %d does not exist", category, id)
-		}
 		object := current.Clone()
 		if err := applyPatch(&object.Props, patch); err != nil {
 			return 0, err
 		}
-		if object.Props == current.Props {
-			continue
+		if object.Props != current.Props {
+			patched = append(patched, object)
 		}
-		edit.setThing(category, id, object)
-		changed++
+	}
+	edit := p.record(fmt.Sprintf("Edit %d %s(s)", len(ids), category))
+	for _, object := range patched {
+		edit.setThing(category, object.ID, object)
 	}
 	edit.commit()
-	return changed, nil
+	return len(patched), nil
 }
 
 func checkPatchKeys(patch PropsPatch) error {

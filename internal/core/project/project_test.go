@@ -589,3 +589,24 @@ func TestPasteThings(t *testing.T) {
 		t.Fatal("paste into another category")
 	}
 }
+
+func TestFailedEditsOfManyThingsChangeNothing(t *testing.T) {
+	project := New(v1098(), client.Features{})
+	project.AddThing(thing.CategoryItem)
+	if err := project.RemoveThings(thing.CategoryItem, []uint32{101, 999}); err == nil {
+		t.Fatal("missing id must fail")
+	}
+	if _, err := project.DuplicateThings(thing.CategoryItem, []uint32{101, 999}); err == nil {
+		t.Fatal("missing id must fail")
+	}
+	if _, err := project.PatchThings(thing.CategoryItem, []uint32{101, 999}, PropsPatch{"pickupable": true}); err == nil {
+		t.Fatal("missing id must fail")
+	}
+	if got, err := project.Thing(thing.CategoryItem, 101); err != nil || got.Props.Pickupable {
+		t.Fatalf("101 was changed: %v", err)
+	}
+	project.Undo()
+	if info := project.Info(); info.Counts.Items != 100 || info.CanUndo {
+		t.Fatalf("items %d, can undo %v: a failed edit left an undo step", info.Counts.Items, info.CanUndo)
+	}
+}

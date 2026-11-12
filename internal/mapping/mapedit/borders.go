@@ -376,7 +376,10 @@ func (e *Editor) reborder(tx *Tx, pos otmap.Position, full bool) {
 	if current == nil && len(newPlan.ids) == 0 {
 		return
 	}
-	prior := tx.Prior(pos)
+	var prior *otmap.Tile
+	if !full {
+		prior = tx.Prior(pos)
+	}
 	dropOptional := newPlan.dropOptional && current != nil && current.State&otmap.StateOptionalBorder != 0
 	var drop func(uint16) bool
 	if full || e.groundBrushOf(prior) != self {

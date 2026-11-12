@@ -82,17 +82,27 @@ func (p *Project) AddThing(category thing.Category) (uint32, error) {
 	return id, nil
 }
 
+// checkThingsExist fails on the first id that is no thing of category, so
+// edits of many things fail before they change anything.
+func (p *Project) checkThingsExist(category thing.Category, ids []uint32) error {
+	for _, id := range ids {
+		if p.things.Get(category, id) == nil {
+			return fmt.Errorf("%s %d does not exist", category, id)
+		}
+	}
+	return nil
+}
+
 func (p *Project) DuplicateThings(category thing.Category, ids []uint32) ([]uint32, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if err := p.checkThingsExist(category, ids); err != nil {
+		return nil, err
+	}
 	edit := p.record(fmt.Sprintf("Duplicate %d %s(s)", len(ids), category))
-	var out []uint32
+	out := make([]uint32, 0, len(ids))
 	for _, id := range ids {
-		src := p.things.Get(category, id)
-		if src == nil {
-			return nil, fmt.Errorf("%s %d does not exist", category, id)
-		}
-		duplicate := src.Clone()
+		duplicate := p.things.Get(category, id).Clone()
 		duplicate.ID = p.things.MaxID(category) + 1
 		edit.setThing(category, duplicate.ID, duplicate)
 		out = append(out, duplicate.ID)
@@ -147,14 +157,15 @@ func (p *Project) PasteThings(category thing.Category, at uint32, objects []*thi
 func (p *Project) RemoveThings(category thing.Category, ids []uint32) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if err := p.checkThingsExist(category, ids); err != nil {
+		return err
+	}
 	sorted := slices.Clone(ids)
 	slices.Sort(sorted)
+	sorted = slices.Compact(sorted)
 	slices.Reverse(sorted)
 	edit := p.record(fmt.Sprintf("Remove %d %s(s)", len(ids), category))
 	for _, id := range sorted {
-		if p.things.Get(category, id) == nil {
-			return fmt.Errorf("%s %d does not exist", category, id)
-		}
 		if id == p.things.MaxID(category) && id != category.MinID() {
 			edit.setThing(category, id, nil)
 		} else {

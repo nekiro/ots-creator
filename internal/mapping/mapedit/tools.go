@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/nekiro/ots-creator/internal/core/otitems"
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
@@ -170,6 +171,9 @@ func findKindDetail(kind string, itemType *otitems.Type, item *otmap.Item) (bool
 func truncate(text string, maxLen int) string {
 	if len(text) <= maxLen {
 		return text
+	}
+	for maxLen > 0 && !utf8.RuneStart(text[maxLen]) {
+		maxLen--
 	}
 	return text[:maxLen] + "…"
 }

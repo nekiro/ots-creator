@@ -17,10 +17,6 @@ func (ps *ProjectService) Cancel() { ps.session.Cancel() }
 
 func (ps *ProjectService) Versions() []client.Version { return client.Versions() }
 
-func (ps *ProjectService) DefaultFeatures(version uint16) client.Features {
-	return client.DefaultFeatures(version)
-}
-
 func (ps *ProjectService) State() State { return ps.session.State() }
 
 func (ps *ProjectService) Inspect(path string) (ClientFiles, error) {

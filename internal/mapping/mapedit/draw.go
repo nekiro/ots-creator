@@ -213,6 +213,10 @@ func (e *Editor) floodFill(start otmap.Position, brush string) *posSet {
 		ground := e.groundBrushOf(tile)
 		return ground != nil && ground.id == oldBrush.id
 	}
+	// Not the scratch tile of the editor: several requests look for an
+	// area at once, under the read lock of the map.
+	var scratch otmap.Tile
+	var items [32]otmap.Item
 	queue := []otmap.Position{start}
 	filled.add(start)
 	for len(queue) > 0 && len(filled.list) < maxDrawTiles {
@@ -224,7 +228,7 @@ func (e *Editor) floodFill(start otmap.Position, brush string) *posSet {
 				continue
 			}
 			next := posAt(nextX, nextY, int(current.Z))
-			if filled.seen[next] || !matches(e.peekPos(next)) {
+			if filled.seen[next] || !matches(e.Map.Peek(next, &scratch, items[:])) {
 				continue
 			}
 			filled.add(next)
