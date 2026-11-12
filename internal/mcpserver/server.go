@@ -126,16 +126,6 @@ func (s *Server) Apply(enabled bool, port int) error {
 	return nil
 }
 
-// URL returns the address agents connect to ("" when stopped).
-func (s *Server) URL() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.listener == nil {
-		return ""
-	}
-	return "http://" + s.address + Path
-}
-
 // nextStroke returns a stroke number of its own: the edits of one batch
 // share it and become one undo step. Agents count down from -1, the
 // editor's own strokes are positive.

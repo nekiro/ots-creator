@@ -208,9 +208,7 @@ func (g *Guest) Start(hooks GuestHooks) {
 		err := g.read(hooks)
 		g.out.close()
 		_ = g.conn.close()
-		if writeErr := <-writerDone; err == nil {
-			err = writeErr
-		}
+		<-writerDone
 		g.mu.Lock()
 		leaving := g.leaving
 		g.mu.Unlock()

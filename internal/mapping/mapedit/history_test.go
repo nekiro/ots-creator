@@ -18,14 +18,6 @@ func historyPutStone(e *Editor, label string, pos otmap.Position, stroke int64) 
 	return tx.Commit()
 }
 
-func historyLabels(entries []ActionInfo) []string {
-	var labels []string
-	for _, entry := range entries {
-		labels = append(labels, entry.Label)
-	}
-	return labels
-}
-
 func historyDrawStroke(e *Editor, stroke int64) {
 	for i := range 3 {
 		e.Draw(DrawRequest{Kind: KindRaw, Item: stoneID, Points: points(at(10+i, 10)), Stroke: stroke})

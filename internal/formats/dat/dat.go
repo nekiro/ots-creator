@@ -81,15 +81,6 @@ func Decode(data []byte, opts Options) (*File, error) {
 	return file, nil
 }
 
-// ReadThing decodes one thing (flags + texture patterns) from r. OBD v1
-// uses this layout.
-func ReadThing(r *binio.Reader, object *thing.Thing, opts Options) error {
-	if err := Table(opts.Format).ReadProperties(r, &object.Props); err != nil {
-		return err
-	}
-	return readGroups(r, object, opts)
-}
-
 func readGroups(r *binio.Reader, object *thing.Thing, opts Options) error {
 	groupCount := 1
 	withGroups := opts.Features.FrameGroups && object.Category == thing.CategoryOutfit
