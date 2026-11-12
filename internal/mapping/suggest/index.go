@@ -184,6 +184,10 @@ type Index struct {
 	blocks map[otmap.ChunkKey]*blockStats
 	total  *counts
 	tuning Tuning
+	// current and currentRev are the map and its revision when every
+	// block was last found counted: nothing to do until one of them changes.
+	current    *otmap.Map
+	currentRev uint64
 }
 
 func New() *Index {
@@ -220,6 +224,9 @@ func (index *Index) around(block otmap.ChunkKey, radius int) *counts {
 func (index *Index) Refresh(gameMap *otmap.Map, ignore func(id uint16) bool, budget int) int {
 	index.mu.Lock()
 	defer index.mu.Unlock()
+	if index.current == gameMap && index.currentRev == gameMap.Rev {
+		return 0
+	}
 	present := map[otmap.ChunkKey]bool{}
 	for _, chunk := range gameMap.Chunks() {
 		present[otmap.MakeKey(chunk.X>>blockBits, chunk.Y>>blockBits, chunk.Z)] = true
@@ -244,6 +251,10 @@ func (index *Index) Refresh(gameMap *otmap.Map, ignore func(id uint16) bool, bud
 		}
 		index.blocks[stale[i]] = stats
 		index.total.apply(stats, 1)
+	}
+	index.current = nil
+	if len(stale) == len(counted) {
+		index.current, index.currentRev = gameMap, gameMap.Rev
 	}
 	return len(stale) - len(counted)
 }
@@ -274,8 +285,8 @@ func signature(gameMap *otmap.Map, block otmap.ChunkKey) uint64 {
 	for chunkY := max(firstY-1, 0); chunkY <= min(firstY+1<<blockBits, maxChunkCoord); chunkY++ {
 		for chunkX := max(firstX-1, 0); chunkX <= min(firstX+1<<blockBits, maxChunkCoord); chunkX++ {
 			key := otmap.MakeKey(uint16(chunkX), uint16(chunkY), floor)
-			if gameMap.Chunk(key) != nil {
-				sum += gameMap.ChunkRev(key) + 1
+			if chunk := gameMap.Chunk(key); chunk != nil {
+				sum += chunk.Rev + 1
 			}
 		}
 	}

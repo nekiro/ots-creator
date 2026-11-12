@@ -152,9 +152,12 @@ type thingLook struct {
 type geometryBuilder struct {
 	scene   *Scene
 	options GeometryOptions
-	// looks caches client things: item client ids, outfits tagged with
-	// outfitCacheKey.
-	looks map[uint32]*thingLook
+	// itemLooks caches the looks of items by client id, which every item
+	// of every tile asks for several times: nil is not looked up yet,
+	// noLook an item without a look. looks caches the rest: outfits tagged
+	// with outfitCacheKey and items with an id past maxItemLooks.
+	itemLooks []*thingLook
+	looks     map[uint32]*thingLook
 	// quads, animated and composed are the sections of the chunk being
 	// built (see chunk), with their entry counts.
 	quads         []byte
@@ -221,7 +224,30 @@ func (b *geometryBuilder) rect(x, y, width, height int, color tint) {
 	b.quad(x, y, spriteRect|size, color)
 }
 
+// noLook marks an item without a look in geometryBuilder.itemLooks.
+var noLook = &thingLook{}
+
+// maxItemLooks bounds geometryBuilder.itemLooks.
+const maxItemLooks = 1 << 17
+
 func (b *geometryBuilder) lookOf(category thing.Category, id uint32) *thingLook {
+	if category == thing.CategoryItem && id < maxItemLooks {
+		if int(id) < len(b.itemLooks) {
+			if look := b.itemLooks[id]; look == noLook {
+				return nil
+			} else if look != nil {
+				return look
+			}
+		} else {
+			b.itemLooks = append(b.itemLooks, make([]*thingLook, int(id)+1-len(b.itemLooks))...)
+		}
+		look := b.loadLook(category, id)
+		b.itemLooks[id] = look
+		if look == nil {
+			b.itemLooks[id] = noLook
+		}
+		return look
+	}
 	cacheKey := id
 	if category == thing.CategoryOutfit {
 		cacheKey |= outfitCacheKey
@@ -229,6 +255,12 @@ func (b *geometryBuilder) lookOf(category thing.Category, id uint32) *thingLook 
 	if look, ok := b.looks[cacheKey]; ok {
 		return look
 	}
+	look := b.loadLook(category, id)
+	b.looks[cacheKey] = look
+	return look
+}
+
+func (b *geometryBuilder) loadLook(category thing.Category, id uint32) *thingLook {
 	var look *thingLook
 	if found, err := b.scene.Things.Thing(category, id); err == nil && len(found.FrameGroups) > 0 {
 		group := found.FrameGroups[0]
@@ -245,7 +277,6 @@ func (b *geometryBuilder) lookOf(category thing.Category, id uint32) *thingLook 
 			}
 		}
 	}
-	b.looks[cacheKey] = look
 	return look
 }
 
