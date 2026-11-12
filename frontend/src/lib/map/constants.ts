@@ -67,8 +67,6 @@ export const PLAY = {
 	maxElevation: 24,
 	/** The white light the player has when its own is weaker (Creature::drawLight). */
 	playerLight: 2,
-	/** The shown world light moves one step towards the server's every this many ms (Map::fadeAmbientLight). */
-	worldLightStepMs: 1000,
 	/** World light of the server by day and by night (TFS LIGHT_LEVEL_DAY / NIGHT). */
 	dayLight: 250,
 	nightLight: 40,

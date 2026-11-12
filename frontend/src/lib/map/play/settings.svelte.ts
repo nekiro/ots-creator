@@ -21,6 +21,8 @@ export interface PlayerSettings {
 	showNames: boolean;
 	showHealth: boolean;
 	showMana: boolean;
+	/** Walking ignores what blocks (not in the client: to look around). */
+	throughWalls: boolean;
 }
 
 const DEFAULT_PLAYER: PlayerSettings = {
@@ -37,6 +39,7 @@ const DEFAULT_PLAYER: PlayerSettings = {
 	showNames: true,
 	showHealth: true,
 	showMana: true,
+	throughWalls: false,
 };
 
 export const playerSettings = $state<PlayerSettings>(loadJson(PLAYER_KEY, DEFAULT_PLAYER));

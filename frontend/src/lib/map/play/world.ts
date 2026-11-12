@@ -5,12 +5,14 @@ import type { FloorItemFlags, FloorWorld } from "./floors";
 import type { WalkWorld } from "./player";
 
 /** Walking: a tile with a ground and nothing that blocks (client Tile::isWalkable). Creatures of
- * the map stand where they spawn, not where they are in game: they do not block. */
-export function walkWorld(chunks: ChunkStore, items: ItemIndex): WalkWorld {
+ * the map stand where they spawn, not where they are in game: they do not block.
+ * throughWalls: while true only the ground counts (not in the client: to look around). */
+export function walkWorld(chunks: ChunkStore, items: ItemIndex, throughWalls: () => boolean = () => false): WalkWorld {
 	return {
 		isWalkable(x, y, z) {
 			const tile = chunks.tile(x, y, z);
-			return !!tile && (tile.flags & TileFlags.ground) !== 0 && (tile.flags & TileFlags.blocking) === 0;
+			if (!tile || (tile.flags & TileFlags.ground) === 0) return false;
+			return throughWalls() || (tile.flags & TileFlags.blocking) === 0;
 		},
 		groundSpeed(x, y, z) {
 			const tile = chunks.peekTile(x, y, z);

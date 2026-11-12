@@ -57,7 +57,11 @@
 	const chunks = new ChunkStore(initial.mapId, () => requestDraw());
 	const geo = new GeoStore(initial.mapId, () => requestDraw());
 	const looks = new Appearances(() => requestDraw());
-	const player = new Player(initial.start, walkWorld(chunks, initial.items), playerSpeed(playerSettings.level));
+	const player = new Player(
+		initial.start,
+		walkWorld(chunks, initial.items, () => playerSettings.throughWalls),
+		playerSpeed(playerSettings.level),
+	);
 	const floors = floorWorld(chunks, initial.items, looks);
 	let shown = $state<Position>({ ...initial.start });
 	let outfitOpen = $state(false);
@@ -91,18 +95,6 @@
 	$effect(() => {
 		player.speed = playerSpeed(playerSettings.level);
 		requestDraw();
-	});
-
-	/** The world light shown: it fades one step a second towards the one the server sends (Map::setLight). */
-	let worldLight = $state(untrack(() => playerSettings.worldLight));
-	$effect(() => {
-		const target = playerSettings.worldLight;
-		const fade = window.setInterval(() => {
-			if (worldLight === target) return window.clearInterval(fade);
-			worldLight += Math.sign(target - worldLight);
-			requestDraw();
-		}, PLAY.worldLightStepMs);
-		return () => window.clearInterval(fade);
 	});
 
 	let raf = 0;
@@ -229,7 +221,7 @@
 					footPhase: player.footPhase,
 					firstFloor,
 					lastFloor: Math.max(firstFloor, lastVisibleFloor(position.z)),
-					worldLight,
+					worldLight: playerSettings.worldLight,
 					names: playerSettings.showNames,
 					healthBars: playerSettings.showHealth,
 					manaBar: playerSettings.showMana,
@@ -396,6 +388,13 @@
 				onclick={() => (playerSettings.worldLight = PLAY.nightLight)}>Night</button
 			>
 		</div>
+		<button
+			class="t-btn sm"
+			class:on={playerSettings.throughWalls}
+			title="Walk through walls and everything else that blocks (not in the client: to look around)"
+			onclick={() => (playerSettings.throughWalls = !playerSettings.throughWalls)}>Through walls</button
+		>
+		<span class="t-vsep"></span>
 		<span class="t-label" title="Client option: the least light the map is shown with">Ambient</span>
 		<Slider bind:value={map.view.ambientLight} min={0} max={100} width={70} />
 		<span class="val">{map.view.ambientLight}%</span>
