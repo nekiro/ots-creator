@@ -386,6 +386,14 @@ func TestSandSurroundedByGrassGetsFourSides(t *testing.T) {
 	bordersExpect(t, e, 50, 49, nil, "lower z sand puts no border on grass")
 }
 
+func TestRepaintingSameGroundKeepsItsBorder(t *testing.T) {
+	e := testEditor(t)
+	bordersField(t, e, "grass", 45, 45, 55, 55)
+	bordersPaint(t, e, "sand", 50, 50)
+	bordersPaint(t, e, "sand", 50, 50)
+	bordersExpect(t, e, 50, 50, []uint16{borderW, borderS, borderE, borderN}, "painting sand over sand keeps the grass border on it")
+}
+
 func TestLowerZOrderGroundPutsNoBorderOnHigher(t *testing.T) {
 	// The grass keeps its outer border but the sand is above it.
 	e := bordersEditor(t,

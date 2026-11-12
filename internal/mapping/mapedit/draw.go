@@ -386,6 +386,7 @@ func (e *Editor) drawGround(tx *Tx, req DrawRequest, area *posSet) error {
 		startTile := e.Map.Tile(req.Points[0])
 		e.replace = strokeReplace{stroke: req.Stroke, brush: e.groundBrushOf(startTile), empty: e.groundBrushOf(startTile) == nil}
 	}
+	painted := newPosSet()
 	for _, pos := range area.list {
 		current := tx.Get(pos)
 		if req.Erase {
@@ -414,10 +415,14 @@ func (e *Editor) drawGround(tx *Tx, req DrawRequest, area *posSet) error {
 			e.cleanBorders(tile)
 		}
 		tile.Ground = e.newItem(brush.items.pick(e.rng))
+		painted.add(pos)
 	}
 	if e.Settings.Automagic {
+		// A painted tile lost its borders above, so it gets all of them
+		// again: comparing plans would skip a tile repainted with the
+		// same ground, whose plan did not change.
 		for _, pos := range area.ring().list {
-			e.fitBorders(tx, pos)
+			e.reborder(tx, pos, painted.seen[pos])
 		}
 	}
 	return nil
