@@ -229,7 +229,7 @@ func (ms *MapService) RemoveRecent(path string) error { return ms.store.RemoveRe
 
 func (ms *MapService) ImportMap(id int, path string, options mapedit.ImportOptions) (MapChange, error) {
 	var items *otitems.DB
-	if err := ms.withMap(id, func(_ *openMap, data *mapData) error { items = data.items; return nil }); err != nil {
+	if err := ms.withMapRead(id, func(_ *openMap, data *mapData) error { items = data.items; return nil }); err != nil {
 		return MapChange{}, err
 	}
 	// The file loads without the lock: it can take long.
@@ -265,7 +265,7 @@ func minimapImage(editor *mapedit.Editor, area image.Rectangle, floor int) *imag
 }
 
 func (ms *MapService) ExportMinimap(id int, dir string, floors []int) (written []string, err error) {
-	err = ms.withMap(id, func(opened *openMap, _ *mapData) error {
+	err = ms.withMapRead(id, func(opened *openMap, _ *mapData) error {
 		minX, minY, maxX, maxY, ok := opened.editor.Map.Bounds()
 		if !ok {
 			return errors.New("the map is empty")

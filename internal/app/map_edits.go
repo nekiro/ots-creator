@@ -26,7 +26,7 @@ func (ms *MapService) Redo(id int) (MapChange, error) {
 }
 
 func (ms *MapService) History(id int) (steps map[string][]mapedit.ActionInfo, err error) {
-	err = ms.withMap(id, func(opened *openMap, _ *mapData) error {
+	err = ms.withMapRead(id, func(opened *openMap, _ *mapData) error {
 		undo, redo := opened.editor.History()
 		steps = map[string][]mapedit.ActionInfo{"undo": undo, "redo": redo}
 		return nil
@@ -110,7 +110,7 @@ func (ms *MapService) RemoveHouse(id int, house uint32) (MapChange, error) {
 }
 
 func (ms *MapService) HouseTiles(id int, house uint32) (tiles []otmap.Position, err error) {
-	err = ms.withMap(id, func(opened *openMap, _ *mapData) error {
+	err = ms.withMapRead(id, func(opened *openMap, _ *mapData) error {
 		tiles = opened.editor.HouseTiles(house)
 		return nil
 	})

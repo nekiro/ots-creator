@@ -115,6 +115,17 @@ func (ms *MapService) withMap(id int, fn func(opened *openMap, data *mapData) er
 	return fn(opened, data)
 }
 
+// withMapRead is withMap under the read lock, for fn that only reads the
+// map: drawing and loading chunks go on while it runs.
+func (ms *MapService) withMapRead(id int, fn func(opened *openMap, data *mapData) error) error {
+	opened, data, unlock, err := ms.read(id)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	return fn(opened, data)
+}
+
 func (ms *MapService) withData(fn func(data *mapData) error) error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()

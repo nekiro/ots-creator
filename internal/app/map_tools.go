@@ -58,7 +58,7 @@ type FindResult struct {
 }
 
 func (ms *MapService) Find(id int, query mapedit.FindQuery) (found FindResult, err error) {
-	err = ms.withMap(id, func(opened *openMap, _ *mapData) error {
+	err = ms.withMapRead(id, func(opened *openMap, _ *mapData) error {
 		found.Results, found.More = opened.editor.Find(query)
 		return nil
 	})
@@ -89,7 +89,7 @@ func (ms *MapService) SetSpawnTimes(id int, seconds int32, name string, inSelect
 }
 
 func (ms *MapService) Stats(id int) (stats mapedit.Statistics, err error) {
-	err = ms.withMap(id, func(opened *openMap, _ *mapData) error {
+	err = ms.withMapRead(id, func(opened *openMap, _ *mapData) error {
 		stats = opened.editor.Stats()
 		return nil
 	})
