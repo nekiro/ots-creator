@@ -63,6 +63,7 @@ type MapService struct {
 }
 
 func NewMapService(session *Session, store *MapStore) *MapService {
+	session.Warn(store.problem)
 	return &MapService{session: session, store: store, maps: map[int]*openMap{}}
 }
 

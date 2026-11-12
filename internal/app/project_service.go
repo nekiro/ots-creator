@@ -17,6 +17,10 @@ func (ps *ProjectService) Cancel() { ps.session.Cancel() }
 
 func (ps *ProjectService) Versions() []client.Version { return client.Versions() }
 
+// StartupWarnings returns the problems found while starting, such as a
+// damaged settings file that was replaced with defaults, once.
+func (ps *ProjectService) StartupWarnings() []string { return ps.session.takeWarnings() }
+
 func (ps *ProjectService) State() State { return ps.session.State() }
 
 func (ps *ProjectService) Inspect(path string) (ClientFiles, error) {

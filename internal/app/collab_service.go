@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -129,8 +128,11 @@ func NewCollabService(maps *MapService) *CollabService {
 	if dir := maps.store.Dir(); dir != "" {
 		cs.storePath = filepath.Join(dir, "collab.json")
 		cs.certPath = filepath.Join(dir, "collab-host.pem")
-		if data, err := os.ReadFile(cs.storePath); err == nil {
-			_ = json.Unmarshal(data, &cs.store)
+		var loaded collabStoreData
+		if err := fsutil.ReadJSON(cs.storePath, &loaded); err != nil {
+			maps.session.Warn(err.Error())
+		} else {
+			cs.store = loaded
 		}
 	}
 	settings := &cs.store.Settings

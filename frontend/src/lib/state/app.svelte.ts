@@ -145,6 +145,7 @@ export const otherVersions = new ResourceVersions(otherSpriteCache);
 let toastSeq = 0;
 const toastTimers = new Map<number, ReturnType<typeof setTimeout>>();
 const MAX_TOASTS = 4;
+const STARTUP_WARNING_MS = 20000;
 /** Shows a toast. One with the key of a shown toast replaces it and keeps it up longer. */
 export function toast(
 	text: string,
@@ -249,6 +250,7 @@ export async function initState(): Promise<void> {
 		}
 	});
 	applyState(await ProjectService.State());
+	for (const warning of await ProjectService.StartupWarnings()) toast(warning, "error", STARTUP_WARNING_MS);
 	applyOther(await CompareService.State());
 }
 

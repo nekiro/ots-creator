@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -50,11 +51,34 @@ type Session struct {
 	onSaved   func(project.Info)
 	// otbPaths remembers the items.otb of each client (nil: not kept).
 	otbPaths otbPaths
+	// warnings are problems found while starting, until the window asks.
+	warnings []string
 }
 
 type otbPaths interface {
 	ItemsOTB(client string) string
 	SetItemsOTB(client, otb string) error
+}
+
+// Warn keeps a problem found while starting (a damaged settings file) for
+// the window to show once it is up; it is logged too. "" is no problem.
+func (s *Session) Warn(text string) {
+	if text == "" {
+		return
+	}
+	log.Print(text)
+	s.mu.Lock()
+	s.warnings = append(s.warnings, text)
+	s.mu.Unlock()
+}
+
+// takeWarnings returns the problems kept by Warn and forgets them.
+func (s *Session) takeWarnings() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	warnings := s.warnings
+	s.warnings = nil
+	return warnings
 }
 
 func NewSession(notify Notifier) *Session {

@@ -50,7 +50,7 @@ func main() {
 	}
 	app.Generator = "OTS Creator " + version
 	session := app.NewSession(emit)
-	prefs := openSettings()
+	prefs := openSettings(session)
 	resources := app.NewResources(session)
 	maps := app.NewMapService(session, app.OpenMapStore())
 	resources.Maps = maps
@@ -192,14 +192,14 @@ func openClient(projects *app.ProjectService, path string) {
 
 // openSettings loads the user settings; on errors it falls back to
 // defaults (and still saves when the file can be written).
-func openSettings() *settings.Store {
+func openSettings(session *app.Session) *settings.Store {
 	path, err := settings.DefaultPath()
 	if err != nil {
 		log.Printf("settings: %v", err)
 	}
 	store, err := settings.Open(path)
 	if err != nil {
-		log.Printf("settings: %v", err)
+		session.Warn(err.Error())
 	}
 	return store
 }

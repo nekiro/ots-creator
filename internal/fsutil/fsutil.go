@@ -3,6 +3,7 @@ package fsutil
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -159,4 +160,32 @@ func EnsureExt(path, ext string) string {
 		return path
 	}
 	return path + ext
+}
+
+// ReadJSON reads the JSON file at path into value. A missing file is no
+// error and leaves value alone. A file that is not valid JSON is moved
+// aside, so the next save does not overwrite what a person may still
+// recover from it; the error tells where it went.
+func ReadJSON(path string, value any) error {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, value); err != nil {
+		return SetAside(path, err)
+	}
+	return nil
+}
+
+// SetAside moves the damaged file at path to path + ".bad" and returns the
+// error to show for it; cause is what is wrong with the file.
+func SetAside(path string, cause error) error {
+	name := filepath.Base(path)
+	if err := os.Rename(path, path+".bad"); err != nil {
+		return fmt.Errorf("%s is damaged and its defaults are used (%w)", name, cause)
+	}
+	return fmt.Errorf("%s was damaged and its defaults are used; the old file is kept as %s.bad (%w)", name, name, cause)
 }

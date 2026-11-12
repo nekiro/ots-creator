@@ -137,7 +137,7 @@ func Open(path string) (*Store, error) {
 	}
 	loaded := Defaults()
 	if err := json.Unmarshal(data, &loaded); err != nil {
-		return store, err
+		return store, fsutil.SetAside(path, err)
 	}
 	loaded.normalize()
 	store.settings = loaded

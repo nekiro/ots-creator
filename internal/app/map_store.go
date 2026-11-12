@@ -1,9 +1,7 @@
 package app
 
 import (
-	"encoding/json"
 	"maps"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -43,6 +41,8 @@ type MapStore struct {
 	mu   sync.Mutex
 	path string
 	data mapStoreData
+	// problem tells why the stored settings could not be loaded ("": loaded).
+	problem string
 }
 
 const maxRecentMaps = 10
@@ -62,9 +62,11 @@ func NewMapStore(path string) *MapStore {
 	if path == "" {
 		return store
 	}
-	data, err := os.ReadFile(store.path)
-	if err == nil {
-		_ = json.Unmarshal(data, &store.data)
+	var loaded mapStoreData
+	if err := fsutil.ReadJSON(store.path, &loaded); err != nil {
+		store.problem = err.Error()
+	} else {
+		store.data = loaded
 	}
 	if store.data.Profiles == nil {
 		store.data.Profiles = map[string]MapDataConfig{}
