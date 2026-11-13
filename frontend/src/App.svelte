@@ -157,10 +157,7 @@
 	{:else if map.mode === "map"}
 		<MapEditor bind:hoverText={mapHover} />
 	{:else}
-		<main
-			bind:this={layout}
-			style="--list-w:{listWidth}px;--left-w:{leftWidth}px;--right-w:{rightWidth}px"
-		>
+		<main bind:this={layout} style="--list-w:{listWidth}px;--left-w:{leftWidth}px;--right-w:{rightWidth}px">
 			<div class="left">
 				<ThingList />
 			</div>
