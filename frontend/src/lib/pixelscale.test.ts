@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitZoom, zoomFor } from "./pixelscale";
+import { fittingScale, splitZoom, zoomFor } from "./pixelscale";
 
 describe("zoomFor", () => {
 	it("snaps fractional system scales to whole screen pixels", () => {
@@ -19,6 +19,28 @@ describe("zoomFor", () => {
 		expect(zoomFor(1.5, "system")).toBe(1);
 		expect(zoomFor(0, "auto")).toBe(1);
 		expect(zoomFor(NaN, 2)).toBe(1);
+	});
+});
+
+describe("fittingScale", () => {
+	const minimum = { width: 1034, height: 600 };
+
+	it("gives the largest whole scale whose layout fits the screen", () => {
+		expect(fittingScale({ width: 1920, height: 1040 }, minimum)).toBe(1);
+		expect(fittingScale({ width: 2560, height: 1400 }, minimum)).toBe(2);
+		expect(fittingScale({ width: 3840, height: 2100 }, minimum)).toBe(3);
+	});
+
+	it("never goes below 1 and is unbounded without a screen", () => {
+		expect(fittingScale({ width: 800, height: 500 }, minimum)).toBe(1);
+		expect(fittingScale(null, minimum)).toBe(Infinity);
+	});
+
+	it("lowers a pixel-perfect scale that would cut the window off", () => {
+		const fullHd = fittingScale({ width: 1920, height: 1040 }, minimum);
+		expect(1.5 * zoomFor(1.5, "auto", fullHd)).toBeCloseTo(1);
+		expect(1.5 * zoomFor(1.5, 2, fullHd)).toBeCloseTo(1);
+		expect(zoomFor(1.5, "system", fullHd)).toBe(1);
 	});
 });
 

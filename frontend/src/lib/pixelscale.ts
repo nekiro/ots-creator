@@ -21,10 +21,26 @@ export const SCALE_MODES: { value: ScaleMode; label: string }[] = [
 
 const KEY = "ui-scale";
 
-export function zoomFor(systemScale: number, mode: ScaleMode): number {
+/**
+ * @param maxScale largest whole scale whose layout minimum fits the screen
+ *   (see fittingScale); a bigger pixel-perfect scale would cut the window off
+ */
+export function zoomFor(systemScale: number, mode: ScaleMode, maxScale = Infinity): number {
 	if (!(systemScale > 0) || mode === "system") return 1;
-	const target = mode === "auto" ? Math.max(1, Math.round(systemScale)) : mode;
+	const wanted = mode === "auto" ? Math.max(1, Math.round(systemScale)) : mode;
+	const target = Math.max(1, Math.min(wanted, maxScale));
 	return target / systemScale;
+}
+
+/** Largest whole scale at which a layout of minimum size fits a work area in
+ * screen pixels; at least 1. A 1080p screen fits 1x only, so 2x there would
+ * show 960 CSS pixels and cut off the panels. */
+export function fittingScale(
+	area: { width: number; height: number } | null,
+	minimum: { width: number; height: number },
+): number {
+	if (!area || !(area.width > 0) || !(area.height > 0)) return Infinity;
+	return Math.max(1, Math.floor(Math.min(area.width / minimum.width, area.height / minimum.height)));
 }
 
 function loadMode(): ScaleMode {
@@ -42,6 +58,22 @@ function loadMode(): ScaleMode {
 let systemScale = 0;
 let current: ScaleMode = "auto";
 let rootZoom = 1;
+/** Work area of the window's screen in screen pixels, null outside Wails. */
+let screenArea: { width: number; height: number } | null = null;
+
+function currentZoom(): number {
+	return zoomFor(systemScale, current, fittingScale(screenArea, MIN_LAYOUT));
+}
+
+async function readScreen(): Promise<void> {
+	try {
+		const screen = await Window.GetScreen();
+		const area = screen?.PhysicalWorkArea;
+		screenArea = area?.Width && area?.Height ? { width: area.Width, height: area.Height } : null;
+	} catch {
+		screenArea = null;
+	}
+}
 
 export function toCss(distance: number): number {
 	return distance / rootZoom;
@@ -57,12 +89,14 @@ export const MIN_LAYOUT = { width: 1040, height: 600 };
 
 export function setMinLayoutWidth(width: number): void {
 	if (width === MIN_LAYOUT.width) return;
+	const before = currentZoom();
 	MIN_LAYOUT.width = width;
-	void applyMinSize();
+	// A wider object list can stop the scale from fitting the screen.
+	void (currentZoom() === before ? applyMinSize() : apply());
 }
 
 async function applyMinSize(): Promise<void> {
-	const z = zoomFor(systemScale, current);
+	const z = currentZoom();
 	try {
 		await Window.SetMinSize(Math.ceil(MIN_LAYOUT.width * z), Math.ceil(MIN_LAYOUT.height * z));
 	} catch {
@@ -71,7 +105,7 @@ async function applyMinSize(): Promise<void> {
 }
 
 async function apply(): Promise<void> {
-	const z = zoomFor(systemScale, current);
+	const z = currentZoom();
 	const { webview, css } = splitZoom(z);
 	rootZoom = css;
 	document.documentElement.style.zoom = css === 1 ? "" : String(css);
@@ -108,6 +142,7 @@ export async function initPixelScale(): Promise<void> {
 		/* not in Wails */
 	}
 	systemScale = window.devicePixelRatio / zoom;
+	await readScreen();
 	await apply();
 
 	const watch = () => {
@@ -115,10 +150,11 @@ export async function initPixelScale(): Promise<void> {
 		media.addEventListener(
 			"change",
 			async () => {
-				const webviewZoom = splitZoom(zoomFor(systemScale, current)).webview;
+				const webviewZoom = splitZoom(currentZoom()).webview;
 				const next = window.devicePixelRatio / webviewZoom;
 				if (Math.abs(next - systemScale) > 0.01) {
 					systemScale = next;
+					await readScreen(); // moved to another screen
 					await apply();
 				}
 				watch();
