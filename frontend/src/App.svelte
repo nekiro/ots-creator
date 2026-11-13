@@ -35,7 +35,7 @@
 	import { followAgents } from "./lib/map/agents";
 	import { followCollab } from "./lib/map/collab.svelte";
 	import { app, initState } from "./lib/state/app.svelte";
-	import { readPositive, writeStored } from "./lib/state/storage";
+	import { readJson, readPositive, saveJson, writeStored } from "./lib/state/storage";
 	import Splitter from "./lib/ui/Splitter.svelte";
 	import ContextMenu from "./lib/ui/ContextMenu.svelte";
 	import ConfirmDialog from "./lib/ui/ConfirmDialog.svelte";
@@ -78,6 +78,34 @@
 		writeStored(SPRITES_KEY, String(spritesHeight));
 	}
 
+	// The object list and the properties panel are widened with splitters as in
+	// the map editor. Their minimum is the width their content is laid out for
+	// (the list's columns from the settings), so they never break the layout;
+	// a narrow window takes the extra width back before the editor shrinks.
+	const SIDES_KEY = "layout:sides";
+	const PROPERTIES_MIN = 250;
+	const EDITOR_MIN_WIDTH = 460;
+	let layout = $state<HTMLElement>();
+	let sides = $state(loadSides());
+
+	function loadSides(): { left: number; right: number } {
+		const stored = (readJson(SIDES_KEY) ?? {}) as { left?: unknown; right?: unknown };
+		return { left: Number(stored.left) || 0, right: Number(stored.right) || 280 };
+	}
+
+	function resizeSide(side: "left" | "right", dx: number) {
+		const minimum = side === "left" ? listWidth : PROPERTIES_MIN;
+		const current = side === "left" ? leftWidth : rightWidth;
+		const other = side === "left" ? rightWidth : leftWidth;
+		const maximum = Math.max(minimum, (layout?.clientWidth ?? 1600) - other - EDITOR_MIN_WIDTH - 24);
+		const next = side === "left" ? current + dx : current - dx;
+		sides[side] = Math.round(Math.max(minimum, Math.min(maximum, next)));
+	}
+
+	function saveSides() {
+		saveJson(SIDES_KEY, sides);
+	}
+
 	// The backend holds window closes while edits are unapplied.
 	$effect(() => {
 		const dirty = app.dirty;
@@ -114,6 +142,8 @@
 	});
 
 	const listWidth = $derived(listPanelWidth(prefs.settings.listColumns || 7));
+	const leftWidth = $derived(Math.max(listWidth, sides.left));
+	const rightWidth = $derived(Math.max(PROPERTIES_MIN, sides.right));
 	$effect(() => setMinLayoutWidth(listWidth + 740));
 </script>
 
@@ -127,10 +157,14 @@
 	{:else if map.mode === "map"}
 		<MapEditor bind:hoverText={mapHover} />
 	{:else}
-		<main style="--list-w:{listWidth}px">
+		<main
+			bind:this={layout}
+			style="--list-w:{listWidth}px;--left-w:{leftWidth}px;--right-w:{rightWidth}px"
+		>
 			<div class="left">
 				<ThingList />
 			</div>
+			<Splitter vertical ondrag={(dx) => resizeSide("left", dx)} onend={saveSides} />
 			<div class="center" bind:this={center} style="--sprites-h:{spritesHeight}px">
 				<section class="t-window editor">
 					<div class="t-window-title">Preview</div>
@@ -139,6 +173,7 @@
 				<Splitter ondrag={resizeSprites} onend={saveHeight} />
 				<SpriteList />
 			</div>
+			<Splitter vertical ondrag={(dx) => resizeSide("right", dx)} onend={saveSides} />
 			<div class="right">
 				{#if app.selection.length > 1}<BulkEdit />{:else}<Properties bind:group />{/if}
 			</div>
@@ -181,12 +216,14 @@
 		flex: 1;
 		min-height: 0;
 		display: grid;
-		/* The object list keeps its width; the editor keeps at least 460px and
-       the properties panel gives up width first. The sum (with gaps) is
-       MIN_LAYOUT.width in pixelscale.ts. */
-		grid-template-columns: var(--list-w, 300px) minmax(460px, 1fr) minmax(250px, 280px);
-		min-width: calc(var(--list-w, 300px) + 734px); /* 460 + 250 + gaps */
-		gap: 6px;
+		/* The side panels have the width set with the splitters, down to their
+       minimum (the object list's columns, 250px of properties) when the
+       window is narrow; the editor keeps at least 460px. The sum of the
+       minimums (with the splitters) is MIN_LAYOUT.width in pixelscale.ts. */
+		grid-template-columns:
+			minmax(var(--list-w), var(--left-w)) auto minmax(460px, 1fr) auto
+			minmax(250px, var(--right-w));
+		min-width: calc(var(--list-w, 300px) + 734px); /* 460 + 250 + splitters */
 		padding: 6px;
 	}
 	.left,
