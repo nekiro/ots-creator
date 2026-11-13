@@ -49,6 +49,16 @@ func (ts *ThingService) Get(category thing.Category, id uint32) (*thing.Thing, e
 	return proj.Thing(category, id)
 }
 
+// SpriteSize returns the pixel size of the client's sprites (32, or 64 for
+// some asset clients).
+func (ts *ThingService) SpriteSize() (int, error) {
+	proj, err := ts.session.Project()
+	if err != nil {
+		return 0, err
+	}
+	return proj.SpriteSize(), nil
+}
+
 // Render returns one animation frame of the list thumbnail of a thing
 // (outfits facing south with addons, items with all layers).
 func (ts *ThingService) Render(category thing.Category, id uint32, frame int) (*image.NRGBA, error) {

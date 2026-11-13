@@ -79,7 +79,16 @@ type updateThingArgs struct {
 type importSheetArgs struct {
 	CategoryArg
 	ID    uint32 `json:"id"`
-	Sheet string `json:"sheet" jsonschema:"PNG sprite sheet, see create_thing"`
+	Sheet string `json:"sheet" jsonschema:"PNG sprite sheet, see create_thing and export_sheet"`
+	Group int    `json:"group,omitempty" jsonschema:"frame group to replace: 0 (default; idle of outfits) or 1 (walking of outfits)"`
+}
+
+type exportSheetArgs struct {
+	CategoryArg
+	ID         uint32 `json:"id"`
+	Path       string `json:"path" jsonschema:"PNG file to write"`
+	Group      int    `json:"group,omitempty" jsonschema:"frame group: 0 (default; idle of outfits), 1 (walking of outfits) or -1 (all groups stacked, when their layouts match)"`
+	Background string `json:"background,omitempty" jsonschema:"transparent (default) or magenta (as Object Builder sheets)"`
 }
 
 type propMap map[string]any
@@ -92,6 +101,10 @@ type thingView struct {
 	Description string         `json:"description,omitempty"`
 	Props       map[string]any `json:"props"`
 	FrameGroups []groupView    `json:"frameGroups"`
+	// ServerID is the id the attached items.otb gives an item once
+	// save_client runs; the map uses server ids.
+	ServerID   uint16 `json:"serverId,omitempty"`
+	ServerNote string `json:"serverIdNote,omitempty"`
 }
 
 type groupView struct {
@@ -202,7 +215,28 @@ func (s *Server) thingResult(category thing.Category, id uint32) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return viewThing(object)
+	view, err := viewThing(object)
+	if err != nil || category != thing.CategoryItem {
+		return view, err
+	}
+	serverIDs, err := s.projects.ItemServerIDs([]uint32{id})
+	switch {
+	case err != nil:
+		view.ServerNote = err.Error()
+	case serverIDs[id] != 0:
+		view.ServerID = serverIDs[id]
+	default:
+		view.ServerNote = "the attached items.otb gives this item no server id: save_client only adds server ids for client ids past the last one it maps, so the map cannot place it"
+	}
+	return view, nil
+}
+
+// sheetLayout explains where the textures of a frame group are in its
+// sprite sheet.
+func sheetLayout(group *thing.FrameGroup, spriteSize int) string {
+	width, height := group.SheetSize(spriteSize)
+	return fmt.Sprintf("%dx%d px: textures of %dx%d px (width x height tiles of %d px), %d per row (patternZ*patternX*layers); texture n = ((((frame*patternZ+z)*patternY+y)*patternX+x)*layers+layer) goes left to right, then top to bottom",
+		width, height, int(group.Width)*spriteSize, int(group.Height)*spriteSize, spriteSize, int(group.PatternZ)*int(group.PatternX)*int(group.Layers))
 }
 
 func (s *Server) addThingTools(server *mcp.Server) {
@@ -407,11 +441,46 @@ func (s *Server) addThingTools(server *mcp.Server) {
 			if err != nil {
 				return nil, err
 			}
-			if err := s.things.ImportSheet(category, args.ID, 0, args.Sheet); err != nil {
+			if err := s.things.ImportSheet(category, args.ID, args.Group, args.Sheet); err != nil {
 				return nil, err
 			}
 			s.refreshItems()
 			return s.thingResult(category, args.ID)
+		})
+
+	addTool(server, "export_sheet", "Writes the sprites of a client object to a PNG sprite sheet, the same layout import_sheet reads: edit it and import it back, or use it as a base for create_thing.",
+		func(_ context.Context, args exportSheetArgs) (any, error) {
+			category, err := args.parse()
+			if err != nil {
+				return nil, err
+			}
+			if args.Path == "" {
+				return nil, errors.New("give the path of the PNG to write")
+			}
+			if args.Background != "" && args.Background != "transparent" && args.Background != "magenta" {
+				return nil, fmt.Errorf("background %q: use transparent or magenta", args.Background)
+			}
+			if err := s.things.ExportSheet(category, args.ID, args.Group, args.Path, args.Background != "magenta"); err != nil {
+				return nil, err
+			}
+			object, err := s.things.Get(category, args.ID)
+			if err != nil {
+				return nil, err
+			}
+			spriteSize, err := s.things.SpriteSize()
+			if err != nil {
+				return nil, err
+			}
+			group, ok := object.Stacked()
+			if args.Group >= 0 && args.Group < len(object.FrameGroups) {
+				group, ok = object.FrameGroups[args.Group], true
+			}
+			result := map[string]any{"path": args.Path}
+			if ok {
+				result["layout"] = sheetLayout(group, spriteSize)
+				result["frames"], result["patternX"], result["patternY"], result["patternZ"], result["layers"] = group.Frames, group.PatternX, group.PatternY, group.PatternZ, group.Layers
+			}
+			return result, nil
 		})
 
 	addTool(server, "save_client", "Writes the client objects and sprites to the client files (the folder or files it was opened from).",

@@ -108,6 +108,36 @@ func (p *Project) OTBPreview() (OTBReport, error) {
 	return report, err
 }
 
+// OTBServerIDs returns the server ids the attached items.otb gives the
+// client items once compiled (as OTBPreview, without writing). Client
+// items it does not map are left out.
+func (p *Project) OTBServerIDs(clientIDs []uint32) (map[uint32]uint16, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if p.otb == nil {
+		return nil, fmt.Errorf("no items.otb is attached")
+	}
+	synced, _, err := p.syncOTB()
+	if err != nil {
+		return nil, err
+	}
+	wanted := make(map[uint32]bool, len(clientIDs))
+	for _, id := range clientIDs {
+		wanted[id] = true
+	}
+	found := map[uint32]uint16{}
+	for _, item := range synced.Items {
+		clientID := uint32(item.ClientID())
+		if item.Deprecated() || !wanted[clientID] {
+			continue
+		}
+		if _, ok := found[clientID]; !ok {
+			found[clientID] = item.ServerID()
+		}
+	}
+	return found, nil
+}
+
 // resetBase records the items as they are on disk; syncing the items.otb
 // compares the client with them.
 func (p *Project) resetBase() {

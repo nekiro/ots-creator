@@ -85,6 +85,25 @@ func TestThingTools(t *testing.T) {
 	call(t, session, "client_redo", map[string]any{}, false)
 
 	call(t, session, "import_sheet", map[string]any{"id": 101, "sheet": sheet}, false)
+
+	exported := filepath.Join(t.TempDir(), "exported.png")
+	text, _ = call(t, session, "export_sheet", map[string]any{"id": 102, "path": exported}, false)
+	if !strings.Contains(text, "32x64 px") || !strings.Contains(text, `"frames":2`) {
+		t.Fatalf("export_sheet: %s", text)
+	}
+	img, err := imaging.Load(exported)
+	if err != nil || img.Rect.Dx() != 32 || img.Rect.Dy() != 64 || img.NRGBAAt(0, 0).A != 0 || img.NRGBAAt(10, 4).A != 255 {
+		t.Fatalf("exported sheet: %v %v", err, img.Rect)
+	}
+	call(t, session, "import_sheet", map[string]any{"id": 101, "sheet": exported, "group": 0}, false)
+	call(t, session, "import_sheet", map[string]any{"id": 101, "sheet": exported, "group": 3}, true)
+	call(t, session, "export_sheet", map[string]any{"id": 102, "path": exported, "background": "green"}, true)
+	// Without an items.otb the result tells why there is no server id.
+	text, _ = call(t, session, "get_thing", map[string]any{"id": 102}, false)
+	if !strings.Contains(text, "serverIdNote") {
+		t.Fatalf("server id note: %s", text)
+	}
+
 	// The test client was never written to disk, so it has no files to save to.
 	call(t, session, "save_client", map[string]any{}, true)
 }

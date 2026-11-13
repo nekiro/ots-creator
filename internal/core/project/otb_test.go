@@ -181,3 +181,21 @@ func TestDetachOTB(t *testing.T) {
 		t.Fatal("preview without items.otb must fail")
 	}
 }
+
+func TestOTBServerIDs(t *testing.T) {
+	project, _ := otbProject(t)
+	if _, err := project.DuplicateThings(thing.CategoryItem, []uint32{100}); err != nil {
+		t.Fatal(err)
+	}
+	ids, err := project.OTBServerIDs([]uint32{101, 106, 107})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ids[101] != 1101 || ids[106] != 1201 || len(ids) != 2 {
+		t.Fatalf("server ids %v", ids)
+	}
+	project.DetachOTB()
+	if _, err := project.OTBServerIDs([]uint32{101}); err == nil {
+		t.Fatal("no error without items.otb")
+	}
+}

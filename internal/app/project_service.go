@@ -122,6 +122,16 @@ func (ps *ProjectService) ItemsOTBPreview() (project.OTBReport, error) {
 	return proj.OTBPreview()
 }
 
+// ItemServerIDs returns the server ids the attached items.otb gives the
+// client items once compiled.
+func (ps *ProjectService) ItemServerIDs(clientIDs []uint32) (map[uint32]uint16, error) {
+	proj, err := ps.session.Project()
+	if err != nil {
+		return nil, err
+	}
+	return proj.OTBServerIDs(clientIDs)
+}
+
 func (ps *ProjectService) New(version client.Version, features client.Features) State {
 	ps.session.Set(project.New(version, features))
 	return ps.session.State()
