@@ -155,6 +155,7 @@ func (s *Server) newMCPServer() *mcp.Server {
 	s.addItemTools(server)
 	s.addWorldTools(server)
 	s.addSelectionTools(server)
+	s.addSuggestTools(server)
 	s.addMaterialTools(server)
 	s.addThingTools(server)
 	return server
@@ -173,7 +174,7 @@ Workflow:
 
 When the brushes do not fit the client, paint with terrain rules instead: count_grounds and learn_terrain on an area of the map in the wanted style, then paint_terrain plans of terrain classes; the borders, walls and decoration come from the sample.
 
-Prefer brushes over raw items: they choose the right border, wall and carpet pieces. Paint grounds first, then walls, then doors, then decoration and items.
+Prefer brushes over raw items: they choose the right border, wall and carpet pieces. Paint grounds first, then walls, then doors, then decoration and items. To decorate in the style of the map, suggest_items tells what the map puts in such places, variants and swap_item vary an item, and complete_object adds the missing parts of a big object.
 
 New brushes: get_brush a similar one as a model, get_borders / save_border for its border, save_brush, then draw with it; add_to_tileset lists raw items in the library and save_creature adds monsters and NPCs. These are written to the brush file at once.
 
