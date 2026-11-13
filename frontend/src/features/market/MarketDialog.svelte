@@ -25,6 +25,9 @@
 	import Select from "../../lib/ui/Select.svelte";
 	import TagPicker from "../../lib/ui/TagPicker.svelte";
 	import ThingCanvas from "../../lib/ui/ThingCanvas.svelte";
+	import { PanView } from "../../lib/pan.svelte";
+	import { fitZoom, stepZoom } from "../../lib/render/zoom";
+	import { frameGroupAt } from "../../lib/thing";
 
 	const SECTIONS = [
 		["all", "All"],
@@ -117,6 +120,8 @@
 		previewError = "";
 		group = 0;
 		direction = 2;
+		manualZoom = null;
+		view.reset();
 		if (!entry || entry.kind !== "object") return;
 		previewLoading = true;
 		read(entry.id)
@@ -128,6 +133,35 @@
 			.catch((err) => selectedId === entry.id && (previewError = errorMessage(err)))
 			.finally(() => selectedId === entry.id && (previewLoading = false));
 	});
+
+	// The object preview is a canvas like the editor's: it fits the stage
+	// until zoomed by hand (ctrl + wheel) and is moved with the wheel, a middle
+	// button drag or space + drag.
+	const PREVIEW_MAX_FIT_ZOOM = 2;
+	const PREVIEW_MAX_ZOOM = 8;
+	let manualZoom = $state<number | null>(null);
+	let stageWidth = $state(0);
+	let stageHeight = $state(0);
+	const previewGroup = $derived(loaded ? frameGroupAt(loaded.thing, group) : null);
+	const previewWidth = $derived((previewGroup?.width ?? 1) * (loaded?.file.spriteSize ?? 32));
+	const previewHeight = $derived((previewGroup?.height ?? 1) * (loaded?.file.spriteSize ?? 32));
+	const previewZoom = $derived(
+		manualZoom ?? fitZoom(previewWidth, previewHeight, stageWidth, stageHeight, PREVIEW_MAX_FIT_ZOOM, 8),
+	);
+	const view = new PanView(
+		() => ({
+			width: previewWidth * previewZoom,
+			height: previewHeight * previewZoom,
+			stageWidth,
+			stageHeight,
+		}),
+		(delta) => {
+			const next = Math.min(PREVIEW_MAX_ZOOM, stepZoom(previewZoom, delta));
+			const factor = next / previewZoom;
+			manualZoom = next;
+			view.rescale(factor);
+		},
+	);
 
 	const isOutfit = $derived(selected?.category === "outfit" && (loaded?.thing.frameGroups[0]?.patternX ?? 0) >= 4);
 	const get = (id: number) => (id > 0 ? loaded?.pixels[id - 1] : undefined);
@@ -200,6 +234,8 @@
 		selectedId = filtered[next].id;
 	}
 </script>
+
+<svelte:window onkeydown={view.key} onkeyup={view.key} onblur={view.blur} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <Dialog title="Market" width={840} onclose={() => (app.dialog = null)}>
@@ -284,17 +320,28 @@
 
 			<aside class="detail col">
 				{#if selected}
-					<div class="stage checker">
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div
+						class="stage checker"
+						class:pan-ready={loaded && view.ready}
+						class:panning={view.dragging}
+						bind:clientWidth={stageWidth}
+						bind:clientHeight={stageHeight}
+						title={loaded ? "Wheel or middle button drag: move · Ctrl + wheel: zoom" : undefined}
+						{...loaded ? view.handlers : {}}
+					>
 						{#if loaded}
-							<ThingCanvas
-								thing={loaded.thing}
-								{get}
-								size={loaded.file.spriteSize}
-								{ready}
-								{group}
-								{direction}
-								zoom={2}
-							/>
+							<div class="pan" style="transform:{view.transform}">
+								<ThingCanvas
+									thing={loaded.thing}
+									{get}
+									size={loaded.file.spriteSize}
+									{ready}
+									{group}
+									{direction}
+									zoom={previewZoom}
+								/>
+							</div>
 						{:else if selected.kind === "sprites"}
 							<img class="pixel pack" src={url(selected.file)} alt={selected.name} />
 						{:else if previewError}
@@ -561,6 +608,18 @@
 		place-items: center;
 		overflow: hidden;
 		border: 1px solid #1a1a1a;
+	}
+	.pan {
+		position: absolute;
+		left: 50%;
+		top: 50%;
+		display: flex;
+	}
+	.stage.pan-ready {
+		cursor: grab;
+	}
+	.stage.panning {
+		cursor: grabbing;
 	}
 	.big {
 		zoom: 2;
