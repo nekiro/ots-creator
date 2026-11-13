@@ -36,7 +36,7 @@ func testServer(t *testing.T, withClient bool, notify app.Notifier) *Server {
 		session.Set(testClient(t))
 	}
 	maps := app.NewMapService(session, app.NewMapStore(filepath.Join(t.TempDir(), "mapeditor.json")))
-	return New(maps, app.NewProjectService(session), notify, "test")
+	return New(maps, app.NewProjectService(session), app.NewThingService(session), notify, "test")
 }
 
 // testClient returns a client with items 100 (a ground) and 101 (a common

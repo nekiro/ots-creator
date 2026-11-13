@@ -26,7 +26,7 @@ func runMCP() int {
 	app.Generator = "OTS Creator " + version
 	session := app.NewSession(nil)
 	maps := app.NewMapService(session, app.OpenMapStore())
-	agents := mcpserver.New(maps, app.NewProjectService(session), nil, version)
+	agents := mcpserver.New(maps, app.NewProjectService(session), app.NewThingService(session), nil, version)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if err := agents.RunStdio(ctx, liveMCPURL); err != nil && ctx.Err() == nil {

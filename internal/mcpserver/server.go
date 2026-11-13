@@ -60,6 +60,7 @@ const shutdownTimeout = 2 * time.Second
 type Server struct {
 	maps     *app.MapService
 	projects *app.ProjectService
+	things   *app.ThingService
 	notify   app.Notifier
 	version  string
 
@@ -75,11 +76,11 @@ type Server struct {
 }
 
 // New returns a stopped server. notify may be nil.
-func New(maps *app.MapService, projects *app.ProjectService, notify app.Notifier, version string) *Server {
+func New(maps *app.MapService, projects *app.ProjectService, things *app.ThingService, notify app.Notifier, version string) *Server {
 	if notify == nil {
 		notify = func(string, any) {}
 	}
-	return &Server{maps: maps, projects: projects, notify: notify, version: version, terrain: ruleStore{dir: maps.SettingsDir()}}
+	return &Server{maps: maps, projects: projects, things: things, notify: notify, version: version, terrain: ruleStore{dir: maps.SettingsDir()}}
 }
 
 // Handler returns the HTTP handler of the MCP endpoint.
@@ -154,6 +155,7 @@ func (s *Server) newMCPServer() *mcp.Server {
 	s.addItemTools(server)
 	s.addWorldTools(server)
 	s.addSelectionTools(server)
+	s.addThingTools(server)
 	return server
 }
 
@@ -170,7 +172,9 @@ Workflow:
 
 When the brushes do not fit the client, paint with terrain rules instead: count_grounds and learn_terrain on an area of the map in the wanted style, then paint_terrain plans of terrain classes; the borders, walls and decoration come from the sample.
 
-Prefer brushes over raw items: they choose the right border, wall and carpet pieces. Paint grounds first, then walls, then doors, then decoration and items.`
+Prefer brushes over raw items: they choose the right border, wall and carpet pieces. Paint grounds first, then walls, then doors, then decoration and items.
+
+The objects of the client (item types, outfits, effects, missiles) and their sprites can be edited too: get_thing, find_things and render_things to look at them, free_ids and create_thing to add one from a PNG sprite sheet, update_thing and import_sheet to change one, client_undo / client_redo, and save_client to write the client files.`
 
 // errNoMap is returned when a tool needs a map and none is open.
 var errNoMap = errors.New("no map is open: use new_map or open_map")

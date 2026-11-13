@@ -67,7 +67,8 @@ func main() {
 	projects := app.NewProjectService(session)
 	settingsService := app.NewSettingsService(prefs, session)
 	// The MCP server lets AI agents edit maps (opt-in in the settings).
-	agents := mcpserver.New(maps, projects, emit, version)
+	things := app.NewThingService(session)
+	agents := mcpserver.New(maps, projects, things, emit, version)
 	settingsService.ApplyMCP = agents.Apply
 	if current := prefs.Get(); current.MCPServer {
 		if err := agents.Apply(true, current.MCPPort); err != nil {
@@ -80,7 +81,7 @@ func main() {
 		Description: "Object editor for Open Tibia clients",
 		Services: []application.Service{
 			application.NewService(projects),
-			application.NewService(app.NewThingService(session)),
+			application.NewService(things),
 			application.NewService(app.NewSpriteService(session)),
 			application.NewService(app.NewCompareService(session)),
 			application.NewService(app.NewDialogService(prefs)),

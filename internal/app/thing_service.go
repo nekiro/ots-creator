@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"image"
 	"os"
 	"path/filepath"
 	"slices"
@@ -46,6 +47,22 @@ func (ts *ThingService) Get(category thing.Category, id uint32) (*thing.Thing, e
 		return nil, err
 	}
 	return proj.Thing(category, id)
+}
+
+// Render returns one animation frame of the list thumbnail of a thing
+// (outfits facing south with addons, items with all layers).
+func (ts *ThingService) Render(category thing.Category, id uint32, frame int) (*image.NRGBA, error) {
+	proj, err := ts.session.Project()
+	if err != nil {
+		return nil, err
+	}
+	object, err := proj.Thing(category, id)
+	if err != nil {
+		return nil, err
+	}
+	pos := project.ThumbnailPos(object)
+	pos.Frame = frame
+	return proj.Render(category, id, pos)
 }
 
 func (ts *ThingService) Find(category thing.Category, filter project.Filter) ([]uint32, error) {
