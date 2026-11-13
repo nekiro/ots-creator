@@ -23,12 +23,12 @@ const KEY = "ui-scale";
 
 /**
  * @param maxScale largest whole scale whose layout minimum fits the screen
- *   (see fittingScale); a bigger pixel-perfect scale would cut the window off
+ *   (see fittingScale). Auto stays within it, so it never cuts the window
+ *   off; an explicit scale is kept as chosen.
  */
 export function zoomFor(systemScale: number, mode: ScaleMode, maxScale = Infinity): number {
 	if (!(systemScale > 0) || mode === "system") return 1;
-	const wanted = mode === "auto" ? Math.max(1, Math.round(systemScale)) : mode;
-	const target = Math.max(1, Math.min(wanted, maxScale));
+	const target = mode === "auto" ? Math.max(1, Math.min(Math.round(systemScale), maxScale)) : mode;
 	return target / systemScale;
 }
 
@@ -63,6 +63,11 @@ let screenArea: { width: number; height: number } | null = null;
 
 function currentZoom(): number {
 	return zoomFor(systemScale, current, fittingScale(screenArea, MIN_LAYOUT));
+}
+
+/** Whether the layout fits the window's screen at a whole scale. */
+export function scaleFits(scale: number): boolean {
+	return scale <= fittingScale(screenArea, MIN_LAYOUT);
 }
 
 async function readScreen(): Promise<void> {

@@ -36,10 +36,10 @@ describe("fittingScale", () => {
 		expect(fittingScale(null, minimum)).toBe(Infinity);
 	});
 
-	it("lowers a pixel-perfect scale that would cut the window off", () => {
+	it("lowers the auto scale that would cut the window off, keeps a chosen one", () => {
 		const fullHd = fittingScale({ width: 1920, height: 1040 }, minimum);
 		expect(1.5 * zoomFor(1.5, "auto", fullHd)).toBeCloseTo(1);
-		expect(1.5 * zoomFor(1.5, 2, fullHd)).toBeCloseTo(1);
+		expect(1.5 * zoomFor(1.5, 2, fullHd)).toBeCloseTo(2);
 		expect(zoomFor(1.5, "system", fullHd)).toBe(1);
 	});
 });

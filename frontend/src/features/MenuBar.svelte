@@ -2,7 +2,7 @@
 	import { Browser, Window } from "@wailsio/runtime";
 	import { commands } from "../lib/commands";
 	import { checkForUpdates, REPO_URL, updates } from "../lib/state/updates.svelte";
-	import { getMode, SCALE_MODES, setMode } from "../lib/pixelscale";
+	import { getMode, SCALE_MODES, scaleFits, setMode } from "../lib/pixelscale";
 	import { app, openSettings } from "../lib/state/app.svelte";
 	import type { MenuEntry, MenuItem } from "../lib/menu.svelte";
 	import { editMenu, objectMenu, spriteMenu, toolsMenu } from "../lib/menus";
@@ -71,7 +71,11 @@
 		{
 			label: "View",
 			items: SCALE_MODES.map((menu) => ({
-				label: menu.label,
+				// Read when the menu opens: the screen can change meanwhile.
+				get label() {
+					const tooBig = typeof menu.value === "number" && !scaleFits(menu.value);
+					return tooBig ? `${menu.label} (does not fit this screen)` : menu.label;
+				},
 				checked: () => scaleMode === menu.value,
 				action: () => {
 					scaleMode = menu.value;
