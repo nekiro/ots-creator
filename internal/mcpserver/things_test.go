@@ -104,6 +104,37 @@ func TestThingTools(t *testing.T) {
 		t.Fatalf("server id note: %s", text)
 	}
 
+	text, _ = call(t, session, "duplicate_things", map[string]any{"ids": []int{102}, "at": 103}, false)
+	if !strings.Contains(text, `"ids":[103]`) {
+		t.Fatalf("duplicate_things at: %s", text)
+	}
+	call(t, session, "duplicate_things", map[string]any{"ids": []int{102}, "at": 103}, true)
+	call(t, session, "duplicate_things", map[string]any{"ids": []int{102}, "at": 103, "replace": true}, false)
+	text, _ = call(t, session, "duplicate_things", map[string]any{"ids": []int{102}}, false)
+	if !strings.Contains(text, `"ids":[104]`) {
+		t.Fatalf("duplicate_things: %s", text)
+	}
+	text, _ = call(t, session, "get_thing", map[string]any{"id": 104}, false)
+	if !strings.Contains(text, `"stackable":true`) {
+		t.Fatalf("copy: %s", text)
+	}
+
+	text, _ = call(t, session, "update_thing", map[string]any{"where": map[string]any{"flag": "stackable"}, "props": map[string]any{"hangable": true}}, false)
+	if !strings.Contains(text, `"changed":3`) {
+		t.Fatalf("update_thing where: %s", text)
+	}
+	call(t, session, "update_thing", map[string]any{"ids": []int{102}, "where": map[string]any{"flag": "stackable"}}, true)
+
+	text, _ = call(t, session, "move_things", map[string]any{"ids": []int{104}, "at": 101}, false)
+	if !strings.Contains(text, `"ids":[101]`) {
+		t.Fatalf("move_things: %s", text)
+	}
+	call(t, session, "remove_things", map[string]any{"ids": []int{101, 103}}, false)
+	text, _ = call(t, session, "find_things", map[string]any{"flag": "stackable"}, false)
+	if !strings.Contains(text, `"total":1`) {
+		t.Fatalf("after remove_things: %s", text)
+	}
+
 	// The test client was never written to disk, so it has no files to save to.
 	call(t, session, "save_client", map[string]any{}, true)
 }

@@ -69,11 +69,38 @@ type createThingArgs struct {
 
 type updateThingArgs struct {
 	CategoryArg
-	IDs         []uint32 `json:"ids"`
-	Props       propMap  `json:"props,omitempty" jsonschema:"properties to change, as named by get_thing"`
-	Name        *string  `json:"name,omitempty"`
-	Description *string  `json:"description,omitempty"`
-	DurationMs  uint32   `json:"durationMs,omitempty" jsonschema:"duration of every animation frame"`
+	IDs         []uint32     `json:"ids,omitempty" jsonschema:"objects to change; or select them with where"`
+	Where       *thingFilter `json:"where,omitempty" jsonschema:"change every object that matches instead of ids"`
+	Props       propMap      `json:"props,omitempty" jsonschema:"properties to change, as named by get_thing"`
+	Name        *string      `json:"name,omitempty"`
+	Description *string      `json:"description,omitempty"`
+	DurationMs  uint32       `json:"durationMs,omitempty" jsonschema:"duration of every animation frame"`
+}
+
+// thingFilter selects objects as find_things does.
+type thingFilter struct {
+	Name string `json:"name,omitempty" jsonschema:"part of the name stored in the client (asset clients only)"`
+	Flag string `json:"flag,omitempty" jsonschema:"property that must be set, as named by get_thing"`
+}
+
+type idsArgs struct {
+	CategoryArg
+	IDs []uint32 `json:"ids"`
+}
+
+type duplicateThingsArgs struct {
+	CategoryArg
+	IDs     []uint32 `json:"ids" jsonschema:"objects to copy"`
+	At      uint32   `json:"at,omitempty" jsonschema:"first id of the copies, in order; must be free unless replace is set (default: after the last object)"`
+	Replace bool     `json:"replace,omitempty" jsonschema:"overwrite objects at the target ids"`
+}
+
+type moveThingsArgs struct {
+	CategoryArg
+	IDs        []uint32 `json:"ids" jsonschema:"objects to move, in id order"`
+	At         uint32   `json:"at" jsonschema:"first target id"`
+	Insert     bool     `json:"insert,omitempty" jsonschema:"put them before at and shift the objects between; otherwise they swap places with the objects at the targets"`
+	UpdateRefs *bool    `json:"updateRefs,omitempty" jsonschema:"change item ids stored in items (market trade as and show as...) to the new ids (default true)"`
 }
 
 type importSheetArgs struct {
@@ -393,11 +420,25 @@ func (s *Server) addThingTools(server *mcp.Server) {
 			return s.thingResult(category, args.ID)
 		})
 
-	addTool(server, "update_thing", "Changes properties, name, description or frame durations of client objects.",
+	addTool(server, "update_thing", "Changes properties, name, description or frame durations of client objects, given by ids or by a where filter (e.g. every pickupable item).",
 		func(_ context.Context, args updateThingArgs) (any, error) {
 			category, err := args.parse()
 			if err != nil {
 				return nil, err
+			}
+			if args.Where != nil {
+				if len(args.IDs) > 0 {
+					return nil, errors.New("give ids or where, not both")
+				}
+				if args.Where.Name == "" && args.Where.Flag == "" {
+					return nil, errors.New("where needs a name or a flag")
+				}
+				if args.IDs, err = s.things.Find(category, project.Filter{Content: project.ContentUsed, Flag: args.Where.Flag, Name: args.Where.Name}); err != nil {
+					return nil, err
+				}
+				if len(args.IDs) == 0 {
+					return map[string]any{"changed": 0}, nil
+				}
 			}
 			if len(args.IDs) == 0 {
 				return nil, errors.New("give at least one id")
@@ -433,6 +474,81 @@ func (s *Server) addThingTools(server *mcp.Server) {
 			}
 			s.refreshItems()
 			return map[string]any{"changed": changed}, nil
+		})
+
+	addTool(server, "duplicate_things", "Copies client objects (properties and sprites) to new ids: a quick base for a variant, whose sprites import_sheet then replaces.",
+		func(_ context.Context, args duplicateThingsArgs) (any, error) {
+			category, err := args.parse()
+			if err != nil {
+				return nil, err
+			}
+			if len(args.IDs) == 0 {
+				return nil, errors.New("give at least one id")
+			}
+			var copies []uint32
+			if args.At == 0 {
+				if copies, err = s.things.Duplicate(category, args.IDs); err != nil {
+					return nil, err
+				}
+			} else {
+				if args.At < category.MinID() {
+					return nil, fmt.Errorf("%s ids start at %d", category, category.MinID())
+				}
+				plan, err := s.things.PlanTargets(category, args.At, len(args.IDs), false)
+				if err != nil {
+					return nil, err
+				}
+				if len(plan.Taken) > 0 && !args.Replace {
+					return nil, fmt.Errorf("%s ids %v are already used: pick free ids (free_ids) or pass replace", category, plan.Taken)
+				}
+				objects := make([]*thing.Thing, 0, len(args.IDs))
+				for _, id := range args.IDs {
+					object, err := s.things.Get(category, id)
+					if err != nil {
+						return nil, err
+					}
+					objects = append(objects, object)
+				}
+				if copies, err = s.things.Paste(category, args.At, objects); err != nil {
+					return nil, err
+				}
+			}
+			s.refreshItems()
+			return map[string]any{"ids": copies}, nil
+		})
+
+	addTool(server, "remove_things", "Removes client objects. The last object of a category is deleted, others become blank so the ids after them stay.",
+		func(_ context.Context, args idsArgs) (any, error) {
+			category, err := args.parse()
+			if err != nil {
+				return nil, err
+			}
+			if len(args.IDs) == 0 {
+				return nil, errors.New("give at least one id")
+			}
+			if err := s.things.Remove(category, args.IDs); err != nil {
+				return nil, err
+			}
+			s.refreshItems()
+			return map[string]any{"removed": len(args.IDs)}, nil
+		})
+
+	addTool(server, "move_things", "Moves client objects to other ids without losing any: the objects at the targets swap places with them, or with insert shift to close the gap. Returns the new ids. Items placed on maps keep their server ids; the attached items.otb follows on save_client.",
+		func(_ context.Context, args moveThingsArgs) (any, error) {
+			category, err := args.parse()
+			if err != nil {
+				return nil, err
+			}
+			if len(args.IDs) == 0 {
+				return nil, errors.New("give at least one id")
+			}
+			updateRefs := args.UpdateRefs == nil || *args.UpdateRefs
+			moved, err := s.things.Move(category, args.IDs, args.At, project.MoveOptions{Insert: args.Insert, UpdateRefs: updateRefs})
+			if err != nil {
+				return nil, err
+			}
+			s.refreshItems()
+			return map[string]any{"ids": moved}, nil
 		})
 
 	addTool(server, "import_sheet", "Replaces the sprites of a client object with a PNG sprite sheet (layout as in create_thing).",

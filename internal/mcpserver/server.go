@@ -174,7 +174,7 @@ When the brushes do not fit the client, paint with terrain rules instead: count_
 
 Prefer brushes over raw items: they choose the right border, wall and carpet pieces. Paint grounds first, then walls, then doors, then decoration and items.
 
-The objects of the client (item types, outfits, effects, missiles) and their sprites can be edited too: get_thing, find_things and render_things to look at them, export_sheet to get the sprite sheet of one as a PNG, free_ids and create_thing to add one from a PNG sprite sheet, update_thing and import_sheet to change one, client_undo / client_redo, and save_client to write the client files.`
+The objects of the client (item types, outfits, effects, missiles) and their sprites can be edited too: get_thing, find_things and render_things to look at them, export_sheet to get the sprite sheet of one as a PNG, free_ids and create_thing to add one from a PNG sprite sheet, update_thing and import_sheet to change them, duplicate_things, move_things and remove_things, client_undo / client_redo, and save_client to write the client files.`
 
 // errNoMap is returned when a tool needs a map and none is open.
 var errNoMap = errors.New("no map is open: use new_map or open_map")
