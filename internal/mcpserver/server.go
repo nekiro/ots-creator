@@ -155,6 +155,7 @@ func (s *Server) newMCPServer() *mcp.Server {
 	s.addItemTools(server)
 	s.addWorldTools(server)
 	s.addSelectionTools(server)
+	s.addMaterialTools(server)
 	s.addThingTools(server)
 	return server
 }
@@ -173,6 +174,8 @@ Workflow:
 When the brushes do not fit the client, paint with terrain rules instead: count_grounds and learn_terrain on an area of the map in the wanted style, then paint_terrain plans of terrain classes; the borders, walls and decoration come from the sample.
 
 Prefer brushes over raw items: they choose the right border, wall and carpet pieces. Paint grounds first, then walls, then doors, then decoration and items.
+
+New brushes: get_brush a similar one as a model, get_borders / save_border for its border, save_brush, then draw with it; add_to_tileset lists raw items in the library and save_creature adds monsters and NPCs. These are written to the brush file at once.
 
 The objects of the client (item types, outfits, effects, missiles) and their sprites can be edited too: get_thing, find_things and render_things to look at them, export_sheet to get the sprite sheet of one as a PNG, free_ids and create_thing to add one from a PNG sprite sheet, update_thing and import_sheet to change them, duplicate_things, move_things and remove_things, client_undo / client_redo, and save_client to write the client files.`
 
