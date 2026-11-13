@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
+	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
 type mapTool struct {
@@ -94,4 +95,24 @@ func (ms *MapService) Stats(id int) (stats mapedit.Statistics, err error) {
 		return nil
 	})
 	return stats, err
+}
+
+// FindPath searches the way a player walks between two tiles (see
+// mapedit.Editor.FindPath).
+func (ms *MapService) FindPath(id int, from, to otmap.Position, limit int) (path mapedit.PathResult, err error) {
+	err = ms.withMapRead(id, func(opened *openMap, _ *mapData) error {
+		path, err = opened.editor.FindPath(from, to, limit)
+		return err
+	})
+	return path, err
+}
+
+// Validate looks for mistakes that break a map in game (see
+// mapedit.Editor.Validate).
+func (ms *MapService) Validate(id int, limit int) (validation mapedit.Validation, err error) {
+	err = ms.withMapRead(id, func(opened *openMap, _ *mapData) error {
+		validation = opened.editor.Validate(limit)
+		return nil
+	})
+	return validation, err
 }

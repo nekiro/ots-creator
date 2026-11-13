@@ -155,6 +155,7 @@ func (s *Server) newMCPServer() *mcp.Server {
 	s.addItemTools(server)
 	s.addWorldTools(server)
 	s.addSelectionTools(server)
+	s.addCheckTools(server)
 	s.addSuggestTools(server)
 	s.addMaterialTools(server)
 	s.addThingTools(server)
@@ -170,7 +171,7 @@ Workflow:
 2. Find what to draw with: list_brushes / get_tileset for brushes (grounds, walls, doodads...), search_items for single items, list_creatures for monsters and NPCs.
 3. Draw: draw (one brush), draw_batch (many brushes, one undo step) or paint_grid (a text plan of a whole area). Ground brushes add borders between grounds and walls connect by themselves.
 4. Look at the result with render_area (an image of the area), terrain_grid (exact tile positions as text) or describe_area / get_tile, and fix what is wrong (undo, draw with erase, remove_item).
-5. save_map writes the map; nothing is written to disk before.
+5. validate_map finds what breaks the map in game and find_path whether players can walk somewhere; save_map writes the map, nothing is written to disk before.
 
 When the brushes do not fit the client, paint with terrain rules instead: count_grounds and learn_terrain on an area of the map in the wanted style, then paint_terrain plans of terrain classes; the borders, walls and decoration come from the sample.
 
