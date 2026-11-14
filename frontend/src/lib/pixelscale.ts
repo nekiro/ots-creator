@@ -90,7 +90,7 @@ export function splitZoom(zoom: number): { webview: number; css: number } {
 
 /** Smallest layout (CSS pixels) where every panel still fits; App.svelte
  * updates the width when the object list width changes. */
-export const MIN_LAYOUT = { width: 1040, height: 600 };
+export const MIN_LAYOUT = { width: 880, height: 600 };
 
 export function setMinLayoutWidth(width: number): void {
 	if (width === MIN_LAYOUT.width) return;

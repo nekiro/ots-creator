@@ -84,7 +84,7 @@
 	// a narrow window takes the extra width back before the editor shrinks.
 	const SIDES_KEY = "layout:sides";
 	const PROPERTIES_MIN = 250;
-	const EDITOR_MIN_WIDTH = 460;
+	const EDITOR_MIN_WIDTH = 300;
 	let layout = $state<HTMLElement>();
 	let sides = $state(loadSides());
 
@@ -144,7 +144,7 @@
 	const listWidth = $derived(listPanelWidth(prefs.settings.listColumns || 7));
 	const leftWidth = $derived(Math.max(listWidth, sides.left));
 	const rightWidth = $derived(Math.max(PROPERTIES_MIN, sides.right));
-	$effect(() => setMinLayoutWidth(listWidth + 740));
+	$effect(() => setMinLayoutWidth(listWidth + 580));
 </script>
 
 <svelte:window {onkeydown} />
@@ -215,12 +215,12 @@
 		display: grid;
 		/* The side panels have the width set with the splitters, down to their
        minimum (the object list's columns, 250px of properties) when the
-       window is narrow; the editor keeps at least 460px. The sum of the
+       window is narrow; the editor keeps at least 300px. The sum of the
        minimums (with the splitters) is MIN_LAYOUT.width in pixelscale.ts. */
 		grid-template-columns:
-			minmax(var(--list-w), var(--left-w)) auto minmax(460px, 1fr) auto
+			minmax(var(--list-w), var(--left-w)) auto minmax(300px, 1fr) auto
 			minmax(250px, var(--right-w));
-		min-width: calc(var(--list-w, 300px) + 734px); /* 460 + 250 + splitters */
+		min-width: calc(var(--list-w, 300px) + 574px); /* 300 + 250 + splitters */
 		padding: 6px;
 	}
 	.left,
