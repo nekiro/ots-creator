@@ -53,15 +53,16 @@
 	type Layout = "list" | "grid";
 	// Brushes and creatures are told apart by name, raw items by their look.
 	const DEFAULT_LAYOUTS: Record<View, Layout> = { terrain: "list", decor: "list", items: "grid", creatures: "list" };
+	/** How many times the grid icons are enlarged: whole multiples keep the pixels sharp. */
+	const MAX_ZOOM = 4;
 
+	// Everything loadPrefs reads is declared above it.
 	const PREFS_KEY = "map:library";
 	const prefs = loadPrefs();
 	let view = $state<View>(prefs.view);
 	let collection = $state<string>(prefs.collection);
 	let layouts = $state<Record<View, Layout>>(prefs.layouts);
 	const layout = $derived(layouts[view]);
-	/** How many times the grid icons are enlarged: whole multiples keep the pixels sharp. */
-	const MAX_ZOOM = 4;
 	let zoom = $state(prefs.zoom);
 	/** A grid cell: the 34px slot enlarged, with its 1px border. */
 	const cellSize = $derived(34 * zoom + 2);
