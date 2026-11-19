@@ -155,7 +155,8 @@ export const mapCommands = {
 		}
 	},
 
-	async open(path = "") {
+	/** Opens a map; askItemIds asks for its item ids even when the map file or the earlier choice decides them. */
+	async open(path = "", askItemIds = false) {
 		if (!needClient()) return;
 		if (!path) {
 			const paths = await DialogService.OpenFiles("openMap", "Open map", MAPS, false);
@@ -166,8 +167,14 @@ export const mapCommands = {
 		// A map open already keeps its item ids: the backend only shows it.
 		let itemIds: ItemIDsChoice | null = { mode: "" as ItemIdsMode, otbPath: "" };
 		try {
-			if (!map.maps.some((open) => samePath(open.path, path)))
-				itemIds = await chooseItemIds({ title: "Open map", name, plan: await MapService.PlanItemIDs(path) });
+			if (!map.maps.some((open) => samePath(open.path, path))) {
+				const plan = await MapService.PlanItemIDs(path);
+				// The map file or the earlier choice for the map decides: no question.
+				itemIds =
+					plan.settled && !askItemIds
+						? { mode: plan.mode, otbPath: "" }
+						: await chooseItemIds({ title: "Open map", name, plan });
+			}
 		} catch (err) {
 			toast(errorMessage(err), "error");
 			return;
@@ -273,6 +280,15 @@ export const mapCommands = {
 			stopProgress();
 			map.loading = null;
 		}
+	},
+
+	/** Closes the map and opens it again, asking for its item ids. */
+	async reopenWithItemIds(id = map.activeId) {
+		const target = map.maps.find((open) => open.id === id);
+		if (!target?.path) return;
+		await mapCommands.close(target.id);
+		if (map.maps.some((open) => open.id === target.id)) return;
+		await mapCommands.open(target.path, true);
 	},
 
 	async close(id = map.activeId) {

@@ -60,7 +60,7 @@ func TestClientIDsAreKeptWhenTheClientHasAnItemsOTB(t *testing.T) {
 	}
 	ms.CloseMap(client.ID)
 	plan, err := ms.PlanItemIDs(path)
-	if err != nil || plan.Mode != otitems.ModeClient {
+	if err != nil || plan.Mode != otitems.ModeClient || !plan.Settled {
 		t.Fatalf("plan of the saved client id map = %+v, %v", plan, err)
 	}
 	opened, err := ms.OpenMap(path, ItemIDsChoice{})
@@ -118,7 +118,7 @@ func TestPlanFollowsTheMapFileAndTheServerFolder(t *testing.T) {
 	}
 	mapPath := filepath.Join(world, "map.otbm")
 	plan, err := ms.PlanItemIDs(mapPath)
-	if err != nil || plan.Mode != otitems.ModeOTB || plan.FoundOTB != found || plan.ClientOTB != "" {
+	if err != nil || plan.Mode != otitems.ModeOTB || plan.FoundOTB != found || plan.ClientOTB != "" || plan.Settled {
 		t.Fatalf("plan next to an items.otb = %+v, %v", plan, err)
 	}
 	// An OTMAP file says which ids it stores.
@@ -139,5 +139,29 @@ func TestPlanFollowsTheMapFileAndTheServerFolder(t *testing.T) {
 	plan, err = ms.PlanItemIDs(textPath)
 	if err != nil || plan.Mode != otitems.ModeClient || plan.FileMode != otitems.ModeClient || plan.FoundOTB != "" {
 		t.Fatalf("plan of a client id OTMAP = %+v, %v", plan, err)
+	}
+}
+
+func TestRememberedServerIDsAskAgainWithoutItemsOTB(t *testing.T) {
+	ms, session := mapTestService(t)
+	if err := session.attachItemsOTB(writeTestOTB(t)); err != nil {
+		t.Fatal(err)
+	}
+	info, err := ms.NewMap(NewMapOptions{Width: 64, Height: 64})
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "server.otbm")
+	if _, err := ms.SaveMap(info.ID, path); err != nil {
+		t.Fatal(err)
+	}
+	if plan, _ := ms.PlanItemIDs(path); plan.Mode != otitems.ModeOTB || !plan.Settled {
+		t.Fatalf("plan with the items.otb = %+v", plan)
+	}
+	if err := session.attachItemsOTB(""); err != nil {
+		t.Fatal(err)
+	}
+	if plan, _ := ms.PlanItemIDs(path); plan.Mode != otitems.ModeOTB || plan.Settled {
+		t.Fatalf("plan without the items.otb = %+v", plan)
 	}
 }

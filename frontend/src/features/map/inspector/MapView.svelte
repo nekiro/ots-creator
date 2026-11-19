@@ -2,6 +2,7 @@
 	import { errorMessage } from "../../../lib/api";
 	import { MapService, SpawnFormat, type MapInfo, type Properties, type Statistics } from "../../../lib/map/data/api";
 	import { edit, map } from "../../../lib/map/state.svelte";
+	import { mapCommands } from "../../../lib/map/view/commands";
 	import Icon from "../../../lib/ui/Icon.svelte";
 	import NumberField from "../../../lib/ui/NumberField.svelte";
 	import Select from "../../../lib/ui/Select.svelte";
@@ -75,7 +76,11 @@
 				? "Client ids (no items.otb)"
 				: `Server ids · items.otb ${map.data?.otbVersion ?? ""}`}</span
 		>
-		<button class="t-btn" onclick={() => (map.dialog = "data")}>items.otb…</button>
+		{#if info.path}<button
+				class="t-btn"
+				title="Open the map again with other item ids or another items.otb"
+				onclick={() => mapCommands.reopenWithItemIds(info.id)}>Change…</button
+			>{:else}<button class="t-btn" onclick={() => (map.dialog = "data")}>items.otb…</button>{/if}
 	</div>
 	<label class="col"
 		><span class="t-label">Description</span><textarea

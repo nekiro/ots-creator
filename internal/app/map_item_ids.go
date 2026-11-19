@@ -26,6 +26,10 @@ type ItemIDsPlan struct {
 	// FileMode is the mode the map file states (OTMAP files do), "" when
 	// the file does not say.
 	FileMode otitems.Mode `json:"fileMode"`
+	// Settled is set when the map file or the earlier choice for the map
+	// decides the mode and its items.otb is at hand: the map opens without
+	// asking.
+	Settled bool `json:"settled"`
 }
 
 // ItemIDsChoice is how a map to open or create stores its item ids.
@@ -77,8 +81,10 @@ func (ms *MapService) planItemIDs(path string) (ItemIDsPlan, error) {
 	switch {
 	case plan.FileMode != "":
 		plan.Mode, plan.Reason = plan.FileMode, "the map file says it uses "+modeName(plan.FileMode)
+		plan.Settled = plan.Mode == otitems.ModeClient || plan.ClientOTB != ""
 	case hasRemembered:
 		plan.Mode, plan.Reason = remembered, "chosen when the map was opened before"
+		plan.Settled = plan.Mode == otitems.ModeClient || plan.ClientOTB != ""
 	case plan.ClientOTB != "":
 		plan.Mode, plan.Reason = otitems.ModeOTB, "the client has an items.otb attached"
 	case plan.FoundOTB != "":
