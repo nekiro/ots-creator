@@ -13,7 +13,7 @@ import (
 func (ms *MapService) saveMaterials(data *mapData) error {
 	data.index()
 	for _, opened := range ms.maps {
-		if ms.dataFor(opened) == data {
+		if opened.editor.Items.Mode == data.items.Mode {
 			opened.editor.SetBrushes(data.brushes)
 		}
 	}

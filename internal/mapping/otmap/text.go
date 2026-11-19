@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -229,4 +230,31 @@ func appendRawValue(out []byte, valueType string, data []byte) ([]byte, error) {
 	default: // u64
 		return strconv.AppendUint(out, binary.LittleEndian.Uint64(data), 10), nil
 	}
+}
+
+// ItemIDsOf tells whether the OTMAP world file at path stores client item
+// ids (or server ids) without reading the map; ok is false when the file
+// cannot be read or does not say.
+func ItemIDsOf(path string) (clientIDs, ok bool) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false, false
+	}
+	lines := strings.Split(string(data), "\n")
+	if len(lines) == 0 || strings.TrimSpace(lines[0]) != worldHeader {
+		return false, false
+	}
+	for _, line := range lines[1:] {
+		keyword, value, _ := strings.Cut(strings.TrimSpace(line), " ")
+		if keyword == "items" {
+			switch strings.TrimSpace(value) {
+			case itemsClient:
+				return true, true
+			case itemsServer:
+				return false, true
+			}
+			return false, false
+		}
+	}
+	return false, false
 }

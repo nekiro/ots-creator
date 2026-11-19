@@ -7,6 +7,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/nekiro/ots-creator/internal/app"
+	"github.com/nekiro/ots-creator/internal/core/otitems"
 	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
@@ -26,12 +27,45 @@ type mapSummary struct {
 	Tiles   int    `json:"tiles"`
 	Width   uint16 `json:"width"`
 	Height  uint16 `json:"height"`
+	// ItemIDs is "server" (ids translated with the items.otb) or "client".
+	ItemIDs string `json:"itemIds"`
 	// Bounds is the used area: min x, min y, max x, max y.
 	Bounds []int `json:"bounds,omitempty"`
 }
 
+// The tools name the item id modes "server" and "client".
+const (
+	itemIDsServer = "server"
+	itemIDsClient = "client"
+)
+
+func itemIDsName(mode otitems.Mode) string {
+	if mode == otitems.ModeClient {
+		return itemIDsClient
+	}
+	return itemIDsServer
+}
+
+// itemIDsChoice reads the itemIds argument of open_map and new_map.
+func itemIDsChoice(name, otbPath string) (app.ItemIDsChoice, error) {
+	choice := app.ItemIDsChoice{OTBPath: otbPath}
+	switch name {
+	case "":
+	case itemIDsServer:
+		choice.Mode = otitems.ModeOTB
+	case itemIDsClient:
+		choice.Mode = otitems.ModeClient
+	default:
+		return choice, errors.New(`itemIds must be "server" or "client"`)
+	}
+	return choice, nil
+}
+
 func summarize(info app.MapInfo, active int) mapSummary {
-	summary := mapSummary{ID: info.ID, Name: info.Name, Path: info.Path, Active: info.ID == active, Changed: info.Changed, Tiles: info.Tiles, Width: info.Props.Width, Height: info.Props.Height}
+	summary := mapSummary{
+		ID: info.ID, Name: info.Name, Path: info.Path, Active: info.ID == active, Changed: info.Changed, Tiles: info.Tiles,
+		Width: info.Props.Width, Height: info.Props.Height, ItemIDs: itemIDsName(info.ItemMode),
+	}
 	if info.HasBounds {
 		summary.Bounds = info.Bounds[:]
 	}
@@ -54,15 +88,26 @@ type openClientArgs struct {
 }
 
 type serverDataArgs struct {
-	DetectFrom    string `json:"detectFrom,omitempty" jsonschema:"server data folder or map path to look for items.otb and items.xml in; found files fill the paths left empty"`
-	ItemsMode     string `json:"itemsMode,omitempty" jsonschema:"auto (items.otb when found), otb or client (map ids are client ids)"`
-	OTBPath       string `json:"otbPath,omitempty" jsonschema:"items.otb path"`
+	DetectFrom    string `json:"detectFrom,omitempty" jsonschema:"server data folder or map path to look for items.otb and items.xml in; found files replace the current ones"`
+	OTBPath       string `json:"otbPath,omitempty" jsonschema:"items.otb of the server: it is attached to the client (compiling the client updates it) and maps on server ids read their ids with it"`
 	XMLPath       string `json:"xmlPath,omitempty" jsonschema:"items.xml path"`
 	MaterialsPath string `json:"materialsPath,omitempty" jsonschema:"brush file (JSON); empty: the default one of the client version"`
 	ServerDir     string `json:"serverDir,omitempty" jsonschema:"server data folder scanned for monsters and NPCs"`
 }
 
+// ItemIDsArgs is how a map to open or create stores its item ids.
+type ItemIDsArgs struct {
+	ItemIDs string `json:"itemIds,omitempty" jsonschema:"server (ids translated to the client with the items.otb of the client) or client (client ids, no items.otb); none: the one the map file says, else the one chosen for the map before, else server when the client has an items.otb"`
+	OTBPath string `json:"otbPath,omitempty" jsonschema:"items.otb for server ids when the client has none or another one; it is attached to the client"`
+}
+
+type openMapArgs struct {
+	Path string `json:"path" jsonschema:"OTBM map or OTMAP world file"`
+	ItemIDsArgs
+}
+
 type newMapArgs struct {
+	ItemIDsArgs
 	Width       int    `json:"width,omitempty" jsonschema:"map width in tiles (default 2048)"`
 	Height      int    `json:"height,omitempty" jsonschema:"map height in tiles (default 2048)"`
 	Description string `json:"description,omitempty"`
@@ -160,18 +205,23 @@ func (s *Server) addSessionTools(server *mcp.Server) {
 			return result, nil
 		})
 
-	addTool(server, "set_server_data", "Sets where the map editor takes item data (items.otb, items.xml), brushes and creatures from, and reloads them. Missing fields keep their current values.",
+	addTool(server, "set_server_data", "Sets the server data of the client: its items.otb (attached to the client), items.xml, brushes and creatures, and reloads them. Missing fields keep their current values. Whether a map uses server or client item ids is chosen per map in open_map and new_map.",
 		func(_ context.Context, args serverDataArgs) (any, error) {
 			config := s.maps.Status().Data.Config
+			otbPath := args.OTBPath
 			if args.DetectFrom != "" {
 				detected := s.maps.DetectData(args.DetectFrom)
-				config.OTBPath, config.XMLPath = detected.OTBPath, detected.XMLPath
-				if detected.ServerDir != "" {
-					config.ServerDir = detected.ServerDir
+				if otbPath == "" {
+					otbPath = detected.OTBPath
+				}
+				setIfGiven(&config.XMLPath, detected.XMLPath)
+				setIfGiven(&config.ServerDir, detected.ServerDir)
+			}
+			if otbPath != "" {
+				if _, err := s.projects.AttachItemsOTB(otbPath); err != nil {
+					return nil, err
 				}
 			}
-			setIfGiven(&config.ItemsMode, args.ItemsMode)
-			setIfGiven(&config.OTBPath, args.OTBPath)
 			setIfGiven(&config.XMLPath, args.XMLPath)
 			setIfGiven(&config.MaterialsPath, args.MaterialsPath)
 			setIfGiven(&config.ServerDir, args.ServerDir)
@@ -195,6 +245,11 @@ func (s *Server) addSessionTools(server *mcp.Server) {
 			if args.SeparateSpawns {
 				options.SpawnFormat = otmap.SpawnsSeparate
 			}
+			choice, err := itemIDsChoice(args.ItemIDs, args.OTBPath)
+			if err != nil {
+				return nil, err
+			}
+			options.ItemIDs = choice
 			info, err := s.maps.NewMap(options)
 			if err != nil {
 				return nil, err
@@ -203,9 +258,13 @@ func (s *Server) addSessionTools(server *mcp.Server) {
 			return summarize(info, info.ID), nil
 		})
 
-	addTool(server, "open_map", "Opens an OTBM map (with its houses, spawns and zones) or an OTMAP map (its .otmap world file) and shows it in the editor. Returns its id and load warnings.",
-		func(_ context.Context, args pathArgs) (any, error) {
-			opened, err := s.maps.OpenMap(args.Path)
+	addTool(server, "open_map", "Opens an OTBM map (with its houses, spawns and zones) or an OTMAP map (its .otmap world file) and shows it in the editor. itemIds tells whether the map uses server ids (with the items.otb of the client) or client ids. Returns its id, its item ids and load warnings.",
+		func(_ context.Context, args openMapArgs) (any, error) {
+			choice, err := itemIDsChoice(args.ItemIDs, args.OTBPath)
+			if err != nil {
+				return nil, err
+			}
+			opened, err := s.maps.OpenMap(args.Path, choice)
 			if err != nil {
 				return nil, err
 			}

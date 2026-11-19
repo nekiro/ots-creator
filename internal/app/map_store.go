@@ -6,21 +6,28 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/nekiro/ots-creator/internal/core/otitems"
 	"github.com/nekiro/ots-creator/internal/fsutil"
 
 	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
 	"github.com/nekiro/ots-creator/internal/settings"
 )
 
+// MapDataConfig is the server data the map editor reads for a client. The
+// items.otb is not part of it: it is the one attached to the client (see
+// Session.attachItemsOTB), and each map tells whether it uses it (see
+// MapItemIDs).
 type MapDataConfig struct {
-	// ItemsMode is "auto" (items.otb when found), "otb" or "client".
-	ItemsMode string `json:"itemsMode"`
-	OTBPath   string `json:"otbPath"`
-	XMLPath   string `json:"xmlPath"`
+	// XMLPath is the items.xml with the item names ("": names of the client).
+	XMLPath string `json:"xmlPath"`
 	// MaterialsPath is the brush file (JSON). Empty uses the default file
 	// of the client version in the settings folder.
 	MaterialsPath string `json:"materialsPath"`
 	ServerDir     string `json:"serverDir"`
+	// LegacyOTBPath is the items.otb older versions kept here, before the
+	// map editor used the one attached to the client. It is only offered
+	// when a map is opened.
+	LegacyOTBPath string `json:"otbPath,omitempty"`
 }
 
 type RecentMap struct {
@@ -35,6 +42,9 @@ type mapStoreData struct {
 	// Keys holds the keyboard shortcuts changed by the user: action id ->
 	// key combinations ("Ctrl+S"). Missing actions use their defaults.
 	Keys map[string][]string `json:"keys,omitempty"`
+	// ItemIDs keeps, by map path, whether the map uses server ids (with the
+	// items.otb of the client) or client ids, as chosen when it was opened.
+	ItemIDs map[string]otitems.Mode `json:"itemIds,omitempty"`
 }
 
 type MapStore struct {
@@ -100,6 +110,28 @@ func (st *MapStore) SetProfile(client string, config MapDataConfig) error {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	st.data.Profiles[profileKey(client)] = config
+	return st.saveLocked()
+}
+
+// MapItemIDs returns the item id mode chosen for the map at path.
+func (st *MapStore) MapItemIDs(path string) (otitems.Mode, bool) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	mode, ok := st.data.ItemIDs[profileKey(path)]
+	return mode, ok && (mode == otitems.ModeOTB || mode == otitems.ModeClient)
+}
+
+func (st *MapStore) SetMapItemIDs(path string, mode otitems.Mode) error {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	key := profileKey(path)
+	if st.data.ItemIDs[key] == mode {
+		return nil
+	}
+	if st.data.ItemIDs == nil {
+		st.data.ItemIDs = map[string]otitems.Mode{}
+	}
+	st.data.ItemIDs[key] = mode
 	return st.saveLocked()
 }
 

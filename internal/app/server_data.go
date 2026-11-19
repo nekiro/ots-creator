@@ -10,10 +10,17 @@ const serverDataSearchDepth = 5
 
 var serverDataFolders = []string{"items", filepath.Join("data", "items"), ""}
 
+// ServerData is the server data found in a folder.
+type ServerData struct {
+	OTBPath   string `json:"otbPath"`
+	XMLPath   string `json:"xmlPath"`
+	ServerDir string `json:"serverDir"`
+}
+
 // detectServerData looks for items.otb and items.xml in a server data
 // folder, a map folder or their parents (data/items, data/world/..).
-func detectServerData(start string) MapDataConfig {
-	var config MapDataConfig
+func detectServerData(start string) ServerData {
+	var config ServerData
 	if start == "" {
 		return config
 	}
@@ -40,6 +47,5 @@ func detectServerData(start string) MapDataConfig {
 		}
 		dir = filepath.Dir(dir)
 	}
-	config.ItemsMode = itemsAuto
 	return config
 }

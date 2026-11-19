@@ -97,7 +97,7 @@
 			{#snippet actions()}
 				<button
 					class="t-icon-btn"
-					title="Items and brushes: items.otb, items.xml, brush import"
+					title="Server data: items.otb of the client, items.xml, brush import"
 					onclick={() => (map.dialog = "data")}><Icon name="tools" /></button
 				>
 			{/snippet}
@@ -216,7 +216,7 @@
 								<div>
 									<span class="t-label">Items</span>
 									{map.data.items.toLocaleString()} · {map.data.mode === "otb"
-										? `items.otb ${map.data.otbVersion}`
+										? `server ids, items.otb ${map.data.otbVersion}`
 										: "client ids (no items.otb)"}
 								</div>
 								<div>

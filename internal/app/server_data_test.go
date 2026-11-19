@@ -24,10 +24,10 @@ func TestDetectServerData(t *testing.T) {
 	if config.OTBPath != filepath.Join(items, "items.otb") || config.XMLPath != filepath.Join(items, "items.xml") {
 		t.Fatalf("config = %+v", config)
 	}
-	if config.ServerDir != filepath.Join(server, "data") || config.ItemsMode != itemsAuto {
-		t.Fatalf("server dir %q, mode %q", config.ServerDir, config.ItemsMode)
+	if config.ServerDir != filepath.Join(server, "data") {
+		t.Fatalf("server dir %q", config.ServerDir)
 	}
-	if empty := detectServerData(""); empty.ItemsMode != "" {
+	if empty := detectServerData(""); empty != (ServerData{}) {
 		t.Fatalf("empty start = %+v", empty)
 	}
 	if none := detectServerData(t.TempDir()); none.XMLPath != "" || none.ServerDir != "" {

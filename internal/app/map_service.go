@@ -19,9 +19,8 @@ var errNoClient = errors.New("open a client first: the map editor draws the map 
 type openMap struct {
 	id     int
 	path   string
+	// editor.Items.Mode is the item id mode of the map (see map_data.go).
 	editor *mapedit.Editor
-	// clientData is retained across Undo/Redo of ID conversion.
-	clientData *mapData
 	// suggestions counts which items go together (see map_suggest.go);
 	// indexing is set while a goroutine counts the changed chunks.
 	suggestions *suggest.Index
@@ -52,7 +51,8 @@ type MapService struct {
 	mu            sync.RWMutex
 	maps          map[int]*openMap
 	lastID        int
-	data          *mapData
+	// data is the item data of the open client by item id mode.
+	data          map[otitems.Mode]*mapData
 	clipboard     *mapedit.Clip
 	clipboardMode otitems.Mode
 	activeID      int
@@ -64,20 +64,24 @@ type MapService struct {
 
 func NewMapService(session *Session, store *MapStore) *MapService {
 	session.Warn(store.problem)
-	return &MapService{session: session, store: store, maps: map[int]*openMap{}}
+	return &MapService{session: session, store: store, maps: map[int]*openMap{}, data: map[otitems.Mode]*mapData{}}
 }
 
-// get returns an open map and the item data. The caller holds the lock.
+// get returns an open map and the item data of its mode. The caller holds
+// the write lock.
 func (ms *MapService) get(id int) (*openMap, *mapData, error) {
-	_, err := ms.ensure("")
-	if err != nil {
-		return nil, nil, err
+	if _, err := ms.session.Project(); err != nil {
+		return nil, nil, errNoClient
 	}
 	opened := ms.maps[id]
 	if opened == nil {
 		return nil, nil, ErrNoMap
 	}
-	return opened, ms.dataFor(opened), nil
+	data, err := ms.dataFor(opened)
+	if err != nil {
+		return nil, nil, err
+	}
+	return opened, data, nil
 }
 
 // read read-locks the service and returns an open map and the item data
@@ -86,18 +90,14 @@ func (ms *MapService) get(id int) (*openMap, *mapData, error) {
 func (ms *MapService) read(id int) (*openMap, *mapData, func(), error) {
 	for {
 		ms.mu.RLock()
-		project, err := ms.session.Project()
-		if err == nil && ms.data != nil && ms.data.project == project {
-			opened := ms.maps[id]
-			if opened == nil {
-				ms.mu.RUnlock()
-				return nil, nil, nil, ErrNoMap
+		if opened := ms.maps[id]; opened != nil {
+			if data := ms.current(opened.editor.Items.Mode); data != nil {
+				return opened, data, ms.mu.RUnlock, nil
 			}
-			return opened, ms.dataFor(opened), ms.mu.RUnlock, nil
 		}
 		ms.mu.RUnlock()
 		ms.mu.Lock()
-		_, _, err = ms.get(id)
+		_, _, err := ms.get(id)
 		ms.mu.Unlock()
 		if err != nil {
 			return nil, nil, nil, err
@@ -129,12 +129,9 @@ func (ms *MapService) withMapRead(id int, fn func(opened *openMap, data *mapData
 func (ms *MapService) withData(fn func(data *mapData) error) error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
-	data, err := ms.ensure("")
+	data, err := ms.dataOf(ms.activeMode())
 	if err != nil {
 		return err
-	}
-	if opened := ms.maps[ms.activeID]; opened != nil {
-		data = ms.dataFor(opened)
 	}
 	return fn(data)
 }
@@ -150,13 +147,18 @@ func (ms *MapService) edit(id int, fn func(editor *mapedit.Editor, data *mapData
 	}
 	beforeMode := opened.editor.Items.Mode
 	count, err := fn(opened.editor, data)
-	resolved := ms.dataFor(opened)
-	opened.editor.Items = resolved.items
-	if opened.editor.Brushes != resolved.brushes {
-		opened.editor.SetBrushes(resolved.brushes)
+	// Converting the ids (or undoing it) changes the mode of the map: it
+	// takes the data of its new mode.
+	if resolved, dataErr := ms.dataFor(opened); dataErr == nil {
+		opened.editor.Items = resolved.items
+		if opened.editor.Brushes != resolved.brushes {
+			opened.editor.SetBrushes(resolved.brushes)
+		}
+	} else if err == nil {
+		err = dataErr
 	}
 	change := ms.change(opened)
-	change.All = beforeMode != resolved.items.Mode
+	change.All = beforeMode != opened.editor.Items.Mode
 	change.Count = count
 	if len(change.Chunks) > 0 || change.All {
 		ms.session.notify(EventMapChanged, MapChanged{ID: id, Chunks: change.Chunks, All: change.All})

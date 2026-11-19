@@ -97,12 +97,14 @@ type NewMapOptions struct {
 	Description string            `json:"description"`
 	// Fill paints a ground brush over the whole area (empty: no ground).
 	Fill string `json:"fill"`
+	// ItemIDs is how the map stores its item ids (see PlanItemIDs).
+	ItemIDs ItemIDsChoice `json:"itemIds"`
 }
 
 func (ms *MapService) NewMap(options NewMapOptions) (MapInfo, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
-	data, err := ms.ensure("")
+	data, err := ms.chooseItemIDs("", options.ItemIDs)
 	if err != nil {
 		return MapInfo{}, err
 	}
@@ -127,7 +129,9 @@ type OpenResult struct {
 	Warnings []string `json:"warnings"`
 }
 
-func (ms *MapService) OpenMap(path string) (OpenResult, error) {
+// OpenMap opens the map at path with the item ids chosen for it (see
+// PlanItemIDs); an empty choice takes the proposed ids.
+func (ms *MapService) OpenMap(path string, itemIDs ItemIDsChoice) (OpenResult, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 	for _, opened := range ms.maps {
@@ -137,7 +141,7 @@ func (ms *MapService) OpenMap(path string) (OpenResult, error) {
 	}
 	report := ms.mapProgress()
 	report("Loading items", progressLoadingItems)
-	data, err := ms.ensure(path)
+	data, err := ms.chooseItemIDs(path, itemIDs)
 	if err != nil {
 		return OpenResult{}, err
 	}
@@ -157,6 +161,7 @@ func (ms *MapService) OpenMap(path string) (OpenResult, error) {
 	go debug.FreeOSMemory()
 	opened.editor.MarkSaved()
 	_ = ms.store.AddRecent(RecentMap{Path: path, Client: data.client})
+	_ = ms.store.SetMapItemIDs(path, items.Mode)
 	return OpenResult{Info: ms.info(opened, true), Warnings: warnings}, nil
 }
 
@@ -196,6 +201,7 @@ func (ms *MapService) SaveMap(id int, path string) (MapChange, error) {
 	opened.path = path
 	opened.editor.MarkSaved()
 	_ = ms.store.AddRecent(RecentMap{Path: path, Client: data.client})
+	_ = ms.store.SetMapItemIDs(path, opened.editor.Items.Mode)
 	change := ms.change(opened)
 	// Saving clears the modified state of every tile.
 	change.All = true

@@ -1,19 +1,20 @@
 package app
 
 import (
+	"github.com/nekiro/ots-creator/internal/core/otitems"
 	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
 )
 
 // ConvertMapToClientIDs converts the loaded working map, including unsaved
-// edits. Saving remains an explicit action; Undo restores server IDs.
+// edits, from server ids to client ids. Saving remains an explicit action;
+// Undo restores server IDs.
 func (ms *MapService) ConvertMapToClientIDs(id int) (MapChange, error) {
-	return ms.edit(id, func(editor *mapedit.Editor, data *mapData) (int, error) {
-		target := data.asClientIDs(ms.store.Dir())
-		count, err := editor.ConvertToClientIDs(target.items, target.brushes)
-		if err == nil {
-			ms.maps[id].clientData = target
+	return ms.edit(id, func(editor *mapedit.Editor, _ *mapData) (int, error) {
+		target, err := ms.dataOf(otitems.ModeClient)
+		if err != nil {
+			return 0, err
 		}
-		return count, err
+		return editor.ConvertToClientIDs(target.items, target.brushes)
 	})
 }
 
@@ -28,16 +29,17 @@ type MapViewData struct {
 func (ms *MapService) ViewData(id int, activate bool) (view MapViewData, err error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
-	data, err := ms.ensure("")
-	if err != nil {
-		return view, err
-	}
+	mode := ms.serverMode()
 	if id != 0 {
 		opened := ms.maps[id]
 		if opened == nil {
 			return view, ErrNoMap
 		}
-		data = ms.dataFor(opened)
+		mode = opened.editor.Items.Mode
+	}
+	data, err := ms.dataOf(mode)
+	if err != nil {
+		return view, err
 	}
 	if activate {
 		ms.activeID = id

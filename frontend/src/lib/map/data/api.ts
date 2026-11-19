@@ -1,9 +1,12 @@
 export * as MapService from "../../../../bindings/github.com/nekiro/ots-creator/internal/app/mapservice";
+export { Mode as ItemIdsMode } from "../../../../bindings/github.com/nekiro/ots-creator/internal/core/otitems/models";
 export type {
 	Appearance,
 	BrushPreview,
 	DataInfo,
 	FindResult as FindResponse,
+	ItemIDsChoice,
+	ItemIDsPlan,
 	ItemTable,
 	MapChange,
 	MapDataConfig,

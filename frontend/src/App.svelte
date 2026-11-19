@@ -24,6 +24,7 @@
 	import ReplaceRefsDialog from "./features/tools/ReplaceRefsDialog.svelte";
 	import ExportSpritesDialog from "./features/tools/ExportSpritesDialog.svelte";
 	import ItemsOtbDialog from "./features/dialogs/ItemsOtbDialog.svelte";
+	import ItemIdsDialog from "./features/map/dialogs/ItemIdsDialog.svelte";
 	import ShareDialog from "./features/market/ShareDialog.svelte";
 	import { listPanelWidth, loadPrefs, prefs } from "./lib/state/prefs.svelte";
 	import { setMinLayoutWidth } from "./lib/pixelscale";
@@ -198,6 +199,7 @@
 {#if app.dialog === "itemsOtb" && app.open}<ItemsOtbDialog />{/if}
 {#if app.dialog === "share" && app.shareTarget && (app.open || app.shareTarget.kind === "file")}<ShareDialog />{/if}
 <ConfirmDialog />
+<ItemIdsDialog />
 <PromptDialog />
 <BusyOverlay />
 <Toasts />

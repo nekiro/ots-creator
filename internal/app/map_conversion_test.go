@@ -11,9 +11,10 @@ import (
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
 )
 
-func workingConversionService(t *testing.T) (*MapService, int, int) {
+// writeTestOTB writes an items.otb of server items 1000-1002 showing the
+// client items 100-102 of mapTestService.
+func writeTestOTB(t testing.TB) string {
 	t.Helper()
-	ms, _ := mapTestService(t)
 	file := itemsotb.New(1, 3, 17)
 	ground := itemsotb.NewItem(1000, 100)
 	ground.Group = itemsotb.GroupGround
@@ -30,7 +31,13 @@ func workingConversionService(t *testing.T) (*MapService, int, int) {
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ms.SetData(MapDataConfig{ItemsMode: itemsOTB, OTBPath: path}); err != nil {
+	return path
+}
+
+func workingConversionService(t *testing.T) (*MapService, int, int) {
+	t.Helper()
+	ms, session := mapTestService(t)
+	if err := session.attachItemsOTB(writeTestOTB(t)); err != nil {
 		t.Fatal(err)
 	}
 	one, err := ms.NewMap(NewMapOptions{Width: 512, Height: 512})
@@ -117,7 +124,7 @@ func TestConvertLoadedMapIncludesUnsavedEdits(t *testing.T) {
 	if _, err := ms.SaveMap(id, source); err != nil {
 		t.Fatal(err)
 	}
-	saved, _, err := otmap.Load(source, ms.dataFor(ms.maps[id]).items, otmap.Format{})
+	saved, _, err := otmap.Load(source, ms.maps[id].editor.Items, otmap.Format{})
 	if err != nil || saved.Tile(pos).Ground.ID != 100 || saved.Tile(pos).Items[0].Ext.Items[0].ID != 102 {
 		t.Fatalf("saved client map = %v", err)
 	}

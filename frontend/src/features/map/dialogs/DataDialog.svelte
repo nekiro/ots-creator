@@ -1,30 +1,51 @@
 <script lang="ts">
-	import { DialogService, errorMessage } from "../../../lib/api";
-	import { toast } from "../../../lib/state/app.svelte";
+	import { DialogService, ProjectService, errorMessage } from "../../../lib/api";
+	import { OTB_FILTERS } from "../../../lib/commands/shared";
+	import { app, toast } from "../../../lib/state/app.svelte";
 	import { MapService, type MapDataConfig } from "../../../lib/map/data/api";
+	import { itemIdsLabel } from "../../../lib/map/itemIds.svelte";
 	import { loadMapData, map } from "../../../lib/map/state.svelte";
 	import Dialog from "../../../lib/ui/Dialog.svelte";
-	import Select from "../../../lib/ui/Select.svelte";
 
 	const data = map.data;
 	let config = $state<MapDataConfig>(
-		data?.config
-			? { ...data.config }
-			: { itemsMode: "auto", otbPath: "", xmlPath: "", materialsPath: "", serverDir: "" },
+		data?.config ? { ...data.config } : { xmlPath: "", materialsPath: "", serverDir: "" },
 	);
+	/** The items.otb attached to the client: the only one, shared with compiling. */
+	const clientOtb = $derived(app.project?.info.itemsOtb ?? null);
+	/** An items.otb picked or found here, attached on Apply. */
+	let pendingOtb = $state("");
 	let busy = $state<string | null>(null);
 	let warnings = $state<string[]>([]);
 
-	async function file(key: "otbPath" | "xmlPath" | "materialsPath", title: string, pattern: string) {
+	async function file(key: "xmlPath" | "materialsPath", title: string, pattern: string) {
 		const paths = await DialogService.OpenFiles("mapData", title, [{ name: pattern, pattern }], false);
 		if (paths?.length) config[key] = paths[0];
+	}
+
+	async function chooseOtb() {
+		const paths = await DialogService.OpenFiles("itemsOtb", "items.otb", OTB_FILTERS, false);
+		if (paths?.length) pendingOtb = paths[0];
+	}
+
+	async function detachOtb() {
+		busy = "Detaching items.otb";
+		try {
+			await ProjectService.DetachItemsOTB();
+			pendingOtb = "";
+			toast("items.otb detached from the client.", "success");
+		} catch (err) {
+			toast(errorMessage(err), "error");
+		} finally {
+			busy = null;
+		}
 	}
 
 	async function detect() {
 		const dir = await DialogService.PickDirectory("mapData", "Server or data folder");
 		if (!dir) return;
 		const found = await MapService.DetectData(dir);
-		config.otbPath = found.otbPath || config.otbPath;
+		if (found.otbPath && found.otbPath !== clientOtb?.path) pendingOtb = found.otbPath;
 		config.xmlPath = found.xmlPath || config.xmlPath;
 		config.serverDir = found.serverDir || dir;
 		toast(
@@ -42,6 +63,10 @@
 	async function apply() {
 		busy = "Loading items";
 		try {
+			if (pendingOtb) {
+				await ProjectService.AttachItemsOTB(pendingOtb);
+				pendingOtb = "";
+			}
 			const info = await MapService.SetData($state.snapshot(config));
 			warnings = info.warnings ?? [];
 			await loadMapData(true);
@@ -125,29 +150,33 @@
 		<div class="sect">
 			<div class="h">Items</div>
 			<p class="t-label hint">
-				Server ids are translated to the client with items.otb. Client ids are used as they are, without
-				items.otb. Names and types come from items.xml.
+				Each map uses server ids, translated to the client with the items.otb of the client, or client ids, used
+				as they are. It is chosen when the map is opened.
+				{#if map.active}This map: <b>{itemIdsLabel(map.active.itemMode)}</b>.{/if}
 			</p>
-			<div class="row">
-				<span class="t-label lbl">Item ids</span>
-				<Select
-					grow
-					value={config.itemsMode}
-					options={[
-						{ value: "auto", label: "Automatic: items.otb when set" },
-						{ value: "otb", label: "Server ids (items.otb)" },
-						{ value: "client", label: "Client ids (no items.otb)" },
-					]}
-					onchange={(value) => (config.itemsMode = value)}
-				/>
-			</div>
 			<div class="row">
 				<span class="t-label lbl">items.otb</span><input
 					class="t-input grow"
-					bind:value={config.otbPath}
-					placeholder="not used"
-				/><button class="t-btn" onclick={() => file("otbPath", "items.otb", "*.otb")}>…</button>
+					readonly
+					value={pendingOtb || clientOtb?.path || ""}
+					placeholder="none attached to the client"
+					title={pendingOtb
+						? "Attached to the client on Apply"
+						: "Attached to the client: compiling the client updates it too"}
+				/><button class="t-btn" onclick={chooseOtb}>…</button>
+				{#if clientOtb && !pendingOtb}<button class="t-btn" onclick={detachOtb}>Detach</button>{/if}
 			</div>
+			{#if pendingOtb}
+				<p class="t-label hint">Apply attaches it to the client, replacing {clientOtb?.path ?? "none"}.</p>
+			{:else if clientOtb}
+				<p class="t-label hint">
+					Version {clientOtb.version} · {clientOtb.items.toLocaleString()} server items.
+				</p>
+			{/if}
+			<p class="t-label hint">
+				items.xml and the brush file belong to the server: they apply to maps on
+				{clientOtb || pendingOtb ? "server ids" : "client ids"}.
+			</p>
 			<div class="row">
 				<span class="t-label lbl">items.xml</span><input
 					class="t-input grow"

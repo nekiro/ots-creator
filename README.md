@@ -132,8 +132,11 @@ the open client; object changes show after **Reload from client**.
   in files that git can diff and merge. A map is saved in the format it was opened in;
   **Save as** picks the format by the extension (`.otbm` or `.otmap`). Several maps open
   in tabs.
-- **Item ids:** server ids (translated with `items.otb`) or client ids, detected
-  automatically. Names and types come from `items.xml`.
+- **Item ids:** each map uses server ids (translated with the `items.otb` attached to the
+  client, the same file compiling keeps in sync) or client ids. Opening or creating a map
+  shows which one and why (the `.otmap` file says it, the earlier choice for the map, an
+  `items.otb` attached to the client or found next to the map); picking an `items.otb`
+  there attaches it to the client. Names and types come from `items.xml`.
 - **Brushes:** grounds with automatic borders, walls with doors and windows, doodads,
   carpets, tables, houses, creatures and spawns, waypoints, zones, PZ / no-PvP / no-logout
   flags and an eraser. Size, square or circle shape, Shift+drag fills a rectangle, and any

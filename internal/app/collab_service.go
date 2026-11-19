@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/nekiro/ots-creator/internal/collab"
+	"github.com/nekiro/ots-creator/internal/core/otitems"
+	"github.com/nekiro/ots-creator/internal/core/project"
 	"github.com/nekiro/ots-creator/internal/fsutil"
 	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
@@ -209,14 +211,16 @@ func (cs *CollabService) statusChanged() {
 }
 
 // compat describes the item data of a map.
-func (ms *MapService) compat(opened *openMap) collab.Compat { return compatOf(ms.dataFor(opened)) }
+func (ms *MapService) compat(opened *openMap, data *mapData) collab.Compat {
+	return compatOf(data.project, opened.editor.Items)
+}
 
-func compatOf(data *mapData) collab.Compat {
-	compat := collab.Compat{ItemsMode: string(data.items.Mode), Items: data.items.Count()}
-	if data.items.MajorVersion != 0 || data.items.MinorVersion != 0 {
-		compat.OTB = fmt.Sprintf("%d.%d.%d", data.items.MajorVersion, data.items.MinorVersion, data.items.BuildNumber)
+func compatOf(proj *project.Project, items *otitems.DB) collab.Compat {
+	compat := collab.Compat{ItemsMode: string(items.Mode), Items: items.Count()}
+	if items.MajorVersion != 0 || items.MinorVersion != 0 {
+		compat.OTB = fmt.Sprintf("%d.%d.%d", items.MajorVersion, items.MinorVersion, items.BuildNumber)
 	}
-	info := data.project.Info()
+	info := proj.Info()
 	compat.Client, compat.DatSignature, compat.SprSignature = info.Version.Name, info.Version.DatSignature, info.Version.SprSignature
 	return compat
 }
@@ -238,12 +242,12 @@ var errBusy = errors.New("a map is shared already: leave that session first")
 func (cs *CollabService) Host(request HostRequest) (CollabStatus, error) {
 	ms := cs.maps
 	ms.mu.Lock()
-	opened, _, err := ms.get(request.MapID)
+	opened, data, err := ms.get(request.MapID)
 	if err != nil {
 		ms.mu.Unlock()
 		return CollabStatus{}, err
 	}
-	compat := ms.compat(opened)
+	compat := ms.compat(opened, data)
 	mapName := opened.name()
 	ms.mu.Unlock()
 
@@ -287,7 +291,7 @@ func (cs *CollabService) Host(request HostRequest) (CollabStatus, error) {
 				return nil, nil, errors.New("the map is not shared now")
 			}
 			attach()
-			return otmap.EncodeOTMAP(opened.editor.Map, ms.dataFor(opened).items)
+			return otmap.EncodeOTMAP(opened.editor.Map, opened.editor.Items)
 		},
 		Edit: func(edit *collab.Edit) error {
 			ms.mu.Lock()
@@ -442,12 +446,13 @@ func (cs *CollabService) Join(request JoinRequest) (MapInfo, error) {
 	}
 	ms := cs.maps
 	ms.mu.Lock()
-	data, err := ms.ensure("")
+	// The shared map takes the item ids of the server of the client.
+	data, err := ms.dataOf(ms.serverMode())
 	if err != nil {
 		ms.mu.Unlock()
 		return MapInfo{}, err
 	}
-	compat := compatOf(data)
+	compat := compatOf(data.project, data.items)
 	ms.mu.Unlock()
 
 	cs.mu.Lock()

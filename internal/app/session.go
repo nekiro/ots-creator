@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -148,6 +149,51 @@ func (s *Session) changed(slot *clientSlot) {
 }
 
 func (s *Session) Project() (*project.Project, error) { return s.client(&s.main) }
+
+// ItemsOTB is the path of the items.otb attached to the open client, ""
+// when none is (or no client is open). It is the only items.otb of the
+// app: compiling keeps it in sync and maps on server ids read their ids
+// with it.
+func (s *Session) ItemsOTB() string {
+	proj, err := s.Project()
+	if err != nil {
+		return ""
+	}
+	if otb := proj.OTB(); otb != nil {
+		return otb.Path
+	}
+	return ""
+}
+
+// attachItemsOTB attaches the items.otb at path to the open client ("":
+// detaches it) and remembers it for the client.
+func (s *Session) attachItemsOTB(path string) error {
+	proj, err := s.Project()
+	if err != nil {
+		return err
+	}
+	if path == "" {
+		proj.DetachOTB()
+	} else if _, err := proj.AttachOTB(path); err != nil {
+		return fmt.Errorf("items.otb: %w", err)
+	}
+	s.Changed()
+	return s.rememberOTB(proj.Info().DatPath, path)
+}
+
+func (s *Session) rememberedOTB(client string) string {
+	if s.otbPaths == nil || client == "" {
+		return ""
+	}
+	return s.otbPaths.ItemsOTB(client)
+}
+
+func (s *Session) rememberOTB(client, otb string) error {
+	if s.otbPaths == nil || client == "" {
+		return nil
+	}
+	return s.otbPaths.SetItemsOTB(client, otb)
+}
 
 func (s *Session) Set(proj *project.Project) { s.setClient(&s.main, proj) }
 

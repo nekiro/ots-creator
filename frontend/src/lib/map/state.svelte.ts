@@ -282,7 +282,8 @@ export async function loadMapData(force = false, activate = true): Promise<void>
 		}
 		const view = await MapService.ViewData(id ?? 0, activate);
 		if (request !== dataRequest || id !== map.activeId) return;
-		const modeChanged = !!map.data && map.data.mode !== view.data.mode;
+		// Another item id mode or items.otb means other items.
+		const modeChanged = !!map.data && (map.data.mode !== view.data.mode || map.data.otbPath !== view.data.otbPath);
 		map.data = view.data;
 		if (force || !map.items || modeChanged) {
 			map.items = new ItemIndex(view.items);

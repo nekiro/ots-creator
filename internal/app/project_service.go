@@ -76,42 +76,23 @@ func (ps *ProjectService) Open(req OpenRequest) (State, error) {
 	return state, nil
 }
 
-func (ps *ProjectService) otbPath(client string) string {
-	if ps.session.otbPaths == nil || client == "" {
-		return ""
-	}
-	return ps.session.otbPaths.ItemsOTB(client)
-}
+func (ps *ProjectService) otbPath(client string) string { return ps.session.rememberedOTB(client) }
 
 func (ps *ProjectService) rememberOTB(client, otb string) error {
-	if ps.session.otbPaths == nil || client == "" {
-		return nil
-	}
-	return ps.session.otbPaths.SetItemsOTB(client, otb)
+	return ps.session.rememberOTB(client, otb)
 }
 
-// AttachItemsOTB keeps an items.otb in sync with the client: compiling
-// then updates it too. It is remembered for the client.
+// AttachItemsOTB attaches the items.otb of the server to the client:
+// compiling then updates it too, and maps on server ids read their ids with
+// it. It is remembered for the client.
 func (ps *ProjectService) AttachItemsOTB(path string) (State, error) {
-	proj, err := ps.session.Project()
-	if err != nil {
-		return ps.session.State(), err
-	}
-	if _, err := proj.AttachOTB(path); err != nil {
-		return ps.session.State(), err
-	}
-	ps.session.Changed()
-	return ps.session.State(), ps.rememberOTB(proj.Info().DatPath, path)
+	err := ps.session.attachItemsOTB(path)
+	return ps.session.State(), err
 }
 
 func (ps *ProjectService) DetachItemsOTB() (State, error) {
-	proj, err := ps.session.Project()
-	if err != nil {
-		return ps.session.State(), err
-	}
-	proj.DetachOTB()
-	ps.session.Changed()
-	return ps.session.State(), ps.rememberOTB(proj.Info().DatPath, "")
+	err := ps.session.attachItemsOTB("")
+	return ps.session.State(), err
 }
 
 func (ps *ProjectService) ItemsOTBPreview() (project.OTBReport, error) {

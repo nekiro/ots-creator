@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/nekiro/ots-creator/internal/core/otitems"
 	"github.com/nekiro/ots-creator/internal/mapping/mapedit"
 	"github.com/nekiro/ots-creator/internal/mapping/materials"
 	"github.com/nekiro/ots-creator/internal/mapping/otmap"
@@ -268,7 +269,7 @@ func TestMapServiceFiles(t *testing.T) {
 	if !imported.All || imported.Info.Tiles != 6 {
 		t.Fatalf("import = %+v", imported.Info)
 	}
-	if opened, err := ms.OpenMap(filepath.Join(dir, "second.otbm")); err != nil || opened.Info.ID != id {
+	if opened, err := ms.OpenMap(filepath.Join(dir, "second.otbm"), ItemIDsChoice{}); err != nil || opened.Info.ID != id {
 		t.Fatalf("reopening an open map = %+v, %v", opened, err)
 	}
 	if err := ms.RemoveRecent(""); err != nil || len(ms.Status().Recent) != 0 {
@@ -284,15 +285,13 @@ func TestMapServiceFiles(t *testing.T) {
 
 func TestMapServiceDataConfig(t *testing.T) {
 	ms, _ := mapTestService(t)
-	info, err := ms.SetData(MapDataConfig{ItemsMode: itemsClient, MaterialsPath: filepath.Join(t.TempDir(), "m.json")})
-	if err != nil || info.Config.ItemsMode != itemsClient {
+	materialsPath := filepath.Join(t.TempDir(), "m.json")
+	info, err := ms.SetData(MapDataConfig{MaterialsPath: materialsPath})
+	if err != nil || info.Config.MaterialsPath != materialsPath || info.Mode != otitems.ModeClient || info.OTBPath != "" {
 		t.Fatalf("set data = %+v, %v", info, err)
 	}
 	if reloaded, err := ms.Reload(); err != nil || reloaded.Materials != info.Materials {
 		t.Fatalf("reload = %+v, %v", reloaded, err)
-	}
-	if _, err := ms.SetData(MapDataConfig{ItemsMode: itemsOTB, OTBPath: filepath.Join(t.TempDir(), "missing.otb")}); err == nil {
-		t.Fatal("loaded a missing items.otb")
 	}
 	if err := ms.SetEditorSettings(mapedit.Settings{}); err != nil {
 		t.Fatal(err)

@@ -94,7 +94,7 @@ func TestMapServiceRoundTrip(t *testing.T) {
 		t.Fatal("changed after save")
 	}
 	ms.CloseMap(info.ID)
-	res, err := ms.OpenMap(path)
+	res, err := ms.OpenMap(path, ItemIDsChoice{})
 	if err != nil {
 		t.Fatal(err)
 	}

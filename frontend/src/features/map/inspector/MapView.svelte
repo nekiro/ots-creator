@@ -63,6 +63,20 @@
 </script>
 
 <div class="m-form">
+	<div
+		class="m-field"
+		title={info.itemMode === "client"
+			? "The item ids of the map are the ids of the client objects."
+			: `The server ids of the map are translated to the client with ${map.data?.otbPath || "the items.otb of the client"}.`}
+	>
+		<span class="m-lbl">Item ids</span>
+		<span class="grow ids"
+			>{info.itemMode === "client"
+				? "Client ids (no items.otb)"
+				: `Server ids · items.otb ${map.data?.otbVersion ?? ""}`}</span
+		>
+		<button class="t-btn" onclick={() => (map.dialog = "data")}>items.otb…</button>
+	</div>
 	<label class="col"
 		><span class="t-label">Description</span><textarea
 			class="t-input text"
@@ -168,6 +182,11 @@
 </div>
 
 <style>
+	.ids {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
 	.col {
 		display: flex;
 		flex-direction: column;

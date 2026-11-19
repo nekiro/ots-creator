@@ -4,7 +4,14 @@ import { clamp } from "../../util/math";
 import { ask } from "../../confirm.svelte";
 import { openContextMenu, type MenuEntry } from "../../menu.svelte";
 import { app, run, toast } from "../../state/app.svelte";
-import { MapService, SpawnFormat, type Position } from "../data/api";
+import { ItemIdsMode, MapService, SpawnFormat, type ItemIDsChoice, type Position } from "../data/api";
+import { chooseItemIds } from "../itemIds.svelte";
+
+/** Whether two file paths name the same file (Windows paths ignore case and slash kind). */
+function samePath(first: string, second: string): boolean {
+	const normal = (path: string) => path.replace(/\\/g, "/").toLowerCase();
+	return normal(first) === normal(second);
+}
 import { MAX_FLOOR } from "../constants";
 import { tileToWorld, worldToTile } from "./coords";
 import { whenRendered } from "../render/rendered";
@@ -130,14 +137,17 @@ export const mapCommands = {
 	async newMap() {
 		if (!needClient()) return;
 		try {
+			const itemIds = await chooseItemIds({ title: "New map", name: "", plan: await MapService.PlanItemIDs("") });
+			if (!itemIds) return;
 			// Servers on client ids (no items.otb) keep monsters and NPCs in separate files.
-			const separate = map.data?.mode === "client";
+			const separate = itemIds.mode === ItemIdsMode.ModeClient;
 			const info = await MapService.NewMap({
 				width: 2048,
 				height: 2048,
 				spawnFormat: separate ? SpawnFormat.SpawnsSeparate : SpawnFormat.SpawnsSingle,
 				description: "",
 				fill: "",
+				itemIds,
 			});
 			await mapCommands.created(info.id);
 		} catch (err) {
@@ -153,10 +163,20 @@ export const mapCommands = {
 			path = paths[0];
 		}
 		const name = path.split(/[\\/]/).pop() ?? path;
+		// A map open already keeps its item ids: the backend only shows it.
+		let itemIds: ItemIDsChoice | null = { mode: "" as ItemIdsMode, otbPath: "" };
+		try {
+			if (!map.maps.some((open) => samePath(open.path, path)))
+				itemIds = await chooseItemIds({ title: "Open map", name, plan: await MapService.PlanItemIDs(path) });
+		} catch (err) {
+			toast(errorMessage(err), "error");
+			return;
+		}
+		if (!itemIds) return;
 		const stopProgress = trackProgress(name);
 		const started = performance.now();
 		try {
-			const opened = await MapService.OpenMap(path);
+			const opened = await MapService.OpenMap(path, itemIds);
 			stopProgress();
 			map.loading = { name, step: "Preparing the view", percent: 98 };
 			await loadMapData(!map.items);
