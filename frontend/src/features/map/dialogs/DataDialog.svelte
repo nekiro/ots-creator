@@ -145,7 +145,7 @@
 	}
 </script>
 
-<Dialog title="Items and brushes" width={560} onclose={() => (map.dialog = null)}>
+<Dialog title="Server data" width={560} onclose={() => (map.dialog = null)}>
 	<div class="col form">
 		<div class="sect">
 			<div class="h">Items</div>

@@ -216,8 +216,8 @@
 								<div>
 									<span class="t-label">Items</span>
 									{map.data.items.toLocaleString()} · {map.data.mode === "otb"
-										? `server ids, items.otb ${map.data.otbVersion}`
-										: "client ids (no items.otb)"}
+										? `items.otb ${map.data.otbVersion} attached to the client: new maps use server ids`
+										: "no items.otb attached to the client: new maps use client ids"}
 								</div>
 								<div>
 									<span class="t-label">Brushes</span>
@@ -234,7 +234,7 @@
 							{:else}
 								<div class="t-label loading"><span class="t-spinner"></span>Loading the item data…</div>
 							{/if}
-							<button class="t-btn" onclick={() => (map.dialog = "data")}>Items and brushes…</button>
+							<button class="t-btn" onclick={() => (map.dialog = "data")}>Server data…</button>
 						</div>
 						<p class="t-label keys">
 							<kbd>Ctrl+N</kbd> new · <kbd>Ctrl+O</kbd> open · <kbd>Ctrl+K</kbd> go to anything ·

@@ -166,7 +166,7 @@ export function mapMenus(): { label: string; items: MenuEntry[] }[] {
 				{ label: "New house", action: () => ((map.side = "world"), addHouse()), disabled: noMap },
 				{ label: "New waypoint…", action: () => ((map.side = "world"), addWaypoint()), disabled: noMap },
 				"-",
-				{ label: "Items and brushes…", action: () => (map.dialog = "data"), disabled: noClient },
+				{ label: "Server data…", action: () => (map.dialog = "data"), disabled: noClient },
 			],
 		},
 	];
