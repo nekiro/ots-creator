@@ -1,5 +1,6 @@
 <script lang="ts" generics="T">
 	import type { Snippet } from "svelte";
+	import { fitCells } from "./gridFit";
 
 	let {
 		count,
@@ -10,7 +11,7 @@
 		cell,
 		scrollTo = null,
 		onkeydown,
-		spread = true,
+		fill = false,
 	}: {
 		count: number;
 		cellWidth: number;
@@ -20,8 +21,8 @@
 		cell: Snippet<[number]>;
 		scrollTo?: number | null;
 		onkeydown?: (event: KeyboardEvent, columns: number) => void;
-		/** Spread the columns over the full width; false keeps them gap apart and centers them. */
-		spread?: boolean;
+		/** Grow the cells (cellWidth is the smallest) to fill the width, by whole even pixels: see fitCells. */
+		fill?: boolean;
 	} = $props();
 
 	let scroller: HTMLDivElement;
@@ -29,16 +30,19 @@
 	let height = $state(0);
 	let scrollTop = $state(0);
 
-	const columns = $derived(Math.max(1, Math.floor((width + gap) / (cellWidth + gap))));
-	// Spread the columns over the full width so no empty strip is left on the right.
+	const fitted = $derived(fill ? fitCells(width, cellWidth, gap) : null);
+	const columns = $derived(fitted?.columns ?? Math.max(1, Math.floor((width + gap) / (cellWidth + gap))));
+	const shownWidth = $derived(fitted?.size ?? cellWidth);
+	const shownHeight = $derived(fitted ? cellHeight + fitted.size - cellWidth : cellHeight);
+	// Without fill, spread the columns over the full width so no empty strip is left on the right.
 	const step = $derived(
-		!spread ? cellWidth + gap : columns > 1 ? Math.max(cellWidth + gap, (width - cellWidth) / (columns - 1)) : 0,
+		fitted ? fitted.size + gap : columns > 1 ? Math.max(cellWidth + gap, (width - cellWidth) / (columns - 1)) : 0,
 	);
 	const left = $derived(
-		spread ? 0 : Math.max(0, Math.floor((width - columns * cellWidth - (columns - 1) * gap) / 2)),
+		fitted ? Math.max(0, Math.floor((width - columns * fitted.size - (columns - 1) * gap) / 2)) : 0,
 	);
 	const rows = $derived(Math.ceil(count / columns));
-	const rowHeight = $derived(cellHeight + gap);
+	const rowHeight = $derived(shownHeight + gap);
 	const first = $derived(Math.max(0, Math.floor(scrollTop / rowHeight) - overscan));
 	const last = $derived(Math.min(rows - 1, Math.ceil((scrollTop + height) / rowHeight) + overscan));
 	const visible = $derived.by(() => {
@@ -91,7 +95,7 @@
 			<div
 				class="cell"
 				style="transform:translate({left + Math.round((i % columns) * step)}px,{Math.floor(i / columns) *
-					rowHeight}px);width:{cellWidth}px;height:{cellHeight}px"
+					rowHeight}px);width:{shownWidth}px;height:{shownHeight}px"
 			>
 				{@render cell(i)}
 			</div>

@@ -20,6 +20,7 @@
 	import SearchField from "../../lib/ui/SearchField.svelte";
 	import Select from "../../lib/ui/Select.svelte";
 	import Slider from "../../lib/ui/Slider.svelte";
+	import { fitCells } from "../../lib/ui/gridFit";
 	import VirtualRows from "../../lib/ui/VirtualRows.svelte";
 	import VirtualGrid from "../../lib/ui/VirtualGrid.svelte";
 	import BrushPreview from "./BrushPreview.svelte";
@@ -64,8 +65,11 @@
 	let layouts = $state<Record<View, Layout>>(prefs.layouts);
 	const layout = $derived(layouts[view]);
 	let zoom = $state(prefs.zoom);
-	/** A grid cell: the 34px slot enlarged, with its 1px border. */
+	/** The smallest grid cell: the 34px slot enlarged, with its 1px border. Cells grow to fill the width. */
 	const cellSize = $derived(34 * zoom + 2);
+	// The brush and creature grids fit their cells to the width like VirtualGrid with fill.
+	let cellsWidth = $state(0);
+	const cellsFit = $derived(fitCells(cellsWidth, cellSize, 2));
 	let itemKind = $state<ItemKind>("all");
 	let who = $state<"all" | "monster" | "npc">("all");
 	let query = $state("");
@@ -331,7 +335,11 @@
 
 {#snippet brushes(list: PaletteBrush[])}
 	{#if layout === "grid"}
-		<div class="cells">
+		<div
+			class="cells"
+			bind:clientWidth={cellsWidth}
+			style="--cell:{cellsFit.size}px;grid-template-columns:repeat({cellsFit.columns}, {cellsFit.size}px)"
+		>
 			{#each list as brush (brush.name)}{@render brushCell(brush)}{/each}
 		</div>
 	{:else}
@@ -548,7 +556,7 @@
 					cellWidth={cellSize}
 					cellHeight={cellSize}
 					gap={2}
-					spread={false}
+					fill
 					scrollTo={revealIndex}
 				>
 					{#snippet cell(i)}{@render itemCell(items[i])}{/snippet}
@@ -612,7 +620,11 @@
 					></span>{shownCreatures.length}
 				</div>
 				{#if layout === "grid"}
-					<div class="cells">
+					<div
+						class="cells"
+						bind:clientWidth={cellsWidth}
+						style="--cell:{cellsFit.size}px;grid-template-columns:repeat({cellsFit.columns}, {cellsFit.size}px)"
+					>
 						{#each shownCreatures as creature (creature.name)}{@render creatureCell(creature)}{/each}
 					</div>
 				{:else}
@@ -662,22 +674,28 @@
 	}
 	.cells {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, calc(34px * var(--zoom) + 2px));
 		justify-content: center;
 		gap: 2px;
 		padding: 2px 0;
 	}
-	/* Grid cells grow by whole multiples: the slot frame and the icons stay pixel perfect. */
-	.cells .m-cell,
+	/* Grid cells fill the width by whole even pixels and the icons grow by whole multiples
+	   (see fitCells): the frame is a 1px line, so every size stays pixel perfect. */
+	.cells .m-cell {
+		width: var(--cell);
+		height: var(--cell);
+	}
 	.grid-host .m-cell {
-		width: calc(34px * var(--zoom) + 2px);
-		height: calc(34px * var(--zoom) + 2px);
+		width: 100%;
+		height: 100%;
 	}
 	.cells .t-slot,
 	.grid-host .t-slot {
-		width: calc(34px * var(--zoom));
-		height: calc(34px * var(--zoom));
-		background-size: 100% 100%;
+		width: 100%;
+		height: 100%;
+		background: rgba(0, 0, 0, 0.3);
+		border-style: solid;
+		border-width: 1px;
+		border-image: url("../../assets/ui/1pixel-down-frame.png") 1 / 1px repeat;
 	}
 	.initials {
 		font-size: calc(11px * var(--zoom));
