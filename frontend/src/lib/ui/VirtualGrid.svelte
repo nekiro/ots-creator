@@ -10,6 +10,7 @@
 		cell,
 		scrollTo = null,
 		onkeydown,
+		spread = true,
 	}: {
 		count: number;
 		cellWidth: number;
@@ -19,6 +20,8 @@
 		cell: Snippet<[number]>;
 		scrollTo?: number | null;
 		onkeydown?: (event: KeyboardEvent, columns: number) => void;
+		/** Spread the columns over the full width; false keeps them gap apart and centers them. */
+		spread?: boolean;
 	} = $props();
 
 	let scroller: HTMLDivElement;
@@ -28,7 +31,12 @@
 
 	const columns = $derived(Math.max(1, Math.floor((width + gap) / (cellWidth + gap))));
 	// Spread the columns over the full width so no empty strip is left on the right.
-	const step = $derived(columns > 1 ? Math.max(cellWidth + gap, (width - cellWidth) / (columns - 1)) : 0);
+	const step = $derived(
+		!spread ? cellWidth + gap : columns > 1 ? Math.max(cellWidth + gap, (width - cellWidth) / (columns - 1)) : 0,
+	);
+	const left = $derived(
+		spread ? 0 : Math.max(0, Math.floor((width - columns * cellWidth - (columns - 1) * gap) / 2)),
+	);
 	const rows = $derived(Math.ceil(count / columns));
 	const rowHeight = $derived(cellHeight + gap);
 	const first = $derived(Math.max(0, Math.floor(scrollTop / rowHeight) - overscan));
@@ -82,7 +90,7 @@
 		{#each visible as i (i)}
 			<div
 				class="cell"
-				style="transform:translate({Math.round((i % columns) * step)}px,{Math.floor(i / columns) *
+				style="transform:translate({left + Math.round((i % columns) * step)}px,{Math.floor(i / columns) *
 					rowHeight}px);width:{cellWidth}px;height:{cellHeight}px"
 			>
 				{@render cell(i)}

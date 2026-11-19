@@ -19,6 +19,7 @@
 	import Icon from "../../lib/ui/Icon.svelte";
 	import SearchField from "../../lib/ui/SearchField.svelte";
 	import Select from "../../lib/ui/Select.svelte";
+	import Slider from "../../lib/ui/Slider.svelte";
 	import VirtualRows from "../../lib/ui/VirtualRows.svelte";
 	import VirtualGrid from "../../lib/ui/VirtualGrid.svelte";
 	import BrushPreview from "./BrushPreview.svelte";
@@ -48,22 +49,61 @@
 		{ kinds: ["table"], label: "Tables" },
 	];
 
+	/** How a tab shows its entries: rows with names, or a grid of icons. */
+	type Layout = "list" | "grid";
+	// Brushes and creatures are told apart by name, raw items by their look.
+	const DEFAULT_LAYOUTS: Record<View, Layout> = { terrain: "list", decor: "list", items: "grid", creatures: "list" };
+
 	const PREFS_KEY = "map:library";
 	const prefs = loadPrefs();
 	let view = $state<View>(prefs.view);
 	let collection = $state<string>(prefs.collection);
+	let layouts = $state<Record<View, Layout>>(prefs.layouts);
+	const layout = $derived(layouts[view]);
+	/** How many times the grid icons are enlarged: whole multiples keep the pixels sharp. */
+	const MAX_ZOOM = 4;
+	let zoom = $state(prefs.zoom);
+	/** A grid cell: the 34px slot enlarged, with its 1px border. */
+	const cellSize = $derived(34 * zoom + 2);
 	let itemKind = $state<ItemKind>("all");
 	let who = $state<"all" | "monster" | "npc">("all");
 	let query = $state("");
 
-	function loadPrefs(): { view: View; collection: string } {
-		const stored = (readJson(PREFS_KEY) ?? {}) as { view?: View; collection?: unknown };
+	function loadPrefs(): { view: View; collection: string; layouts: Record<View, Layout>; zoom: number } {
+		const stored = (readJson(PREFS_KEY) ?? {}) as {
+			view?: View;
+			collection?: unknown;
+			layouts?: unknown;
+			zoom?: unknown;
+		};
+		const layouts = { ...DEFAULT_LAYOUTS };
+		if (stored.layouts && typeof stored.layouts === "object") {
+			for (const [tab, value] of Object.entries(stored.layouts)) {
+				if (tab in layouts && (value === "list" || value === "grid")) layouts[tab as View] = value;
+			}
+		}
 		return {
 			view: VIEWS.some((view) => view.id === stored.view) ? stored.view! : "terrain",
 			collection: typeof stored.collection === "string" ? stored.collection : "",
+			layouts,
+			zoom:
+				typeof stored.zoom === "number" && Number.isInteger(stored.zoom)
+					? Math.min(Math.max(stored.zoom, 1), MAX_ZOOM)
+					: 1,
 		};
 	}
-	$effect(() => saveJson(PREFS_KEY, { view, collection }));
+	$effect(() => saveJson(PREFS_KEY, { view, collection, layouts: $state.snapshot(layouts), zoom }));
+
+	// Ctrl+wheel over a grid enlarges its icons.
+	function onwheel(event: WheelEvent) {
+		if (!event.ctrlKey || layout !== "grid") return;
+		event.preventDefault();
+		zoom = Math.min(Math.max(zoom + (event.deltaY < 0 ? 1 : -1), 1), MAX_ZOOM);
+	}
+
+	function toggleLayout() {
+		layouts[view] = layout === "grid" ? "list" : "grid";
+	}
 
 	const palette = $derived(map.palette);
 	const loadingData = $derived(app.open && (!map.items || !map.palette));
@@ -159,9 +199,7 @@
 			view = decorBrush ? "decor" : "terrain";
 			if (!(decorBrush ? decor : terrain).some((brush) => brush.name === request.name)) query = "";
 			if (!(decorBrush ? decorAll : terrainAll).some((brush) => brush.name === request.name)) collection = "";
-			void tick().then(() =>
-				libraryRoot?.querySelector(".m-row.on, .stamp.on")?.scrollIntoView({ block: "nearest" }),
-			);
+			void tick().then(() => libraryRoot?.querySelector(".m-body .on")?.scrollIntoView({ block: "nearest" }));
 		});
 	});
 
@@ -169,6 +207,13 @@
 		if (revealed === null || map.brush?.kind !== "raw" || map.brush.item !== revealed) return null;
 		const index = items.indexOf(revealed);
 		return index >= 0 ? index : null;
+	});
+	// The item list scrolls to the item itself; the grid takes scrollTo.
+	let itemRows = $state<VirtualRows<number>>();
+	$effect(() => {
+		const index = revealIndex;
+		if (index === null || layout !== "list") return;
+		void tick().then(() => itemRows?.reveal(index));
 	});
 
 	const matchedCreatures = $derived(named(creatures));
@@ -252,8 +297,6 @@
 		map.editBrush = { name: "", type: view === "decor" ? "doodad" : "ground" };
 		map.dialog = "brush";
 	}
-
-	const ITEM_CELL = 36;
 </script>
 
 {#snippet brushRow(brush: PaletteBrush)}
@@ -269,6 +312,30 @@
 		<span class="t-slot"><ItemIcon id={brush.look} size={24} /></span>
 		<span class="m-name">{brush.name}</span>
 	</button>
+{/snippet}
+
+{#snippet brushCell(brush: PaletteBrush)}
+	{@const choice = brushSel(brush)}
+	<button
+		class="m-cell"
+		class:on={isBrushActive(choice)}
+		title="{brush.name} · double-click to edit"
+		onclick={() => selectBrush(choice)}
+		ondblclick={() => editBrush(brush)}
+		oncontextmenu={(event) => brushMenu(event, brush)}
+	>
+		<span class="t-slot"><ItemIcon id={brush.look} size={32 * zoom} crisp /></span>
+	</button>
+{/snippet}
+
+{#snippet brushes(list: PaletteBrush[])}
+	{#if layout === "grid"}
+		<div class="cells">
+			{#each list as brush (brush.name)}{@render brushCell(brush)}{/each}
+		</div>
+	{:else}
+		{#each list as brush (brush.name)}{@render brushRow(brush)}{/each}
+	{/if}
 {/snippet}
 
 {#snippet stampCards(list: PaletteBrush[])}
@@ -302,7 +369,41 @@
 		onclick={() => selectBrush(choice)}
 		oncontextmenu={(event) => itemMenu(event, id)}
 	>
-		<span class="t-slot"><ItemIcon {id} /></span>
+		<span class="t-slot"><ItemIcon {id} size={32 * zoom} crisp /></span>
+	</button>
+{/snippet}
+
+{#snippet itemRow(id: number)}
+	{@const choice = itemSel(id)}
+	<button
+		class="m-row"
+		class:on={isBrushActive(choice)}
+		title="{map.items?.name(id)} · {id}"
+		onclick={() => selectBrush(choice)}
+		oncontextmenu={(event) => itemMenu(event, id)}
+	>
+		<span class="t-slot"><ItemIcon {id} size={24} /></span>
+		<span class="m-name">{map.items?.name(id) || "no name"}</span>
+		<span class="m-meta">{id}</span>
+	</button>
+{/snippet}
+
+{#snippet creatureCell(creature: CreatureType)}
+	{@const choice = creatureSel(creature)}
+	<button
+		class="m-cell"
+		class:on={isBrushActive(choice)}
+		title="{creature.name}{creature.npc ? ' · NPC' : ''}"
+		onclick={() => selectBrush(choice)}
+	>
+		<span class="t-slot"
+			>{#if creature.outfit.lookType || creature.outfit.lookItem}<ItemIcon
+					outfit={creature.outfit.lookItem ? 0 : creature.outfit.lookType}
+					id={creature.outfit.lookItem}
+					size={32 * zoom}
+					crisp
+				/>{:else}<span class="initials">{creature.name.slice(0, 2)}</span>{/if}</span
+		>
 	</button>
 {/snippet}
 
@@ -336,8 +437,20 @@
 	</div>
 {/snippet}
 
-<div class="lib" bind:this={libraryRoot}>
-	<SearchField bind:value={query} placeholder="Search by name or id" />
+<div class="lib" bind:this={libraryRoot} style="--zoom:{zoom}" {onwheel}>
+	<div class="bar">
+		<span class="grow"><SearchField bind:value={query} placeholder="Search by name or id" /></span>
+		{#if layout === "grid"}
+			<span class="zoom" title="Icon size (Ctrl+wheel over the grid)"
+				><Slider bind:value={zoom} min={1} max={MAX_ZOOM} width={56} /><span class="dim">{zoom}×</span></span
+			>
+		{/if}
+		<button
+			class="t-icon-btn"
+			title={layout === "grid" ? "Show as a list, with names" : "Show as a grid of icons"}
+			onclick={toggleLayout}><Icon name={layout === "grid" ? "list" : "grid"} /></button
+		>
+	</div>
 
 	<div class="t-tabs views" role="tablist">
 		{#each VIEWS as tab}
@@ -382,7 +495,7 @@
 				{@const list = terrain.filter((brush) => group.kinds.includes(brush.kind))}
 				{#if list.length}
 					<div class="m-sect">{group.label}</div>
-					{#each list as brush (brush.name)}{@render brushRow(brush)}{/each}
+					{@render brushes(list)}
 				{/if}
 			{/each}
 			{#if !terrain.length}
@@ -404,7 +517,7 @@
 		</div>
 	{:else if view === "decor"}
 		<div class="m-body t-panel m-scroll">
-			{#each decor.filter((brush) => !brush.preview) as brush (brush.name)}{@render brushRow(brush)}{/each}
+			{@render brushes(decor.filter((brush) => !brush.preview))}
 			{@render stampCards(decor.filter((brush) => !!brush.preview))}
 			{#if !decor.length}
 				{#if search}{@render noMatch()}{:else if allBrushes.length}<div class="m-empty">
@@ -425,13 +538,16 @@
 				>
 			{/each}
 		</div>
-		<div class="m-body t-panel grid-host">
-			{#if items.length}
+		<div class="m-body t-panel" class:grid-host={layout === "grid"} class:m-scroll={layout === "list"}>
+			{#if items.length && layout === "list"}
+				<VirtualRows bind:this={itemRows} {items} row={itemRow} />
+			{:else if items.length}
 				<VirtualGrid
 					count={items.length}
-					cellWidth={ITEM_CELL}
-					cellHeight={ITEM_CELL}
+					cellWidth={cellSize}
+					cellHeight={cellSize}
 					gap={2}
+					spread={false}
 					scrollTo={revealIndex}
 				>
 					{#snippet cell(i)}{@render itemCell(items[i])}{/snippet}
@@ -494,7 +610,13 @@
 					{who === "npc" ? "NPCs" : who === "monster" ? "Monsters" : "Creatures"}<span class="grow"
 					></span>{shownCreatures.length}
 				</div>
-				<VirtualRows items={shownCreatures} row={creatureRow} />
+				{#if layout === "grid"}
+					<div class="cells">
+						{#each shownCreatures as creature (creature.name)}{@render creatureCell(creature)}{/each}
+					</div>
+				{:else}
+					<VirtualRows items={shownCreatures} row={creatureRow} />
+				{/if}
 			{:else if search}
 				{@render noMatch()}
 			{:else}
@@ -536,6 +658,34 @@
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
+	}
+	.cells {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, calc(34px * var(--zoom) + 2px));
+		justify-content: center;
+		gap: 2px;
+		padding: 2px 0;
+	}
+	/* Grid cells grow by whole multiples: the slot frame and the icons stay pixel perfect. */
+	.cells .m-cell,
+	.grid-host .m-cell {
+		width: calc(34px * var(--zoom) + 2px);
+		height: calc(34px * var(--zoom) + 2px);
+	}
+	.cells .t-slot,
+	.grid-host .t-slot {
+		width: calc(34px * var(--zoom));
+		height: calc(34px * var(--zoom));
+		background-size: 100% 100%;
+	}
+	.initials {
+		font-size: calc(11px * var(--zoom));
+		color: var(--text-dim);
+	}
+	.zoom {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
 	}
 	.stamps {
 		display: grid;
