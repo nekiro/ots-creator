@@ -9,14 +9,11 @@ import (
 
 // ImportOBD adds the sprites of an OBD file and appends its thing to the
 // matching category. When replaceID is not zero, that thing is replaced
-// instead. It returns the id of the imported thing.
+// instead. An outfit gets the frame groups of the client (see
+// fitFrameGroups). It returns the id of the imported thing.
 func (p *Project) ImportOBD(obdData *obd.Data, replaceID uint32) (uint32, error) {
-	if obdData.SpriteSize != p.features.SpriteSize {
-		return 0, fmt.Errorf("object uses %dpx sprites, client uses %dpx", obdData.SpriteSize, p.features.SpriteSize)
-	}
-	object := obdData.Thing.Clone()
-	object.Extra = nil
-	if err := object.Validate(); err != nil {
+	object, pixels, err := p.objectFromFile(obdData)
+	if err != nil {
 		return 0, err
 	}
 	p.mu.Lock()
@@ -25,15 +22,13 @@ func (p *Project) ImportOBD(obdData *obd.Data, replaceID uint32) (uint32, error)
 	if replaceID != 0 && p.things.Get(category, replaceID) == nil {
 		return 0, fmt.Errorf("%s %d does not exist", category, replaceID)
 	}
-	edit := p.record(fmt.Sprintf("Import %s", category))
-	for groupIndex, group := range object.FrameGroups {
-		pixels := make([][]byte, len(obdData.Sprites[groupIndex]))
-		for i, sprite := range obdData.Sprites[groupIndex] {
-			pixels[i] = sprite.Pixels
-		}
-		ids := p.addSpritesDedup(edit, pixels)
-		copy(group.Sprites, ids)
+	fitted, ok := p.fitFrameGroups(object)
+	if !ok {
+		return 0, errNoFrameGroups(category)
 	}
+	object = fitted
+	edit := p.record(fmt.Sprintf("Import %s", category))
+	p.addObjectSprites(edit, object, pixels)
 	if replaceID != 0 {
 		object.ID = replaceID
 		keepExtra(object, p.things.Get(category, replaceID))
@@ -47,8 +42,8 @@ func (p *Project) ImportOBD(obdData *obd.Data, replaceID uint32) (uint32, error)
 
 // ImportOBDsTo imports OBD files of category, files[i] to targets[i],
 // replacing the things there. Targets past the end of the category extend
-// it, filling any gap with empty things. The whole import is one undoable
-// edit.
+// it, filling any gap with empty things. Outfits get the frame groups of
+// the client (see fitFrameGroups). The whole import is one undoable edit.
 func (p *Project) ImportOBDsTo(category thing.Category, files []*obd.Data, targets []uint32) ([]uint32, error) {
 	if len(targets) != len(files) {
 		return nil, fmt.Errorf("%d target ids for %d %s(s)", len(targets), len(files), category)
@@ -64,31 +59,29 @@ func (p *Project) ImportOBDsTo(category thing.Category, files []*obd.Data, targe
 		seen[id] = true
 	}
 	things := make([]*thing.Thing, len(files))
+	pixels := make([][][]byte, len(files))
 	for i, obdData := range files {
-		if obdData.SpriteSize != p.features.SpriteSize {
-			return nil, fmt.Errorf("object uses %dpx sprites, client uses %dpx", obdData.SpriteSize, p.features.SpriteSize)
+		object, objectPixels, err := p.objectFromFile(obdData)
+		if err != nil {
+			return nil, err
 		}
-		object := obdData.Thing.Clone()
-		object.Extra = nil
 		if object.Category != category {
 			return nil, fmt.Errorf("object is a %s, not a %s", object.Category, category)
 		}
-		if err := object.Validate(); err != nil {
-			return nil, err
-		}
-		things[i] = object
+		things[i], pixels[i] = object, objectPixels
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	for i, object := range things {
+		fitted, ok := p.fitFrameGroups(object)
+		if !ok {
+			return nil, errNoFrameGroups(category)
+		}
+		things[i] = fitted
+	}
 	edit := p.record(fmt.Sprintf("Import %d %s(s)", len(things), category))
 	for i, object := range things {
-		for groupIndex, group := range object.FrameGroups {
-			pixels := make([][]byte, len(files[i].Sprites[groupIndex]))
-			for j, sprite := range files[i].Sprites[groupIndex] {
-				pixels[j] = sprite.Pixels
-			}
-			copy(group.Sprites, p.addSpritesDedup(edit, pixels))
-		}
+		p.addObjectSprites(edit, object, pixels[i])
 		object.ID = targets[i]
 		for id := p.things.MaxID(category) + 1; id < object.ID; id++ {
 			edit.setThing(category, id, thing.New(id, category))
@@ -98,6 +91,85 @@ func (p *Project) ImportOBDsTo(category thing.Category, files []*obd.Data, targe
 	}
 	edit.commit()
 	return targets, nil
+}
+
+// objectFromFile checks an OBD file and returns a copy of its thing whose
+// sprite slots hold the numbers 1..n of the returned pixels, so its frame
+// groups can be reshaped before the sprites are added (addObjectSprites).
+func (p *Project) objectFromFile(obdData *obd.Data) (*thing.Thing, [][]byte, error) {
+	if obdData.SpriteSize != p.features.SpriteSize {
+		return nil, nil, fmt.Errorf("object uses %dpx sprites, client uses %dpx", obdData.SpriteSize, p.features.SpriteSize)
+	}
+	object := obdData.Thing.Clone()
+	object.Extra = nil
+	if err := object.Validate(); err != nil {
+		return nil, nil, err
+	}
+	if len(obdData.Sprites) < len(object.FrameGroups) {
+		return nil, nil, fmt.Errorf("pixels for %d frame groups, %s has %d", len(obdData.Sprites), object.Category, len(object.FrameGroups))
+	}
+	var pixels [][]byte
+	for groupIndex, group := range object.FrameGroups {
+		sprites := obdData.Sprites[groupIndex]
+		for slot := range group.Sprites {
+			group.Sprites[slot] = 0
+			if slot < len(sprites) {
+				pixels = append(pixels, sprites[slot].Pixels)
+				group.Sprites[slot] = uint32(len(pixels))
+			}
+		}
+	}
+	return object, pixels, nil
+}
+
+// addObjectSprites adds the pixels the frame groups of object use and puts
+// their sprite ids in place of the numbers objectFromFile gave. Pixels no
+// slot uses any more (frames dropped by fitFrameGroups) are not added.
+func (p *Project) addObjectSprites(edit *recorder, object *thing.Thing, pixels [][]byte) {
+	var used [][]byte
+	usedIndex := map[uint32]int{}
+	for _, group := range object.FrameGroups {
+		for _, number := range group.Sprites {
+			if _, ok := usedIndex[number]; number != 0 && !ok {
+				usedIndex[number] = len(used)
+				used = append(used, pixels[number-1])
+			}
+		}
+	}
+	ids := p.addSpritesDedup(edit, used)
+	for _, group := range object.FrameGroups {
+		for slot, number := range group.Sprites {
+			if number != 0 {
+				group.Sprites[slot] = ids[usedIndex[number]]
+			}
+		}
+	}
+}
+
+// fitFrameGroups gives an outfit the frame groups the client keeps, as
+// Object Builder does: an outfit of an old client (one group: frame 0 is
+// idle, the rest is walking) is split into idle and walking groups when the
+// client has frame groups, and idle and walking groups are merged into one
+// when it has none. ok is false when they cannot be merged because their
+// layouts differ. Other things are returned as they are. Call it with p.mu
+// held.
+func (p *Project) fitFrameGroups(object *thing.Thing) (fitted *thing.Thing, ok bool) {
+	if object.Category != thing.CategoryOutfit {
+		return object, true
+	}
+	withGroups := p.features.FrameGroups || p.format == FormatAssets
+	switch {
+	case withGroups && needsGroupSplit(object):
+		return splitGroups(object), true
+	case !withGroups && len(object.FrameGroups) > 1:
+		merged := mergeGroups(object)
+		return merged, merged != nil
+	}
+	return object, true
+}
+
+func errNoFrameGroups(category thing.Category) error {
+	return fmt.Errorf("%s: idle and walking layouts differ, the client has no frame groups", category)
 }
 
 func (p *Project) ExportOBD(category thing.Category, id uint32, version int) (*obd.Data, error) {

@@ -66,17 +66,12 @@ func transfer(dst, src *Project, category thing.Category, ids []uint32, appendNe
 	dst.mu.Lock()
 	defer dst.mu.Unlock()
 	things := snap.things
-	groups := dst.features.FrameGroups || dst.format == FormatAssets
 	for i, object := range things {
-		if len(object.FrameGroups) > 1 && !groups {
-			merged := mergeGroups(object)
-			if merged == nil {
-				return TransferResult{}, fmt.Errorf("%s %d: idle and walking layouts differ, the target client has no frame groups", category, object.ID)
-			}
-			things[i] = merged
-		} else if dst.format == FormatAssets && needsGroupSplit(object) {
-			things[i] = splitGroups(object)
+		fitted, ok := dst.fitFrameGroups(object)
+		if !ok {
+			return TransferResult{}, fmt.Errorf("%s %d: idle and walking layouts differ, the target client has no frame groups", category, object.ID)
 		}
+		things[i] = fitted
 	}
 
 	label := fmt.Sprintf("Copy %d %s(s)", len(things), category)

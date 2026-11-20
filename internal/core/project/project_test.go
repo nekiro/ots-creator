@@ -610,3 +610,59 @@ func TestFailedEditsOfManyThingsChangeNothing(t *testing.T) {
 		t.Fatalf("items %d, can undo %v: a failed edit left an undo step", info.Counts.Items, info.CanUndo)
 	}
 }
+
+// An outfit of an old client (one group: frame 0 idle, frames 1.. walking)
+// is split into idle and walking groups when imported into a client with
+// frame groups, and merged back into one group in a client without them.
+func TestOBDImportFitsFrameGroups(t *testing.T) {
+	old := New(version(t, 860), client.Features{})
+	if old.Info().Features.FrameGroups {
+		t.Skip("8.60 has frame groups")
+	}
+	old.AddSprites([][]byte{solid(255, 0, 0), solid(0, 255, 0), solid(0, 0, 255)})
+	o, _ := old.Thing(thing.CategoryOutfit, 1)
+	o.FrameGroups[0].Resize(1, 1, 1, 1, 1, 1, 3, thing.CategoryOutfit.DefaultDuration())
+	o.FrameGroups[0].Sprites = []uint32{1, 2, 3}
+	if err := old.UpdateThing(o); err != nil {
+		t.Fatal(err)
+	}
+	oldData, err := old.ExportOBD(thing.CategoryOutfit, 1, obd.Version3)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	current := New(v1098(), client.Features{})
+	id, err := current.ImportOBD(oldData, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	split, _ := current.Thing(thing.CategoryOutfit, id)
+	if len(split.FrameGroups) != 2 {
+		t.Fatalf("%d groups", len(split.FrameGroups))
+	}
+	idle, walking := split.FrameGroups[0], split.FrameGroups[1]
+	if idle.Frames != 1 || walking.Frames != 2 || walking.Type != thing.FrameGroupWalking ||
+		idle.Sprites[0] != 1 || walking.Sprites[0] != 2 || walking.Sprites[1] != 3 {
+		t.Fatalf("idle %+v walking %+v", idle, walking)
+	}
+	ids, err := current.ImportOBDsTo(thing.CategoryOutfit, []*obd.Data{oldData}, []uint32{1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replaced, _ := current.Thing(thing.CategoryOutfit, ids[0]); len(replaced.FrameGroups) != 2 {
+		t.Fatalf("ImportOBDsTo kept %d groups", len(replaced.FrameGroups))
+	}
+
+	newData, err := current.ExportOBD(thing.CategoryOutfit, id, obd.Version3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err = old.ImportOBD(newData, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	merged, _ := old.Thing(thing.CategoryOutfit, id)
+	if len(merged.FrameGroups) != 1 || merged.FrameGroups[0].Frames != 3 {
+		t.Fatalf("groups %+v", merged.FrameGroups)
+	}
+}
