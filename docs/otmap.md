@@ -254,7 +254,7 @@ tile within the radius of the center, and NPCs use it as their walking range.
 | Creature attribute | Default | Meaning |
 |---|---|---|
 | `spawntime=N` | 0 | Respawn time in seconds |
-| `dir=D` | `n` | Look direction |
+| `dir=D` | none | Look direction: `n`, `e`, `s` or `w`. Without it the server chooses (TFS keeps the NPC's own direction) and the editor shows north |
 | `weight=N` | 0 | Spawn weight (separate spawn files) |
 
 ### Order

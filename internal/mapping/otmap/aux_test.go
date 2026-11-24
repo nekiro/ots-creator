@@ -82,6 +82,27 @@ func TestSpawnsRoundTrip(t *testing.T) {
 	}
 }
 
+func TestSpawnsKeepGivenNorth(t *testing.T) {
+	data := `<spawns>
+		<spawn centerx="10" centery="10" centerz="7" radius="3">
+			<npc name="Guard" x="0" y="0" z="7" spawntime="60" direction="0"/>
+			<npc name="Clerk" x="1" y="0" z="7" spawntime="60"/>
+		</spawn>
+	</spawns>`
+	loaded := New(100, 100)
+	if _, err := ReadSpawns(loaded, []byte(data), false); err != nil {
+		t.Fatal(err)
+	}
+	guard, clerk := loaded.Tile(Position{10, 10, 7}).Creatures()[0], loaded.Tile(Position{11, 10, 7}).Creatures()[0]
+	if !guard.HasDirection() || guard.Direction != 0 || clerk.HasDirection() {
+		t.Fatalf("guard %+v clerk %+v", guard, clerk)
+	}
+	written, _, _ := WriteSpawns(loaded)
+	if text := string(written); !strings.Contains(text, `name="Guard" x="0" y="0" z="7" spawntime="60" direction="0"`) || strings.Count(text, "direction") != 1 {
+		t.Fatalf("a given north must be written and no direction must stay none:\n%s", text)
+	}
+}
+
 func TestReadSpawnsWarnings(t *testing.T) {
 	m := New(100, 100)
 	data := `<spawns>

@@ -778,7 +778,8 @@ func (e *Editor) drawCreature(tx *Tx, req DrawRequest) error {
 		if spawnTime <= 0 {
 			spawnTime = e.Settings.DefaultSpawnTime
 		}
-		creature := otmap.Creature{Name: req.Creature, NPC: req.NPC, SpawnTime: spawnTime, Direction: req.Direction}
+		creature := otmap.Creature{Name: req.Creature, NPC: req.NPC, SpawnTime: spawnTime}
+		creature.SetDirection(req.Direction % creatureDirectionCount)
 		tile.EnsureExt().Creatures = []otmap.Creature{creature}
 		if e.Settings.AutoCreateSpawn && !e.covered(target, req.NPC) {
 			if req.NPC && e.Map.SpawnFormat == otmap.SpawnsSeparate {

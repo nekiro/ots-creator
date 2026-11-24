@@ -25,7 +25,7 @@ import (
 
 // Protocol is the version of the protocol; editors of other versions
 // cannot join each other.
-const Protocol = 1
+const Protocol = 2
 
 // DefaultPort is the TCP port a host listens on unless set otherwise.
 const DefaultPort = 47816

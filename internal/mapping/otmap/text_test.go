@@ -199,6 +199,30 @@ func TestOTMAPRoundTrip(t *testing.T) {
 	}
 }
 
+func TestOTMAPKeepsGivenNorth(t *testing.T) {
+	items := testItems()
+	path := filepath.Join(t.TempDir(), "map.otmap")
+	original := New(256, 256)
+	creatures := []Creature{{Name: "Guard", NPC: true, ExplicitNorth: true}, {Name: "Clerk", NPC: true}}
+	original.SetTile(Position{50, 60, 7}, &Tile{Ext: &TileExt{Creatures: creatures}})
+	if got := string(appendCreature(nil, Position{50, 60, 7}, creatures[0])); !strings.Contains(got, " dir=n") {
+		t.Fatalf("a given north is not written: %q", got)
+	}
+	if got := string(appendCreature(nil, Position{50, 60, 7}, creatures[1])); strings.Contains(got, "dir=") {
+		t.Fatalf("no direction is written as one: %q", got)
+	}
+	if _, err := Save(path, original, items, Format{}); err != nil {
+		t.Fatal(err)
+	}
+	loaded, _, err := Load(path, items, Format{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := loaded.Tile(Position{50, 60, 7}).Creatures(); !slices.Equal(got, creatures) {
+		t.Fatalf("creatures = %+v, want %+v", got, creatures)
+	}
+}
+
 func TestOTMAPText(t *testing.T) {
 	items := testItems()
 	world, sectors, err := EncodeOTMAP(textSampleMap(), items)

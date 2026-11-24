@@ -328,7 +328,7 @@ func TestCodecRoundTrip(t *testing.T) {
 				Attrs: []otmap.Attr{{Key: "k", Type: otmap.AttrFloat, Num: 1.5}},
 				Raw:   []otmap.RawAttr{{Code: 9, Data: []byte{1, 2}}},
 			}}},
-			Ext: &otmap.TileExt{Creatures: []otmap.Creature{{Name: "Rat", NPC: true, SpawnTime: -1, Direction: 2, Weight: 3}}, SpawnNPC: &otmap.Spawn{Radius: 2}, Zones: []uint16{4}},
+			Ext: &otmap.TileExt{Creatures: []otmap.Creature{{Name: "Rat", NPC: true, SpawnTime: -1, Direction: 2, Weight: 3}, {Name: "Guard", NPC: true, ExplicitNorth: true}, {Name: "Clerk", NPC: true}}, SpawnNPC: &otmap.Spawn{Radius: 2}, Zones: []uint16{4}},
 		}},
 		{Pos: otmap.Position{X: 5, Y: 6, Z: 7}},
 	}, Meta: &mapedit.MetaData{Width: 10, Description: "d", Towns: []otmap.Town{{ID: 1, Name: "T"}}, Houses: []otmap.House{{ID: 2, Beds: 3}}, Zones: []otmap.Zone{{ID: 1, Name: "z"}}}}
@@ -341,6 +341,9 @@ func TestCodecRoundTrip(t *testing.T) {
 	}
 	if !mapedit.SameTile(decoded.Tiles[0].Tile, edit.Tiles[0].Tile) || decoded.Tiles[1].Tile != nil {
 		t.Fatalf("tiles: %+v", decoded.Tiles)
+	}
+	if creatures := decoded.Tiles[0].Tile.Creatures(); len(creatures) != 3 || !creatures[1].ExplicitNorth || creatures[1].Direction != 0 || creatures[2].HasDirection() || creatures[0].Direction != 2 {
+		t.Fatalf("creatures: %+v (a given north differs from no direction)", creatures)
 	}
 	if decoded.Meta == nil || decoded.Meta.Houses[0].Beds != 3 || decoded.Meta.Zones[0].Name != "z" {
 		t.Fatalf("meta: %+v", decoded.Meta)

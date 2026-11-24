@@ -23,7 +23,11 @@ export const FLUIDS = [
 
 export const FLUID_OPTIONS = FLUIDS.map(([value, label]) => ({ value: value as number, label }));
 
-export const DIRECTION_OPTIONS = [
+/** A creature without a direction: the server chooses it. */
+export const NO_DIRECTION = -1;
+
+export const CREATURE_DIRECTION_OPTIONS = [
+	{ value: NO_DIRECTION, label: "Default" },
 	{ value: 0, label: "North" },
 	{ value: 1, label: "East" },
 	{ value: 2, label: "South" },

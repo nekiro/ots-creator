@@ -28,6 +28,10 @@ type Edit struct {
 // maxItemDepth bounds containers in containers.
 const maxItemDepth = 32
 
+// explicitNorthBit marks, in the direction byte of a creature, a north that
+// was given (the low bits are then 0).
+const explicitNorthBit = 0x80
+
 var errTooDeep = errors.New("containers are nested too deep")
 
 func encodeEdit(edit *Edit) []byte {
@@ -146,7 +150,11 @@ func putTile(w *binio.Writer, tile *otmap.Tile) {
 		putString(w, creature.Name)
 		w.Bool(creature.NPC)
 		w.I32(creature.SpawnTime)
-		w.U8(creature.Direction)
+		direction := creature.Direction
+		if creature.ExplicitNorth {
+			direction |= explicitNorthBit
+		}
+		w.U8(direction)
 		w.U8(creature.Weight)
 	}
 	putSpawn(w, ext.Spawn)
@@ -175,7 +183,11 @@ func getTile(r *binio.Reader) *otmap.Tile {
 	if count := getCount(r, 11); count > 0 {
 		ext.Creatures = make([]otmap.Creature, count)
 		for i := range ext.Creatures {
-			ext.Creatures[i] = otmap.Creature{Name: getString(r), NPC: r.Bool(), SpawnTime: r.I32(), Direction: r.U8(), Weight: r.U8()}
+			creature := otmap.Creature{Name: getString(r), NPC: r.Bool(), SpawnTime: r.I32()}
+			direction := r.U8()
+			creature.Direction, creature.ExplicitNorth = direction&^explicitNorthBit, direction&explicitNorthBit != 0
+			creature.Weight = r.U8()
+			ext.Creatures[i] = creature
 		}
 	}
 	ext.Spawn = getSpawn(r)

@@ -18,9 +18,29 @@ type Creature struct {
 	NPC       bool   `json:"npc"`
 	SpawnTime int32  `json:"spawnTime"`
 	Direction uint8  `json:"direction"`
+	// ExplicitNorth tells a north (0) that was given from no direction at
+	// all: without a direction the server chooses (TFS keeps the NPC's own).
+	ExplicitNorth bool `json:"explicitNorth,omitempty"`
 	// Weight is the spawn weight of separate monster files (0 = default).
 	Weight   uint8 `json:"weight,omitempty"`
 	Selected bool  `json:"selected"`
+}
+
+// HasDirection reports whether a direction was given to the creature.
+func (creature Creature) HasDirection() bool {
+	return creature.Direction != 0 || creature.ExplicitNorth
+}
+
+// SetDirection gives the creature a direction.
+func (creature *Creature) SetDirection(direction uint8) {
+	creature.Direction = direction
+	creature.ExplicitNorth = direction == 0
+}
+
+// ClearDirection leaves the direction to the server.
+func (creature *Creature) ClearDirection() {
+	creature.Direction = 0
+	creature.ExplicitNorth = false
 }
 
 type Spawn struct {

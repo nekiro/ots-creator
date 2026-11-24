@@ -15,7 +15,13 @@
 	import Icon from "../../lib/ui/Icon.svelte";
 	import Select from "../../lib/ui/Select.svelte";
 	import ItemIcon from "./ItemIcon.svelte";
-	import { ATTR_TYPE_OPTIONS, DIRECTION_OPTIONS, FLUID_OPTIONS, parseCount } from "../../lib/map/editor/itemAttrs";
+	import {
+		ATTR_TYPE_OPTIONS,
+		CREATURE_DIRECTION_OPTIONS,
+		FLUID_OPTIONS,
+		NO_DIRECTION,
+		parseCount,
+	} from "../../lib/map/editor/itemAttrs";
 	import { clamp } from "../../lib/util/math";
 
 	const tile = $derived(map.tile);
@@ -594,14 +600,14 @@
 							/>
 							<span class="t-label">s</span>
 							<Select
-								value={creature.direction}
+								value={creature.direction || creature.explicitNorth ? creature.direction : NO_DIRECTION}
 								width={70}
-								options={DIRECTION_OPTIONS}
+								options={CREATURE_DIRECTION_OPTIONS}
 								onchange={(value) =>
 									inspected &&
 									edit((id) =>
 										MapService.UpdateCreature(id, inspected!, creatureIndex, {
-											direction: value,
+											...(value === NO_DIRECTION ? { noDirection: true } : { direction: value }),
 											remove: false,
 										}),
 									)}

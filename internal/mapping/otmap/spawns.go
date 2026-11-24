@@ -68,7 +68,7 @@ func ReadSpawns(gameMap *Map, data []byte, npcFile bool) ([]string, error) {
 			}
 			creature := Creature{Name: name, NPC: creatureNode.Name == "npc" || npcFile, SpawnTime: int32(creatureNode.Int("spawntime")), Weight: uint8(creatureNode.Int("weight"))}
 			if creatureNode.Has("direction") {
-				creature.Direction = uint8(min(max(creatureNode.Int("direction"), 0), 3))
+				creature.SetDirection(uint8(min(max(creatureNode.Int("direction"), 0), 3)))
 			}
 			creatureTile := gameMap.Tile(pos).Clone()
 			if creatureTile == nil {
@@ -154,7 +154,7 @@ func WriteSpawns(gameMap *Map) (monsters, npcs []byte, unsaved int) {
 							}
 						}
 						attrs := []xmlAttr{{"name", creature.Name}, {"x", strconv.Itoa(dx)}, {"y", strconv.Itoa(dy)}, {"z", itoa(area.pos.Z)}, {"spawntime", itoa(creature.SpawnTime)}}
-						if creature.Direction != 0 {
+						if creature.HasDirection() {
 							attrs = append(attrs, xmlAttr{"direction", itoa(creature.Direction)})
 						}
 						if separate && creature.Weight != 0 && !creature.NPC {

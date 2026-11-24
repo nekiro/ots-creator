@@ -297,8 +297,8 @@ func appendCreature(out []byte, pos Position, creature Creature) []byte {
 		out = append(out, " spawntime="...)
 		out = strconv.AppendInt(out, int64(creature.SpawnTime), 10)
 	}
-	if direction := min(int(creature.Direction), len(directionNames)-1); direction != 0 {
-		out = append(append(out, " dir="...), directionNames[direction]...)
+	if creature.HasDirection() {
+		out = append(append(out, " dir="...), directionNames[min(int(creature.Direction), len(directionNames)-1)]...)
 	}
 	if creature.Weight != 0 {
 		out = append(out, " weight="...)

@@ -1138,6 +1138,25 @@ func creatureEditor(t *testing.T) *Editor {
 	return e
 }
 
+func TestUpdateCreatureDirectionNorthIsGiven(t *testing.T) {
+	e := creatureEditor(t)
+	if got := e.Map.Tile(at(5, 5)).Creatures()[1]; got.HasDirection() {
+		t.Fatalf("creature = %+v, want no direction", got)
+	}
+	if err := e.UpdateCreature(at(5, 5), 1, CreaturePatch{Direction: ptr[uint8](0)}); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.Map.Tile(at(5, 5)).Creatures()[1]; !got.ExplicitNorth || got.Direction != 0 {
+		t.Fatalf("creature = %+v, want a given north", got)
+	}
+	if err := e.UpdateCreature(at(5, 5), 1, CreaturePatch{NoDirection: true}); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.Map.Tile(at(5, 5)).Creatures()[1]; got.HasDirection() {
+		t.Fatalf("creature = %+v, want no direction again", got)
+	}
+}
+
 func TestUpdateCreatureChangesFields(t *testing.T) {
 	e := creatureEditor(t)
 	err := e.UpdateCreature(at(5, 5), 0, CreaturePatch{SpawnTime: ptr[int32](90), Direction: ptr[uint8](6), Weight: ptr[uint8](3), Name: ptr("Cave Rat")})

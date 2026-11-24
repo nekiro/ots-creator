@@ -769,11 +769,13 @@ func (e *Editor) UpdateTile(pos otmap.Position, patch TilePatch) {
 
 // CreaturePatch changes a creature (Remove deletes it).
 type CreaturePatch struct {
-	SpawnTime *int32  `json:"spawnTime,omitempty"`
-	Direction *uint8  `json:"direction,omitempty"`
-	Weight    *uint8  `json:"weight,omitempty"`
-	Name      *string `json:"name,omitempty"`
-	Remove    bool    `json:"remove,omitempty"`
+	SpawnTime *int32 `json:"spawnTime,omitempty"`
+	Direction *uint8 `json:"direction,omitempty"`
+	// NoDirection takes the direction away: the server chooses it.
+	NoDirection bool    `json:"noDirection,omitempty"`
+	Weight      *uint8  `json:"weight,omitempty"`
+	Name        *string `json:"name,omitempty"`
+	Remove      bool    `json:"remove,omitempty"`
 }
 
 func (e *Editor) UpdateCreature(pos otmap.Position, index int, patch CreaturePatch) error {
@@ -793,8 +795,10 @@ func (e *Editor) UpdateCreature(pos otmap.Position, index int, patch CreaturePat
 	if patch.SpawnTime != nil {
 		creature.SpawnTime = *patch.SpawnTime
 	}
-	if patch.Direction != nil {
-		creature.Direction = *patch.Direction % creatureDirectionCount
+	if patch.NoDirection {
+		creature.ClearDirection()
+	} else if patch.Direction != nil {
+		creature.SetDirection(*patch.Direction % creatureDirectionCount)
 	}
 	if patch.Weight != nil {
 		creature.Weight = *patch.Weight

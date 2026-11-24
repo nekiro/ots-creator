@@ -1077,7 +1077,7 @@ func (p *sectorParser) creature(c *cursor, npc bool) error {
 				c.at = start
 				return c.errorf("direction must be n, e, s or w")
 			}
-			creature.Direction = uint8(direction)
+			creature.SetDirection(uint8(direction))
 		case "weight":
 			weight, err := c.uint(math.MaxUint8)
 			if err != nil {
