@@ -14,9 +14,9 @@
 [Download](https://github.com/nekiro/ots-creator/releases/latest) ·
 [Features](#features) ·
 [Map editor](#map-editor) ·
+[Server items](#server-items) ·
 [AI agents](#ai-agents-mcp) ·
-[OTOBJ format](#otobj-object-format) ·
-[OTMAP format](#otmap-map-format) ·
+[Formats](#file-formats) ·
 [Development](#development)
 
 </div>
@@ -52,12 +52,8 @@ Later versions install from the built-in updater.
   sheets, with object names and descriptions. Unchanged files are written back byte for byte.
 - **New clients and conversion** between versions and between dat/spr and assets
   ("Compile as"), with a warning for every flag the target cannot store.
-- **Optional `items.otb` sync** for servers that map server ids to client ids with it (TFS,
-  OTServ). Pick the file in Open client or in File > Server items; it is remembered per
-  client. Compiling also updates it: server items follow moved client items, edited items
-  get their client data reloaded (flags, light, minimap color, sprite hash…) and new client
-  items get new server ids. Server ids and server-only data are kept, and an unchanged file
-  is not rewritten.
+- **Server files:** an optional `items.otb` is kept in sync when compiling, and an
+  optional `items.xml` is shown and edited per item. See [Server items](#server-items).
 
 ### Object editing
 
@@ -73,7 +69,7 @@ Later versions install from the built-in updater.
 
 ### Import and export
 
-- **Objects** as `.otobj` (the native format, see [below](#otobj-object-format)) or OBD from
+- **Objects** as `.otobj` (the native format, see [OTOBJ](docs/otobj.md)) or OBD from
   ObjectBuilder (import of versions 1 to 3, export as version 3). The export format is a
   setting. The object viewer opens both without a client.
 - **Export everything** at once: all objects (one folder per category) or all sprites
@@ -124,216 +120,46 @@ Later versions install from the built-in updater.
 ## Map editor
 
 Switch between **Objects** and **Map** at the top left. Maps are drawn with the sprites of
-the open client; object changes show after **Reload from client**.
+the open client. Full guide: [docs/map-editor.md](docs/map-editor.md).
 
-- **Files:** OTBM versions 1 to 4 open and are saved as version 2 (what servers load), with
-  houses, spawns (one file, or separate monster and NPC files), zones, towns and
-  waypoints. The text format OTMAP (see [below](#otmap-map-format)) holds the same data
-  in files that git can diff and merge. A map is saved in the format it was opened in;
-  **Save as** picks the format by the extension (`.otbm` or `.otmap`). Several maps open
-  in tabs.
-- **Item ids:** each map uses server ids (translated with the `items.otb` attached to the
-  client, the same file compiling keeps in sync) or client ids. Opening or creating a map
-  shows which one and why (the `.otmap` file says it, the earlier choice for the map, an
-  `items.otb` attached to the client or found next to the map); picking an `items.otb`
-  there attaches it to the client. Names and types come from `items.xml`.
+- **Files:** OTBM versions 1 to 4, and the text format [OTMAP](docs/otmap.md) that git can
+  diff and merge, with houses, spawns, zones, towns and waypoints. Several maps open in tabs.
 - **Brushes:** grounds with automatic borders, walls with doors and windows, doodads,
-  carpets, tables, houses, creatures and spawns, waypoints, zones, PZ / no-PvP / no-logout
-  flags and an eraser. Size, square or circle shape, Shift+drag fills a rectangle, and any
-  item can be placed as is.
-- **Brush files** use the editor's own JSON format and are edited in the app. Brushes,
-  tilesets and creatures of Remere's Map Editor are imported from its data folder, and a
-  selection becomes a doodad brush.
-- **Layout:** a **Library** of everything to draw with (terrain, decoration, items,
-  creatures, one search), a **World** outline of towns, houses, waypoints and areas, and an
-  inspector for whatever you click (tile, house, town, or the map and its statistics).
-  Changes apply as you type.
-- **Ctrl+K** goes to anything: a position (pasted in any format), a town, house, waypoint,
-  brush, item, creature or command.
-- **Selection** over one or several floors, with a floating bar (copy, move between floors,
-  redo borders, find, make a brush) and an undo history you can jump back in.
-- **Find and tools:** a find panel with replace and remove; map tools (unknown items,
-  corpses, empty spawns, spawn times, unseen tiles, borders) on the selection or the whole map; import
-  of another map at an offset; minimap export.
-- **Big maps:** the backend builds the drawing data of each 32×32 chunk once and the GPU
-  keeps it (WebGL2), so panning and zooming only move the camera and only animated sprites
-  update per frame. Plain tiles are stored packed, so maps with millions of tiles stay
-  small in memory.
+  carpets, tables, houses, creatures, spawns, zones and tile flags. Brushes, tilesets and
+  creatures of Remere's Map Editor are imported.
+- **Navigation:** a library of everything to draw with, a world outline, an inspector for
+  whatever you click, and **Ctrl+K** to go to any position, town, house, brush or item.
+- **Selection and tools:** copy and move between floors, find and replace, map checks,
+  import of another map, minimap export.
+- **Big maps:** drawn by the GPU, so maps with millions of tiles stay fast.
+- **Map together:** several people edit one map live, hosted by one of them. See
+  [docs/map-together.md](docs/map-together.md).
 
-### Map together
+## Server items
 
-Several people can edit one map at the same time. One of them hosts: the map stays on
-their computer and the others connect to it directly. No server of this project is
-involved, nothing is uploaded anywhere.
+For the files a server keeps next to the client. Both are optional and remembered per
+client. Full guide: [docs/server-items.md](docs/server-items.md).
 
-- **Host:** open the map, click the people icon next to the map tabs, **Host a map** and
-  **Start hosting** (a password is optional). Copy the invite code and send it to the
-  others. The session ends when the host ends it or closes the map; the host saves the map
-  as usual.
-- **Join:** **Join a shared map…** on the start screen (or the people icon), paste the
-  invite code or type an address (`203.0.113.5:47816`). Sessions on your network are
-  listed by themselves, and sessions you joined before show whether they are open now
-  and join with one click. A joined map opens in a new tab; leaving keeps it as your own
-  copy.
-- **Live:** every edit, undo and redo shows to everyone at once, with houses, towns,
-  waypoints and zones. Undo only takes back your own edits and keeps the tiles others
-  changed since. The others' cursors show on the map with their names and brushes, and the
-  session panel lists who is there (click a name to go to them) with a chat.
-- **Same data:** everyone needs the same client and the same items (`items.otb` or client
-  ids); the editor refuses to join otherwise. Brushes may differ: edits are shared as the
-  resulting tiles.
-- **Reaching the host:** on the same network it just works. Over the internet the host's
-  router must forward TCP port 47816 (the default): the editor asks the router to do it by
-  UPnP and finds the host's internet address with a public STUN server, and both go into
-  the invite code. When the router cannot be reached from the internet (carrier-grade NAT,
-  UPnP off), all join one VPN such as Tailscale, ZeroTier or Radmin VPN: the invite code
-  includes the VPN address too.
-- **Security:** the connection is encrypted (TLS). The invite code carries the
-  fingerprint of the host's certificate, so a guest only connects to the host that invited
-  them. Your system may ask to let OTS Creator accept connections when you host: allow it.
-  Sessions are found on the network on UDP port 47817.
-
-Two people drawing different grounds right next to each other at the same moment may get
-a wrong border between them; drawing it again fixes it.
-
-### Server item attributes
-
-Some servers add their own item attributes to OTBM (for example quest numbers on chests
-and doors). The editor cannot skip an attribute it does not know, because OTBM does not
-store attribute sizes: it warns and drops that attribute and the ones after it on the item.
-
-To keep them, put `<map>-attributes.json` next to the map (`world-attributes.json` for
-`world.otbm`) and list each attribute with its code and type:
-
-```json
-[
-  { "code": 25, "name": "Door quest number", "type": "u16" },
-  { "code": 26, "name": "Door quest value", "type": "i32" },
-  { "code": 28, "name": "Chest quest number", "type": "u16" }
-]
-```
-
-Types: `u8`, `u16`, `u32`, `i32`, `u64` (little-endian, as the server writes them) and
-`string` (uint16 length, then the text). The file is read when the map opens; listed
-attributes are kept unchanged and written back when the map is saved. Codes of standard
-OTBM attributes (1 to 24 and 128) cannot be redefined. In OTBM, `name` is only for you.
-
-An OTMAP map declares these attributes in its world file instead, and its sector files
-write them by a key made from `name` (`door_quest_number=12`). Saving an OTMAP map as OTBM
-writes the attributes file when it does not exist yet.
+- **`items.otb`** (servers on server ids): compiling keeps it in sync with the client.
+- **`items.xml`:** each item shows and edits its entry (name, attributes); compiling writes
+  the edits and an entry for every new item, and keeps the rest of the file byte for byte.
+- **Attribute map** (servers on client ids): writes the properties of the client items to
+  `items.xml` as attributes, and shows where an entry differs from the client.
 
 ## AI agents (MCP)
 
-AI agents such as Claude Code can build maps through an
-[MCP](https://modelcontextprotocol.io) server. The agent starts OTS Creator by itself as a
-command (**Settings > AI agents > Copy command** gives the line), for example:
+AI agents such as Claude Code can build maps and edit objects through an
+[MCP](https://modelcontextprotocol.io) server, with the editor open or closed. Setup and
+tools: [docs/mcp.md](docs/mcp.md).
 
-```
-claude mcp add ots-creator -- "C:\Users\you\AppData\Local\Programs\OTS Creator\otscreator.exe" mcp
-```
+## File formats
 
-This works with the editor closed: the agent opens the client and maps without a window
-and saves them with `save_map`. To watch the agent work, turn on the MCP server in
-**Settings > AI agents** (port 47800 by default; only programs on this computer can
-connect): while the editor runs, the agent's edits go to it, show live and are undone like
-your own. Agents that connect over HTTP can use `http://127.0.0.1:47800/mcp` directly.
-
-Its tools cover everything a map needs:
-
-- **Files:** open a client, set the server data, new, open, save, close and import maps,
-  map properties, undo and redo.
-- **Catalog:** brushes, tilesets, items (by name, id or flags) and creatures.
-- **Drawing:** any brush at points or over a rectangle, batches of brushes as one undo
-  step, and `paint_grid`, which paints an area from a text plan (one character per tile).
-- **Looking:** `render_area` returns an image of an area drawn with the client's sprites,
-  with a grid and coordinates; also a minimap image, a text listing of tiles, single tiles,
-  find and statistics.
-- **Details:** items and their attributes (action and unique ids, text, teleports,
-  containers), tile flags, houses, towns, waypoints, zones, creatures and spawns.
-- **Selection:** select, copy, cut, paste, delete, move, make a brush from it, and the
-  map tools (borders, randomize, cleanup, replace items).
-
-## OTOBJ object format
-
-`.otobj` is a ZIP with a `manifest.json` and one PNG sprite sheet per frame group. Full
-specification: [docs/otobj.md](docs/otobj.md).
-
-```
-manifest.json        category, name, flags by name, frame groups, animation, NPC trade
-sprites/idle.png     sprite sheet in the ObjectBuilder layout
-sprites/walking.png
-```
-
-Why not OBD:
-
-- **Readable:** plain JSON you can read in a text editor and diff in git. OBD is one
-  LZMA-compressed binary block.
-- **Version independent:** flags are stored by name (`pickupable`, `hasLight`), not as the
-  flag bytes of one dat version. On import the client keeps what it can store and warns
-  about the rest.
-- **Editable sprites:** normal PNG sheets in the ObjectBuilder layout.
-- **Complete:** also stores names, descriptions, NPC trade, Tibia 12+ flags and 64 px sprites.
-- **Extensible:** readers ignore unknown keys and files, so new fields need no new version.
-
-Measured on the current CipSoft client (one file at a time, one core):
-
-| | OBD | OTOBJ |
-|---|---|---|
-| Reading | 1x | 2 to 4x faster |
-| Writing 1 000 items | 3.6 s | 0.26 s |
-| Typical outfit (citizen) | 84 KB | 80 KB |
-| Outfit with many colors | 134 KB | 386 KB |
-| All 1 978 outfits | 72 MB | 111 MB |
-
-Files can be up to 3 times larger, because LZMA compresses raw pixels better than PNG.
-Sheets with at most 256 colors use a palette, which brings most outfits to the size of OBD.
-OBD stays fully supported for ObjectBuilder, and the market keeps storing objects as OBD.
-
-## OTMAP map format
-
-OTMAP is a map as text: a world file and one file per 32×32 sector, one line per tile.
-Full specification: [docs/otmap.md](docs/otmap.md).
-
-```
-map.otmap                  item ids, size, server attributes, towns, houses, zones, waypoints
-sectors/1011_1007.sector   tiles, spawn areas and creatures of x 32352-32383, y 32224-32255
-```
-
-```
-32353 32224 7 [pz] 4515 1209(aid=1001)
-32354 32224 7 4515 1387(dest=32360,32230,8)
-32358 32224 7 4515 1739(uid=5000 chest_quest_number=7){3031:100 2853{3046}}
-spawn 32362 32228 7 radius=3
-monster 32362 32228 7 "Rat" spawntime=60
-```
-
-Why not OTBM:
-
-- **Diffable:** an edited tile is one changed line, with its world position. OTBM is one
-  binary file that changes as a whole.
-- **Mergeable:** edits to different tiles merge in git without conflicts.
-- **One place:** houses, spawns, zones and server attributes are in the same folder and
-  syntax, not in XML and JSON side files.
-- **Canonical:** opening and saving writes the same bytes, so a save without changes gives
-  an empty diff. Unchanged sector files are not rewritten.
-- **Lossless:** OTBM → OTMAP → OTBM keeps every tile, item, attribute, house, town, zone,
-  waypoint and spawn.
-
-Measured on an 8.0 map with 8 million tiles (all cores):
-
-| | OTBM | OTMAP |
-|---|---|---|
-| Open | 1.1 s | 0.36 s |
-| Save | – | 1.2 s, 0.1 s without changes |
-| On disk | 75 MB | 182 MB in 2 155 files |
-| Git repository after the first commit | 19.4 MiB | 23.5 MiB |
-
-Keep LF line endings in the repository that holds the map (`.gitattributes`):
-
-```
-*.otmap  text eol=lf
-*.sector text eol=lf
-```
+- **[OTOBJ](docs/otobj.md):** one object as a ZIP with a readable `manifest.json` and PNG
+  sprite sheets. Flags are stored by name, so a file does not depend on a client version.
+  OBD from ObjectBuilder stays supported.
+- **[OTMAP](docs/otmap.md):** a map as text, one line per tile in one file per 32×32
+  sector. An edited tile is one changed line, and edits to different tiles merge in git.
+  Converting from and to OTBM loses nothing.
 
 ## Development
 
