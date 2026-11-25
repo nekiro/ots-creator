@@ -353,13 +353,12 @@ func TestXMLPasteAttributes(t *testing.T) {
 		t.Fatalf("changed %d: %v", changed, err)
 	}
 	earth := xmlEntry(t, project, 102).Item
-	if earth.Name != "earth" || len(earth.Attributes) != 2 || earth.Attributes[0].Key != "weight" || earth.Attributes[1].Children[0].Key != "inner" {
+	if earth.Name != "earth" || len(earth.Attributes) != 3 || earth.Attributes[0].Key != "weight" || earth.Attributes[2].Children[0].Key != "inner" {
 		t.Fatalf("earth %+v", earth)
 	}
-	// The mapped attribute of the target stays (under its alias), the copied
-	// one is not pasted, and the other attributes are replaced.
+	// All attributes are replaced, those of the attribute map too.
 	last := xmlEntry(t, project, 105).Item
-	if last.Name != "last" || len(last.Attributes) != 3 || last.Attributes[0].Key != "pickup" || last.Attributes[1].Key != "weight" || last.Attributes[2].Key != "slot" {
+	if last.Name != "last" || len(last.Attributes) != 3 || last.Attributes[0].Key != "weight" || last.Attributes[1].Key != "pickupable" || last.Attributes[2].Key != "slot" {
 		t.Fatalf("last %+v", last)
 	}
 	// Pasting the same again changes nothing, and the paste is one undo step.

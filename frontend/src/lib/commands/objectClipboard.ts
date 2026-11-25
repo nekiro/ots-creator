@@ -1,5 +1,6 @@
 import {
 	CATEGORY_NAMES,
+	Category,
 	OBJECT_EXT,
 	ProjectService,
 	ThingService,
@@ -8,7 +9,14 @@ import {
 	type Thing,
 } from "../api";
 import { pasteAttributes } from "../itemsXml";
-import { clipboardThing, clipboardThings, copyThings, pasteInto, type PasteMode } from "../clipboard";
+import {
+	clipboardServerAttributes,
+	clipboardThing,
+	clipboardThings,
+	copyThings,
+	pasteInto,
+	type PasteMode,
+} from "../clipboard";
 import { app, run, select, toast } from "../state/app.svelte";
 import { prefs } from "../state/prefs.svelte";
 import { reportImported } from "./objects";
@@ -29,7 +37,11 @@ export const clipboardCommands = {
 			),
 		);
 		if (!things) return;
-		copyThings(things);
+		// A single item is copied with the attributes of its items.xml entry,
+		// which Paste server attributes pastes alone as well.
+		const attributes = things.length === 1 && app.xml ? snapshot(app.xml.item.attributes ?? []) : null;
+		copyThings(things, attributes);
+		if (attributes) app.xmlClip = attributes;
 		// Replaces an image on the system clipboard (see handlePaste). The saved
 		// objects go along as files, so they paste in a file manager (Windows).
 		ThingService.CopyObjectFiles(category, ids, prefs.settings.objectFormat, OBJECT_CLIP).catch(() =>
@@ -46,7 +58,8 @@ export const clipboardCommands = {
 	 * Pastes the copied object (or its properties) onto the selection. One
 	 * object is pasted into the editor (Apply saves it); several are saved
 	 * directly as one undo step. Several copied objects go to the ids from the
-	 * focused one on (see pasteCopies).
+	 * focused one on (see pasteCopies). An item copied with the attributes of
+	 * its items.xml entry gives those to the items too.
 	 */
 	async paste(mode: PasteMode) {
 		if (!guard() || app.selection.length === 0) return;
@@ -61,16 +74,24 @@ export const clipboardCommands = {
 			toast("Copy an object first (Ctrl+C).");
 			return;
 		}
+		const attached = app.project?.info.itemsXml;
+		const attributes =
+			attached && app.category === Category.CategoryItem && source.category === Category.CategoryItem
+				? clipboardServerAttributes()
+				: null;
 		try {
 			if (app.selection.length === 1 && app.draft) {
 				app.draft = pasteInto(snapshot(app.draft), source, mode);
+				if (attributes && app.xml) pasteAttributes(app.xml.item, attributes);
 				return;
 			}
 			const ids = [...app.selection];
 			if (mode === "properties") {
-				const patched = await run("Pasting", () =>
-					ThingService.Patch(app.category, ids, source.props as unknown as PropsPatch),
-				);
+				const patched = await run("Pasting", async () => {
+					const count = await ThingService.Patch(app.category, ids, source.props as unknown as PropsPatch);
+					if (attributes) await ProjectService.PasteItemXMLAttributes(ids, attributes);
+					return count;
+				});
 				if (patched !== undefined) toast(`Pasted properties onto ${patched} object(s).`, "success");
 				return;
 			}
@@ -79,6 +100,7 @@ export const clipboardCommands = {
 			);
 			const ok = await run("Pasting", async () => {
 				await ThingService.UpdateMany(things);
+				if (attributes) await ProjectService.PasteItemXMLAttributes(ids, attributes);
 				return true;
 			});
 			if (ok) toast(`Pasted onto ${ids.length} object(s).`, "success");
@@ -109,7 +131,7 @@ export const clipboardCommands = {
 		const attached = app.project?.info.itemsXml;
 		if (!copied || !attached || !app.xml || app.selection.length === 0) return;
 		if (app.selection.length === 1) {
-			pasteAttributes(app.xml.item, copied, attached.serverIds ? [] : (attached.mapping ?? []));
+			pasteAttributes(app.xml.item, copied);
 			return;
 		}
 		if (!(await confirmDiscard())) return;

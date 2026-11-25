@@ -1,11 +1,22 @@
-import type { Properties, Thing } from "./api";
+import type { Properties, Thing, XMLAttribute } from "./api";
 
 export type PasteMode = "object" | "properties";
 
 let copied: Thing[] = [];
+let copiedAttributes: XMLAttribute[] | null = null;
 
-export function copyThings(things: Thing[]): void {
+/**
+ * Copies the objects. A single item goes with the attributes of its
+ * items.xml entry when an items.xml is attached.
+ */
+export function copyThings(things: Thing[], serverAttributes: XMLAttribute[] | null = null): void {
 	copied = JSON.parse(JSON.stringify(things));
+	copiedAttributes = serverAttributes && JSON.parse(JSON.stringify(serverAttributes));
+}
+
+/** The items.xml attributes of the copied item; null when it was copied without. */
+export function clipboardServerAttributes(): XMLAttribute[] | null {
+	return copiedAttributes;
 }
 
 export function clipboardThings(): Thing[] {

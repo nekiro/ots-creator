@@ -517,8 +517,8 @@ func (p *Project) editXML(edit *recorder, clientID uint32, item *itemsxml.Item) 
 
 // PasteXMLAttributes gives the attributes copied from one entry to the
 // entries of other items, as one undo step, and returns how many entries
-// changed. The names of the entries stay. On client ids the attributes of the
-// attribute map stay as well: the client says those for every item.
+// changed. The names of the entries stay. The attributes of the attribute map
+// are pasted like the rest: an entry that differs from the client then says so.
 func (p *Project) PasteXMLAttributes(clientIDs []uint32, attributes []itemsxml.Attribute) (int, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -526,18 +526,6 @@ func (p *Project) PasteXMLAttributes(clientIDs []uint32, attributes []itemsxml.A
 		return 0, errNoXML
 	}
 	p.refreshXML()
-	var mapped map[string]mappedValue
-	if p.otb == nil {
-		mapped = mappedAttributes(p.xml.mapping, nil)
-	}
-	isMapped := func(attribute itemsxml.Attribute) bool {
-		for _, written := range mapped {
-			if written.names(attribute.Key) {
-				return true
-			}
-		}
-		return false
-	}
 	edit := p.record("Paste items.xml attributes")
 	changed := 0
 	for _, clientID := range clientIDs {
@@ -553,17 +541,7 @@ func (p *Project) PasteXMLAttributes(clientIDs []uint32, attributes []itemsxml.A
 			entry = &itemsxml.Item{}
 		}
 		pasted := entry.Clone()
-		pasted.Attributes = nil
-		for _, attribute := range entry.Attributes {
-			if isMapped(attribute) {
-				pasted.Attributes = append(pasted.Attributes, attribute)
-			}
-		}
-		for _, attribute := range attributes {
-			if !isMapped(attribute) {
-				pasted.Attributes = append(pasted.Attributes, attribute)
-			}
-		}
+		pasted.Attributes = attributes
 		if p.editXML(edit, clientID, pasted) {
 			changed++
 		}

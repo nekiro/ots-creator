@@ -132,9 +132,7 @@
 		<button
 			class="t-btn"
 			disabled={!app.xmlClip}
-			title={mapping.length
-				? "Replaces the attributes with the copied ones; the attributes of the attribute map stay"
-				: "Replaces the attributes with the copied ones"}
+			title="Replaces the attributes with the copied ones"
 			onclick={commands.pasteServerAttributes}>Paste</button
 		>
 	</div>

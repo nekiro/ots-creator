@@ -28,8 +28,9 @@ remembered per client, and one found next to the client or its `items.otb` is of
   the rest. The object list shows and searches the names of the file.
 - **Copy and paste:** **Copy** in the section (or **Copy server attributes** in the menu of
   an item) takes the attributes of an entry, and **Paste** replaces the attributes of the
-  selected items with them, several items as one undo step. Names stay, and so do the
-  attributes of the attribute map: the client says those for every item.
+  selected items with them, several items as one undo step. Names stay. **Copy object** of
+  one item takes its attributes along, and **Paste object** and **Paste properties** paste
+  them the same way.
 - **Compiling** writes the edited entries and adds an entry for every new item. Everything
   else in the file keeps its bytes: comments, formatting, charset. A `fromid`/`toid` range
   is only split when an item inside it changes. On client ids the entries also follow items
@@ -46,12 +47,16 @@ to `items.xml`, so it can be shared with the server:
 
 ```json
 {
-  "attributes": [
-    { "client": "pickupable", "key": "pickupable" },
-    { "client": "groundSpeed", "key": "groundspeed" },
-    { "client": "unpassable", "key": "blocksolid", "aliases": ["blocking"] },
-    { "client": "unmoveable", "key": "moveable", "not": true }
-  ]
+	"attributes": [
+		{ "client": "pickupable", "key": "pickupable" },
+		{ "client": "groundSpeed", "key": "groundspeed" },
+		{
+			"client": "unpassable",
+			"key": "blocksolid",
+			"aliases": ["blocking"]
+		},
+		{ "client": "unmoveable", "key": "moveable", "not": true }
+	]
 }
 ```
 
