@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Properties, XMLItemData, XMLMapping } from "./api";
-import { applyMappedChanges, fillFromClient, mappedAttributes, mappedDifferences } from "./itemsXml";
+import { applyMappedChanges, fillFromClient, mappedAttributes, mappedDifferences, pasteAttributes } from "./itemsXml";
 
 const mapping: XMLMapping[] = [
 	{ client: "pickupable", key: "pickupable" },
@@ -83,6 +83,24 @@ describe("items.xml attribute map", () => {
 		fillFromClient(item, mapping, props({ pickupable: true }), "sword");
 		expect(item.name).toBe("sword");
 		expect(item.attributes?.map((attribute) => attribute.key)).toEqual(["weight", "pickupable", "moveable"]);
+	});
+	it("pastes copied attributes, keeping the mapped ones of the entry", () => {
+		const item = entry();
+		item.attributes = [
+			{ key: "Pickupable", value: "1", children: [] },
+			{ key: "armor", value: "4", children: [] },
+		];
+		const copied = [
+			{ key: "weight", value: "3500", children: [{ key: "inner", value: "1", children: [] }] },
+			{ key: "moveable", value: "1", children: [] },
+		];
+		pasteAttributes(item, copied, mapping);
+		expect(item.attributes.map((attribute) => attribute.key)).toEqual(["Pickupable", "weight"]);
+		// The pasted attributes are copies.
+		item.attributes[1].children![0].value = "2";
+		expect(copied[0].children[0].value).toBe("1");
+		pasteAttributes(item, copied, []);
+		expect(item.attributes.map((attribute) => attribute.key)).toEqual(["weight", "moveable"]);
 	});
 	it("lists where an entry differs from the client", () => {
 		const item = entry();

@@ -334,3 +334,43 @@ func TestXMLReadAgainWhenChangedOnDisk(t *testing.T) {
 		t.Fatal("detached")
 	}
 }
+
+func TestXMLPasteAttributes(t *testing.T) {
+	project, _ := xmlProject(t)
+	if err := project.SetXMLMapping([]XMLMapping{{Client: "pickupable", Key: "pickupable", Aliases: []string{"pickup"}}}); err != nil {
+		t.Fatal(err)
+	}
+	target := xmlEntry(t, project, 105)
+	target.Item.SetAttribute("pickup", "1")
+	target.Item.SetAttribute("armor", "4")
+	if err := project.SetItemXML(105, target.Item); err != nil {
+		t.Fatal(err)
+	}
+	copied := []itemsxml.Attribute{{Key: "weight", Value: "3500"}, {Key: "pickupable", Value: "0"}, {Key: "slot", Value: "hand", Children: []itemsxml.Attribute{{Key: "inner", Value: "1"}}}}
+	// 999 does not exist and is skipped.
+	changed, err := project.PasteXMLAttributes([]uint32{102, 104, 105, 999}, copied)
+	if err != nil || changed != 3 {
+		t.Fatalf("changed %d: %v", changed, err)
+	}
+	earth := xmlEntry(t, project, 102).Item
+	if earth.Name != "earth" || len(earth.Attributes) != 2 || earth.Attributes[0].Key != "weight" || earth.Attributes[1].Children[0].Key != "inner" {
+		t.Fatalf("earth %+v", earth)
+	}
+	// The mapped attribute of the target stays (under its alias), the copied
+	// one is not pasted, and the other attributes are replaced.
+	last := xmlEntry(t, project, 105).Item
+	if last.Name != "last" || len(last.Attributes) != 3 || last.Attributes[0].Key != "pickup" || last.Attributes[1].Key != "weight" || last.Attributes[2].Key != "slot" {
+		t.Fatalf("last %+v", last)
+	}
+	// Pasting the same again changes nothing, and the paste is one undo step.
+	if changed, _ := project.PasteXMLAttributes([]uint32{102, 104, 105}, copied); changed != 0 {
+		t.Fatalf("pasted again: %d", changed)
+	}
+	project.Undo()
+	if entry := xmlEntry(t, project, 102).Item; len(entry.Attributes) != 0 {
+		t.Fatalf("undo kept %+v", entry)
+	}
+	if entry := xmlEntry(t, project, 105).Item; len(entry.Attributes) != 2 || entry.Attributes[1].Key != "armor" {
+		t.Fatalf("undo kept %+v", entry)
+	}
+}

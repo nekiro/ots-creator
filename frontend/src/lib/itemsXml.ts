@@ -70,6 +70,18 @@ export function fillFromClient(item: XMLItemData, mapping: XMLMapping[], props: 
 	for (const written of mappedAttributes(mapping, props).values()) setAttribute(item, written);
 }
 
+/**
+ * Gives the entry the attributes copied from another entry. The attributes
+ * of the map stay as the entry has them and are not pasted: the client says
+ * those for every item.
+ */
+export function pasteAttributes(item: XMLItemData, copied: XMLAttribute[], mapping: XMLMapping[]): void {
+	const mapped = [...mappedAttributes(mapping, {} as Properties).values()];
+	const isMapped = (attribute: XMLAttribute) => mapped.some((written) => names(written, attribute.key));
+	const pasted = JSON.parse(JSON.stringify(copied.filter((attribute) => !isMapped(attribute)))) as XMLAttribute[];
+	item.attributes = [...(item.attributes ?? []).filter(isMapped), ...pasted];
+}
+
 const TRUE_VALUES = new Set(["1", "true", "yes"]);
 // Servers read flags as booleans: "1" and "true" are the same value.
 const sameValue = (a: string, b: string) =>

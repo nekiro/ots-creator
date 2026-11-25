@@ -218,6 +218,23 @@ func (ps *ProjectService) SetItemXML(clientID uint32, item itemsxml.Item) error 
 	return nil
 }
 
+// PasteItemXMLAttributes gives copied items.xml attributes to the entries of
+// client items as one undo step and returns how many entries changed.
+func (ps *ProjectService) PasteItemXMLAttributes(clientIDs []uint32, attributes []itemsxml.Attribute) (int, error) {
+	proj, err := ps.session.Project()
+	if err != nil {
+		return 0, err
+	}
+	changed, err := proj.PasteXMLAttributes(clientIDs, attributes)
+	if err != nil {
+		return 0, err
+	}
+	if changed > 0 {
+		ps.session.Changed()
+	}
+	return changed, nil
+}
+
 func (ps *ProjectService) New(version client.Version, features client.Features) State {
 	ps.session.Set(project.New(version, features))
 	return ps.session.State()

@@ -1,4 +1,13 @@
-import { CATEGORY_NAMES, OBJECT_EXT, ThingService, errorMessage, type PropsPatch, type Thing } from "../api";
+import {
+	CATEGORY_NAMES,
+	OBJECT_EXT,
+	ProjectService,
+	ThingService,
+	errorMessage,
+	type PropsPatch,
+	type Thing,
+} from "../api";
+import { pasteAttributes } from "../itemsXml";
 import { clipboardThing, clipboardThings, copyThings, pasteInto, type PasteMode } from "../clipboard";
 import { app, run, select, toast } from "../state/app.svelte";
 import { prefs } from "../state/prefs.svelte";
@@ -76,6 +85,38 @@ export const clipboardCommands = {
 		} catch (err) {
 			toast(errorMessage(err), "error");
 		}
+	},
+
+	/** Copies the attributes of the items.xml entry of the focused item. */
+	copyServerAttributes() {
+		if (!app.xml) return;
+		const copied = snapshot(app.xml.item.attributes ?? []);
+		app.xmlClip = copied;
+		toast(
+			copied.length === 1
+				? `Copied 1 server attribute of item #${app.focused}.`
+				: `Copied ${copied.length} server attributes of item #${app.focused}.`,
+		);
+	},
+
+	/**
+	 * Pastes the copied items.xml attributes onto the selected items. One item
+	 * gets them in the editor (Apply saves them); several are saved directly
+	 * as one undo step.
+	 */
+	async pasteServerAttributes() {
+		const copied = app.xmlClip;
+		const attached = app.project?.info.itemsXml;
+		if (!copied || !attached || !app.xml || app.selection.length === 0) return;
+		if (app.selection.length === 1) {
+			pasteAttributes(app.xml.item, copied, attached.serverIds ? [] : (attached.mapping ?? []));
+			return;
+		}
+		if (!(await confirmDiscard())) return;
+		const ids = [...app.selection];
+		const changed = await run("Pasting", () => ProjectService.PasteItemXMLAttributes(ids, copied));
+		if (changed !== undefined)
+			toast(`Pasted server attributes onto ${changed} of ${ids.length} items. Ctrl+Z to undo.`, "success");
 	},
 };
 

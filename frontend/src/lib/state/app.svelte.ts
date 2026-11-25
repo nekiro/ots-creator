@@ -8,6 +8,7 @@ import {
 	normalizeThing,
 	type State,
 	type Thing,
+	type XMLAttribute,
 	type XMLItem,
 } from "../api";
 import { otherSpriteCache, spriteCache, type SpriteCache } from "../render/sprites";
@@ -68,6 +69,8 @@ class AppState {
 	/** Working copy of the items.xml entry of the focused item; null without an attached items.xml. */
 	xml = $state<XMLItem | null>(null);
 	xmlOriginal = $state<string>("");
+	/** The attributes of an items.xml entry copied to paste into other entries. */
+	xmlClip = $state.raw<XMLAttribute[] | null>(null);
 	selectedSprites = $state.raw<number[]>([]);
 	readonly selectedSpriteSet = $derived(new Set(this.selectedSprites));
 	toasts = $state<Toast[]>([]);

@@ -9,6 +9,7 @@
 		mappedDifferences,
 		type MappedValue,
 	} from "../lib/itemsXml";
+	import { commands } from "../lib/commands";
 	import { app } from "../lib/state/app.svelte";
 	import Icon from "../lib/ui/Icon.svelte";
 
@@ -123,6 +124,19 @@
 				onclick={fill}>{entry.exists ? "Fill from client" : "Create from client"}</button
 			>
 		{/if}
+		<button
+			class="t-btn"
+			title="Copies the attributes of this entry, to paste them into the entries of other items"
+			onclick={commands.copyServerAttributes}>Copy</button
+		>
+		<button
+			class="t-btn"
+			disabled={!app.xmlClip}
+			title={mapping.length
+				? "Replaces the attributes with the copied ones; the attributes of the attribute map stay"
+				: "Replaces the attributes with the copied ones"}
+			onclick={commands.pasteServerAttributes}>Paste</button
+		>
 	</div>
 </section>
 

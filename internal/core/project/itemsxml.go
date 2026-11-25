@@ -485,6 +485,16 @@ func (p *Project) SetItemXML(clientID uint32, item itemsxml.Item) error {
 		return fmt.Errorf("item %d does not exist", clientID)
 	}
 	p.refreshXML()
+	edit := p.record(fmt.Sprintf("Edit items.xml of item %d", clientID))
+	if p.editXML(edit, clientID, &item) {
+		edit.commit()
+	}
+	return nil
+}
+
+// editXML makes an entry the edit of an item and records it; false when the
+// item has that entry already. The caller holds the lock.
+func (p *Project) editXML(edit *recorder, clientID uint32, item *itemsxml.Item) bool {
 	edited := item.Clone()
 	normalizeXMLItem(edited)
 	disk := p.diskID(clientID)
@@ -498,13 +508,70 @@ func (p *Project) SetItemXML(clientID uint32, item itemsxml.Item) error {
 	}
 	before := p.xmlEdits[disk]
 	if before == edited || (before != nil && edited != nil && before.Equal(edited)) {
-		return nil
+		return false
 	}
-	edit := p.record(fmt.Sprintf("Edit items.xml of item %d", clientID))
 	edit.entry.xml = append(edit.entry.xml, xmlChange{id: disk, before: before, after: edited})
 	p.setXMLEdit(disk, edited)
-	edit.commit()
-	return nil
+	return true
+}
+
+// PasteXMLAttributes gives the attributes copied from one entry to the
+// entries of other items, as one undo step, and returns how many entries
+// changed. The names of the entries stay. On client ids the attributes of the
+// attribute map stay as well: the client says those for every item.
+func (p *Project) PasteXMLAttributes(clientIDs []uint32, attributes []itemsxml.Attribute) (int, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.xml == nil {
+		return 0, errNoXML
+	}
+	p.refreshXML()
+	var mapped map[string]mappedValue
+	if p.otb == nil {
+		mapped = mappedAttributes(p.xml.mapping, nil)
+	}
+	isMapped := func(attribute itemsxml.Attribute) bool {
+		for _, written := range mapped {
+			if written.names(attribute.Key) {
+				return true
+			}
+		}
+		return false
+	}
+	edit := p.record("Paste items.xml attributes")
+	changed := 0
+	for _, clientID := range clientIDs {
+		if p.things.Get(thing.CategoryItem, clientID) == nil {
+			continue
+		}
+		disk := p.diskID(clientID)
+		entry := p.xmlEdits[disk]
+		if entry == nil {
+			entry, _ = p.xmlDiskEntry(disk)
+		}
+		if entry == nil {
+			entry = &itemsxml.Item{}
+		}
+		pasted := entry.Clone()
+		pasted.Attributes = nil
+		for _, attribute := range entry.Attributes {
+			if isMapped(attribute) {
+				pasted.Attributes = append(pasted.Attributes, attribute)
+			}
+		}
+		for _, attribute := range attributes {
+			if !isMapped(attribute) {
+				pasted.Attributes = append(pasted.Attributes, attribute)
+			}
+		}
+		if p.editXML(edit, clientID, pasted) {
+			changed++
+		}
+	}
+	if changed > 0 {
+		edit.commit()
+	}
+	return changed, nil
 }
 
 func (p *Project) setXMLEdit(diskID uint32, item *itemsxml.Item) {

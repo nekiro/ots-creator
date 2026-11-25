@@ -10,6 +10,8 @@ const notSingle = () => !app.open || app.selection.length !== 1;
 const noSprite = () => !app.open || app.selectedSprites.length === 0;
 const noClip = () => noThing() || clipboardThings().length === 0;
 const noPropsClip = () => noThing() || !clipboardThing();
+const noServerItem = () => !app.xml;
+const noServerClip = () => !app.xml || !app.xmlClip;
 const fmt = () => (prefs.settings.objectFormat === "obd" ? "OBD" : "OTOBJ");
 
 function copy(text: string) {
@@ -42,6 +44,16 @@ function clipboardEntries(): MenuEntry[] {
 			action: () => commands.paste("properties"),
 			disabled: noPropsClip,
 		},
+		...(app.project?.info.itemsXml
+			? [
+					{ label: "Copy server attributes", action: commands.copyServerAttributes, disabled: noServerItem },
+					{
+						label: "Paste server attributes",
+						action: commands.pasteServerAttributes,
+						disabled: noServerClip,
+					},
+				]
+			: []),
 	];
 }
 
