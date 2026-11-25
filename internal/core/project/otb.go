@@ -24,10 +24,28 @@ type itemsOTB struct {
 	// synced file encodes differently.
 	data []byte
 	info OTBInfo
+	// servers maps the client ids on disk to their server ids.
+	servers map[uint16]uint16
+}
+
+// serverIDs maps client ids to the first server item that is not
+// deprecated of each.
+func serverIDs(items []*itemsotb.Item) map[uint16]uint16 {
+	servers := make(map[uint16]uint16, len(items))
+	for _, item := range items {
+		clientID := item.ClientID()
+		if item.Deprecated() || clientID == 0 {
+			continue
+		}
+		if _, ok := servers[clientID]; !ok {
+			servers[clientID] = item.ServerID()
+		}
+	}
+	return servers
 }
 
 func newItemsOTB(path string, file *itemsotb.File, data []byte) *itemsOTB {
-	otb := &itemsOTB{path: path, file: file, data: data}
+	otb := &itemsOTB{path: path, file: file, data: data, servers: serverIDs(file.Items)}
 	major, minor, build := file.Version()
 	otb.info = OTBInfo{Path: path, Version: fmt.Sprintf("%d.%d.%d", major, minor, build), Items: len(file.Items)}
 	for _, item := range file.Items {

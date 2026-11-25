@@ -2,7 +2,7 @@ import { CompareService, DialogService, Format, ProjectService, WindowService, t
 import { ask } from "../confirm.svelte";
 import { map } from "../map/state.svelte";
 import { app, applyDraft, revertDraft, run, toast } from "../state/app.svelte";
-import { offerOptimize, openedNote, otbNote, sheetsNote } from "./compile";
+import { offerOptimize, openedNote, otbNote, sheetsNote, xmlNote } from "./compile";
 import { confirmLeave, guard } from "./shared";
 
 export const projectCommands = {
@@ -65,7 +65,7 @@ export const projectCommands = {
 		}
 		if (!(await offerOptimize())) return;
 		const stats = await run("Compiling", () => ProjectService.Compile());
-		if (stats) toast(`Client compiled.${sheetsNote(stats)}${otbNote(stats)}`, "success");
+		if (stats) toast(`Client compiled.${sheetsNote(stats)}${otbNote(stats)}${xmlNote(stats)}`, "success");
 	},
 
 	async close() {

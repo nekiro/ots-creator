@@ -8,6 +8,7 @@ import {
 	normalizeThing,
 	type State,
 	type Thing,
+	type XMLItem,
 } from "../api";
 import { otherSpriteCache, spriteCache, type SpriteCache } from "../render/sprites";
 import type { QueueItem } from "./queue.svelte";
@@ -41,6 +42,7 @@ export type DialogName =
 	| "replaceRefs"
 	| "exportSprites"
 	| "itemsOtb"
+	| "itemsXml"
 	| null;
 
 export type SettingsSection = "general" | "objects" | "map" | "keys" | "agents";
@@ -63,6 +65,9 @@ class AppState {
 	/** Working copy of the focused thing; edits apply on "Apply". */
 	draft = $state<Thing | null>(null);
 	original = $state<string>("");
+	/** Working copy of the items.xml entry of the focused item; null without an attached items.xml. */
+	xml = $state<XMLItem | null>(null);
+	xmlOriginal = $state<string>("");
 	selectedSprites = $state.raw<number[]>([]);
 	readonly selectedSpriteSet = $derived(new Set(this.selectedSprites));
 	toasts = $state<Toast[]>([]);
@@ -92,7 +97,9 @@ class AppState {
 	get focused(): number | null {
 		return this.selection[0] ?? null;
 	}
-	dirty = $derived(!!this.draft && JSON.stringify(this.draft) !== this.original);
+	thingDirty = $derived(!!this.draft && JSON.stringify(this.draft) !== this.original);
+	xmlDirty = $derived(!!this.xml && JSON.stringify(this.xml.item) !== this.xmlOriginal);
+	dirty = $derived(this.thingDirty || this.xmlDirty);
 	supported = $derived(new Set(this.project?.info?.supported ?? []));
 	maxId(category: Category): number {
 		const counts = this.project?.info?.counts;
@@ -217,6 +224,8 @@ function applyState(state: State): void {
 		app.selection = [];
 		app.draft = null;
 		app.original = "";
+		app.xml = null;
+		app.xmlOriginal = "";
 		return;
 	}
 	const max = app.maxId(app.category);
@@ -258,17 +267,30 @@ async function reloadDraft(): Promise<void> {
 	const id = app.focused;
 	if (id === null || !app.open) return;
 	try {
-		const thing = await ThingService.Get(app.category, id);
-		if (thing && app.focused === id) setDraft(thing);
+		const category = app.category;
+		const [thing, xml] = await Promise.all([ThingService.Get(category, id), loadXml(category, id)]);
+		if (thing && app.focused === id && app.category === category) setDraft(thing, xml);
 	} catch {
 		/* thing vanished; selection is fixed by applyState */
 	}
 }
 
-function setDraft(thing: Parameters<typeof normalizeThing>[0]): void {
+/** The items.xml entry of an item; null when no items.xml is attached. */
+async function loadXml(category: Category, id: number): Promise<XMLItem | null> {
+	if (category !== Category.CategoryItem || !app.project?.info.itemsXml) return null;
+	try {
+		return await ProjectService.ItemXML(id);
+	} catch {
+		return null;
+	}
+}
+
+function setDraft(thing: Parameters<typeof normalizeThing>[0], xml: XMLItem | null): void {
 	const plain = normalizeThing(thing);
 	app.draft = plain;
 	app.original = JSON.stringify(plain);
+	app.xml = xml && JSON.parse(JSON.stringify(xml));
+	app.xmlOriginal = xml ? JSON.stringify(xml.item) : "";
 }
 
 export async function select(id: number, additive = false): Promise<void> {
@@ -281,8 +303,9 @@ export async function select(id: number, additive = false): Promise<void> {
 	}
 	app.selection = [id];
 	try {
-		const thing = await ThingService.Get(app.category, id);
-		if (thing && app.focused === id) setDraft(thing);
+		const category = app.category;
+		const [thing, xml] = await Promise.all([ThingService.Get(category, id), loadXml(category, id)]);
+		if (thing && app.focused === id && app.category === category) setDraft(thing, xml);
 	} catch (err) {
 		toast(errorMessage(err), "error");
 	}
@@ -298,8 +321,15 @@ export async function applyDraft(): Promise<void> {
 	if (!app.draft || !app.dirty) return;
 	const snapshot = $state.snapshot(app.draft);
 	try {
-		await ThingService.Update(snapshot as Thing);
-		app.original = JSON.stringify(snapshot);
+		if (app.thingDirty) {
+			await ThingService.Update(snapshot as Thing);
+			app.original = JSON.stringify(snapshot);
+		}
+		if (app.xml && app.xmlDirty) {
+			const item = $state.snapshot(app.xml.item);
+			await ProjectService.SetItemXML(snapshot.id, item);
+			app.xmlOriginal = JSON.stringify(item);
+		}
 	} catch (err) {
 		toast(errorMessage(err), "error");
 	}
@@ -307,4 +337,5 @@ export async function applyDraft(): Promise<void> {
 
 export function revertDraft(): void {
 	if (app.original) app.draft = JSON.parse(app.original);
+	if (app.xml && app.xmlOriginal) app.xml.item = JSON.parse(app.xmlOriginal);
 }

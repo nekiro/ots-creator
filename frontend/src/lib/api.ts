@@ -32,12 +32,20 @@ export type {
 	CompileStats,
 	OTBInfo,
 	OTBReport,
+	XMLInfo,
+	XMLItem,
+	XMLMapping,
+	XMLReport,
 	ConvertResult,
 	PropsPatch,
 	DiffEntry,
 	DiffResult,
 	TransferResult,
 } from "../../bindings/github.com/nekiro/ots-creator/internal/core/project/models";
+export type {
+	Item as XMLItemData,
+	Attribute as XMLAttribute,
+} from "../../bindings/github.com/nekiro/ots-creator/internal/formats/itemsxml/models";
 export { Format } from "../../bindings/github.com/nekiro/ots-creator/internal/core/project/models";
 export type { Version, Features } from "../../bindings/github.com/nekiro/ots-creator/internal/core/client/models";
 export type {

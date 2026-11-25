@@ -27,8 +27,35 @@ export function otbNote(stats: CompileStats): string {
 	return ` Updated items.otb${parts.length ? ` (${parts.join(", ")})` : ""}.`;
 }
 
+export function xmlNote(stats: CompileStats): string {
+	const xml = stats.xml;
+	if (!xml) return "";
+	if (xml.error) {
+		toast(`items.xml was not updated: ${xml.error}`, "error");
+		return "";
+	}
+	if (xml.skipped)
+		toast(
+			`${xml.skipped} edited items.xml ${xml.skipped === 1 ? "entry" : "entries"} not written: the items.otb gives the item no server id.`,
+		);
+	if (!xml.written) return "";
+	return ` Updated items.xml${xmlParts(xml)}.`;
+}
+
+/** What compiling changes in the items.xml, as " (2 edited, 1 new)"; "" for nothing. */
+export function xmlParts(xml: NonNullable<CompileStats["xml"]>): string {
+	const parts = [
+		xml.edited && `${xml.edited} edited`,
+		xml.added && `${xml.added} new`,
+		xml.updated && `${xml.updated} with changed attributes`,
+		xml.moved && `${xml.moved} moved`,
+	].filter(Boolean);
+	return parts.length ? ` (${parts.join(", ")})` : "";
+}
+
 export function openedNote(state: State | undefined) {
 	if (state?.otbError) toast(`items.otb was not loaded: ${state.otbError}`, "error");
+	if (state?.xmlError) toast(`items.xml was not loaded: ${state.xmlError}`, "error");
 }
 
 export async function offerOptimize(): Promise<boolean> {

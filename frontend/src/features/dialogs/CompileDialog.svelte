@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import { DialogService, Format, ProjectService, type Features, type Version } from "../../lib/api";
-	import { offerOptimize, otbNote, sheetsNote } from "../../lib/commands";
+	import { offerOptimize, otbNote, sheetsNote, xmlNote } from "../../lib/commands";
 	import { applyDraft, app, run, toast } from "../../lib/state/app.svelte";
 	import Dialog from "../../lib/ui/Dialog.svelte";
 	import Select from "../../lib/ui/Select.svelte";
@@ -58,7 +58,7 @@
 			}),
 		);
 		if (stats) {
-			toast(`Compiled assets to ${dir}.${sheetsNote(stats)}${otbNote(stats)}`, "success");
+			toast(`Compiled assets to ${dir}.${sheetsNote(stats)}${otbNote(stats)}${xmlNote(stats)}`, "success");
 		}
 	}
 
@@ -80,7 +80,7 @@
 			}),
 		);
 		if (stats) {
-			toast(`Compiled ${version.name} to ${base}.dat/.spr.${otbNote(stats)}`, "success");
+			toast(`Compiled ${version.name} to ${base}.dat/.spr.${otbNote(stats)}${xmlNote(stats)}`, "success");
 		}
 	}
 </script>
@@ -132,6 +132,9 @@
 		{/if}
 		{#if info.itemsOtb}
 			<div class="t-label">Also updates {info.itemsOtb.path} to match the client.</div>
+		{/if}
+		{#if info.itemsXml}
+			<div class="t-label">Also writes the edited and new entries to {info.itemsXml.path}.</div>
 		{/if}
 		{#if warnings.length}
 			<div class="warn">

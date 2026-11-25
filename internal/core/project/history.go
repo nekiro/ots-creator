@@ -1,6 +1,9 @@
 package project
 
-import "github.com/nekiro/ots-creator/internal/core/thing"
+import (
+	"github.com/nekiro/ots-creator/internal/core/thing"
+	"github.com/nekiro/ots-creator/internal/formats/itemsxml"
+)
 
 const maxHistory = 200
 
@@ -8,6 +11,13 @@ type thingChange struct {
 	category      thing.Category
 	id            uint32
 	before, after *thing.Thing // nil when the slot does not exist
+}
+
+// xmlChange is an edit of the items.xml entry of the item with an id on
+// disk (nil: the entry as the file has it).
+type xmlChange struct {
+	id            uint32
+	before, after *itemsxml.Item
 }
 
 type spriteChange struct {
@@ -25,6 +35,7 @@ type historyEntry struct {
 	lenAfter     map[thing.Category]int
 	things       []thingChange
 	sprites      []spriteChange
+	xml          []xmlChange
 	spritesCount [2]uint32 // before, after
 	itemMoves    map[uint32]uint32
 }
@@ -157,7 +168,7 @@ func (r *recorder) commit() {
 		r.entry.lenAfter[category] = len(r.project.things.Things[category])
 	}
 	r.entry.spritesCount[1] = r.project.sprites.count()
-	if len(r.entry.things) == 0 && len(r.entry.sprites) == 0 && r.entry.spritesCount[0] == r.entry.spritesCount[1] {
+	if len(r.entry.things) == 0 && len(r.entry.sprites) == 0 && len(r.entry.xml) == 0 && r.entry.spritesCount[0] == r.entry.spritesCount[1] {
 		return
 	}
 	r.project.applyMoves(r.entry.itemMoves)
@@ -200,6 +211,13 @@ func (p *Project) applyEdit(entry *historyEntry, forward bool) {
 		p.applyMoves(entry.itemMoves)
 	} else {
 		p.applyMoves(invertMoves(entry.itemMoves))
+	}
+	for _, change := range entry.xml {
+		if forward {
+			p.setXMLEdit(change.id, change.after)
+		} else {
+			p.setXMLEdit(change.id, change.before)
+		}
 	}
 	p.sprites.setCount(count)
 	for _, change := range entry.sprites {

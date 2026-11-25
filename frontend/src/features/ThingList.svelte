@@ -4,6 +4,7 @@
 	import { anchoredRange, idRange } from "../lib/util/selection";
 	import {
 		CATEGORIES,
+		Category,
 		CATEGORY_LABELS,
 		Format,
 		errorMessage,
@@ -84,7 +85,11 @@
 	$effect(() => {
 		const category = app.category;
 		void app.rev;
-		if (!app.open || app.project?.info.format !== Format.FormatAssets) {
+		// Asset clients name their objects; items.xml names the items of the others.
+		const named =
+			app.project?.info.format === Format.FormatAssets ||
+			(category === Category.CategoryItem && !!app.project?.info.itemsXml);
+		if (!app.open || !named) {
 			names = {};
 			return;
 		}

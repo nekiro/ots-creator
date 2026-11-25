@@ -15,6 +15,7 @@ import (
 	"github.com/nekiro/ots-creator/internal/core/thing"
 	"github.com/nekiro/ots-creator/internal/formats/assets"
 	"github.com/nekiro/ots-creator/internal/formats/dat"
+	"github.com/nekiro/ots-creator/internal/formats/itemsxml"
 	"github.com/nekiro/ots-creator/internal/formats/spr"
 )
 
@@ -35,6 +36,7 @@ type Info struct {
 	FormatLabel string          `json:"formatLabel"`
 	Supported   []string        `json:"supported"`
 	ItemsOTB    *OTBInfo        `json:"itemsOtb"`
+	ItemsXML    *XMLInfo        `json:"itemsXml"`
 }
 
 type Counts struct {
@@ -67,6 +69,10 @@ type Project struct {
 	// to the ids they were moved to since (see otb.go).
 	base  []*thing.Thing
 	moves map[uint32]uint32
+	xml   *itemsXML // attached items.xml, nil when none
+	// xmlEdits holds the edited items.xml entries until they are compiled,
+	// by the id on disk of their item (see itemsxml.go).
+	xmlEdits map[uint32]*itemsxml.Item
 }
 
 type OpenOptions struct {
@@ -155,6 +161,11 @@ func (p *Project) infoLocked() Info {
 		info := p.otb.info
 		otb = &info
 	}
+	var xml *XMLInfo
+	if p.xml != nil {
+		info := p.xmlInfo()
+		xml = &info
+	}
 	label, supported := dat.Table(client.MetadataFormat(p.version.Value)).Name(), dat.Table(client.MetadataFormat(p.version.Value)).Supported()
 	if p.format == FormatAssets {
 		label, supported = "Protobuf appearances", assets.Supported()
@@ -178,6 +189,7 @@ func (p *Project) infoLocked() Info {
 		FormatLabel: label,
 		Supported:   supported,
 		ItemsOTB:    otb,
+		ItemsXML:    xml,
 	}
 }
 
@@ -207,6 +219,7 @@ type CompileStats struct {
 	// Freed is the size of the removed sheets minus the new ones, in bytes.
 	Freed int64      `json:"freed"`
 	OTB   *OTBReport `json:"otb"`
+	XML   *XMLReport `json:"xml"`
 }
 
 // Compile writes the project to disk. Files are written to temporary files
@@ -216,16 +229,19 @@ type CompileStats struct {
 func (p *Project) Compile(options CompileOptions) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	// The items.otb is synced against the items on disk, before they change.
+	// The items.otb and items.xml are synced against the items on disk,
+	// before they change.
+	xmlData, xmlRep := p.prepareXML()
 	otbFile, otbData, otbRep := p.prepareOTB()
 	if options.Stats != nil {
-		options.Stats.OTB = otbRep
+		options.Stats.OTB, options.Stats.XML = otbRep, xmlRep
 	}
 	if options.Format == FormatAssets {
 		if err := p.compileAssets(options.DatPath, options.Progress, options.Stats); err != nil {
 			return err
 		}
 		p.writeOTB(otbFile, otbData, otbRep)
+		p.writeXML(xmlData, xmlRep)
 		p.saved()
 		return nil
 	}
@@ -264,6 +280,7 @@ func (p *Project) Compile(options CompileOptions) error {
 		}
 	}
 	p.writeOTB(otbFile, otbData, otbRep)
+	p.writeXML(xmlData, xmlRep)
 	// Reload sprites from the new file so the in-memory overlay is dropped.
 	spriteFile, err := spr.Open(sprBuf.Bytes(), spr.Options{Extended: features.Extended, Transparent: features.Transparency, SpriteSize: features.SpriteSize})
 	if err != nil {

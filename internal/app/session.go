@@ -32,6 +32,8 @@ type State struct {
 	// OTBError is set by Open when the items.otb remembered for the client
 	// could not be read; the client is open without it.
 	OTBError string `json:"otbError,omitempty"`
+	// XMLError is the same for the items.xml remembered for the client.
+	XMLError string `json:"xmlError,omitempty"`
 }
 
 type clientSlot struct {
@@ -50,7 +52,8 @@ type Session struct {
 	canceled  atomic.Bool
 	exporting atomic.Int32
 	onSaved   func(project.Info)
-	// otbPaths remembers the items.otb of each client (nil: not kept).
+	// otbPaths remembers the items.otb and items.xml of each client (nil:
+	// not kept).
 	otbPaths otbPaths
 	// warnings are problems found while starting, until the window asks.
 	warnings []string
@@ -59,6 +62,8 @@ type Session struct {
 type otbPaths interface {
 	ItemsOTB(client string) string
 	SetItemsOTB(client, otb string) error
+	ItemsXML(client string) string
+	SetItemsXML(client, xml string) error
 }
 
 // Warn keeps a problem found while starting (a damaged settings file) for
@@ -193,6 +198,36 @@ func (s *Session) rememberOTB(client, otb string) error {
 		return nil
 	}
 	return s.otbPaths.SetItemsOTB(client, otb)
+}
+
+// attachItemsXML attaches the items.xml at path to the open client ("":
+// detaches it) and remembers it for the client.
+func (s *Session) attachItemsXML(path string) error {
+	proj, err := s.Project()
+	if err != nil {
+		return err
+	}
+	if path == "" {
+		proj.DetachXML()
+	} else if _, err := proj.AttachXML(path); err != nil {
+		return fmt.Errorf("items.xml: %w", err)
+	}
+	s.Changed()
+	return s.rememberXML(proj.Info().DatPath, path)
+}
+
+func (s *Session) rememberedXML(client string) string {
+	if s.otbPaths == nil || client == "" {
+		return ""
+	}
+	return s.otbPaths.ItemsXML(client)
+}
+
+func (s *Session) rememberXML(client, xml string) error {
+	if s.otbPaths == nil || client == "" {
+		return nil
+	}
+	return s.otbPaths.SetItemsXML(client, xml)
 }
 
 func (s *Session) Set(proj *project.Project) { s.setClient(&s.main, proj) }

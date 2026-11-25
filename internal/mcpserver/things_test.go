@@ -138,3 +138,40 @@ func TestThingTools(t *testing.T) {
 	// The test client was never written to disk, so it has no files to save to.
 	call(t, session, "save_client", map[string]any{}, true)
 }
+
+func TestItemsXMLTools(t *testing.T) {
+	session, _ := testSession(t)
+	path := filepath.Join(t.TempDir(), "items.xml")
+	if err := os.WriteFile(path, []byte("<items>\n\t<item id=\"100\" name=\"void\" />\n</items>\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	call(t, session, "update_item_xml", map[string]any{"id": 100, "name": "x"}, true)
+	text, _ := call(t, session, "set_items_xml", map[string]any{}, false)
+	if !strings.Contains(text, `"attached":false`) {
+		t.Fatalf("not attached: %s", text)
+	}
+	text, _ = call(t, session, "set_items_xml", map[string]any{"path": path, "mapping": []map[string]any{{"client": "unmoveable", "key": "moveable", "not": true}}}, false)
+	if !strings.Contains(text, `"items":1`) || !strings.Contains(text, `"key":"moveable"`) || !strings.Contains(text, `"serverIds":false`) {
+		t.Fatalf("set_items_xml: %s", text)
+	}
+	call(t, session, "set_items_xml", map[string]any{"mapping": []map[string]any{{"client": "nope", "key": "x"}}}, true)
+	text, _ = call(t, session, "update_item_xml", map[string]any{"id": 100, "name": "the void", "attributes": map[string]any{"weight": "5"}}, false)
+	if !strings.Contains(text, `"name":"the void"`) || !strings.Contains(text, `"key":"weight"`) {
+		t.Fatalf("update_item_xml: %s", text)
+	}
+	text, _ = call(t, session, "get_thing", map[string]any{"id": 100}, false)
+	if !strings.Contains(text, `"itemsXml"`) || !strings.Contains(text, `"the void"`) {
+		t.Fatalf("get_thing: %s", text)
+	}
+	text, _ = call(t, session, "set_items_xml", map[string]any{}, false)
+	if !strings.Contains(text, `"edited":1`) {
+		t.Fatalf("pending: %s", text)
+	}
+	call(t, session, "client_undo", map[string]any{}, false)
+	if text, _ = call(t, session, "get_thing", map[string]any{"id": 100}, false); strings.Contains(text, "the void") {
+		t.Fatalf("undo: %s", text)
+	}
+	if text, _ = call(t, session, "set_items_xml", map[string]any{"detach": true}, false); !strings.Contains(text, `"attached":false`) {
+		t.Fatalf("detach: %s", text)
+	}
+}

@@ -8,7 +8,9 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"maps"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -132,6 +134,23 @@ type thingView struct {
 	// save_client runs; the map uses server ids.
 	ServerID   uint16 `json:"serverId,omitempty"`
 	ServerNote string `json:"serverIdNote,omitempty"`
+	// ItemsXML is the entry of an item in the attached items.xml.
+	ItemsXML *project.XMLItem `json:"itemsXml,omitempty"`
+}
+
+type itemsXMLArgs struct {
+	Path    string                `json:"path,omitempty" jsonschema:"items.xml of the server to attach to the client; empty keeps the attached one"`
+	Detach  bool                  `json:"detach,omitempty" jsonschema:"detach the items.xml from the client"`
+	Mapping *[]project.XMLMapping `json:"mapping,omitempty" jsonschema:"the attribute map, replacing the stored one (an empty list removes it): rows of client (JSON name of a client property, e.g. unpassable, groundSpeed), key (the items.xml attribute), value (written value; empty: 1 for a flag, the number of a value), not (write while the property is NOT set) and aliases (other keys the server reads as key, kept instead of adding key). Only used on client ids (no items.otb)"`
+}
+
+type itemXMLArgs struct {
+	ID         uint32            `json:"id" jsonschema:"client id of the item"`
+	Name       *string           `json:"name,omitempty" jsonschema:"new name"`
+	Article    *string           `json:"article,omitempty" jsonschema:"new article (a, an)"`
+	Plural     *string           `json:"plural,omitempty" jsonschema:"new plural name"`
+	Attributes map[string]string `json:"attributes,omitempty" jsonschema:"attributes to set, key to value (e.g. weight: 3500)"`
+	Remove     []string          `json:"remove,omitempty" jsonschema:"keys of attributes to remove"`
 }
 
 type groupView struct {
@@ -245,6 +264,9 @@ func (s *Server) thingResult(category thing.Category, id uint32) (any, error) {
 	view, err := viewThing(object)
 	if err != nil || category != thing.CategoryItem {
 		return view, err
+	}
+	if entry, err := s.projects.ItemXML(id); err == nil {
+		view.ItemsXML = &entry
 	}
 	serverIDs, err := s.projects.ItemServerIDs([]uint32{id})
 	switch {
@@ -599,7 +621,60 @@ func (s *Server) addThingTools(server *mcp.Server) {
 			return result, nil
 		})
 
-	addTool(server, "save_client", "Writes the client objects and sprites to the client files (the folder or files it was opened from).",
+	addTool(server, "set_items_xml", "Attaches the items.xml of the server to the open client (or detaches it) and sets its attribute map. get_thing then shows the entry of each item (itemsXml), update_item_xml edits it and save_client writes the file: edited entries, an entry for every new item and, on client ids, the mapped attributes of new and changed items. Its ids are server ids when an items.otb is attached, else client ids. Without arguments it returns the attached file and what save_client will change in it.",
+		func(_ context.Context, args itemsXMLArgs) (any, error) {
+			switch {
+			case args.Detach:
+				if _, err := s.projects.DetachItemsXML(); err != nil {
+					return nil, err
+				}
+			case args.Path != "":
+				if _, err := s.projects.AttachItemsXML(args.Path); err != nil {
+					return nil, err
+				}
+			}
+			if args.Mapping != nil {
+				if _, err := s.projects.SetItemsXMLMapping(*args.Mapping); err != nil {
+					return nil, err
+				}
+			}
+			info := s.projects.State().Info.ItemsXML
+			if info == nil {
+				return map[string]any{"attached": false, "found": s.projects.FindItemsXML()}, nil
+			}
+			pending, err := s.projects.ItemsXMLPreview()
+			if err != nil {
+				return nil, err
+			}
+			return map[string]any{"attached": true, "itemsXml": info, "nextSave": pending}, nil
+		})
+
+	addTool(server, "update_item_xml", "Edits the entry of an item in the attached items.xml (see set_items_xml): its name, article, plural and attributes. Returns the entry; save_client writes the file and client_undo reverts the edit.",
+		func(_ context.Context, args itemXMLArgs) (any, error) {
+			entry, err := s.projects.ItemXML(args.ID)
+			if err != nil {
+				return nil, err
+			}
+			item := entry.Item
+			for field, value := range map[*string]*string{&item.Name: args.Name, &item.Article: args.Article, &item.Plural: args.Plural} {
+				if value != nil {
+					*field = *value
+				}
+			}
+			for _, key := range args.Remove {
+				item.RemoveAttribute(key)
+			}
+			keys := slices.Sorted(maps.Keys(args.Attributes))
+			for _, key := range keys {
+				item.SetAttribute(key, args.Attributes[key])
+			}
+			if err := s.projects.SetItemXML(args.ID, item); err != nil {
+				return nil, err
+			}
+			return s.projects.ItemXML(args.ID)
+		})
+
+	addTool(server, "save_client", "Writes the client objects and sprites to the client files (the folder or files it was opened from), and updates the attached items.otb and items.xml.",
 		func(context.Context, struct{}) (any, error) {
 			stats, err := s.projects.Compile()
 			if err != nil {

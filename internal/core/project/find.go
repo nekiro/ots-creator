@@ -42,7 +42,8 @@ func (p *Project) FindThings(category thing.Category, filter Filter) ([]uint32, 
 				return false
 			}
 		}
-		if name != "" && !strings.Contains(strings.ToLower(object.Name), name) {
+		if name != "" && !strings.Contains(strings.ToLower(object.Name), name) &&
+			!(category == thing.CategoryItem && strings.Contains(strings.ToLower(p.xmlName(object.ID)), name)) {
 			return false
 		}
 		return filter.Content == ContentAll || p.hasPixels(object) == (filter.Content == ContentUsed)
@@ -85,8 +86,15 @@ func (p *Project) Names(category thing.Category) map[uint32]string {
 	defer p.mu.RUnlock()
 	out := map[uint32]string{}
 	for _, object := range p.things.Things[category] {
-		if object != nil && object.Name != "" {
-			out[object.ID] = object.Name
+		if object == nil {
+			continue
+		}
+		name := object.Name
+		if name == "" && category == thing.CategoryItem {
+			name = p.xmlName(object.ID)
+		}
+		if name != "" {
+			out[object.ID] = name
 		}
 	}
 	return out

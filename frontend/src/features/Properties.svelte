@@ -9,6 +9,7 @@
 	import Select from "../lib/ui/Select.svelte";
 	import Icon from "../lib/ui/Icon.svelte";
 	import FlagFields from "./FlagFields.svelte";
+	import ServerItem from "./ServerItem.svelte";
 
 	let { group = $bindable(0) }: { group?: number } = $props();
 
@@ -173,6 +174,9 @@
 						>
 					</section>
 				{/if}
+			{/if}
+			{#if app.xml && draft.category === Category.CategoryItem}
+				<ServerItem entry={app.xml} />
 			{/if}
 			<section>
 				<h4>

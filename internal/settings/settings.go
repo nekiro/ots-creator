@@ -56,6 +56,9 @@ type Settings struct {
 	// ItemsOTB maps a client (its dat path or asset folder) to the
 	// items.otb kept in sync with it. Like Recent, Update keeps it as stored.
 	ItemsOTB map[string]string `json:"itemsOtb"`
+	// ItemsXML maps a client to the items.xml shown and edited with it,
+	// like ItemsOTB.
+	ItemsXML map[string]string `json:"itemsXml"`
 	// MCPServer runs the local MCP server through which AI agents edit
 	// maps; MCPPort is its port on 127.0.0.1.
 	MCPServer bool `json:"mcpServer"`
@@ -71,7 +74,7 @@ const (
 const DefaultMCPPort = 47800
 
 func Defaults() Settings {
-	return Settings{CheckUpdates: true, SheetBackground: BackgroundMagenta, ExportFormat: "png", ObjectFormat: "otobj", ListColumns: DefaultListColumns, MCPPort: DefaultMCPPort, Recent: []Recent{}, MarketShared: map[string]string{}, LastDirs: map[string]string{}, ItemsOTB: map[string]string{}}
+	return Settings{CheckUpdates: true, SheetBackground: BackgroundMagenta, ExportFormat: "png", ObjectFormat: "otobj", ListColumns: DefaultListColumns, MCPPort: DefaultMCPPort, Recent: []Recent{}, MarketShared: map[string]string{}, LastDirs: map[string]string{}, ItemsOTB: map[string]string{}, ItemsXML: map[string]string{}}
 }
 
 func (s *Settings) normalize() {
@@ -104,6 +107,9 @@ func (s *Settings) normalize() {
 	}
 	if s.ItemsOTB == nil {
 		s.ItemsOTB = map[string]string{}
+	}
+	if s.ItemsXML == nil {
+		s.ItemsXML = map[string]string{}
 	}
 	if len(s.Recent) > MaxRecent {
 		s.Recent = s.Recent[:MaxRecent]
@@ -152,6 +158,7 @@ func (st *Store) Get() Settings {
 	snapshot.MarketShared = maps.Clone(st.settings.MarketShared)
 	snapshot.LastDirs = maps.Clone(st.settings.LastDirs)
 	snapshot.ItemsOTB = maps.Clone(st.settings.ItemsOTB)
+	snapshot.ItemsXML = maps.Clone(st.settings.ItemsXML)
 	return snapshot
 }
 
@@ -164,6 +171,7 @@ func (st *Store) Update(updated Settings) error {
 	updated.MarketShared = st.settings.MarketShared
 	updated.LastDirs = st.settings.LastDirs
 	updated.ItemsOTB = st.settings.ItemsOTB
+	updated.ItemsXML = st.settings.ItemsXML
 	updated.normalize()
 	st.settings = updated
 	return st.saveLocked()
@@ -253,10 +261,33 @@ func (st *Store) SetItemsOTB(clientPath, otbPath string) error {
 	if st.settings.ItemsOTB == nil {
 		st.settings.ItemsOTB = map[string]string{}
 	}
-	if otbPath == "" {
-		delete(st.settings.ItemsOTB, fsutil.PathKey(clientPath))
+	return st.setClientFile(st.settings.ItemsOTB, clientPath, otbPath)
+}
+
+func (st *Store) ItemsXML(clientPath string) string {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	return st.settings.ItemsXML[fsutil.PathKey(clientPath)]
+}
+
+func (st *Store) SetItemsXML(clientPath, xmlPath string) error {
+	if clientPath == "" {
+		return nil
+	}
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if st.settings.ItemsXML == nil {
+		st.settings.ItemsXML = map[string]string{}
+	}
+	return st.setClientFile(st.settings.ItemsXML, clientPath, xmlPath)
+}
+
+// setClientFile remembers a file of a client ("": forgets it).
+func (st *Store) setClientFile(files map[string]string, clientPath, path string) error {
+	if path == "" {
+		delete(files, fsutil.PathKey(clientPath))
 	} else {
-		st.settings.ItemsOTB[fsutil.PathKey(clientPath)] = otbPath
+		files[fsutil.PathKey(clientPath)] = path
 	}
 	return st.saveLocked()
 }

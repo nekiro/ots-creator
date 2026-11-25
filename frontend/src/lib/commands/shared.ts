@@ -11,6 +11,8 @@ export const OBJECT_FILTERS = [
 
 export const OTB_FILTERS = [{ name: "Server items (items.otb)", pattern: "*.otb" }];
 
+export const XML_FILTERS = [{ name: "Server items (items.xml)", pattern: "*.xml" }];
+
 export const IMAGE_FILTERS = [
 	{ name: "Images (*.png, *.bmp, *.gif, *.jpg)", pattern: "*.png;*.bmp;*.gif;*.jpg;*.jpeg" },
 ];

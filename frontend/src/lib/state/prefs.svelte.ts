@@ -22,6 +22,7 @@ export const prefs = $state<{ settings: Settings }>({
 		marketShared: {},
 		lastDirs: {},
 		itemsOtb: {},
+		itemsXml: {},
 		mcpServer: false,
 		mcpPort: 47800,
 	},

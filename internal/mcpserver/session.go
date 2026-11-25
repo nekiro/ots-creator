@@ -202,6 +202,12 @@ func (s *Server) addSessionTools(server *mcp.Server) {
 			if state.OTBError != "" {
 				result["itemsOtbError"] = state.OTBError
 			}
+			if state.XMLError != "" {
+				result["itemsXmlError"] = state.XMLError
+			}
+			if state.Info.ItemsXML != nil {
+				result["itemsXml"] = state.Info.ItemsXML.Path
+			}
 			return result, nil
 		})
 
