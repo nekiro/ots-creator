@@ -1004,6 +1004,27 @@ func TestDeleteSelectionKeepsUnselectedItems(t *testing.T) {
 	}
 }
 
+func TestDeleteSelectionRemovesFlagsAndHouseWithTheGround(t *testing.T) {
+	e := selectionSandWithStone(t)
+	e.Draw(DrawRequest{Kind: KindFlag, Flag: otmap.FlagPZ | otmap.FlagNoLogout, Points: points(at(70, 70))})
+	e.Map.Tile(at(70, 70)).HouseID = 5
+	e.SelectTiles(points(at(70, 70)), false)
+	e.DeleteSelection("")
+	if tile := e.Map.Tile(at(70, 70)); tile != nil {
+		t.Fatalf("tile %+v left after delete, want no tile", tile)
+	}
+}
+
+func TestDeleteSelectionOfAnItemKeepsFlags(t *testing.T) {
+	e := selectionSandWithStone(t)
+	e.Draw(DrawRequest{Kind: KindFlag, Flag: otmap.FlagPZ, Points: points(at(70, 70))})
+	e.SelectItem(at(70, 70), 0, false)
+	e.DeleteSelection("")
+	if tile := e.Map.Tile(at(70, 70)); tile == nil || tile.Flags != otmap.FlagPZ {
+		t.Fatalf("tile %+v, want the ground with its PZ flag", tile)
+	}
+}
+
 func TestDeleteSelectionUndoRestoresTilesAndSelection(t *testing.T) {
 	e := selectionSandWithStone(t)
 	e.SelectRect(*rect(69, 69, 71, 71), FloorsCurrent, false, false, false)

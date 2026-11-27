@@ -415,7 +415,13 @@ func (e *Editor) DeleteSelection(label string) int {
 	tx := e.Begin(label, 0)
 	changed := newPosSet()
 	for _, pos := range e.Selected() {
-		if e.reshapes(extract(tx.Edit(pos), true)) {
+		tile := tx.Edit(pos)
+		clipTile := extract(tile, true)
+		if clipTile.Ground != nil {
+			// The house and flags go with the ground, as when moving it.
+			tile.HouseID, tile.Flags = 0, 0
+		}
+		if e.reshapes(clipTile) {
 			changed.add(pos)
 		}
 	}
