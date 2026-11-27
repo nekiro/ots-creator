@@ -74,8 +74,9 @@ Later versions install from the built-in updater.
   setting. The object viewer opens both without a client.
 - **Export everything** at once: all objects (one folder per category) or all sprites
   (single files or sheets).
-- **Sprite sheets** of one frame group or a whole outfit. On import the layout (directions,
-  mask layer, mounts, addons, frames) is detected from the image.
+- **Sprite sheets** of one frame group or a whole outfit, or of many selected objects at once
+  into a folder. On import the layout (directions, mask layer, mounts, addons, frames) is
+  detected from the image.
 - **Drop** images, `.otobj` or `.obd` files anywhere, onto the preview or onto an object, or
   paste a PNG with Ctrl+V. A slicer cuts images into sprites.
 

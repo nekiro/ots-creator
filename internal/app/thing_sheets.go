@@ -7,6 +7,8 @@ import (
 	"image"
 	"image/color"
 	"os"
+	"path/filepath"
+	"slices"
 
 	"github.com/nekiro/ots-creator/internal/core/imaging"
 	"github.com/nekiro/ots-creator/internal/core/project"
@@ -35,6 +37,68 @@ func (ts *ThingService) ExportSheet(category thing.Category, id uint32, group in
 		return err
 	}
 	return os.WriteFile(path, data, fsutil.FileMode)
+}
+
+// ExportSheets writes the sprite sheet of each thing into dir, named
+// {category}_{id}.{format}, with every frame group in one sheet. A thing
+// whose idle and walking groups have different layouts gets one sheet per
+// group: {category}_{id}_idle and {category}_{id}_walking. dir is created
+// when missing. transparent keeps alpha in png; other formats get a magenta
+// background.
+func (ts *ThingService) ExportSheets(category thing.Category, ids []uint32, dir, format string, transparent bool) ([]string, error) {
+	format = imaging.FormatOf("x." + format)
+	proj, err := ts.session.Project()
+	if err != nil {
+		return nil, err
+	}
+	transparent = transparent && format == "png"
+	if err := os.MkdirAll(dir, fsutil.DirMode); err != nil {
+		return nil, err
+	}
+	written := make([][]string, len(ids))
+	err = ts.session.parallel("Exporting sprite sheets", len(ids), func(i int) error {
+		id := ids[i]
+		found, err := proj.Thing(category, id)
+		if err != nil {
+			return err
+		}
+		base := filepath.Join(dir, fmt.Sprintf("%s_%d", category, id))
+		write := func(group int, path string) error {
+			img, err := renderSheet(proj, category, id, group, transparent)
+			if err != nil {
+				return err
+			}
+			data, err := imaging.Encode(img, format, imaging.Magenta)
+			if err != nil {
+				return err
+			}
+			if err := os.WriteFile(path, data, fsutil.FileMode); err != nil {
+				return err
+			}
+			written[i] = append(written[i], path)
+			return nil
+		}
+		if _, ok := found.Stacked(); ok {
+			return write(AllGroups, base+"."+format)
+		}
+		for group := range found.FrameGroups {
+			if err := write(group, base+"_"+groupSuffix(group)+"."+format); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return slices.Concat(written...), err
+}
+
+func groupSuffix(group int) string {
+	switch group {
+	case 0:
+		return "idle"
+	case 1:
+		return "walking"
+	}
+	return fmt.Sprintf("group%d", group)
 }
 
 func renderSheet(proj *project.Project, category thing.Category, id uint32, group int, transparent bool) (*image.NRGBA, error) {

@@ -94,7 +94,12 @@ export function objectMenu(context = false): MenuEntry[] {
 			: [{ label: `Export all objects (${fmt()})…`, action: commands.exportAllObjects, disabled: noProject }]),
 		"-",
 		{ label: "Import sprite sheet…", action: () => commands.importSheet(0), disabled: notSingle },
-		{ label: "Export sprite sheet…", action: () => commands.exportSheet(0), disabled: notSingle },
+		{
+			label:
+				app.selection.length > 1 ? `Export sprite sheets (${app.selection.length})…` : "Export sprite sheet…",
+			action: () => commands.exportSheet(0),
+			disabled: noThing,
+		},
 		{ label: "Publish to market…", action: commands.shareObject, disabled: notSingle },
 		...(context
 			? ([

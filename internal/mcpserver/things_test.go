@@ -98,6 +98,16 @@ func TestThingTools(t *testing.T) {
 	call(t, session, "import_sheet", map[string]any{"id": 101, "sheet": exported, "group": 0}, false)
 	call(t, session, "import_sheet", map[string]any{"id": 101, "sheet": exported, "group": 3}, true)
 	call(t, session, "export_sheet", map[string]any{"id": 102, "path": exported, "background": "green"}, true)
+	sheets := filepath.Join(t.TempDir(), "sheets")
+	text, _ = call(t, session, "export_sheet", map[string]any{"ids": []uint32{101, 102}, "dir": sheets}, false)
+	if !strings.Contains(text, "item_101.png") || !strings.Contains(text, "item_102.png") {
+		t.Fatalf("export_sheet ids: %s", text)
+	}
+	if img, err := imaging.Load(filepath.Join(sheets, "item_102.png")); err != nil || img.Rect.Dx() != 32 || img.Rect.Dy() != 64 {
+		t.Fatalf("exported sheet of ids: %v", err)
+	}
+	call(t, session, "export_sheet", map[string]any{"ids": []uint32{101}}, true)
+	call(t, session, "export_sheet", map[string]any{"ids": []uint32{101}, "dir": sheets, "path": exported}, true)
 	// Without an items.otb the result tells why there is no server id.
 	text, _ = call(t, session, "get_thing", map[string]any{"id": 102}, false)
 	if !strings.Contains(text, "serverIdNote") {

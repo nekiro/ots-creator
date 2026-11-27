@@ -9,6 +9,7 @@ import (
 	"image/color"
 	"image/draw"
 	"maps"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -114,10 +115,12 @@ type importSheetArgs struct {
 
 type exportSheetArgs struct {
 	CategoryArg
-	ID         uint32 `json:"id"`
-	Path       string `json:"path" jsonschema:"PNG file to write"`
-	Group      int    `json:"group,omitempty" jsonschema:"frame group: 0 (default; idle of outfits), 1 (walking of outfits) or -1 (all groups stacked, when their layouts match)"`
-	Background string `json:"background,omitempty" jsonschema:"transparent (default) or magenta (as Object Builder sheets)"`
+	ID         uint32   `json:"id,omitempty" jsonschema:"object to export; or several with ids"`
+	Path       string   `json:"path,omitempty" jsonschema:"PNG file to write, with id"`
+	Group      int      `json:"group,omitempty" jsonschema:"frame group, with id: 0 (default; idle of outfits), 1 (walking of outfits) or -1 (all groups stacked, when their layouts match)"`
+	IDs        []uint32 `json:"ids,omitempty" jsonschema:"objects to export into dir, one sheet each with all frame groups stacked: {category}_{id}.png; an outfit whose idle and walking groups have different layouts gets {category}_{id}_idle.png and {category}_{id}_walking.png"`
+	Dir        string   `json:"dir,omitempty" jsonschema:"folder to write the sheets of ids into; created when missing"`
+	Background string   `json:"background,omitempty" jsonschema:"transparent (default) or magenta (as Object Builder sheets)"`
 }
 
 type propMap map[string]any
@@ -586,17 +589,34 @@ func (s *Server) addThingTools(server *mcp.Server) {
 			return s.thingResult(category, args.ID)
 		})
 
-	addTool(server, "export_sheet", "Writes the sprites of a client object to a PNG sprite sheet, the same layout import_sheet reads: edit it and import it back, or use it as a base for create_thing.",
+	addTool(server, "export_sheet", "Writes the sprites of a client object to a PNG sprite sheet, the same layout import_sheet reads: edit it and import it back, or use it as a base for create_thing. With ids and dir it writes the sheets of several objects into a folder.",
 		func(_ context.Context, args exportSheetArgs) (any, error) {
 			category, err := args.parse()
 			if err != nil {
 				return nil, err
 			}
-			if args.Path == "" {
-				return nil, errors.New("give the path of the PNG to write")
-			}
 			if args.Background != "" && args.Background != "transparent" && args.Background != "magenta" {
 				return nil, fmt.Errorf("background %q: use transparent or magenta", args.Background)
+			}
+			if len(args.IDs) > 0 {
+				if args.Dir == "" {
+					return nil, errors.New("give the dir to write the sheets of ids into")
+				}
+				if args.ID != 0 || args.Path != "" {
+					return nil, errors.New("give either id and path or ids and dir")
+				}
+				files, err := s.things.ExportSheets(category, args.IDs, args.Dir, "png", args.Background != "magenta")
+				if err != nil {
+					return nil, err
+				}
+				names := make([]string, len(files))
+				for i, file := range files {
+					names[i] = filepath.Base(file)
+				}
+				return map[string]any{"dir": args.Dir, "files": names}, nil
+			}
+			if args.Path == "" {
+				return nil, errors.New("give the path of the PNG to write (with id), or ids and dir")
 			}
 			if err := s.things.ExportSheet(category, args.ID, args.Group, args.Path, args.Background != "magenta"); err != nil {
 				return nil, err

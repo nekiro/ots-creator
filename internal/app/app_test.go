@@ -3,12 +3,14 @@ package app
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"image"
 	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/nekiro/ots-creator/internal/core/client"
@@ -281,5 +283,39 @@ func TestWholeOutfitSheet(t *testing.T) {
 	o, _ := ts.Get(thing.CategoryOutfit, 1)
 	if len(o.FrameGroups) != 2 || o.FrameGroups[0].Frames != 1 || o.FrameGroups[1].Frames != 8 {
 		t.Fatalf("groups after round trip: %d", len(o.FrameGroups))
+	}
+
+	// Several at once: one whole sheet each, or one per group when the
+	// groups have different layouts.
+	copies, err := ts.Duplicate(thing.CategoryOutfit, []uint32{1})
+	if err != nil || len(copies) != 1 {
+		t.Fatalf("duplicate %v %v", copies, err)
+	}
+	second := copies[0]
+	other, _ := ts.Get(thing.CategoryOutfit, second)
+	other.FrameGroups[1].Resize(1, 1, 1, 4, 1, 1, 2, 300)
+	if err := ts.Update(other); err != nil {
+		t.Fatal(err)
+	}
+	sheets := filepath.Join(dir, "sheets")
+	if err := os.Mkdir(sheets, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	paths, err := ts.ExportSheets(thing.CategoryOutfit, []uint32{1, second}, sheets, "png", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slices.Sort(paths)
+	want := []string{"outfit_1.png", fmt.Sprintf("outfit_%d_idle.png", second), fmt.Sprintf("outfit_%d_walking.png", second)}
+	if len(paths) != len(want) {
+		t.Fatalf("sheets %v", paths)
+	}
+	for i, path := range paths {
+		if filepath.Base(path) != want[i] {
+			t.Fatalf("sheets %v, want %v", paths, want)
+		}
+	}
+	if img, err := imaging.Load(paths[0]); err != nil || img.Rect.Dx() != 256 || img.Rect.Dy() != 576 {
+		t.Fatalf("whole sheet %v %v", img.Rect, err)
 	}
 }

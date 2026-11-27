@@ -1,5 +1,6 @@
 import { CATEGORY_NAMES, DialogService, ThingService, encodeBytes, errorMessage, res } from "../api";
 import { app, applyDraft, run, toast, versions } from "../state/app.svelte";
+import { prefs } from "../state/prefs.svelte";
 import { IMAGE_FILTERS, guard, imageFilters } from "./shared";
 
 async function importSheetWith(load: (id: number) => Promise<void>): Promise<void> {
@@ -21,10 +22,35 @@ async function importSheetWith(load: (id: number) => Promise<void>): Promise<voi
 export const ALL_GROUPS = -1;
 
 export const sheetCommands = {
-	exportSheet(group = 0) {
-		if (!guard() || app.focused === null) return;
+	/** One object opens the export dialog with a preview; several are
+	 * written into a folder, one sheet each, in the format and background
+	 * of the settings. */
+	async exportSheet(group = 0) {
+		if (!guard()) return;
+		if (app.selection.length > 1) return sheetCommands.exportSheets();
+		if (app.focused === null) return;
 		app.sheetGroup = group;
 		app.dialog = "sheet";
+	},
+
+	/** Writes the sheet of every selected object into a folder, named
+	 * {category}_{id}; an outfit whose idle and walking frames have
+	 * different layouts gets a sheet for each (_idle, _walking). */
+	async exportSheets() {
+		if (!guard() || app.selection.length === 0) return;
+		const dir = await DialogService.PickDirectory("exportSheets", "Export sprite sheets to");
+		if (!dir) return;
+		const { exportFormat, sheetBackground } = prefs.settings;
+		const files = await run("Exporting sprite sheets", () =>
+			ThingService.ExportSheets(
+				app.category,
+				app.selection,
+				dir,
+				exportFormat,
+				sheetBackground === "transparent",
+			),
+		);
+		if (files) toast(`Exported ${files.length} sprite sheet(s) to ${dir}.`, "success");
 	},
 
 	async saveSheet(group: number, format: string, transparent: boolean): Promise<boolean> {
